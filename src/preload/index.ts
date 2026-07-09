@@ -31,4 +31,12 @@ const untypedInvoke = client.invoke as (ch: string, arg: unknown) => Promise<unk
 contextBridge.exposeInMainWorld('loredex', {
   invoke: (ch: string, arg: unknown) => untypedInvoke(ch, arg),
   onEvent: (cb: (e: unknown) => void) => client.onEvent(cb),
+  // Main-owned native capabilities (story 1.4): the vault picker lives in the
+  // main process (native panel + persisted choice) — still ONE bridge global.
+  pickVault: (): Promise<string | null> => ipcRenderer.invoke('loredex:pick-vault'),
+  onVaultChanged: (cb: (vaultPath: string) => void): (() => void) => {
+    const listener = (_e: unknown, vaultPath: string): void => cb(vaultPath)
+    ipcRenderer.on('vault-changed', listener)
+    return () => ipcRenderer.removeListener('vault-changed', listener)
+  },
 })

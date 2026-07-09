@@ -9,6 +9,8 @@ declare global {
     loredex: {
       invoke(ch: string, arg: unknown): Promise<unknown>
       onEvent(cb: (e: CoreEvent) => void): Unsubscribe
+      pickVault(): Promise<string | null>
+      onVaultChanged(cb: (vaultPath: string) => void): Unsubscribe
     }
   }
 }
@@ -22,4 +24,13 @@ export function invoke<K extends keyof CoreApi>(
 
 export function onEvent(cb: (e: CoreEvent) => void): Unsubscribe {
   return window.loredex.onEvent(cb)
+}
+
+/** Native vault picker (main-owned); resolves after the core host restarted. */
+export function pickVault(): Promise<string | null> {
+  return window.loredex.pickVault()
+}
+
+export function onVaultChanged(cb: (vaultPath: string) => void): Unsubscribe {
+  return window.loredex.onVaultChanged(cb)
 }

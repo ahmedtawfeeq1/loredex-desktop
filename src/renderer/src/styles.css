@@ -1,0 +1,428 @@
+/* Loredex Desktop — DESIGN.md tokens + shell. "Card catalog": archival reading
+   surface, disciplined dense chrome. Tokens implemented exactly as specified. */
+
+:root {
+  --bg-sidebar: rgba(236, 236, 238, 0.72);
+  --bg-content: #ffffff;
+  --bg-raised: #fafaf8;
+  --hairline: #e3e3e0;
+  --text-1: #1d1d1f;
+  --text-2: #6e6e73;
+  --ink: #2e6e5e;
+  --stamp: #a16a1b;
+  --rust: #a63d2f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-sidebar: rgba(28, 28, 30, 0.72);
+    --bg-content: #232326;
+    --bg-raised: #2a2a2e;
+    --hairline: #3a3a3e;
+    --text-1: #ededef;
+    --text-2: #98989e;
+    --ink: #63b3a1;
+    --stamp: #d9a441;
+    --rust: #d4715f;
+  }
+}
+
+/* app setting wins over the OS theme (no toggle UI yet — hook is live) */
+:root[data-theme='light'] {
+  --bg-sidebar: rgba(236, 236, 238, 0.72);
+  --bg-content: #ffffff;
+  --bg-raised: #fafaf8;
+  --hairline: #e3e3e0;
+  --text-1: #1d1d1f;
+  --text-2: #6e6e73;
+  --ink: #2e6e5e;
+  --stamp: #a16a1b;
+  --rust: #a63d2f;
+}
+:root[data-theme='dark'] {
+  --bg-sidebar: rgba(28, 28, 30, 0.72);
+  --bg-content: #232326;
+  --bg-raised: #2a2a2e;
+  --hairline: #3a3a3e;
+  --text-1: #ededef;
+  --text-2: #98989e;
+  --ink: #63b3a1;
+  --stamp: #d9a441;
+  --rust: #d4715f;
+}
+
+/* ── type roles ────────────────────────────────────────────────────────── */
+
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  --font-serif: ui-serif, 'New York', Georgia, serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: transparent; /* window vibrancy shows through the sidebar */
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-1);
+  overflow: hidden;
+  user-select: none;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+a {
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ── three-pane layout ─────────────────────────────────────────────────── */
+
+.app {
+  display: flex;
+  height: 100%;
+}
+
+.sidebar {
+  width: 220px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-sidebar);
+}
+
+.sidebar-drag {
+  height: 52px;
+  flex: none;
+  -webkit-app-region: drag;
+}
+
+.sidebar nav {
+  flex: 1;
+  padding: 0 8px;
+  overflow-y: auto;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 5px;
+  transition: background 100ms ease-out;
+}
+
+.nav-item:hover {
+  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+}
+
+.nav-item[aria-current='true'] {
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  font-weight: 600;
+}
+
+.pane-list {
+  width: 300px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-content);
+  border-left: 1px solid var(--hairline);
+  border-right: 1px solid var(--hairline);
+  overflow-y: auto;
+}
+
+.pane-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 4px 12px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-content);
+}
+
+.pane-list-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pane-reader {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-content);
+  overflow-y: auto;
+}
+
+/* ── vault identity chip (permanent — the F6 fix made visible) ─────────── */
+
+.vault-chip {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 8px;
+  padding: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-raised);
+}
+
+.vault-chip-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 4px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink); /* ink = clean; amber = ahead/behind; rust = error */
+}
+
+.vault-chip-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vault-chip-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vault-chip-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl; /* keep the distinguishing tail of the path visible */
+  text-align: left;
+}
+
+/* ── empty states: one serif sentence + one button ─────────────────────── */
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--bg-content);
+  border-left: 1px solid var(--hairline);
+}
+
+.empty-state p {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  color: var(--text-2);
+}
+
+.button-primary {
+  padding: 5px 14px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 600;
+  transition: background 100ms ease-out;
+}
+
+.button-quiet {
+  padding: 3px 8px;
+  border-radius: 5px;
+  color: var(--text-2);
+  font-size: 11px;
+  transition: background 100ms ease-out;
+}
+
+.button-quiet:hover {
+  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+}
+
+/* ── reader ────────────────────────────────────────────────────────────── */
+
+.note {
+  max-width: 68ch;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  user-select: text;
+}
+
+.note-title {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.frontmatter {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  padding: 8px 12px;
+  margin-bottom: 24px;
+}
+
+.frontmatter table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.frontmatter td {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 0;
+  vertical-align: top;
+}
+
+.frontmatter td.fm-key {
+  color: var(--text-2);
+  width: 120px;
+  padding-right: 12px;
+}
+
+.note-body {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.note-body h1,
+.note-body h2,
+.note-body h3 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  margin: 24px 0 8px;
+}
+
+.note-body h1 {
+  font-size: 22px;
+}
+.note-body h2 {
+  font-size: 17px;
+}
+.note-body h3 {
+  font-size: 15px;
+}
+
+.note-body p,
+.note-body ul,
+.note-body ol,
+.note-body blockquote {
+  margin: 8px 0;
+}
+
+.note-body ul,
+.note-body ol {
+  padding-left: 24px;
+}
+
+.note-body code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0 3px;
+}
+
+.note-body pre {
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.note-body pre code {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.note-body blockquote {
+  border-left: 2px solid var(--hairline);
+  padding-left: 12px;
+  color: var(--text-2);
+}
+
+.note-body table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  display: block;
+  overflow-x: auto;
+}
+
+.note-body th,
+.note-body td {
+  border: 1px solid var(--hairline);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.note-body th {
+  font-weight: 600;
+  background: var(--bg-raised);
+}
+
+.note-body a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.note-body a:hover {
+  text-decoration: underline;
+}
+
+.note-body hr {
+  border: none;
+  border-top: 1px solid var(--hairline);
+  margin: 16px 0;
+}
+
+.note-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--rust);
+  padding: 16px 24px;
+}

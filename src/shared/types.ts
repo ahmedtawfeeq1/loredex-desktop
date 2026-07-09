@@ -68,6 +68,22 @@ export interface ActivityEvent {
 
 // ── app-local view types (permanent) ────────────────────────────────────────
 
+/**
+ * Vault identity shown by the chrome badge (F14/F6 evidence) and later echoed
+ * by MCP responses. Built core-side from the resolved config + loredex version.
+ */
+export interface VaultIdentity {
+  vaultPath: string
+  /** vaultPath with the home dir abbreviated to ~ (chip display; tooltip keeps full) */
+  displayPath: string
+  /** where the vault path came from: the loredex config file or the app picker */
+  configSource: 'loredex-config' | 'vault-picker'
+  /** origin remote url read from <vault>/.git/config, if any */
+  remote: string | null
+  /** version of the embedded loredex engine (F6 evidence) */
+  engineVersion: string
+}
+
 export interface Facets {
   project?: string
   type?: string

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -19,19 +19,19 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Vault picker (AC: 1, 4)
-  - [ ] `src/main/dialogs.ts`: `dialog.showOpenDialog({ properties: ['openDirectory'] })` invoked from a menu item + empty-state button
-  - [ ] Persist the chosen path (simple JSON in `app.getPath('userData')`, written by main); pass it to the core host at fork time as the vault override for `initEngine`
-  - [ ] No directory reads before a vault is chosen; no reads outside it after
-- [ ] Minimal reader (AC: 2)
-  - [ ] `src/renderer/src/markdown/`: unified pipeline — `remark-parse` → `remark-gfm` → `remark-rehype` → `rehype-sanitize` → `rehype-react`
-  - [ ] `views/reader/NoteView.tsx`: fetch via `invoke('vault.readNote', {path})`, render body through the pipeline, frontmatter as a key/value metadata panel
-  - [ ] Hardcode/first-note selection is acceptable (full tree is Story 2.1); a simple path input or "open Start Here" button suffices
-- [ ] Identity badge (AC: 3)
-  - [ ] `components/IdentityBadge.tsx`: reads `invoke('config.get')` → shows vault path (abbreviated), config source, remote URL
-  - [ ] Mount in the app shell chrome (top bar) so every view includes it
-- [ ] App shell (AC: 2, 3)
-  - [ ] Minimal `App.tsx` layout: top chrome (badge) + content area; zustand store for `config` + current note
+- [x] Vault picker (AC: 1, 4)
+  - [x] `src/main/dialogs.ts`: `dialog.showOpenDialog({ properties: ['openDirectory'] })` invoked from a menu item + empty-state button
+  - [x] Persist the chosen path (simple JSON in `app.getPath('userData')`, written by main); pass it to the core host at fork time as the vault override for `initEngine`
+  - [x] No directory reads before a vault is chosen; no reads outside it after
+- [x] Minimal reader (AC: 2)
+  - [x] `src/renderer/src/markdown/`: unified pipeline — `remark-parse` → `remark-gfm` → `remark-rehype` → `rehype-sanitize` → `rehype-react`
+  - [x] `views/reader/NoteView.tsx`: fetch via `invoke('vault.readNote', {path})`, render body through the pipeline, frontmatter as a key/value metadata panel
+  - [x] Hardcode/first-note selection is acceptable (full tree is Story 2.1); a simple path input or "open Start Here" button suffices
+- [x] Identity badge (AC: 3)
+  - [x] `components/IdentityBadge.tsx`: reads `invoke('app.identity')` → shows vault path (abbreviated), config source, remote URL (tooltip)
+  - [x] Mount in the app shell chrome (sidebar vault chip per DESIGN.md) so every view includes it
+- [x] App shell (AC: 2, 3)
+  - [x] Minimal `App.tsx` layout: DESIGN.md three-pane shell (sidebar + list pane + reader); zustand stores for identity + current note
 
 ## Dev Notes
 
@@ -58,10 +58,28 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5), BMAD dev agent, 2026-07-10.
+
 ### Debug Log References
+
+- `npm run typecheck` clean; `npm test` 24/24; `npm run build` green (see commit).
 
 ### Completion Notes List
 
+- Vault picker: native `dialog.showOpenDialog(openDirectory)` in main (`dialogs.ts`), persisted to `userData/vault.json`; picked path crosses to the core host as `--vault <path>` at fork time and `initEngine(vaultOverride)` wins over any loredex config (F6: config still resolves exactly once per core-host lifetime — a vault change kills + re-forks the host and re-brokers ports, renderers get a `vault-changed` push after the new port).
+- **Deviation:** badge reads a new app-local contract channel `app.identity` (returns `VaultIdentity` incl. `engineVersion` read from the embedded loredex package) instead of raw `config.get` — loredex `Config` carries no source/remote/engine-version. Same one-seam evolution pattern story 2.1 prescribes for `vault.tree`. Remote is a read-only peek at `<vault>/.git/config` (no git shell-out).
+- **Deviation:** the picker + `vault-changed` push are main-owned native capabilities, exposed as two extra methods on the single `window.loredex` bridge global (`pickVault`, `onVaultChanged`) — not core-seam channels, since the dialog and bootstrap persistence live in main per this story's dev notes. No new bridge global.
+- **Deviation (DESIGN.md):** badge implemented as the DESIGN.md sidebar vault-identity chip (name 13/600, path + engine version 11px mono, ink sync dot, full identity tooltip via shared `formatVaultIdentity`) rather than a "top bar" — DESIGN.md is binding over the story sketch. Sidebar nav shows only the implemented Reader view (Home/Inbox/Search/Activity arrive with their epics; dead nav would violate lazy-minimal). Cmd+K palette deferred to story 2.4 (search); Open Vault has menu item + Cmd+O.
+- Release-time TODO: `loredex` is a `file:../loredex` link (local npm pkg pattern proven by loredex-obsidian), NOT the pinned npm version — swap to the exact npm pin before release.
+- New exact-pinned deps: unified@11.0.5, remark-parse@11.0.0, remark-gfm@4.0.1, remark-rehype@11.1.2, rehype-sanitize@6.0.0, rehype-react@8.0.0, unist-util-visit@5.0.0, zustand@5.0.8.
+
 ### File List
+
+- `src/main/dialogs.ts` (new), `src/main/index.ts`, `src/main/windows.ts` (hiddenInset + sidebar vibrancy + external-link guard)
+- `src/core/engine.ts` (identity/engineVersion/remote, configSource), `src/core/handlers.ts`, `src/core/index.ts` (`--vault` argv)
+- `src/shared/types.ts` (`VaultIdentity`), `src/shared/ipc-contract.ts` (`app.identity`), `src/shared/identity.ts` (new) + `identity.test.ts`
+- `src/preload/index.ts` (pickVault/onVaultChanged), `src/renderer/src/api.ts`
+- `src/renderer/src/markdown/pipeline.ts` (new) + `pipeline.test.ts`, `src/renderer/src/stores/app.ts`, `src/renderer/src/stores/reader.ts`, `src/renderer/src/components/IdentityBadge.tsx`, `src/renderer/src/views/reader/NoteView.tsx`, `src/renderer/src/App.tsx`, `src/renderer/src/styles.css`, `src/renderer/src/main.tsx`
+- `package.json` / `package-lock.json`
 
 ## QA Results

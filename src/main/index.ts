@@ -1,16 +1,23 @@
 /**
  * Main process — logic-free by rule (architecture.md#coding-standards #4).
- * Owns: window lifecycle, forking the core host, brokering MessagePortMain pairs.
+ * Owns: window lifecycle, forking the core host, brokering MessagePortMain
+ * pairs, the native vault picker (menu item + renderer button) and the
+ * persisted vault choice (story 1.4).
  */
 import { join } from 'node:path'
-import { app, BrowserWindow, MessageChannelMain, utilityProcess } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, MessageChannelMain, utilityProcess } from 'electron'
+import { loadVaultPath, pickVaultDialog, saveVaultPath } from './dialogs'
 import { createMainWindow } from './windows'
 
 let core: Electron.UtilityProcess | null = null
 let quitting = false
 
 function forkCoreHost(): void {
-  core = utilityProcess.fork(join(import.meta.dirname, 'core.js'), [], {
+  // The persisted vault crosses to the core host at fork time — config
+  // resolves exactly once per core-host lifetime (F6).
+  const vaultPath = loadVaultPath()
+  const args = vaultPath ? ['--vault', vaultPath] : []
+  core = utilityProcess.fork(join(import.meta.dirname, 'core.js'), args, {
     serviceName: 'loredex-core',
   })
   core.on('exit', (code) => {
@@ -31,7 +38,59 @@ function brokerPorts(win: BrowserWindow): void {
   win.webContents.postMessage('core-port', null, [port2])
 }
 
+/**
+ * Vault picker flow (menu + renderer button): native panel → persist → restart
+ * the core host so config re-resolves with the new vault → notify renderers
+ * AFTER the fresh port is brokered (message ordering on the same channel).
+ */
+async function pickVault(win: BrowserWindow | null): Promise<string | null> {
+  const picked = await pickVaultDialog(win)
+  if (!picked) return null
+  saveVaultPath(picked)
+  if (core) {
+    const old = core
+    await new Promise<void>((resolve) => {
+      // The standing 'exit' handler (registered first) re-forks + re-brokers.
+      old.once('exit', () => setImmediate(resolve))
+      old.kill()
+    })
+  } else {
+    forkCoreHost()
+    for (const w of BrowserWindow.getAllWindows()) brokerPorts(w)
+  }
+  for (const w of BrowserWindow.getAllWindows()) w.webContents.send('vault-changed', picked)
+  return picked
+}
+
+function buildMenu(): void {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      { role: 'appMenu' },
+      {
+        label: 'File',
+        submenu: [
+          {
+            label: 'Open Vault…',
+            accelerator: 'CmdOrCtrl+O',
+            click: (_item, win) =>
+              void pickVault(win instanceof BrowserWindow ? win : null),
+          },
+          { type: 'separator' },
+          { role: 'close' },
+        ],
+      },
+      { role: 'editMenu' },
+      { role: 'viewMenu' },
+      { role: 'windowMenu' },
+    ]),
+  )
+}
+
 app.whenReady().then(() => {
+  buildMenu()
+  ipcMain.handle('loredex:pick-vault', (event) =>
+    pickVault(BrowserWindow.fromWebContents(event.sender)),
+  )
   forkCoreHost()
   const win = createMainWindow()
   // did-finish-load also covers renderer reloads — each load gets a fresh port pair

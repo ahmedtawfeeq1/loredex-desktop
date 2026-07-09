@@ -9,7 +9,11 @@ import { registerCoreHandlers } from './handlers'
 import { createCoreIpc } from './ipc'
 
 // Config resolves exactly once, BEFORE any handler is registered (F6).
-const config = initEngine()
+// Main passes the picked vault (persisted userData JSON) as `--vault <path>`;
+// the override wins over any loredex config file (story 1.4).
+const vaultFlag = process.argv.indexOf('--vault')
+const vaultOverride = vaultFlag !== -1 ? process.argv[vaultFlag + 1] : undefined
+const config = initEngine(vaultOverride)
 const ipc = createCoreIpc()
 registerCoreHandlers(ipc)
 

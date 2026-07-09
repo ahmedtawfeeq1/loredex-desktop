@@ -3,6 +3,7 @@
  * architecture.md#ipc-contract. One generic request/response channel pattern,
  * one push event channel. All payload types live here or in ./types.ts.
  */
+import type { Config, Doc, ProductDashboard, SearchHit } from 'loredex'
 import type {
   ActivityEvent,
   ConsumeReceipt,
@@ -17,33 +18,8 @@ import type {
   WizardResult,
 } from './types'
 
-// TEMPORARY stubs — story 1.3 replaces these with `import type { ... } from 'loredex'`.
-export interface Config {
-  vaultPath: string
-  sync: 'git' | 'none'
-  editor?: string
-  projects: Record<string, { name: string }>
-}
-export interface Doc {
-  meta: Record<string, unknown>
-  body: string
-}
-export interface SearchHit {
-  name: string
-  project: string
-  topic: string
-  date: string
-  status: string
-  kind: 'brief' | 'handoff' | 'note'
-  excerpt: string
-  path: string
-  score: number
-}
-export interface ProductDashboard {
-  generatedAt: string
-  projects: unknown[]
-  handoffs: unknown[]
-}
+// Payload types that exist in the pinned loredex are imported, never redefined.
+export type { Config, Doc, ProductDashboard, SearchHit }
 
 // ── CoreApi map: renderer → core (request/response) ─────────────────────────
 

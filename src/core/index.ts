@@ -3,10 +3,15 @@
  * Receives brokered MessagePortMain ends from main and serves the typed IPC
  * seam over them (dispatch + event fan-out in ./ipc).
  */
-import { createCoreIpc } from './ipc'
 import type { PortLike } from '../shared/ipc-contract'
+import { initEngine } from './engine'
+import { registerCoreHandlers } from './handlers'
+import { createCoreIpc } from './ipc'
 
+// Config resolves exactly once, BEFORE any handler is registered (F6).
+const config = initEngine()
 const ipc = createCoreIpc()
+registerCoreHandlers(ipc)
 
 function mainPortAdapter(port: Electron.MessagePortMain): PortLike {
   return {
@@ -24,6 +29,8 @@ process.parentPort.on('message', (e: PortEvent) => {
   ipc.attach(mainPortAdapter(e.ports[0]))
 })
 
-console.log('[loredex-core] core host started')
+console.log(
+  `[loredex-core] core host started — config: ${config ? config.vaultPath : 'none (vault picker pending)'}`,
+)
 
 export { ipc }

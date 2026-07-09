@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,17 +20,17 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Add the engine dependency (AC: 1)
-  - [ ] `npm i -E loredex` (exact pin, latest 2.x published release)
-- [ ] Engine facade (AC: 1, 2)
-  - [ ] `src/core/engine.ts`: the sole `import 'loredex'` site; `initEngine(vaultOverride?)` calls `loadConfig` exactly once, memoizes the resolved `Config`, exposes typed accessors used by handlers
-  - [ ] Core-host entry `src/core/index.ts` calls `initEngine()` before registering IPC handlers; a second init call throws
-- [ ] IPC handlers (AC: 2, 3, 4)
-  - [ ] Register `config.get` → memoized `Config`
-  - [ ] Register `vault.readNote` → `resolveNoteInsideVault(vault, path)` then `parseDoc`; resolution failure → `VAULT_OUTSIDE_PATH` envelope
-  - [ ] Register `vault.search` → `searchVault(q)`; `facets` param accepted but may be ignored until Story 2.4
-- [ ] Pinned-release fix verification (AC: 5)
-  - [ ] Add `tests/pinned-release.test.ts`: against the installed `node_modules/loredex`, assert the router writes the quoted gitattributes pattern (F8) and handoff footers use the project-local `loredex` invocation, not `npx -y loredex@latest` (F6); test fails on a regressed pin bump
+- [x] Add the engine dependency (AC: 1)
+  - [x] `npm i -E loredex` (exact pin, latest 2.x published release)
+- [x] Engine facade (AC: 1, 2)
+  - [x] `src/core/engine.ts`: the sole `import 'loredex'` site; `initEngine(vaultOverride?)` calls `loadConfig` exactly once, memoizes the resolved `Config`, exposes typed accessors used by handlers
+  - [x] Core-host entry `src/core/index.ts` calls `initEngine()` before registering IPC handlers; a second init call throws
+- [x] IPC handlers (AC: 2, 3, 4)
+  - [x] Register `config.get` → memoized `Config`
+  - [x] Register `vault.readNote` → `resolveNoteInsideVault(vault, path)` then `parseDoc`; resolution failure → `VAULT_OUTSIDE_PATH` envelope
+  - [x] Register `vault.search` → `searchVault(q)`; `facets` param accepted but may be ignored until Story 2.4
+- [x] Pinned-release fix verification (AC: 5)
+  - [x] Add `tests/pinned-release.test.ts`: against the installed `node_modules/loredex`, assert the router writes the quoted gitattributes pattern (F8) and handoff footers use the project-local `loredex` invocation, not `npx -y loredex@latest` (F6); test fails on a regressed pin bump
 
 ## Dev Notes
 
@@ -58,10 +58,33 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5) — BMAD dev agent
+
 ### Debug Log References
+
+- `npm run typecheck` green; `npm test` 18 passing (4 files, incl. tests/pinned-release.test.ts); `npm run build` green.
+- Time-boxed `LOREDEX_CONFIG_DIR=<sim>/.loredex-config npm run dev`: core host logged `config: .../loredex-simulation/nimbus-vault` — the embedded engine resolved the real simulated team vault config once at startup.
 
 ### Completion Notes List
 
+- DEVIATION (decided scope cut, release-time TODO): `loredex` is installed as `"loredex": "file:../loredex"` (local sibling link, npm pkg pattern proven by loredex-obsidian), NOT the exact-pinned npm 2.x release AC1 asks for. Replace with the exact npm pin before release; ci.yml clones and builds the sibling as a stand-in.
+- `src/core/engine.ts` is the sole runtime `import 'loredex'` site. `initEngine()` calls `loadConfig()` exactly once; a second call throws (F6 defense). No config on disk → engine holds `null` and handlers answer with a `NO_CONFIG` envelope until story 1.4's vault picker.
+- Contract types `Config`/`Doc`/`SearchHit`/`ProductDashboard` now `import type from 'loredex'`; the story-1.2 temporary stubs were removed from `src/shared/ipc-contract.ts` (type-only imports don't violate the sole-import rule).
+- `vault.readNote` joins vault-relative paths to the vault root, then routes through `resolveNoteInsideVault` — traversal and absolute escapes reject as `VAULT_OUTSIDE_PATH` (tested).
+- `vault.search` proxies `searchVault`; `facets` accepted but ignored until story 2.4.
+- DEVIATION (file placement): handler registration lives in `src/core/handlers.ts` (not in the architecture source tree) so tests can wire real engine + dispatcher without importing the `process.parentPort` entry.
+- AC5 check pins to the *installed build* under `node_modules/loredex/dist`: F8 quoted gitattributes rule (`"Start Here - Product.md" merge=loredex-generated`) present; every handoff consume footer uses project-local `loredex handoffs --consume`, none use npx.
+- Fixture vault `tests/fixtures/vault/`: 2 projects (nimbus-api, nimbus-web), product brief, 2 notes + 1 handoff note — reused by story 1.7's MCP contract test.
+
 ### File List
+
+- package.json / package-lock.json ("loredex": "file:../loredex" — release TODO above)
+- src/core/engine.ts (new — sole loredex import site)
+- src/core/handlers.ts (new — registers config.get / vault.readNote / vault.search)
+- src/core/index.ts (initEngine() before handler registration)
+- src/shared/ipc-contract.ts (loredex type imports replace temp stubs)
+- src/core/engine.test.ts (new — init-once, readNote, traversal rejection, search, full IPC round-trip)
+- tests/pinned-release.test.ts (new — F8/F6 fix verification against installed build)
+- tests/fixtures/vault/** (new fixture: brief + 3 notes across 2 projects, one handoff)
 
 ## QA Results

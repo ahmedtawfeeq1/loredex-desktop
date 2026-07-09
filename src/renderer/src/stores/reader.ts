@@ -19,8 +19,11 @@ interface ReaderState {
   selected: string | null
   doc: Doc | null
   docError: string | null
+  /** wikilink targets to render inline beneath the note — set when a handoff
+   *  brief is opened from the board (story 3.2, F5 reading order) */
+  readingOrder: string[]
   loadTree(): Promise<void>
-  open(path: string): Promise<void>
+  open(path: string, readingOrder?: string[]): Promise<void>
   /** manual refresh action: re-walk the tree and re-read the open note */
   refresh(): Promise<void>
   reset(): void
@@ -34,6 +37,7 @@ export const useReader = create<ReaderState>((set, get) => ({
   selected: null,
   doc: null,
   docError: null,
+  readingOrder: [],
 
   async loadTree() {
     try {
@@ -44,8 +48,8 @@ export const useReader = create<ReaderState>((set, get) => ({
     }
   },
 
-  async open(path) {
-    set({ selected: path, docError: null })
+  async open(path, readingOrder = []) {
+    set({ selected: path, docError: null, readingOrder })
     useDiagnostics.getState().clearNote(path) // re-fed as the note re-renders
     try {
       const doc = await invoke('vault.readNote', { path })
@@ -60,13 +64,20 @@ export const useReader = create<ReaderState>((set, get) => ({
     clearLinkCaches() // vault.tree also rebuilds the core-side link index
     useDiagnostics.getState().clear()
     await get().loadTree()
-    const { selected } = get()
-    if (selected) await get().open(selected)
+    const { selected, readingOrder } = get()
+    if (selected) await get().open(selected, readingOrder)
   },
 
   reset() {
     clearLinkCaches()
     useDiagnostics.getState().clear()
-    set({ tree: null, treeError: null, selected: null, doc: null, docError: null })
+    set({
+      tree: null,
+      treeError: null,
+      selected: null,
+      doc: null,
+      docError: null,
+      readingOrder: [],
+    })
   },
 }))

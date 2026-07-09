@@ -21,4 +21,7 @@ export function registerCoreHandlers(ipc: CoreIpc): void {
   )
   // `facets` is accepted by the contract but ignored until story 2.4
   ipc.register('vault.search', ({ q }) => engine.search(q))
+  ipc.register('handoffs.list', ({ scope, project }) =>
+    engine.handoffs(project ? { direction: scope, project } : { direction: scope }),
+  )
 }

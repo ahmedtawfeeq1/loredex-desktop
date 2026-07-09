@@ -1,0 +1,50 @@
+/**
+ * The routing-slip handoff card (DESIGN.md signature element): stamp chip +
+ * mono route line, serif objective, mono footer. Card click opens the brief
+ * in the reader; consume action arrives with story 3.4.
+ */
+import { formatAge } from '../../../shared/handoff-lanes'
+import type { HandoffCard } from '../../../shared/types'
+import { StatusChip } from './StatusChip'
+
+export function HandoffCardView({
+  card,
+  onOpen,
+  consumeSlot,
+  pressed,
+}: {
+  card: HandoffCard
+  onOpen: (card: HandoffCard) => void
+  /** story 3.4 mounts the consume action here; 3.6 will add the read-state dot */
+  consumeSlot?: React.ReactNode
+  /** stamp-press animation trigger (story 3.4) */
+  pressed?: boolean
+}): React.JSX.Element {
+  const notes = card.readingOrder.length
+  return (
+    <div
+      className="handoff-card"
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(card)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(card)
+      }}
+    >
+      <div className="handoff-card-top">
+        <StatusChip status={card.status} pressed={pressed} />
+        <span className="handoff-route">
+          {card.from} ⟶ {card.to}
+        </span>
+        <span className="handoff-date">{card.date || formatAge(card.ageDays)}</span>
+      </div>
+      <p className="handoff-objective">{card.objective || card.name}</p>
+      <div className="handoff-foot">
+        <span>
+          {notes === 1 ? '1 note' : `${notes} notes`} · {formatAge(card.ageDays)}
+        </span>
+        {consumeSlot}
+      </div>
+    </div>
+  )
+}

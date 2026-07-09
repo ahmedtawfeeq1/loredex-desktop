@@ -639,3 +639,259 @@ a {
   color: var(--rust);
   padding: 2px 0 2px 12px;
 }
+
+/* ── handoff board (story 3.2) ─────────────────────────────────────────── */
+
+.pane-board {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-content);
+  border-left: 1px solid var(--hairline);
+  overflow-y: auto;
+}
+
+.board {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.board-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 4px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-content);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.board-switcher {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+}
+
+.board-tab {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-2);
+  transition: background 100ms ease-out;
+}
+
+.board-tab:hover {
+  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+}
+
+.board-tab[aria-selected='true'] {
+  color: var(--ink);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
+.board-groups {
+  padding: 8px 0;
+}
+
+.board-group-title {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.board-lanes {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 12px 16px;
+}
+
+.board-lane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.board-lane-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.board-lane-empty {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--text-2);
+  padding: 8px 0;
+}
+
+/* ── the routing-slip handoff card (DESIGN.md signature) ───────────────── */
+
+.handoff-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition:
+    background 100ms ease-out,
+    border-color 100ms ease-out;
+}
+
+.handoff-card:hover {
+  border-color: color-mix(in srgb, var(--ink) 40%, var(--hairline));
+}
+
+.handoff-card.skeleton {
+  height: 88px;
+  cursor: default;
+  opacity: 0.5;
+}
+
+.handoff-card-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.handoff-route {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.handoff-date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.handoff-objective {
+  font-family: var(--font-serif); /* the only serif outside the reader */
+  font-size: 15px;
+  line-height: 1.35;
+  margin: 8px 0;
+}
+
+.handoff-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* stamp chip: 1px border in state color, state-color text, transparent fill —
+   a rubber stamp, not a pill */
+.status-chip {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.chip-open {
+  color: var(--stamp);
+}
+
+.chip-consumed {
+  color: var(--text-2);
+}
+
+.chip-stale {
+  color: var(--rust);
+}
+
+/* consume = stamp press: the app's ONE bespoke animation (120ms ease-out);
+   the global prefers-reduced-motion rule disables it */
+@keyframes stamp-press {
+  from {
+    transform: scale(0.97);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.chip-pressed {
+  animation: stamp-press 120ms ease-out;
+}
+
+/* nav open-count badge: amber pill, 10px mono */
+.nav-badge {
+  float: right;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #fff;
+  background: var(--stamp);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* ── reading order inline (story 3.2, F5) ──────────────────────────────── */
+
+.reading-order {
+  margin-top: 32px;
+  border-top: 1px solid var(--hairline);
+  padding-top: 16px;
+}
+
+.ro-heading {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ro-item {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  padding: 8px 12px;
+  margin: 8px 0;
+}
+
+.ro-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ro-meta {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  padding: 4px 0;
+}
+
+.ro-broken {
+  color: var(--rust);
+}

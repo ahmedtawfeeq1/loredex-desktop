@@ -5,6 +5,7 @@
 import { useMemo } from 'react'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useReader } from '../../stores/reader'
+import { ReadingOrderInline } from '../handoffs/ReadingOrderInline'
 
 export function formatValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(', ')
@@ -40,6 +41,7 @@ export function NoteView(): React.JSX.Element {
   const selected = useReader((s) => s.selected)
   const doc = useReader((s) => s.doc)
   const docError = useReader((s) => s.docError)
+  const readingOrder = useReader((s) => s.readingOrder)
 
   // memoize per note content — a 1 MB note re-renders only when it changes
   const rendered = useMemo(() => (doc ? renderMarkdown(doc.body) : null), [doc])
@@ -60,6 +62,7 @@ export function NoteView(): React.JSX.Element {
       <h1 className="note-title">{title}</h1>
       <FrontmatterPanel meta={doc.meta as Record<string, unknown>} />
       <div className="note-body">{rendered}</div>
+      <ReadingOrderInline targets={readingOrder} from={selected} />
     </article>
   )
 }

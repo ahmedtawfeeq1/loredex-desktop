@@ -10,6 +10,9 @@ import { isAbsolute, join } from 'node:path'
 import {
   type Config,
   type Doc,
+  type HandoffCard,
+  type HandoffScope,
+  listHandoffs,
   loadConfig,
   parseDoc,
   resolveNoteInsideVault,
@@ -56,6 +59,16 @@ export function readNote(path: string): Doc {
 
 export function search(q: string): SearchHit[] {
   return searchVault(getConfig().vaultPath, q)
+}
+
+/** All handoffs in scope (story 3.2) — lib collector, never app-side note parsing. */
+export function handoffs(scope: HandoffScope): HandoffCard[] {
+  return listHandoffs(getConfig().vaultPath, scope)
+}
+
+/** Registered project names from the resolved config ("my projects" — story 3.7 filter). */
+export function registeredProjects(): string[] {
+  return [...new Set(Object.values(getConfig().projects).map((p) => p.name))]
 }
 
 /** Embedded engine version — read from the loredex package itself (F6 evidence). */

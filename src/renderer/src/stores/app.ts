@@ -7,10 +7,14 @@ import { isErrEnvelope } from '../../../shared/ipc-contract'
 import type { VaultIdentity } from '../../../shared/types'
 import { invoke, pickVault } from '../api'
 
+export type AppView = 'reader' | 'handoffs' | 'settings'
+
 interface AppState {
   status: 'loading' | 'no-vault' | 'ready'
   identity: VaultIdentity | null
   error: string | null
+  view: AppView
+  setView(view: AppView): void
   init(): Promise<void>
   openVaultPicker(): Promise<string | null>
 }
@@ -19,6 +23,11 @@ export const useApp = create<AppState>((set, get) => ({
   status: 'loading',
   identity: null,
   error: null,
+  view: 'reader',
+
+  setView(view) {
+    set({ view })
+  },
 
   async init() {
     try {

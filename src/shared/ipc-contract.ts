@@ -34,7 +34,10 @@ export interface CoreApi {
   'vault.tree': { in: void; out: TreeNode[] }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   'vault.resolveLink': { in: { link: string; from: string }; out: LinkResolution }
-  'handoffs.list': { in: { scope: 'inbox' | 'outbox' | 'all' }; out: HandoffCard[] } // (lib PR-1)
+  /** app-local contract evolution (story 3.2): optional project qualifier — lib
+   *  HandoffScope semantics: inbox/outbox are relative to `project`; without it
+   *  the scope is company-wide and direction is ignored. */
+  'handoffs.list': { in: { scope: 'inbox' | 'outbox' | 'all'; project?: string }; out: HandoffCard[] } // (lib PR-1)
   'handoffs.consume': { in: { id: string; identity: Identity }; out: ConsumeReceipt } // (lib PR-2)
   'route.preview': { in: { file: string }; out: RoutePreview } // (lib PR-3)
   'route.undo': { in: { receiptId: string }; out: void } // (lib PR-3)

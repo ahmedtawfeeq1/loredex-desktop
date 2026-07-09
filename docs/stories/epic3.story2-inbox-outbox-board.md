@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -19,14 +19,14 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Core handler (AC: 1, 2)
-  - [ ] Register `handoffs.list` → `listHandoffs(scope)` from the engine facade; scope mapping `inbox|outbox|all` per the contract
-- [ ] Board UI (AC: 1, 2, 4)
-  - [ ] `views/handoffs/Board.tsx`: two lanes per selected project; project switcher; company-wide toggle (all projects, grouped)
-  - [ ] `components/HandoffCardView.tsx`: from → to, objective, relative age, `StatusChip` (open/consumed)
-  - [ ] Empty state per lane; skeleton loading; subscribe to `vault.changed` → refetch
-- [ ] Brief opening (AC: 3)
-  - [ ] Card click → reader opens the handoff note; reading-order references render inline (each referenced note fetched via `vault.readNote` and rendered as an expandable section beneath the brief, links via Story 2.2 resolution)
+- [x] Core handler (AC: 1, 2)
+  - [x] Register `handoffs.list` → `listHandoffs(scope)` from the engine facade; scope mapping `inbox|outbox|all` per the contract
+- [x] Board UI (AC: 1, 2, 4)
+  - [x] `views/handoffs/Board.tsx`: two lanes per selected project; project switcher; company-wide toggle (all projects, grouped)
+  - [x] `components/HandoffCardView.tsx`: from → to, objective, relative age, `StatusChip` (open/consumed)
+  - [x] Empty state per lane; skeleton loading; subscribe to `vault.changed` → refetch
+- [x] Brief opening (AC: 3)
+  - [x] Card click → reader opens the handoff note; reading-order references render inline (each referenced note fetched via `vault.readNote` and rendered as an expandable section beneath the brief, links via Story 2.2 resolution)
 
 ## Dev Notes
 
@@ -52,10 +52,37 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5), BMAD dev agent
+
 ### Debug Log References
+
+- `npm run typecheck` clean; `npm test` 11 files / 48 tests green; `npm run build` (electron-vite) green.
 
 ### Completion Notes List
 
+- `handoffs.list` registered in the core host → `engine.handoffs()` → lib `listHandoffs` (sole loredex import site preserved). Contract in-shape evolved app-locally with an optional `project` qualifier so inbox/outbox map onto the lib's `HandoffScope` semantics (direction relative to a project; company-wide without one).
+- Board fetches company-wide once (`scope: 'all'`) and derives lanes in pure view logic (`src/shared/handoff-lanes.ts` — placed in shared, not views/, so core-side vitest exercises exactly what the renderer renders; deviation from the story's file list, reason: tsconfig project boundaries node/web).
+- Per-project lanes + project switcher tabs + company-wide grouped (PM) view; skeleton loading, per-lane serif empty states; refetch on `vault.changed`/`handoff.new`/`handoff.stateChanged` events (no watcher in v0.1 — events arrive from local ops and the story 3.7 refresh check).
+- Routing-slip card per DESIGN.md: stamp chip (`StatusChip` renders arbitrary status strings), mono route line `from ⟶ to` with right-aligned date, serif objective, mono footer with note count + age. Read-state slot left for 3.6 (`consumeSlot` prop is the 3.4 seam).
+- Card click opens the brief in the reader; reading-order targets (lib-parsed `HandoffCard.readingOrder`) render inline beneath the note as expandable sections via the story-2.2 resolution caches + the sanctioned markdown pipeline (no second renderer).
+- Fixture vault gained cross-project handoffs under `projects/*/handoffs/` (lib collector only walks those dirs). Board assembly additionally asserted against the real nimbus simulation vault (skipped when absent).
+
 ### File List
+
+- `src/shared/ipc-contract.ts` (handoffs.list in-shape: optional project)
+- `src/shared/handoff-lanes.ts` (new — pure lane assembly; + `.test` coverage via core test)
+- `src/core/engine.ts` (`handoffs`, `registeredProjects`)
+- `src/core/handlers.ts` (register handoffs.list)
+- `src/core/handoffs.test.ts` (new — seam + lanes tests, fixture + nimbus vault)
+- `src/renderer/src/stores/handoffs.ts` (new)
+- `src/renderer/src/stores/reader.ts` (readingOrder ride-along)
+- `src/renderer/src/stores/app.ts` (view switching)
+- `src/renderer/src/views/handoffs/Board.tsx` (new)
+- `src/renderer/src/views/handoffs/ReadingOrderInline.tsx` (new)
+- `src/renderer/src/components/HandoffCardView.tsx`, `StatusChip.tsx` (new)
+- `src/renderer/src/views/reader/NoteView.tsx` (reading order mount)
+- `src/renderer/src/App.tsx` (Handoffs nav + badge slot)
+- `src/renderer/src/styles.css` (board + routing-slip card + reading order)
+- `tests/fixtures/vault/projects/nimbus-web/handoffs/*.md`, `tests/fixtures/vault/projects/nimbus-api/handoffs/*.md` (new fixtures)
 
 ## QA Results

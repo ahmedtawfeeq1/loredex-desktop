@@ -11,7 +11,20 @@
  *   effect is identical per-command injection. Recorded deviation; a lib PR
  *   revision threading `-c` args replaces this.
  */
+import { execFileSync } from 'node:child_process'
 import type { Identity } from '../shared/types'
+
+/**
+ * Read-only `git log` runner for the activity feed (story 6.2). Callers pass
+ * the lib's ACTIVITY_LOG_ARGS so every host invokes git identically.
+ */
+export function gitLog(vaultPath: string, args: readonly string[]): string {
+  return execFileSync('git', [...args], {
+    cwd: vaultPath,
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  })
+}
 
 export function gitIdentityArgs(identity: Identity): string[] {
   return ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`]

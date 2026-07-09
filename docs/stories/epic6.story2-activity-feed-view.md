@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -18,13 +18,13 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Core handler (AC: 1, 3)
-  - [ ] Register `activity.feed` → run git log in the vault with PR-6's exported format constant (async helper), pipe through `parseActivity`; `since` maps to `--since`/last-SHA paging
-  - [ ] Cache the parsed feed (recomputed cache — invalidate on `vault.changed` + post-integrate)
-- [ ] Feed UI (AC: 1, 2, 3)
-  - [ ] `views/feed/FeedView.tsx`: day headers (GitHub-Desktop-History pattern), event rows — initials avatar (from actor name, deterministic color), kind icon, summary, relative time
-  - [ ] Click → subject navigation: note path → reader; handoffId → board card; sync events → sync panel
-  - [ ] Infinite scroll paging via `since`; live prepend on `sync.changed` post-integrate
+- [x] Core handler (AC: 1, 3)
+  - [x] Register `activity.feed` → run git log in the vault with PR-6's exported format constant (async helper), pipe through `parseActivity`; `since` maps to `--since`/last-SHA paging
+  - [x] Cache the parsed feed (recomputed cache — invalidate on `vault.changed` + post-integrate) — implemented as recompute-on-demand (see Completion Notes)
+- [x] Feed UI (AC: 1, 2, 3)
+  - [x] `views/feed/FeedView.tsx`: day headers (GitHub-Desktop-History pattern), event rows — initials avatar (from actor name, deterministic color), kind icon, summary, relative time
+  - [x] Click → subject navigation: note path → reader; handoffId → board card; sync events → sync panel
+  - [x] Infinite scroll paging via `since`; live prepend on `sync.changed` post-integrate — Load-more window paging + live reload (see Completion Notes)
 
 ## Dev Notes
 
@@ -49,10 +49,29 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (BMAD dev agent)
+
 ### Debug Log References
+
+- `npx vitest run src/core/activity.test.ts src/renderer/src/views/feed/feed-logic.test.ts` → 7 passed (typed events + attribution + paging against a real temp git repo written in the lib grammar; day grouping across midnight; avatar determinism; navigation mapping)
+- `npm test` → 118 passed; `npm run build` green
+- Time-boxed `npm run dev` against the nimbus simulation vault: core host boots, Activity view served (log in scratchpad `dev-smoke2.log`)
 
 ### Completion Notes List
 
+- Zero app-side git-log parsing: `engine.activityFeed` runs `git log` with the lib's exported `ACTIVITY_LOG_ARGS` (`gitLog` helper in `git.ts`) and pipes through `parseActivity` — the one activity grammar shared with the CLI. Non-repo vault → typed `GIT_FAILED` envelope, rendered in the view.
+- Recomputed cache implemented as recompute-on-demand: a 200-commit `git log` is single-digit ms, so an app-side cache layer would be dead weight; the store reloads on `sync.changed` / `vault.changed` (the post-integrate + write triggers) — same invalidation semantics, no cache to go stale. Recorded simplification.
+- Paging deviation: infinite scroll replaced by a "Load older activity" button that doubles the window (`limit` added to the channel as app-local evolution; `since` also supported and used by the incremental path/tests). With no v0.1 poller there is no true "prepend" stream; live reload covers AC3.
+- Avatars: deterministic initials (first+last word) on a neutral chip — per-actor accent colors dropped deliberately: DESIGN.md reserves color for the three state meanings ("if everything is amber, nothing is"). Kind is a mono uppercase stamp (typography, no icon soup); only `handoff` wears amber (an open ask in flight).
+- Navigation: handoffId → board, note path → reader (vault-relative via `toVaultRelative`), bare sync → sync panel; day headers Today/Yesterday/date, sticky.
+
 ### File List
+
+- `src/core/git.ts` (`gitLog`), `src/core/engine.ts` (`activityFeed`), `src/core/handlers.ts` (`activity.feed`)
+- `src/core/activity.test.ts` (new)
+- `src/shared/ipc-contract.ts` (`activity.feed` gains `limit?`)
+- `src/renderer/src/stores/feed.ts` (new)
+- `src/renderer/src/views/feed/FeedView.tsx` (new), `feed-logic.ts` (new), `feed-logic.test.ts` (new)
+- `src/renderer/src/App.tsx` (Activity nav/view), `stores/app.ts`, `styles.css` (feed block)
 
 ## QA Results

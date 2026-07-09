@@ -36,10 +36,20 @@ function forkCoreHost(): void {
 
 /** Hand one end of a fresh MessageChannelMain to the core host, the other to the renderer. */
 function brokerPorts(win: BrowserWindow): void {
-  if (!core) return
+  if (!core || win.isDestroyed() || win.webContents.isDestroyed()) return
   const { port1, port2 } = new MessageChannelMain()
+  try {
+    // The render frame can be disposed between the guard and the call (window
+    // closing, reload mid-flight) — Electron then throws "Render frame was
+    // disposed before WebFrameMain could be accessed". Skip; the next
+    // did-finish-load brokers a fresh pair.
+    win.webContents.postMessage('core-port', null, [port2])
+  } catch {
+    port1.close()
+    port2.close()
+    return
+  }
   core.postMessage({ t: 'port' }, [port1])
-  win.webContents.postMessage('core-port', null, [port2])
 }
 
 /**

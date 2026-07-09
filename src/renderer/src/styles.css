@@ -1063,6 +1063,109 @@ a {
   color: var(--rust);
 }
 
+/* ── activity feed (story 6.2): rows per the type roles — 13px summary,
+     11px mono metadata; status stays typography, no icon soup ───────────── */
+
+.feed {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.feed-list {
+  max-width: 68ch;
+  padding: 4px 12px 24px;
+}
+
+.feed-day {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 12px 0 4px;
+  position: sticky;
+  top: 0;
+  background: var(--bg-content);
+}
+
+.feed-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px 6px 4px;
+  border-left: 4px solid transparent;
+  border-radius: 0 5px 5px 0;
+  transition:
+    background 100ms ease-out,
+    border-color 100ms ease-out;
+}
+
+.feed-row:hover {
+  background: var(--bg-raised);
+  border-left-color: var(--ink);
+}
+
+.feed-avatar {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border: 1px solid var(--hairline);
+  border-radius: 50%;
+  background: var(--bg-raised);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feed-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.feed-summary {
+  font-size: 13px;
+}
+
+.feed-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* kind stamp: mono uppercase typography, not icons; quiet by default */
+.feed-kind {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 10px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.feed-kind-handoff {
+  color: var(--stamp); /* an open ask travelling between teams — attention */
+}
+
+.feed-more {
+  display: block;
+  margin: 12px auto 0;
+}
+
 /* ── sync health panel (story 5.2) ─────────────────────────────────────── */
 
 .sync {

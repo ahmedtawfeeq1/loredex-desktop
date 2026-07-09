@@ -10,9 +10,11 @@ import { useApp } from './stores/app'
 import { useHandoffs } from './stores/handoffs'
 import { useReader } from './stores/reader'
 import { openCount } from '../../shared/handoff-lanes'
+import { useFeed } from './stores/feed'
 import { useHome } from './stores/home'
 import { useSearch } from './stores/search'
 import { useSync } from './stores/sync'
+import { FeedView } from './views/feed/FeedView'
 import { Board } from './views/handoffs/Board'
 import { HomeView } from './views/home/HomeView'
 import { SyncPanel } from './views/sync/SyncPanel'
@@ -52,6 +54,7 @@ export default function App(): React.JSX.Element {
       useSearch.getState().reset()
       useHome.getState().reset()
       useSync.getState().reset()
+      useFeed.getState().reset()
       void init()
     })
   }, [init])
@@ -126,6 +129,14 @@ export default function App(): React.JSX.Element {
           <button
             type="button"
             className="nav-item"
+            aria-current={view === 'feed'}
+            onClick={() => setView('feed')}
+          >
+            Activity
+          </button>
+          <button
+            type="button"
+            className="nav-item"
             aria-current={view === 'sync'}
             onClick={() => setView('sync')}
           >
@@ -154,6 +165,10 @@ export default function App(): React.JSX.Element {
         ) : view === 'search' ? (
           <main className="pane-board">
             <SearchView />
+          </main>
+        ) : view === 'feed' ? (
+          <main className="pane-board">
+            <FeedView />
           </main>
         ) : view === 'sync' ? (
           <main className="pane-board">

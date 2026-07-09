@@ -65,7 +65,8 @@ export interface CoreApi {
   /** app-local contract evolution (story 2.5): the Start Here brief + freshness */
   'home.brief': { in: void; out: HomeBrief }
   'vault.createOrJoin': { in: WizardInput; out: WizardResult }
-  'activity.feed': { in: { since?: string }; out: ActivityEvent[] } // (lib PR-6)
+  /** app-local contract evolution (story 6.2): optional window size for paging */
+  'activity.feed': { in: { since?: string; limit?: number }; out: ActivityEvent[] } // (lib PR-6)
 }
 
 // ── CoreEvent union: core → renderer (push, one channel) ────────────────────

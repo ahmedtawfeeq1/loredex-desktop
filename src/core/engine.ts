@@ -8,8 +8,11 @@ import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import {
+  ACTIVITY_LOG_ARGS,
+  type ActivityEvent,
   ambientGitIdentity,
   buildDashboard,
+  parseActivity,
   type Config,
   type ConsumeReceipt,
   consumeHandoff,
@@ -35,7 +38,7 @@ import {
   vaultSchemaStatus,
 } from 'loredex'
 import { abbreviatePath } from '../shared/identity'
-import { withGitIdentity } from './git'
+import { gitLog, withGitIdentity } from './git'
 import { ipcError } from '../shared/ipc-contract'
 import type { HomeBrief, VaultIdentity } from '../shared/types'
 
@@ -150,6 +153,28 @@ export function pullPush(): { pulled: boolean; pushed: boolean } {
 /** Vault schema vs this engine (story 5.2 handshake, NFR8) — lib check. */
 export function schemaStatus(): VaultSchemaStatus {
   return vaultSchemaStatus(getConfig().vaultPath)
+}
+
+/**
+ * Activity feed (story 6.2): the vault's git log through the lib's one
+ * activity grammar — zero app-side commit-message parsing. Recomputed cache:
+ * derived fresh from git truth on every call, never persisted.
+ */
+export function activityFeed(opts: { since?: string; limit?: number } = {}): ActivityEvent[] {
+  const { vaultPath } = getConfig()
+  const args: string[] = [...ACTIVITY_LOG_ARGS, '-n', String(opts.limit ?? 200)]
+  if (opts.since) args.push(`--since=${opts.since}`)
+  let log: string
+  try {
+    log = gitLog(vaultPath, args)
+  } catch (e) {
+    throw ipcError(
+      'GIT_FAILED',
+      'could not read the vault git history — is this vault a git repository?',
+      e instanceof Error ? e.message : String(e),
+    )
+  }
+  return parseActivity(log)
 }
 
 /** The vault repo's git config identity — the settings form's default. */

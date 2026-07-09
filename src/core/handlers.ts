@@ -89,6 +89,9 @@ export function registerCoreHandlers(
     }
     saveIdentityProfile(identity)
   })
+  // Activity feed (story 6.2): git log through the lib's activity grammar.
+  // Recomputed on every call — git IS the cache (state-placement rule).
+  ipc.register('activity.feed', ({ since, limit }) => engine.activityFeed({ since, limit }))
   // Sync health (story 5.2). sync.status is read-only (lib syncStatus — never
   // fetches); its warnings render in the panel grid. sync.run is a lib write
   // op: write lock + per-command identity; every warning it produces is ALSO

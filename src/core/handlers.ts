@@ -4,11 +4,13 @@
  */
 import * as engine from './engine'
 import type { CoreIpc } from './ipc'
+import { walkVault } from './tree'
 
 export function registerCoreHandlers(ipc: CoreIpc): void {
   ipc.register('config.get', () => engine.getConfig())
   ipc.register('app.identity', () => engine.identity())
   ipc.register('vault.readNote', ({ path }) => engine.readNote(path))
+  ipc.register('vault.tree', () => walkVault(engine.getConfig().vaultPath))
   // `facets` is accepted by the contract but ignored until story 2.4
   ipc.register('vault.search', ({ q }) => engine.search(q))
 }

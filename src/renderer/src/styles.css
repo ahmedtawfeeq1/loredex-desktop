@@ -193,6 +193,67 @@ a {
   overflow-y: auto;
 }
 
+/* ── vault tree (story 2.1) ────────────────────────────────────────────── */
+
+.tree-branch {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 8px 0;
+}
+
+.tree-branch .tree-branch {
+  padding: 0 0 0 12px;
+}
+
+.tree-dir {
+  display: block;
+  padding: 4px 8px 4px 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background 100ms ease-out;
+}
+
+.tree-dir:hover {
+  background: color-mix(in srgb, var(--text-1) 6%, transparent);
+}
+
+.tree-dir::marker {
+  color: var(--text-2);
+  font-size: 9px;
+}
+
+.tree-file {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px 4px 12px;
+  border-left: 4px solid transparent;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition:
+    background 100ms ease-out,
+    border-color 100ms ease-out;
+}
+
+.tree-file:hover {
+  background: color-mix(in srgb, var(--text-1) 6%, transparent);
+}
+
+.tree-file[aria-current='true'] {
+  border-left-color: var(--ink); /* 4px Archive Ink left rail */
+  background: var(--bg-raised);
+  font-weight: 600;
+}
+
+.tree-empty {
+  font-family: var(--font-serif);
+  color: var(--text-2);
+  padding: 16px 12px;
+}
+
 /* ── vault identity chip (permanent — the F6 fix made visible) ─────────── */
 
 .vault-chip {

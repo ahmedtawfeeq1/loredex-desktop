@@ -21,8 +21,8 @@ development_status:
   1-9-auto-update-channels-translocation: ready-for-dev
   epic-1-retrospective: optional
 
-  epic-2: backlog          # Vault Reader & Product Home
-  2-1-vault-tree-note-rendering: ready-for-dev
+  epic-2: in-progress      # Vault Reader & Product Home
+  2-1-vault-tree-note-rendering: done
   2-2-wikilink-resolution: ready-for-dev
   2-3-vault-watcher-live-refresh: ready-for-dev
   2-4-faceted-search: ready-for-dev

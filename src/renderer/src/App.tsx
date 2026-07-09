@@ -9,29 +9,7 @@ import { IdentityBadge } from './components/IdentityBadge'
 import { useApp } from './stores/app'
 import { useReader } from './stores/reader'
 import { NoteView } from './views/reader/NoteView'
-
-const START_HERE = 'Start Here - Product.md'
-
-function ListPane(): React.JSX.Element {
-  const open = useReader((s) => s.open)
-  const selected = useReader((s) => s.selected)
-  return (
-    <div className="pane-list">
-      <div className="pane-list-header">
-        <span className="pane-list-title">Vault</span>
-      </div>
-      <button
-        type="button"
-        className="nav-item"
-        style={{ margin: '0 8px' }}
-        aria-current={selected === START_HERE}
-        onClick={() => void open(START_HERE)}
-      >
-        Start Here - Product
-      </button>
-    </div>
-  )
-}
+import { VaultTree } from './views/reader/VaultTree'
 
 function EmptyVault(): React.JSX.Element {
   const openVaultPicker = useApp((s) => s.openVaultPicker)
@@ -71,7 +49,7 @@ export default function App(): React.JSX.Element {
       </aside>
       {status === 'ready' ? (
         <>
-          <ListPane />
+          <VaultTree />
           <main className="pane-reader">
             <NoteView />
           </main>

@@ -14,6 +14,7 @@ import type {
   RoutePreview,
   SyncHealth,
   SyncReport,
+  TreeNode,
   VaultIdentity,
   WizardInput,
   WizardResult,
@@ -29,6 +30,8 @@ export interface CoreApi {
   /** app-local contract evolution (story 1.4): badge/MCP identity incl. engine version */
   'app.identity': { in: void; out: VaultIdentity }
   'vault.readNote': { in: { path: string }; out: Doc }
+  /** app-local contract evolution (story 2.1): read-only markdown tree of the vault */
+  'vault.tree': { in: void; out: TreeNode[] }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   'vault.resolveLink': { in: { link: string; from: string }; out: LinkResolution }
   'handoffs.list': { in: { scope: 'inbox' | 'outbox' | 'all' }; out: HandoffCard[] } // (lib PR-1)

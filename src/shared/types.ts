@@ -84,6 +84,16 @@ export interface VaultIdentity {
   engineVersion: string
 }
 
+/** Vault markdown tree node (story 2.1) — read-only listing, core-host walk. */
+export interface TreeNode {
+  /** display name: file basename without .md, or folder name */
+  name: string
+  /** vault-relative path (posix separators) */
+  path: string
+  kind: 'dir' | 'file'
+  children?: TreeNode[]
+}
+
 export interface Facets {
   project?: string
   type?: string

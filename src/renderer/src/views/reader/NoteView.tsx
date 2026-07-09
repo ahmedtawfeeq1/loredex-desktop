@@ -6,14 +6,18 @@ import { useMemo } from 'react'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useReader } from '../../stores/reader'
 
-function formatValue(value: unknown): string {
+export function formatValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(', ')
   if (value instanceof Date) return value.toISOString().slice(0, 10)
   if (typeof value === 'object' && value !== null) return JSON.stringify(value)
   return String(value)
 }
 
-function FrontmatterPanel({ meta }: { meta: Record<string, unknown> }): React.JSX.Element | null {
+export function FrontmatterPanel({
+  meta,
+}: {
+  meta: Record<string, unknown>
+}): React.JSX.Element | null {
   const entries = Object.entries(meta).filter(([, v]) => v !== undefined && v !== null)
   if (entries.length === 0) return null
   return (

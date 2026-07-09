@@ -1063,6 +1063,51 @@ a {
   color: var(--rust);
 }
 
+/* ── product home (story 2.5) ──────────────────────────────────────────── */
+
+.home {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* freshness badge: quiet when fresh; amber = aging attention; rust = stale */
+.freshness {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.freshness-fresh {
+  color: var(--text-2);
+}
+
+.freshness-aging {
+  color: var(--stamp);
+}
+
+.freshness-stale {
+  color: var(--rust);
+}
+
+.home-generated-hint {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--text-2);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  padding: 8px 12px;
+  margin-bottom: 16px;
+}
+
 /* ── search view (story 2.4) ───────────────────────────────────────────── */
 
 .search {

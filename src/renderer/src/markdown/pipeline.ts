@@ -12,6 +12,7 @@ import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 import { MarkdownAnchor } from '../components/WikiLink'
+import { remarkShaLinks } from './shaLinks'
 import { remarkWikilinks } from './wikilinks'
 
 /** defaultSchema + the wikilink carrier attributes (story 2.2). */
@@ -33,14 +34,31 @@ const options: RehypeReactOptions = {
   components: { a: MarkdownAnchor },
 }
 
-const processor = unified()
-  .use(remarkParse)
-  .use(remarkWikilinks)
-  .use(remarkGfm)
-  .use(remarkRehype)
-  .use(rehypeSanitize, schema)
-  .use(rehypeReact, options)
+function buildProcessor(commitBase: string | null) {
+  return unified()
+    .use(remarkParse)
+    .use(remarkWikilinks)
+    .use(remarkShaLinks, { commitBase })
+    .use(remarkGfm)
+    .use(remarkRehype)
+    .use(rehypeSanitize, schema)
+    .use(rehypeReact, options)
+}
 
-export function renderMarkdown(body: string): ReactNode {
-  return processor.processSync(body).result
+const processor = buildProcessor(null)
+// one extra processor per commit base (in practice: the vault's one remote)
+const shaProcessors = new Map<string, ReturnType<typeof buildProcessor>>()
+
+/**
+ * THE render entry for all note/brief markdown. `commitBase` (story 2.5)
+ * additionally turns commit SHAs into remote links — same pipeline, same
+ * sanitize step, wikilinks still resolve.
+ */
+export function renderMarkdown(body: string, commitBase?: string | null): ReactNode {
+  let p = processor
+  if (commitBase) {
+    p = shaProcessors.get(commitBase) ?? buildProcessor(commitBase)
+    shaProcessors.set(commitBase, p)
+  }
+  return p.processSync(body).result
 }

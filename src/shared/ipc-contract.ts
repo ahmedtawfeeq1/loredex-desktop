@@ -10,6 +10,7 @@ import type {
   Facets,
   FacetValues,
   HandoffCard,
+  HomeBrief,
   Identity,
   IdentitySettings,
   LinkResolution,
@@ -58,6 +59,8 @@ export interface CoreApi {
   'sync.status': { in: void; out: SyncHealth } // (lib PR-4)
   'sync.run': { in: void; out: SyncReport } // (lib PR-5)
   'dashboard.build': { in: void; out: ProductDashboard }
+  /** app-local contract evolution (story 2.5): the Start Here brief + freshness */
+  'home.brief': { in: void; out: HomeBrief }
   'vault.createOrJoin': { in: WizardInput; out: WizardResult }
   'activity.feed': { in: { since?: string }; out: ActivityEvent[] } // (lib PR-6)
 }

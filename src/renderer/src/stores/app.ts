@@ -7,7 +7,7 @@ import { isErrEnvelope } from '../../../shared/ipc-contract'
 import type { VaultIdentity } from '../../../shared/types'
 import { invoke, pickVault } from '../api'
 
-export type AppView = 'reader' | 'handoffs' | 'search' | 'settings'
+export type AppView = 'home' | 'reader' | 'handoffs' | 'search' | 'settings'
 
 interface AppState {
   status: 'loading' | 'no-vault' | 'ready'
@@ -23,7 +23,8 @@ export const useApp = create<AppState>((set, get) => ({
   status: 'loading',
   identity: null,
   error: null,
-  view: 'reader',
+  // home is the default view once a vault is open (story 2.5)
+  view: 'home',
 
   setView(view) {
     set({ view })

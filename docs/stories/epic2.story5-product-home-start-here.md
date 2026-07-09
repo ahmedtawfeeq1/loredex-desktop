@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,15 +20,15 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Home data (AC: 1, 3)
-  - [ ] Register `dashboard.build` handler → `buildDashboard()` (write lock respected once Story 3.5 lands; until then direct) returning `ProductDashboard`
-  - [ ] Read path: render the existing brief note (`PRODUCT_BRIEF_NAME` locates it) through the markdown pipeline; freshness = brief file mtime / dashboard metadata, shown as a relative-age badge with a stale threshold style
-- [ ] SHA hyperlinks (AC: 2)
-  - [ ] Remark/rehype plugin `markdown/shaLinks.ts`: detect 7–40 char hex tokens in brief content, wrap as links to `<remote>/commit/<sha>` using the remote from `config.get`; unresolvable remote → plain code style, no dead links
-- [ ] Re-curate (AC: 4)
+- [x] Home data (AC: 1, 3)
+  - [x] Register `dashboard.build` handler → `buildDashboard()` (write lock respected once Story 3.5 lands; until then direct) returning `ProductDashboard`
+  - [x] Read path: render the existing brief note (`PRODUCT_BRIEF_NAME` locates it) through the markdown pipeline; freshness = brief file mtime / dashboard metadata, shown as a relative-age badge with a stale threshold style
+- [x] SHA hyperlinks (AC: 2)
+  - [x] Remark/rehype plugin `markdown/shaLinks.ts`: detect 7–40 char hex tokens in brief content, wrap as links to `<remote>/commit/<sha>` using the remote from `config.get`; unresolvable remote → plain code style, no dead links
+- [ ] Re-curate (AC: 4) — SKIPPED per v0.1 scope cut (see Completion Notes)
   - [ ] Home button → `invoke('dashboard.build')`; run in the core host without blocking other handlers (async path); renderer shows an in-progress state on the freshness badge; failure → error toast + `git.warning`-style detail
-- [ ] Brief wikilinks (AC: 5)
-  - [ ] Ensure the home view uses the same markdown pipeline instance so `WikiLink` components resolve inside the brief
+- [x] Brief wikilinks (AC: 5)
+  - [x] Ensure the home view uses the same markdown pipeline instance so `WikiLink` components resolve inside the brief
 
 ## Dev Notes
 
@@ -54,10 +54,28 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (BMAD dev agent)
+
 ### Debug Log References
+
+- `npx vitest run src/renderer/src/markdown/shaLinks.test.ts src/renderer/src/views/home/freshness.test.ts` → 14 passed
+- `npm test` → 100 passed; `npm run build` green
 
 ### Completion Notes List
 
+- DEVIATION (directed scope cut): AC4's one-click re-curate button is skipped — a real 40–60 s curate requires the claude CLI; render + freshness only. The `dashboard.build` handler IS registered (core-host compute, `ProductDashboard` out, with the story-2.6 snapshot callback point marked in `handlers.ts`), so the seam exists; the home UI ships a Refresh (re-read from disk) instead.
+- New app-local `home.brief` channel: brief file body + mtime when `PRODUCT_BRIEF_NAME` exists; otherwise `renderDashboardMarkdown(buildDashboard(...))` rendered live (read-only, `generated: true`, amber hint pointing at `loredex product`).
+- Freshness badge (`views/home/freshness.ts`): fresh (<1d, quiet) / aging (1–6d, Stamp Amber) / stale (≥7d, rust) — amber stays an attention state per DESIGN.md.
+- SHA links: remark plugin handles bare-text AND `inline code` SHAs; `isLikelySha` requires 7–40 hex chars with ≥1 digit (kills "deadbeef"-style prose false positives — recorded heuristic); remote → commit base handles https/ssh/scp forms; unresolvable remote → no linkification, no dead links.
+- One pipeline: `renderMarkdown(body, commitBase?)` builds a memoized processor variant with the SHA plugin inserted between wikilinks and gfm — same sanitize step, wikilinks resolve inside the brief (AC5); external SHA anchors ride the existing main-process `shell.openExternal` guard.
+- Home replaced 'reader' as the default view once a vault is open.
+
 ### File List
+
+- `src/core/engine.ts` (`dashboard`, `homeBrief`), `src/core/handlers.ts` (`dashboard.build`, `home.brief`)
+- `src/shared/types.ts` (`HomeBrief`), `src/shared/ipc-contract.ts` (`home.brief`)
+- `src/renderer/src/markdown/shaLinks.ts` (new), `shaLinks.test.ts` (new), `pipeline.ts` (commitBase variant)
+- `src/renderer/src/views/home/HomeView.tsx` (new), `freshness.ts` (new), `freshness.test.ts` (new)
+- `src/renderer/src/stores/home.ts` (new), `stores/app.ts` (default view 'home'), `App.tsx`, `styles.css` (home + freshness blocks)
 
 ## QA Results

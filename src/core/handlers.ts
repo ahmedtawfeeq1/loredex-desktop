@@ -72,6 +72,11 @@ export function registerCoreHandlers(
       return receipt
     }),
   )
+  // Product home (story 2.5). dashboard.build is the re-curate seam — it runs
+  // in the core host so a long build never blocks a window; story 2.6 hooks
+  // its post-build snapshot here (callback point, not implemented in v0.1).
+  ipc.register('dashboard.build', () => engine.dashboard(new Date().toISOString().slice(0, 10)))
+  ipc.register('home.brief', () => engine.homeBrief())
   ipc.register('settings.identity.get', () => ({
     profile: loadIdentityProfile(),
     ambient: engine.ambientIdentity(),

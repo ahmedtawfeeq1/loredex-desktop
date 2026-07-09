@@ -101,6 +101,19 @@ export interface IdentitySettings {
 }
 
 /**
+ * Product home payload (story 2.5): the Start Here brief as it sits on disk,
+ * or a live-rendered deterministic dashboard when no brief file exists yet.
+ */
+export interface HomeBrief {
+  /** vault-relative brief path; null when rendered live (no file) */
+  path: string | null
+  markdown: string
+  /** brief file mtime ISO (freshness badge); null when rendered live */
+  mtime: string | null
+  generated: boolean
+}
+
+/**
  * In-app MCP server state (story 1.6). Loud-failure port policy: 'port-conflict'
  * renders as a prominent sync-health error with a settings override — the app
  * never silently falls back to listen(0).

@@ -10,8 +10,10 @@ import { useApp } from './stores/app'
 import { useHandoffs } from './stores/handoffs'
 import { useReader } from './stores/reader'
 import { openCount } from '../../shared/handoff-lanes'
+import { useHome } from './stores/home'
 import { useSearch } from './stores/search'
 import { Board } from './views/handoffs/Board'
+import { HomeView } from './views/home/HomeView'
 import { Diagnostics } from './views/reader/Diagnostics'
 import { NoteView } from './views/reader/NoteView'
 import { VaultTree } from './views/reader/VaultTree'
@@ -46,6 +48,7 @@ export default function App(): React.JSX.Element {
       useReader.getState().reset()
       useHandoffs.getState().reset()
       useSearch.getState().reset()
+      useHome.getState().reset()
       void init()
     })
   }, [init])
@@ -86,6 +89,14 @@ export default function App(): React.JSX.Element {
           <button
             type="button"
             className="nav-item"
+            aria-current={view === 'home'}
+            onClick={() => setView('home')}
+          >
+            Home
+          </button>
+          <button
+            type="button"
+            className="nav-item"
             aria-current={view === 'reader'}
             onClick={() => setView('reader')}
           >
@@ -121,7 +132,11 @@ export default function App(): React.JSX.Element {
         <IdentityBadge />
       </aside>
       {status === 'ready' ? (
-        view === 'handoffs' ? (
+        view === 'home' ? (
+          <main className="pane-board">
+            <HomeView />
+          </main>
+        ) : view === 'handoffs' ? (
           <main className="pane-board">
             <Board />
           </main>

@@ -3,12 +3,13 @@
  * architecture.md#coding-standards #3). Config resolves exactly once per
  * core-host lifetime (F6 split-brain defense); a respawned host re-resolves.
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import {
   ambientGitIdentity,
+  buildDashboard,
   type Config,
   type ConsumeReceipt,
   consumeHandoff,
@@ -21,6 +22,9 @@ import {
   loadConfig,
   LOREDEX_SCHEMA,
   parseDoc,
+  PRODUCT_BRIEF_NAME,
+  type ProductDashboard,
+  renderDashboardMarkdown,
   resolveNoteInsideVault,
   type SearchHit,
   searchVault,
@@ -28,7 +32,7 @@ import {
 import { abbreviatePath } from '../shared/identity'
 import { withGitIdentity } from './git'
 import { ipcError } from '../shared/ipc-contract'
-import type { VaultIdentity } from '../shared/types'
+import type { HomeBrief, VaultIdentity } from '../shared/types'
 
 /** undefined = not yet initialized; null = initialized, no config on disk. */
 let config: Config | null | undefined
@@ -71,6 +75,38 @@ export function search(q: string, limit?: number): SearchHit[] {
 /** Parsed frontmatter of one note (facet narrowing, story 2.4) — read-only. */
 export function noteMeta(absPath: string): Record<string, unknown> {
   return parseDoc(readFileSync(absPath, 'utf8')).meta as Record<string, unknown>
+}
+
+/** Product dashboard compute (story 2.5) — read-only lib aggregation. */
+export function dashboard(today: string): ProductDashboard {
+  return buildDashboard(getConfig().vaultPath, today)
+}
+
+/**
+ * The Start Here brief for the home view (story 2.5): the file as curated when
+ * it exists (freshness = its mtime); otherwise the deterministic dashboard
+ * sections rendered live — read-only either way, no vault write.
+ */
+export function homeBrief(): HomeBrief {
+  const { vaultPath } = getConfig()
+  const abs = join(vaultPath, PRODUCT_BRIEF_NAME)
+  try {
+    const mtime = statSync(abs).mtime.toISOString()
+    return {
+      path: PRODUCT_BRIEF_NAME,
+      markdown: parseDoc(readFileSync(abs, 'utf8')).body,
+      mtime,
+      generated: false,
+    }
+  } catch {
+    const today = new Date().toISOString().slice(0, 10)
+    return {
+      path: null,
+      markdown: renderDashboardMarkdown(dashboard(today), today),
+      mtime: null,
+      generated: true,
+    }
+  }
 }
 
 /** All handoffs in scope (story 3.2) — lib collector, never app-side note parsing. */

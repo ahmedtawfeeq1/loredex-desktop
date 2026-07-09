@@ -10,10 +10,13 @@ import { useApp } from './stores/app'
 import { useHandoffs } from './stores/handoffs'
 import { useReader } from './stores/reader'
 import { openCount } from '../../shared/handoff-lanes'
+import { useSearch } from './stores/search'
 import { Board } from './views/handoffs/Board'
 import { Diagnostics } from './views/reader/Diagnostics'
 import { NoteView } from './views/reader/NoteView'
 import { VaultTree } from './views/reader/VaultTree'
+import { Palette } from './views/search/Palette'
+import { SearchView } from './views/search/SearchView'
 import { SettingsView } from './views/settings/SettingsView'
 
 function EmptyVault(): React.JSX.Element {
@@ -42,9 +45,23 @@ export default function App(): React.JSX.Element {
     return onVaultChanged(() => {
       useReader.getState().reset()
       useHandoffs.getState().reset()
+      useSearch.getState().reset()
       void init()
     })
   }, [init])
+
+  useEffect(() => {
+    // global Cmd+K: the palette works from every view (story 2.4)
+    function onKey(e: KeyboardEvent): void {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        const s = useSearch.getState()
+        s.setPaletteOpen(!s.paletteOpen)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(
     // notification click (story 3.7): a handoff path opens the brief in the
@@ -86,6 +103,15 @@ export default function App(): React.JSX.Element {
           <button
             type="button"
             className="nav-item"
+            aria-current={view === 'search'}
+            title="Search the vault (⌘K)"
+            onClick={() => setView('search')}
+          >
+            Search
+          </button>
+          <button
+            type="button"
+            className="nav-item"
             aria-current={view === 'settings'}
             onClick={() => setView('settings')}
           >
@@ -98,6 +124,10 @@ export default function App(): React.JSX.Element {
         view === 'handoffs' ? (
           <main className="pane-board">
             <Board />
+          </main>
+        ) : view === 'search' ? (
+          <main className="pane-board">
+            <SearchView />
           </main>
         ) : view === 'settings' ? (
           <main className="pane-board">
@@ -117,6 +147,7 @@ export default function App(): React.JSX.Element {
       ) : (
         <div className="empty-state" />
       )}
+      <Palette />
     </div>
   )
 }

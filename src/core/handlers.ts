@@ -6,12 +6,13 @@ import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
 import * as engine from './engine'
+import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { getMcpStatus } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import { loadIdentityProfile, saveIdentityProfile, saveMcpPortOverride } from './settings'
-import { walkVault } from './tree'
+import { listMarkdownFiles, walkVault } from './tree'
 import { withWriteLock } from './write-lock'
 
 export function registerCoreHandlers(
@@ -32,17 +33,25 @@ export function registerCoreHandlers(
   ipc.register('app.identity', () => engine.identity())
   ipc.register('vault.readNote', ({ path }) => engine.readNote(path))
   ipc.register('vault.tree', () => {
-    // the manual refresh re-walks the tree — rebuild the link index with it,
-    // and run the new-handoff check (story 3.7 refresh trigger)
+    // the manual refresh re-walks the tree — rebuild the link index and the
+    // facet cache with it, and run the new-handoff check (story 3.7 trigger)
     invalidateLinkIndex()
+    clearFacetCache()
     notifier.refresh()
     return walkVault(engine.getConfig().vaultPath)
   })
   ipc.register('vault.resolveLink', ({ link, from }) =>
     resolveLink(engine.getConfig().vaultPath, link, from),
   )
-  // `facets` is accepted by the contract but ignored until story 2.4
-  ipc.register('vault.search', ({ q }) => engine.search(q))
+  // full-text ranking is the lib's searchVault; facets narrow by frontmatter
+  // app-side (story 2.4). Wider limit so narrowing has material to work on.
+  ipc.register('vault.search', ({ q, facets }) =>
+    filterHits(engine.search(q, 50), facets, engine.noteMeta),
+  )
+  ipc.register('vault.facets', () => {
+    const vaultPath = engine.getConfig().vaultPath
+    return aggregateFacetValues(vaultPath, listMarkdownFiles(vaultPath), engine.noteMeta)
+  })
   ipc.register('handoffs.list', ({ scope, project }) => {
     // every board fetch doubles as the new-handoff check (story 3.7)
     const all = notifier.refresh()

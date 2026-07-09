@@ -55,10 +55,24 @@ export interface TreeNode {
   children?: TreeNode[]
 }
 
+/** Frontmatter facets narrowing full-text hits (story 2.4). Values come from
+ *  the vault's own frontmatter (aggregated, never hardcoded). */
 export interface Facets {
   project?: string
+  topic?: string
   type?: string
   status?: string
+  /** handoff route facets: sending / receiving project */
+  from?: string
+  to?: string
+}
+
+/** Facet vocabulary aggregated from vault frontmatter (story 2.4). */
+export interface FacetValues {
+  projects: string[]
+  topics: string[]
+  types: string[]
+  statuses: string[]
 }
 
 /** Wikilink resolution result (story 2.2) — read-only view logic, app-side. */

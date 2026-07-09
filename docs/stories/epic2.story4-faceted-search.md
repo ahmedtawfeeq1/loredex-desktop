@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -19,15 +19,15 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Core-side facets (AC: 2)
-  - [ ] Define `Facets` in `src/shared/types.ts`: `{ project?, topic?, type?, status?, from?, to? }`
-  - [ ] Extend the `vault.search` handler: run `searchVault(q)`, then filter hits by frontmatter facets (parse via `parseDoc` on hit paths, memoized per mtime)
-- [ ] Search view (AC: 1, 3)
-  - [ ] `views/search/SearchView.tsx`: query input + facet dropdowns (values aggregated from vault frontmatter via a small `vault.facetValues`-style aggregation — implement inside the existing `vault.search` handler family or a memoized core-side aggregate exposed on the search response), result list with title/project/highlighted snippet, Enter/click → reader
-- [ ] Cmd+K palette (AC: 1, 3)
-  - [ ] `views/search/Palette.tsx`: global Cmd+K overlay, same `vault.search` backend, keyboard-first (arrows + Enter), recent-notes fallback when the query is empty
-- [ ] Performance (AC: 4)
-  - [ ] Debounce input (150 ms); memoize frontmatter parses; measure against a generated 1,000-note fixture and record the number in the story's Completion Notes
+- [x] Core-side facets (AC: 2)
+  - [x] Define `Facets` in `src/shared/types.ts`: `{ project?, topic?, type?, status?, from?, to? }`
+  - [x] Extend the `vault.search` handler: run `searchVault(q)`, then filter hits by frontmatter facets (parse via `parseDoc` on hit paths, memoized per mtime)
+- [x] Search view (AC: 1, 3)
+  - [x] `views/search/SearchView.tsx`: query input + facet dropdowns (values aggregated from vault frontmatter via a small `vault.facetValues`-style aggregation — implement inside the existing `vault.search` handler family or a memoized core-side aggregate exposed on the search response), result list with title/project/highlighted snippet, Enter/click → reader
+- [x] Cmd+K palette (AC: 1, 3)
+  - [x] `views/search/Palette.tsx`: global Cmd+K overlay, same `vault.search` backend, keyboard-first (arrows + Enter), recent-notes fallback when the query is empty
+- [x] Performance (AC: 4)
+  - [x] Debounce input (150 ms); memoize frontmatter parses; measure against a generated 1,000-note fixture and record the number in the story's Completion Notes
 
 ## Dev Notes
 
@@ -53,10 +53,31 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (BMAD dev agent)
+
 ### Debug Log References
+
+- `npx vitest run src/core/facets.test.ts` → 9 passed; `[perf] 1000-note faceted search: 42.4 ms` (gate: <500 ms)
+- `npx vitest run src/renderer/src/views/search/palette-nav.test.ts` → 8 passed
+- `npm run build` green
 
 ### Completion Notes List
 
+- Full-text = lib `searchVault` via `engine.search(q, 50)` (limit widened from the lib's default 10 so facet narrowing has material — recorded decision); facets narrow app-side in `src/core/facets.ts`.
+- project/topic/status ride the `SearchHit` itself; type/from/to lazily parse hit frontmatter through an mtime-keyed memo (`memoizedMeta`) — mtime keying self-invalidates on file change, and the manual refresh (`vault.tree`) clears the cache outright, which is the v0.1 stand-in for story 2.3's `vault.changed` hook (no watcher in v0.1 — scope cut).
+- Facet vocabulary: new app-local `vault.facets` channel aggregates projects (tree segments + handoff from/to) and topic/type/status values from the vault as-is — nothing hardcoded.
+- Palette: generic keyboard-first command list (`palette-nav.ts` pure helpers unit-tested; search is the first item provider, recents the empty-query provider). Recents tracked by subscribing to reader selections. Overlay on `--bg-raised`, ink selection rail, mono footer hints — DESIGN.md tokens.
+- Both surfaces share one zustand store (`stores/search.ts`): 150 ms debounce on keystrokes, immediate re-query on facet flips, stale-response guard (seq).
+- Perf on generated 1,000-note vault: 42.4 ms for search + facet narrowing (memo cold), 12× under the 500 ms AC.
+
 ### File List
+
+- `src/core/facets.ts` (new), `src/core/facets.test.ts` (new)
+- `src/core/engine.ts` (`search(q, limit)`, `noteMeta`)
+- `src/core/handlers.ts` (`vault.search` facets, `vault.facets`, cache clear on refresh)
+- `src/shared/types.ts` (`Facets` extended, `FacetValues`), `src/shared/ipc-contract.ts` (`vault.facets`)
+- `src/renderer/src/stores/search.ts` (new)
+- `src/renderer/src/views/search/SearchView.tsx`, `Palette.tsx`, `palette-nav.ts`, `palette-nav.test.ts` (new)
+- `src/renderer/src/App.tsx` (Search nav, Cmd+K listener, palette mount), `src/renderer/src/stores/app.ts` (view union), `styles.css` (search + palette blocks)
 
 ## QA Results

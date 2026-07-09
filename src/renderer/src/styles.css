@@ -1062,3 +1062,194 @@ a {
   font-size: 11px;
   color: var(--rust);
 }
+
+/* ── search view (story 2.4) ───────────────────────────────────────────── */
+
+.search {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.search-controls {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-input,
+.palette-input {
+  font: inherit;
+  color: var(--text-1);
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 5px 8px;
+  width: 100%;
+}
+
+.facet-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.facet {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.facet select {
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-1);
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  padding: 2px 4px;
+}
+
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0 16px;
+}
+
+.search-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 12px 6px 8px;
+  border-left: 4px solid transparent;
+  transition:
+    background 100ms ease-out,
+    border-color 100ms ease-out;
+}
+
+.search-row:hover {
+  background: color-mix(in srgb, var(--text-1) 6%, transparent);
+}
+
+.search-row[aria-current='true'] {
+  border-left-color: var(--ink);
+  background: var(--bg-raised);
+}
+
+.search-row-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.search-row-meta {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  padding: 1px 0;
+}
+
+.search-row-snippet {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.search-row mark,
+.palette-item mark {
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+/* ── Cmd+K palette (story 2.4): overlay on --bg-raised ─────────────────── */
+
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.palette {
+  margin-top: 96px;
+  width: 560px;
+  max-width: calc(100vw - 48px);
+  background: var(--bg-raised);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.palette-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.palette-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px 5px 4px;
+  border-left: 4px solid transparent;
+  border-radius: 0 5px 5px 0;
+}
+
+.palette-item[aria-current='true'] {
+  border-left-color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.palette-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-item-meta {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.palette-empty {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--text-2);
+  padding: 8px 4px;
+}
+
+.palette-foot {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-2);
+  border-top: 1px solid var(--hairline);
+  padding: 6px 4px 0;
+}

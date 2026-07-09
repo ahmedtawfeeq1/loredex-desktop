@@ -8,6 +8,7 @@ import type {
   ActivityEvent,
   ConsumeReceipt,
   Facets,
+  FacetValues,
   HandoffCard,
   Identity,
   IdentitySettings,
@@ -35,6 +36,9 @@ export interface CoreApi {
   /** app-local contract evolution (story 2.1): read-only markdown tree of the vault */
   'vault.tree': { in: void; out: TreeNode[] }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
+  /** app-local contract evolution (story 2.4): facet dropdown vocabulary,
+   *  aggregated core-side from vault frontmatter (memoized per mtime) */
+  'vault.facets': { in: void; out: FacetValues }
   'vault.resolveLink': { in: { link: string; from: string }; out: LinkResolution }
   /** app-local contract evolution (story 3.2): optional project qualifier — lib
    *  HandoffScope semantics: inbox/outbox are relative to `project`; without it

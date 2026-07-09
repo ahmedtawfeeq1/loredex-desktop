@@ -64,8 +64,13 @@ export function readNote(path: string): Doc {
   return parseDoc(readFileSync(resolved, 'utf8'))
 }
 
-export function search(q: string): SearchHit[] {
-  return searchVault(getConfig().vaultPath, q)
+export function search(q: string, limit?: number): SearchHit[] {
+  return searchVault(getConfig().vaultPath, q, limit === undefined ? {} : { limit })
+}
+
+/** Parsed frontmatter of one note (facet narrowing, story 2.4) — read-only. */
+export function noteMeta(absPath: string): Record<string, unknown> {
+  return parseDoc(readFileSync(absPath, 'utf8')).meta as Record<string, unknown>
 }
 
 /** All handoffs in scope (story 3.2) — lib collector, never app-side note parsing. */

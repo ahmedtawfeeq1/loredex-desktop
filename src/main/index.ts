@@ -7,6 +7,7 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, Menu, MessageChannelMain, utilityProcess } from 'electron'
 import { loadVaultPath, pickVaultDialog, saveVaultPath } from './dialogs'
+import { handleCoreMessage } from './notifications'
 import { createMainWindow } from './windows'
 
 let core: Electron.UtilityProcess | null = null
@@ -21,6 +22,8 @@ function forkCoreHost(): void {
   core = utilityProcess.fork(join(import.meta.dirname, 'core.js'), args, {
     serviceName: 'loredex-core',
   })
+  // story 3.7: notification/badge display requests from the core host
+  core.on('message', handleCoreMessage)
   core.on('exit', (code) => {
     core = null
     if (quitting) return

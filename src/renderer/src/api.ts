@@ -11,6 +11,7 @@ declare global {
       onEvent(cb: (e: CoreEvent) => void): Unsubscribe
       pickVault(): Promise<string | null>
       onVaultChanged(cb: (vaultPath: string) => void): Unsubscribe
+      onOpenHandoff(cb: (relPath: string) => void): Unsubscribe
     }
   }
 }
@@ -33,4 +34,9 @@ export function pickVault(): Promise<string | null> {
 
 export function onVaultChanged(cb: (vaultPath: string) => void): Unsubscribe {
   return window.loredex.onVaultChanged(cb)
+}
+
+/** Notification click (story 3.7): '' = batched summary → the board. */
+export function onOpenHandoff(cb: (relPath: string) => void): Unsubscribe {
+  return window.loredex.onOpenHandoff(cb)
 }

@@ -63,6 +63,24 @@ export type CoreEvent =
   | { kind: 'sync.changed'; health: SyncHealth }
   | { kind: 'git.warning'; text: string } // F8: surface stderr, never swallow
 
+// ── Core → main control channel (story 3.7) ────────────────────────────────
+// The core host DECIDES (filter, dedupe, batch); main only DISPLAYS (native
+// Notification + dock badge). Travels over process.parentPort, not the seam.
+
+export type MainControlMessage =
+  | { t: 'notify'; title: string; body: string; relPath: string }
+  | { t: 'badge'; count: number }
+
+export function isMainControlMessage(v: unknown): v is MainControlMessage {
+  if (typeof v !== 'object' || v === null || !('t' in v)) return false
+  const m = v as MainControlMessage
+  if (m.t === 'notify') {
+    return typeof m.title === 'string' && typeof m.body === 'string' && typeof m.relPath === 'string'
+  }
+  if (m.t === 'badge') return typeof m.count === 'number'
+  return false
+}
+
 // ── Error envelope ──────────────────────────────────────────────────────────
 
 /**

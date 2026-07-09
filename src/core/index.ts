@@ -19,7 +19,11 @@ const config = initEngine(vaultOverride)
 const userDataFlag = process.argv.indexOf('--user-data')
 initSettings(userDataFlag !== -1 ? process.argv[userDataFlag + 1] : undefined)
 const ipc = createCoreIpc()
-registerCoreHandlers(ipc)
+// Display requests (native notifications, dock badge) go to main over the
+// control channel — core decides, main displays (story 3.7).
+const notifier = registerCoreHandlers(ipc, (msg) => process.parentPort.postMessage(msg))
+// Startup check: seed the snapshot + set the badge before any user action.
+notifier.refresh()
 
 function mainPortAdapter(port: Electron.MessagePortMain): PortLike {
   return {

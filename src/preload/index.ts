@@ -39,4 +39,10 @@ contextBridge.exposeInMainWorld('loredex', {
     ipcRenderer.on('vault-changed', listener)
     return () => ipcRenderer.removeListener('vault-changed', listener)
   },
+  // story 3.7: notification click → deep-navigate ('' = open the board)
+  onOpenHandoff: (cb: (relPath: string) => void): (() => void) => {
+    const listener = (_e: unknown, relPath: string): void => cb(relPath)
+    ipcRenderer.on('open-handoff', listener)
+    return () => ipcRenderer.removeListener('open-handoff', listener)
+  },
 })

@@ -32,12 +32,12 @@ development_status:
 
   epic-3: in-progress      # Handoffs, Consume & Notifications
   3-1-loredex-pr1-listhandoffs: done
-  3-2-inbox-outbox-board: ready-for-dev
+  3-2-inbox-outbox-board: done
   3-3-loredex-pr2-consume-schema: done
-  3-4-in-app-consume-identity: ready-for-dev
+  3-4-in-app-consume-identity: done
   3-5-remote-event-poller-write-lock: ready-for-dev
   3-6-read-state-store-appdb: ready-for-dev
-  3-7-native-notifications-badge: ready-for-dev
+  3-7-native-notifications-badge: done
   epic-3-retrospective: optional
 
   epic-4: backlog          # Routing Safety
@@ -63,4 +63,11 @@ development_status:
   6-3-e2e-nimbus-suite: ready-for-dev
   epic-6-retrospective: optional
 
-action_items: []
+action_items:
+  - loredex lib: HandoffCard.id (note basename) is NOT unique across projects — nimbus vault has
+    two open "2026-07-09-handoff-nimbus-backend-2" (to frontend and to mobile); consumeHandoff
+    picks the first match and the board keys collide. Fix in lib (qualify id or consume by path).
+  - release-time TODO: package.json pins loredex as file:../loredex (local link while lib PRs
+    land); switch to the published pinned 2.x version before release.
+  - story 3.7 leftovers for 3.6/6.3: snooze respect needs the app.db store; two-clone latency
+    test rides the Playwright harness.

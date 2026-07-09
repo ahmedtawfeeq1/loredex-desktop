@@ -4,7 +4,7 @@
  * (open-count badge), Settings.
  */
 import { useEffect } from 'react'
-import { onVaultChanged } from './api'
+import { onOpenHandoff, onVaultChanged } from './api'
 import { IdentityBadge } from './components/IdentityBadge'
 import { useApp } from './stores/app'
 import { useHandoffs } from './stores/handoffs'
@@ -45,6 +45,21 @@ export default function App(): React.JSX.Element {
       void init()
     })
   }, [init])
+
+  useEffect(
+    // notification click (story 3.7): a handoff path opens the brief in the
+    // reader; a batched summary ('') opens the board
+    () =>
+      onOpenHandoff((relPath) => {
+        if (relPath) {
+          setView('reader')
+          void useReader.getState().open(relPath)
+        } else {
+          setView('handoffs')
+        }
+      }),
+    [setView],
+  )
 
   return (
     <div className="app">

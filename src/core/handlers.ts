@@ -4,21 +4,37 @@
  */
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
-import { ipcError } from '../shared/ipc-contract'
+import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
 import * as engine from './engine'
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
+import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import { loadIdentityProfile, saveIdentityProfile } from './settings'
 import { walkVault } from './tree'
 import { withWriteLock } from './write-lock'
 
-export function registerCoreHandlers(ipc: CoreIpc): void {
+export function registerCoreHandlers(
+  ipc: CoreIpc,
+  // story 3.7: display requests travel core → main; tests default to a no-op
+  postToMain: (msg: MainControlMessage) => void = () => {},
+): HandoffNotifier {
+  // v0.1 has no poller — the notification/badge check rides every refresh action
+  const notifier = createHandoffNotifier({
+    listAll: () => engine.handoffs({ direction: 'all' }),
+    myProjects: () => engine.registeredProjects(),
+    vaultPath: () => engine.getConfig().vaultPath,
+    post: postToMain,
+    emit: (event) => ipc.emit(event),
+  })
+
   ipc.register('config.get', () => engine.getConfig())
   ipc.register('app.identity', () => engine.identity())
   ipc.register('vault.readNote', ({ path }) => engine.readNote(path))
   ipc.register('vault.tree', () => {
-    // the manual refresh re-walks the tree — rebuild the link index with it
+    // the manual refresh re-walks the tree — rebuild the link index with it,
+    // and run the new-handoff check (story 3.7 refresh trigger)
     invalidateLinkIndex()
+    notifier.refresh()
     return walkVault(engine.getConfig().vaultPath)
   })
   ipc.register('vault.resolveLink', ({ link, from }) =>
@@ -26,9 +42,12 @@ export function registerCoreHandlers(ipc: CoreIpc): void {
   )
   // `facets` is accepted by the contract but ignored until story 2.4
   ipc.register('vault.search', ({ q }) => engine.search(q))
-  ipc.register('handoffs.list', ({ scope, project }) =>
-    engine.handoffs(project ? { direction: scope, project } : { direction: scope }),
-  )
+  ipc.register('handoffs.list', ({ scope, project }) => {
+    // every board fetch doubles as the new-handoff check (story 3.7)
+    const all = notifier.refresh()
+    if (!project) return all // company-wide: direction is ignored without a project
+    return engine.handoffs({ direction: scope, project })
+  })
   // Consume is a lib write op: write lock (3.5 shim) + per-command git identity.
   ipc.register('handoffs.consume', ({ id, identity }) =>
     withWriteLock(() => {
@@ -39,6 +58,7 @@ export function registerCoreHandlers(ipc: CoreIpc): void {
       const rel = toVaultRelative(receipt.path, engine.getConfig().vaultPath)
       ipc.emit({ kind: 'handoff.stateChanged', id, from: 'open', to: 'consumed', by: identity })
       ipc.emit({ kind: 'vault.changed', paths: [rel] })
+      notifier.refresh() // badge drops immediately (story 3.7 AC3)
       return receipt
     }),
   )
@@ -52,4 +72,6 @@ export function registerCoreHandlers(ipc: CoreIpc): void {
     }
     saveIdentityProfile(identity)
   })
+
+  return notifier
 }

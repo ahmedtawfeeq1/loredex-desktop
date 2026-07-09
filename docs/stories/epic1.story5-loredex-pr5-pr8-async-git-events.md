@@ -61,6 +61,9 @@ Approved
 
 ### Completion Notes List
 
+- PARTIAL (PR-8 subset only, landed as a prerequisite of epic3.story3): injectable typed emitter in `loredex/src/core/events.ts` (`LoredexEmitter`, `LoredexEventMap`, `setLoredexEmitter`, `noopEmitter`, `Identity`) with emissions from route (`executePlan`), `storeNote`, consume, and `gitPullPush`; default no-op keeps CLI byte-identical; exported from `lib.ts`; tests in `tests/events.test.ts` (loredex commit 99a134d).
+- PR-5 (async git variants + `SyncReport`) NOT implemented — none of the four v0.1 lib exports need it; story remains open for that half.
+
 ### File List
 
 ## QA Results

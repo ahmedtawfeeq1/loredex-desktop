@@ -5,33 +5,10 @@
  * Rule: never inline-duplicate these anywhere else (architecture.md#coding-standards #2).
  */
 
-// ── loredex stubs (replaced by lib PRs) ─────────────────────────────────────
+// ── loredex payload types (landed lib PRs re-exported; rest still stubbed) ──
 
-/** (lib PR-1) */
-export interface HandoffCard {
-  id: string
-  name: string
-  from: string
-  to: string
-  objective: string
-  date: string
-  status: string
-  path: string
-}
-
-/** (lib PR-2) */
-export interface Identity {
-  name: string
-  email: string
-}
-
-/** (lib PR-2) */
-export interface ConsumeReceipt {
-  id: string
-  handoffId: string
-  by: Identity
-  at: string
-}
+/** (lib PR-1, PR-2, PR-4, PR-6 — landed, local file: dep) */
+export type { ActivityEvent, ConsumeReceipt, HandoffCard, Identity, SyncHealth } from 'loredex'
 
 /** (lib PR-3) */
 export interface RoutePreview {
@@ -41,29 +18,11 @@ export interface RoutePreview {
   receiptId?: string
 }
 
-/** (lib PR-4) */
-export interface SyncHealth {
-  state: 'ok' | 'behind' | 'dirty' | 'error'
-  behind: number
-  ahead: number
-  lastSync?: string
-  warnings: string[]
-}
-
 /** (lib PR-5) */
 export interface SyncReport {
   pulled: number
   pushed: boolean
   warnings: string[]
-}
-
-/** (lib PR-6) */
-export interface ActivityEvent {
-  at: string
-  kind: string
-  who: string
-  summary: string
-  path?: string
 }
 
 // ── app-local view types (permanent) ────────────────────────────────────────

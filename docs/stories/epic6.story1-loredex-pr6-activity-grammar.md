@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -18,12 +18,12 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Grammar + parser (AC: 1)
-  - [ ] In the loredex repo: define `ActivityEvent` — `{ kind: 'route'|'consume'|'handoff'|'sync'; actor: {name, email}; at: ISO; subject: {path?, handoffId?, project?}; summary: string; sha: string }`
-  - [ ] `parseActivity(gitLog)`: parse structured git log output (commit message conventions the engine already writes via `gitAutoCommit`, plus name-status paths) into events; unknown commits → a generic `sync`-kind event, never dropped silently
-  - [ ] Document the commit-message grammar it relies on so future engine writes stay parseable (one grammar, lib-owned)
-- [ ] Export + release (AC: 2, 3)
-  - [ ] Export `parseActivity` + `ActivityEvent` from `lib.ts`; tests; release; desktop pin bump; replace the `ActivityEvent` stub in `src/shared/types.ts`
+- [x] Grammar + parser (AC: 1)
+  - [x] In the loredex repo: define `ActivityEvent` — `{ kind: 'route'|'consume'|'handoff'|'sync'; actor: {name, email}; at: ISO; subject: {path?, handoffId?, project?}; summary: string; sha: string }`
+  - [x] `parseActivity(gitLog)`: parse structured git log output (commit message conventions the engine already writes via `gitAutoCommit`, plus name-status paths) into events; unknown commits → a generic `sync`-kind event, never dropped silently
+  - [x] Document the commit-message grammar it relies on so future engine writes stay parseable (one grammar, lib-owned)
+- [x] Export + release (AC: 2, 3)
+  - [x] Export `parseActivity` + `ActivityEvent` from `lib.ts`; tests; release; desktop pin bump; replace the `ActivityEvent` stub in `src/shared/types.ts`
 
 ## Dev Notes
 
@@ -47,10 +47,24 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (Claude Code)
+
 ### Debug Log References
+
+- loredex repo: `npm run typecheck` clean; `npm run lint` clean; `npm test` 115/115 green; `npm run build` OK (commit 95c04cc)
+- Manual: `parseActivity` over the nimbus vault's real git log — 30 commits typed as handoff/route/consume/sync with correct actors/subjects
 
 ### Completion Notes List
 
+- `parseActivity(gitLog)` + `ActivityEvent` in new `loredex/src/core/activity.ts`: `{kind: route|consume|handoff|sync, actor {name,email}, at ISO, subject {path?, handoffId?, project?}, summary, sha}`; identity from commit author; unknown commits become generic `sync` events (never dropped); malformed records skipped without throwing; input (newest-first) order preserved.
+- `ACTIVITY_LOG_ARGS` exported so every caller invokes `git log` identically (record/unit separators + `--name-status`); the engine commit-message grammar is documented in the module JSDoc (route/consume/handoff patterns from `gitAutoCommit` call sites).
+- Desktop `ActivityEvent` stub replaced with the lib type.
+- Tests: each event kind, unknown-commit fallback, malformed-line resilience, ordering stability, and a real-git end-to-end parse using `ACTIVITY_LOG_ARGS`.
+- DEVIATION: no npm release/pin bump — local `file:` dep; release-time TODO.
+
 ### File List
+
+- loredex: src/core/activity.ts (new), src/lib.ts, tests/activity.test.ts (commit 95c04cc)
+- loredex-desktop: src/shared/types.ts
 
 ## QA Results

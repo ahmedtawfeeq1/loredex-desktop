@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -18,14 +18,14 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Generalize the collector (AC: 1)
-  - [ ] In the loredex repo: extract/extend `collectProductHandoffs` into `listHandoffs(scope: { direction: 'inbox'|'outbox'|'all'; project?: string })`
-  - [ ] Define + export `HandoffCard`: id, from/to project, objective, created date, status (open/consumed vocabulary in M1), note path, reading-order refs
-  - [ ] Company-wide = no `project` filter; per-project = filtered lanes
-- [ ] CLI rewire (AC: 2)
-  - [ ] Point the CLI's handoff-listing command at `listHandoffs`; output byte-compatible (snapshot test)
-- [ ] Release (AC: 3)
-  - [ ] Unit tests; loredex release; bump the desktop exact pin; replace the `HandoffCard` stub in `loredex-desktop/src/shared/types.ts` with `import type { HandoffCard } from 'loredex'`
+- [x] Generalize the collector (AC: 1)
+  - [x] In the loredex repo: extract/extend `collectProductHandoffs` into `listHandoffs(scope: { direction: 'inbox'|'outbox'|'all'; project?: string })`
+  - [x] Define + export `HandoffCard`: id, from/to project, objective, created date, status (open/consumed vocabulary in M1), note path, reading-order refs
+  - [x] Company-wide = no `project` filter; per-project = filtered lanes
+- [x] CLI rewire (AC: 2)
+  - [x] Point the CLI's handoff-listing command at `listHandoffs`; output byte-compatible (snapshot test)
+- [x] Release (AC: 3)
+  - [x] Unit tests; loredex release; bump the desktop exact pin; replace the `HandoffCard` stub in `loredex-desktop/src/shared/types.ts` with `import type { HandoffCard } from 'loredex'`
 
 ## Dev Notes
 
@@ -50,10 +50,24 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (Claude Code)
+
 ### Debug Log References
+
+- loredex repo: `npm run typecheck` clean; `npm run lint` clean; `npm test` 115/115 green; `npm run build` OK (commit e9e8601)
+- CLI parity verified via inline snapshot test + manual run against the nimbus simulation vault
 
 ### Completion Notes List
 
+- `listHandoffs(vaultPath, scope, today?)` added in `loredex/src/core/product.ts`; `HandoffCard extends ProductHandoff` with `id` + `readingOrder` (parsed from the "## Reading order" section). `collectProductHandoffs` is now a thin wrapper over it (one collector).
+- CLI `handoffs` listing and MCP `handoffs_open` rewired onto the export; CLI output byte-compatible (path-sorted to match the old walk order; inline-snapshot parity test).
+- Exported from `lib.ts`: `listHandoffs`, `HandoffCard`, `HandoffScope`.
+- Desktop `HandoffCard` stub replaced with `export type { HandoffCard } from 'loredex'` in `src/shared/types.ts`.
+- DEVIATION (sanctioned scope cut): no npm release/pin bump — the desktop uses `"loredex": "file:../loredex"` with dist rebuilt. Release-time TODO: publish loredex and pin the exact version.
+
 ### File List
+
+- loredex: src/core/product.ts, src/commands/handoff.ts, src/mcp/server.ts, src/lib.ts, tests/listhandoffs.test.ts (commit e9e8601)
+- loredex-desktop: src/shared/types.ts
 
 ## QA Results

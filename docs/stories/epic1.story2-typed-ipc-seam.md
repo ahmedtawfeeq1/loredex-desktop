@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,20 +20,20 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Author the contract (AC: 1)
-  - [ ] Copy the `CoreApi` map + `CoreEvent` union verbatim from the architecture IPC contract into `src/shared/ipc-contract.ts`
-  - [ ] Add `src/shared/types.ts` with local stubs for types not yet exported by loredex (`HandoffCard`, `ConsumeReceipt`, `RoutePreview`, `SyncHealth`, `SyncReport`, `ActivityEvent`, `Identity`) plus app-local `Facets`, `LinkResolution`, `WizardInput`, `WizardResult` — marked with the lib PR that will replace each
-  - [ ] Define the error envelope type `{ code, message, detail? }` and the `IpcCode` union (`NOT_IMPLEMENTED`, `VAULT_OUTSIDE_PATH`, `LOCK_BUSY`, `GIT_FAILED`, `PORT_CONFLICT`)
-- [ ] Core-side dispatcher (AC: 2, 4)
-  - [ ] `src/core/ipc.ts`: message envelope `{id, ch, arg}` → handler registry `register<K>(ch, handler)`; responses `{id, ok, out}` or `{id, ok:false, err}`
-  - [ ] `emit(event: CoreEvent)` broadcast helper on the event channel
-  - [ ] Unknown channel → `NOT_IMPLEMENTED` envelope; handler throw → caught, wrapped, never crashes the host
-- [ ] Renderer side (AC: 2, 3)
-  - [ ] `src/preload/index.ts`: receive the brokered port, expose `contextBridge.exposeInMainWorld('loredex', { invoke, onEvent })` and nothing else
-  - [ ] `src/renderer/src/api.ts`: typed `invoke<K extends keyof CoreApi>` promise wrapper (correlation by id, timeout), `onEvent(cb): Unsubscribe`
-  - [ ] Survive port re-broker (Story 1.1 respawn): pending invokes rejected with a retryable envelope, listeners re-attached to the new port
-- [ ] Tests (AC: 5)
-  - [ ] Unit tests with an in-memory MessageChannel: round-trip, unknown channel, handler throw, event fan-out to multiple listeners, port-swap recovery
+- [x] Author the contract (AC: 1)
+  - [x] Copy the `CoreApi` map + `CoreEvent` union verbatim from the architecture IPC contract into `src/shared/ipc-contract.ts`
+  - [x] Add `src/shared/types.ts` with local stubs for types not yet exported by loredex (`HandoffCard`, `ConsumeReceipt`, `RoutePreview`, `SyncHealth`, `SyncReport`, `ActivityEvent`, `Identity`) plus app-local `Facets`, `LinkResolution`, `WizardInput`, `WizardResult` — marked with the lib PR that will replace each
+  - [x] Define the error envelope type `{ code, message, detail? }` and the `IpcCode` union (`NOT_IMPLEMENTED`, `VAULT_OUTSIDE_PATH`, `LOCK_BUSY`, `GIT_FAILED`, `PORT_CONFLICT`)
+- [x] Core-side dispatcher (AC: 2, 4)
+  - [x] `src/core/ipc.ts`: message envelope `{id, ch, arg}` → handler registry `register<K>(ch, handler)`; responses `{id, ok, out}` or `{id, ok:false, err}`
+  - [x] `emit(event: CoreEvent)` broadcast helper on the event channel
+  - [x] Unknown channel → `NOT_IMPLEMENTED` envelope; handler throw → caught, wrapped, never crashes the host
+- [x] Renderer side (AC: 2, 3)
+  - [x] `src/preload/index.ts`: receive the brokered port, expose `contextBridge.exposeInMainWorld('loredex', { invoke, onEvent })` and nothing else
+  - [x] `src/renderer/src/api.ts`: typed `invoke<K extends keyof CoreApi>` promise wrapper (correlation by id, timeout), `onEvent(cb): Unsubscribe`
+  - [x] Survive port re-broker (Story 1.1 respawn): pending invokes rejected with a retryable envelope, listeners re-attached to the new port
+- [x] Tests (AC: 5)
+  - [x] Unit tests with an in-memory MessageChannel: round-trip, unknown channel, handler throw, event fan-out to multiple listeners, port-swap recovery
 
 ## Dev Notes
 
@@ -59,10 +59,30 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5) — BMAD dev agent
+
 ### Debug Log References
+
+- `npm run typecheck` green; `npm test` 11 passing (2 files); `npm run build` green.
 
 ### Completion Notes List
 
+- Contract transcribed verbatim (CoreApi map + CoreEvent union) into `src/shared/ipc-contract.ts` with wire protocol (`req`/`res`/`evt` + story-1.1 `ping`/`pong` liveness), error envelope, guards, and `PortLike` abstraction.
+- `src/shared/types.ts` holds lib-PR stubs (HandoffCard, ConsumeReceipt, RoutePreview, SyncHealth, SyncReport, ActivityEvent, Identity — each marked with its PR) plus permanent app-local view types (Facets, LinkResolution, WizardInput, WizardResult).
+- DEVIATION: `IpcCode` extended beyond the architecture's five codes with `INTERNAL` (non-envelope handler throw), `TIMEOUT`, `PORT_SWAPPED` (retryable, port re-broker), `NO_CONFIG` (used by story 1.3 when no config is resolved yet). The architecture says codes "include" the five, so this is an allowed extension.
+- DEVIATION (file placement): the client wrapper lives in `src/shared/ipc-client.ts` (not in the architecture source tree) because the preload owns the port — correlation/timeout/port-swap logic must run there, and shared placement keeps it unit-testable in plain node. `src/renderer/src/api.ts` is the thin typed re-export over `window.loredex`.
+- Temporary local stubs for `Config`/`Doc`/`SearchHit`/`ProductDashboard` in the contract — story 1.3 replaces them with `import type from 'loredex'`.
+- Port swap: pending invokes rejected with `PORT_SWAPPED` + `detail.retryable: true`; pre-attach invokes are buffered and flushed on first attach; event listeners live in the client so they survive swaps.
+
 ### File List
+
+- src/shared/ipc-contract.ts (rewritten: full contract + wire protocol + envelope + PortLike)
+- src/shared/types.ts (new)
+- src/shared/ipc-client.ts (new — client wrapper used by preload)
+- src/core/ipc.ts (new — dispatcher + event fan-out)
+- src/core/index.ts (attaches brokered ports to the dispatcher)
+- src/preload/index.ts (contextBridge exposes window.loredex only)
+- src/renderer/src/api.ts (new — typed invoke/onEvent)
+- src/shared/ipc-contract.test.ts, src/core/ipc.test.ts (11 tests)
 
 ## QA Results

@@ -86,6 +86,24 @@ export interface IdentitySettings {
   ambient: Identity | null
 }
 
+/**
+ * In-app MCP server state (story 1.6). Loud-failure port policy: 'port-conflict'
+ * renders as a prominent sync-health error with a settings override — the app
+ * never silently falls back to listen(0).
+ */
+export interface McpStatus {
+  state: 'running' | 'port-conflict' | 'stopped'
+  /** actually bound port when running (what the discovery file records) */
+  port: number | null
+  preferredPort: number
+  /** persisted settings override; null = default port */
+  portOverride: number | null
+  /** failure detail for the sync-health surface */
+  message: string | null
+  /** ~/.loredex/desktop.json when written */
+  discoveryPath: string | null
+}
+
 export interface WizardInput {
   mode: 'create' | 'join'
   vaultPath: string

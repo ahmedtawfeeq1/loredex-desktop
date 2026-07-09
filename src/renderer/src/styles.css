@@ -1056,3 +1056,9 @@ a {
   font-size: 11px;
   color: var(--ink);
 }
+
+.settings-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--rust);
+}

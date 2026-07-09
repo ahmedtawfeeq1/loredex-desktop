@@ -12,12 +12,14 @@ import {
   type Config,
   type ConsumeReceipt,
   consumeHandoff,
+  createLoredexMcpServer,
   type Doc,
   type HandoffCard,
   type HandoffScope,
   type Identity,
   listHandoffs,
   loadConfig,
+  LOREDEX_SCHEMA,
   parseDoc,
   resolveNoteInsideVault,
   type SearchHit,
@@ -89,6 +91,19 @@ export function consume(id: string, identity: Identity): ConsumeReceipt {
 /** The vault repo's git config identity — the settings form's default. */
 export function ambientIdentity(): Identity {
   return ambientGitIdentity(getConfig().vaultPath)
+}
+
+/**
+ * The lib MCP server over the once-resolved config (story 1.6) — the same
+ * factory the CLI stdio host uses: two hosts, zero duplicated tool logic.
+ */
+export function createMcpServer(): ReturnType<typeof createLoredexMcpServer> {
+  return createLoredexMcpServer(getConfig())
+}
+
+/** Vault frontmatter schema this engine writes — discovery-file schemaVersion. */
+export function schemaVersion(): number {
+  return LOREDEX_SCHEMA
 }
 
 /** Embedded engine version — read from the loredex package itself (F6 evidence). */

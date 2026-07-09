@@ -1,5 +1,6 @@
-/** Settings view (story 3.4): identity profile. More sections arrive with their stories. */
+/** Settings view (story 3.4): identity profile; MCP host section (story 1.6). */
 import { IdentityForm } from './IdentityForm'
+import { McpSection } from './McpSection'
 
 export function SettingsView(): React.JSX.Element {
   return (
@@ -8,6 +9,7 @@ export function SettingsView(): React.JSX.Element {
         <span className="pane-list-title">Settings</span>
       </div>
       <IdentityForm />
+      <McpSection />
     </div>
   )
 }

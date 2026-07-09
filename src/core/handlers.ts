@@ -8,8 +8,9 @@ import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
 import * as engine from './engine'
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
+import { getMcpStatus } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
-import { loadIdentityProfile, saveIdentityProfile } from './settings'
+import { loadIdentityProfile, saveIdentityProfile, saveMcpPortOverride } from './settings'
 import { walkVault } from './tree'
 import { withWriteLock } from './write-lock'
 
@@ -71,6 +72,15 @@ export function registerCoreHandlers(
       throw ipcError('INTERNAL', 'identity needs a name and a valid email')
     }
     saveIdentityProfile(identity)
+  })
+  // MCP host state + port override (story 1.6). The override applies on the
+  // next core-host start — no live rebind, the discovery file must stay true.
+  ipc.register('mcp.status', () => getMcpStatus())
+  ipc.register('settings.mcpPort.set', ({ port }) => {
+    if (port !== null && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
+      throw ipcError('INTERNAL', 'MCP port must be an integer between 1024 and 65535')
+    }
+    saveMcpPortOverride(port)
   })
 
   return notifier

@@ -12,6 +12,7 @@ import type {
   Identity,
   IdentitySettings,
   LinkResolution,
+  McpStatus,
   RoutePreview,
   SyncHealth,
   SyncReport,
@@ -44,6 +45,10 @@ export interface CoreApi {
    *  persisted in the core host's settings JSON (app.db seam, story 3.6) */
   'settings.identity.get': { in: void; out: IdentitySettings }
   'settings.identity.set': { in: Identity; out: void }
+  /** app-local contract evolution (story 1.6): MCP host state + port override.
+   *  The override applies on the next core-host start (vault switch or relaunch). */
+  'mcp.status': { in: void; out: McpStatus }
+  'settings.mcpPort.set': { in: { port: number | null }; out: void }
   'route.preview': { in: { file: string }; out: RoutePreview } // (lib PR-3)
   'route.undo': { in: { receiptId: string }; out: void } // (lib PR-3)
   'sync.status': { in: void; out: SyncHealth } // (lib PR-4)

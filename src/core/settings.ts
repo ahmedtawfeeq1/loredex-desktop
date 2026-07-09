@@ -6,6 +6,7 @@
  * only this module changes — the settings.identity.* channels stay put.
  * Main passes its userData dir at fork time; the core host owns the file.
  */
+import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isValidIdentity } from '../shared/identity'
@@ -26,13 +27,40 @@ function readAll(): Record<string, unknown> {
   }
 }
 
+function writeAll(patch: Record<string, unknown>): void {
+  if (!settingsFile) return
+  mkdirSync(join(settingsFile, '..'), { recursive: true })
+  writeFileSync(settingsFile, `${JSON.stringify({ ...readAll(), ...patch }, null, 2)}\n`)
+}
+
 export function loadIdentityProfile(): Identity | null {
   const { identity } = readAll()
   return isValidIdentity(identity) ? { name: identity.name, email: identity.email } : null
 }
 
 export function saveIdentityProfile(identity: Identity): void {
-  if (!settingsFile) return // no userData dir (unit tests without initSettings)
-  mkdirSync(join(settingsFile, '..'), { recursive: true })
-  writeFileSync(settingsFile, `${JSON.stringify({ ...readAll(), identity }, null, 2)}\n`)
+  writeAll({ identity })
+}
+
+// ── MCP host settings (story 1.6) ───────────────────────────────────────────
+
+/** Per-install bearer token: generated once, persisted in userData. */
+export function loadOrCreateMcpToken(): string {
+  const { mcpToken } = readAll()
+  if (typeof mcpToken === 'string' && mcpToken.length >= 32) return mcpToken
+  const token = randomBytes(32).toString('hex')
+  writeAll({ mcpToken: token })
+  return token
+}
+
+/** Settings override for the MCP port; null = preferred default (52017). */
+export function loadMcpPortOverride(): number | null {
+  const { mcpPort } = readAll()
+  return typeof mcpPort === 'number' && Number.isInteger(mcpPort) && mcpPort > 0 && mcpPort < 65536
+    ? mcpPort
+    : null
+}
+
+export function saveMcpPortOverride(port: number | null): void {
+  writeAll({ mcpPort: port })
 }

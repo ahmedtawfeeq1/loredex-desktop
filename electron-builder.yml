@@ -1,0 +1,16 @@
+# Loredex Desktop packaging — macOS arm64 only (architecture.md#distribution-constraints)
+# TODO(story 1.8): code signing + notarization (Developer ID, hardened runtime,
+# entitlements allow-jit only, inside-out signing, notarytool + staple). Out of scope for v0.1.
+appId: dev.loredex.desktop
+productName: Loredex
+directories:
+  output: dist
+files:
+  - out/**
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  minimumSystemVersion: '14.0'

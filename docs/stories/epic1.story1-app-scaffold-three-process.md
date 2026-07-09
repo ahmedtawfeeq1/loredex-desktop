@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -21,22 +21,22 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Scaffold the repo (AC: 1, 6)
-  - [ ] `npm create @quick-start/electron` (electron-vite) with the React + TS template; convert to ESM (`"type": "module"`)
-  - [ ] Pin exact versions per the tech-stack table (Electron 43.x, TypeScript 5.x, electron-vite 4.x, electron-builder 26.x, React 19.x); record exact pins in File List
-  - [ ] Add `electron-builder.yml`: `mac.target: [dmg, zip]`, `arch: [arm64]`, `LSMinimumSystemVersion: '14.0'`
-  - [ ] MIT `LICENSE`, README stub
-- [ ] Lay down the source tree skeleton (AC: 1)
-  - [ ] Create `src/main/`, `src/core/`, `src/preload/`, `src/renderer/src/`, `src/shared/` exactly per the architecture source tree; empty modules may export TODO stubs
-- [ ] Three-process topology (AC: 2, 3, 4)
-  - [ ] `src/main/index.ts`: create `BrowserWindow` with `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, preload wired
-  - [ ] Fork `src/core/index.ts` via `utilityProcess.fork` at app ready
-  - [ ] Broker a `MessageChannelMain` pair: one port to core host via `postMessage`, one to renderer via `webContents.postMessage`
-  - [ ] Implement ping: renderer sends `{t:'ping'}` over the port, core host replies `{t:'pong'}`, renderer logs it
-  - [ ] On core-host `exit` event: re-fork and re-broker fresh ports; window stays open
-- [ ] CI (AC: 5)
-  - [ ] `.github/workflows/ci.yml` on `macos-latest`: install, typecheck, vitest, `electron-builder --mac --arm64` (unsigned, `CSC_IDENTITY_AUTO_DISCOVERY=false`), upload DMG artifact
-  - [ ] One passing vitest unit test (e.g. a ping message codec test)
+- [x] Scaffold the repo (AC: 1, 6)
+  - [x] Scaffolded manually to the exact architecture source tree (equivalent of the electron-vite React+TS template, already ESM `"type": "module"`)
+  - [x] Pin exact versions per the tech-stack table (Electron 43.x, TypeScript 5.x, electron-vite 4.x, electron-builder 26.x, React 19.x); record exact pins in File List
+  - [x] Add `electron-builder.yml`: `mac.target: [dmg, zip]`, `arch: [arm64]`, `LSMinimumSystemVersion: '14.0'`
+  - [x] MIT `LICENSE`, README stub
+- [x] Lay down the source tree skeleton (AC: 1)
+  - [x] Create `src/main/`, `src/core/`, `src/preload/`, `src/renderer/src/`, `src/shared/` exactly per the architecture source tree; empty modules may export TODO stubs
+- [x] Three-process topology (AC: 2, 3, 4)
+  - [x] `src/main/index.ts`: create `BrowserWindow` with `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, preload wired
+  - [x] Fork `src/core/index.ts` via `utilityProcess.fork` at app ready
+  - [x] Broker a `MessageChannelMain` pair: one port to core host via `postMessage`, one to renderer via `webContents.postMessage`
+  - [x] Implement ping: renderer sends `{t:'ping'}` over the port, core host replies `{t:'pong'}`, renderer logs it
+  - [x] On core-host `exit` event: re-fork and re-broker fresh ports; window stays open
+- [x] CI (AC: 5)
+  - [x] `.github/workflows/ci.yml` on `macos-latest`: install, typecheck, vitest, `electron-builder --mac --arm64` (unsigned, `CSC_IDENTITY_AUTO_DISCOVERY=false`), upload DMG artifact
+  - [x] One passing vitest unit test (e.g. a ping message codec test)
 
 ## Dev Notes
 
@@ -63,10 +63,33 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5) — BMAD dev agent
+
 ### Debug Log References
+
+- `npm run typecheck` / `npm test` (2 passing) / `npm run build` all green.
+- Time-boxed `npm run dev` launch: core host logged `ping received — replying pong`, proving renderer → core → renderer transport over the brokered MessagePort.
 
 ### Completion Notes List
 
+- Scaffolded manually to the architecture source tree instead of running the `@quick-start/electron` generator (a prior interrupted run had begun this; audited and kept).
+- Exact pins: electron 43.1.0, typescript 5.9.3, electron-vite 4.0.1, electron-builder 26.15.3, react 19.2.7, react-dom 19.2.7, vite 7.3.6, vitest 4.1.10.
+- Preload emitted as CJS (`index.cjs`) — sandboxed preloads cannot be ESM; the rest of the app is ESM.
+- Core host built as a second main-process entry (`out/main/core.js`) and forked via `utilityProcess.fork`.
+- Respawn: main re-forks on core `exit` and re-brokers fresh ports to all windows; `did-finish-load` re-brokers on renderer reloads.
+- SCOPE CUT (v0.1, decided): no signing/notarization in CI — `ci.yml` builds unsigned with a TODO for story 1.8's release.yml.
+- DEVIATION / release TODO: `loredex` will be consumed as a `file:` link to the sibling repo for v0.1 (story 1.3); CI clones and builds the sibling repo. Replace with the exact-pinned npm release before shipping.
+
 ### File List
+
+- package.json, package-lock.json (exact pins above)
+- electron.vite.config.ts, electron-builder.yml, tsconfig.json, tsconfig.node.json, tsconfig.web.json, vitest.config.ts
+- .github/workflows/ci.yml (unsigned DMG artifact, TODO signing → story 1.8)
+- .gitignore, LICENSE (MIT), README.md
+- src/main/index.ts, src/main/windows.ts
+- src/core/index.ts
+- src/preload/index.ts
+- src/renderer/index.html, src/renderer/src/main.tsx
+- src/shared/ipc-contract.ts, src/shared/ipc-contract.test.ts
 
 ## QA Results

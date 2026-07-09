@@ -1,0 +1,34 @@
+# CI — unsigned build + tests on every PR (architecture.md#testing-strategy).
+# TODO(story 1.8): signing/notarization lives in release.yml, not here. This
+# workflow intentionally builds UNSIGNED (CSC_IDENTITY_AUTO_DISCOVERY=false).
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest # arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # TODO(release): loredex is a local file: dependency for v0.1. Replace the
+      # sibling checkout below with the exact-pinned npm release before shipping.
+      - name: Check out and build sibling loredex (file: dependency)
+        run: |
+          git clone --depth 1 https://github.com/ahmedtawfeeq1/loredex ../loredex
+          cd ../loredex && npm ci && npm run build
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build unsigned DMG
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: loredex-desktop-dmg
+          path: dist/*.dmg

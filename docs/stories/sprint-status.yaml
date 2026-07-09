@@ -9,8 +9,8 @@ generated: 2026-07-09
 project: loredex-desktop
 
 development_status:
-  epic-1: backlog          # Walking Skeleton (M0)
-  1-1-app-scaffold-three-process: ready-for-dev
+  epic-1: in-progress      # Walking Skeleton (M0)
+  1-1-app-scaffold-three-process: done
   1-2-typed-ipc-seam: ready-for-dev
   1-3-core-host-embeds-loredex: ready-for-dev
   1-4-vault-picker-first-note-badge: ready-for-dev

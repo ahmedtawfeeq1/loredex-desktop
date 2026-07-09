@@ -9,6 +9,8 @@ import type { Doc } from '../../../shared/ipc-contract'
 import { isErrEnvelope } from '../../../shared/ipc-contract'
 import type { TreeNode } from '../../../shared/types'
 import { invoke } from '../api'
+import { clearLinkCaches } from '../markdown/resolveCache'
+import { useDiagnostics } from './diagnostics'
 
 interface ReaderState {
   tree: TreeNode[] | null
@@ -44,6 +46,7 @@ export const useReader = create<ReaderState>((set, get) => ({
 
   async open(path) {
     set({ selected: path, docError: null })
+    useDiagnostics.getState().clearNote(path) // re-fed as the note re-renders
     try {
       const doc = await invoke('vault.readNote', { path })
       // keep the tree responsive while a large note (≤1 MB) renders
@@ -54,12 +57,16 @@ export const useReader = create<ReaderState>((set, get) => ({
   },
 
   async refresh() {
+    clearLinkCaches() // vault.tree also rebuilds the core-side link index
+    useDiagnostics.getState().clear()
     await get().loadTree()
     const { selected } = get()
     if (selected) await get().open(selected)
   },
 
   reset() {
+    clearLinkCaches()
+    useDiagnostics.getState().clear()
     set({ tree: null, treeError: null, selected: null, doc: null, docError: null })
   },
 }))

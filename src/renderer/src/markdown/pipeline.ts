@@ -11,6 +11,8 @@ import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
+import { MarkdownAnchor } from '../components/WikiLink'
+import { remarkWikilinks } from './wikilinks'
 
 /** defaultSchema + the wikilink carrier attributes (story 2.2). */
 const schema = {
@@ -22,10 +24,18 @@ const schema = {
   },
 }
 
-const options: RehypeReactOptions = { Fragment, jsx, jsxs }
+const options: RehypeReactOptions = {
+  Fragment,
+  jsx,
+  jsxs,
+  // wikilinks (marked by the remark plugin) render through WikiLink;
+  // plain anchors open externally via the main-process guard
+  components: { a: MarkdownAnchor },
+}
 
 const processor = unified()
   .use(remarkParse)
+  .use(remarkWikilinks)
   .use(remarkGfm)
   .use(remarkRehype)
   .use(rehypeSanitize, schema)

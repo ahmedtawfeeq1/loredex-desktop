@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,18 +20,18 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Resolution engine (AC: 1, 2)
-  - [ ] `src/core/links.ts`: index vault note basenames/paths (from the Story 2.1 walk); implement Obsidian shortest-path resolution — exact path match, then unique basename, then shortest distinguishing suffix; return `LinkResolution` = `{ status: 'resolved'|'ambiguous'|'broken', target?, candidates?: {path, project}[] }`
-  - [ ] Register `vault.resolveLink` handler (`{link, from}` → `LinkResolution`)
-  - [ ] Rebuild the link index on `vault.changed` (hook point for Story 2.3; until then, on demand)
-- [ ] Renderer wikilink plugin (AC: 1, 2, 4)
-  - [ ] Remark plugin in `src/renderer/src/markdown/wikilinks.ts`: parse `[[target]]` and `[[target|alias]]` into link nodes carrying the raw target
-  - [ ] `WikiLink.tsx` component: resolves via `invoke('vault.resolveLink')` (batched per note render); resolved → navigates the reader; ambiguous → popover picker showing candidates with project context; broken → diagnostic style (dashed underline + warning color), click opens the diagnostics panel — NEVER creates a file
-- [ ] Hover previews (AC: 3)
-  - [ ] On hover (debounced), `invoke('vault.readNote')` on the target; render the first ~20 lines through the markdown pipeline in a popover; cache per session
-- [ ] Diagnostics list (AC: 4)
-  - [ ] `views/reader/Diagnostics.tsx`: broken links found in the current note (and a per-vault list fed lazily as notes render)
-- [ ] Tests (AC: 5)
+- [x] Resolution engine (AC: 1, 2)
+  - [x] `src/core/links.ts`: index vault note basenames/paths (from the Story 2.1 walk); implement Obsidian shortest-path resolution — exact path match, then unique basename, then shortest distinguishing suffix; return `LinkResolution` = `{ status: 'resolved'|'ambiguous'|'broken', target?, candidates?: {path, project}[] }`
+  - [x] Register `vault.resolveLink` handler (`{link, from}` → `LinkResolution`)
+  - [x] Rebuild the link index on `vault.changed` (hook point for Story 2.3; until then, on demand)
+- [x] Renderer wikilink plugin (AC: 1, 2, 4)
+  - [x] Remark plugin in `src/renderer/src/markdown/wikilinks.ts`: parse `[[target]]` and `[[target|alias]]` into link nodes carrying the raw target
+  - [x] `WikiLink.tsx` component: resolves via `invoke('vault.resolveLink')` (batched per note render); resolved → navigates the reader; ambiguous → popover picker showing candidates with project context; broken → diagnostic style (dashed underline + warning color), click opens the diagnostics panel — NEVER creates a file
+- [x] Hover previews (AC: 3)
+  - [x] On hover (debounced), `invoke('vault.readNote')` on the target; render the first ~20 lines through the markdown pipeline in a popover; cache per session
+- [x] Diagnostics list (AC: 4)
+  - [x] `views/reader/Diagnostics.tsx`: broken links found in the current note (and a per-vault list fed lazily as notes render)
+- [x] Tests (AC: 5)
 
 ## Dev Notes
 
@@ -57,10 +57,28 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5), BMAD dev agent, 2026-07-10.
+
 ### Debug Log References
+
+- `npm run typecheck` clean; `npm test` 43/43; `npm run build` green.
+- Time-boxed `npm run dev` smoke against the nimbus simulation vault: core host logged `config: …/loredex-simulation/_machine2/nimbus-vault` (persisted `--vault` override at fork).
 
 ### Completion Notes List
 
+- Resolution engine in `src/core/links.ts` (core host, one index for all views): exact vault-relative path match first, then case-insensitive path-suffix match — unique basename is the one-segment suffix case, longer suffixes are the shortest-distinguishing-suffix disambiguation. `./`/`../` links resolve against the linking note's folder. `|alias` and `#heading` parts tolerated. Index built from the story-2.1 `listMarkdownFiles` walk, cached per vault, invalidated by `vault.tree` (the manual refresh) — the `vault.changed` hook point for story 2.3.
+- `LinkResolution` reshaped in `shared/types.ts` to this story's contract (`status`/`target`/`candidates{path,project}`), replacing the 1.2-era stub.
+- Batching: `resolveCached` dedupes to ONE `vault.resolveLink` per unique target per note (session cache, settled values readable synchronously so re-renders don't flicker); hover previews cache `vault.readNote` per target and render the first 20 lines through the sanctioned pipeline (350 ms debounce).
+- Ambiguous → in-place popover picker listing candidates with project context (never a silent guess); broken → rust dotted underline + diagnostic tooltip, click opens the diagnostics panel; nothing anywhere creates a file. Diagnostics panel: current note first, per-vault list fed lazily as notes render, sticky rust count pill in the reader.
+- **Deviation (minor):** DESIGN.md specifies broken links as "rust dotted-underline" — implemented as specified (the story's "dashed underline" phrasing lost to the binding design system). External (non-wiki) anchors render via the same `MarkdownAnchor` and open in the default browser through the main-process navigation guard.
+- Fixtures added to `tests/fixtures/vault`: same-basename `2026-07-07 - meeting-notes.md` under nimbus-api and nimbus-web (collision) + `2026-07-08 - nimbus-web - crosslinks.md` (unique, aliased, colliding and broken wikilinks).
+
 ### File List
+
+- `src/shared/types.ts` (`LinkResolution`/`LinkCandidate`)
+- `src/core/links.ts` (new) + `links.test.ts`, `src/core/handlers.ts` (register + index invalidation)
+- `src/renderer/src/markdown/wikilinks.ts` (new) + `wikilinks.test.ts`, `markdown/resolveCache.ts` (new), `markdown/pipeline.ts` (plugin + anchor component)
+- `src/renderer/src/components/WikiLink.tsx` (new), `src/renderer/src/views/reader/Diagnostics.tsx` (new), `src/renderer/src/stores/diagnostics.ts` (new), `src/renderer/src/stores/reader.ts` (cache/diagnostics lifecycle), `src/renderer/src/App.tsx`, `src/renderer/src/styles.css`
+- `tests/fixtures/vault/projects/nimbus-api/meetings/2026-07-07 - meeting-notes.md`, `tests/fixtures/vault/projects/nimbus-web/meetings/2026-07-07 - meeting-notes.md`, `tests/fixtures/vault/projects/nimbus-web/2026-07-08 - nimbus-web - crosslinks.md` (new fixtures)
 
 ## QA Results

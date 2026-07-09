@@ -8,6 +8,7 @@ import { onVaultChanged } from './api'
 import { IdentityBadge } from './components/IdentityBadge'
 import { useApp } from './stores/app'
 import { useReader } from './stores/reader'
+import { Diagnostics } from './views/reader/Diagnostics'
 import { NoteView } from './views/reader/NoteView'
 import { VaultTree } from './views/reader/VaultTree'
 
@@ -52,6 +53,7 @@ export default function App(): React.JSX.Element {
           <VaultTree />
           <main className="pane-reader">
             <NoteView />
+            <Diagnostics />
           </main>
         </>
       ) : status === 'no-vault' ? (

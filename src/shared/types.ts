@@ -100,10 +100,20 @@ export interface Facets {
   status?: string
 }
 
+/** Wikilink resolution result (story 2.2) — read-only view logic, app-side. */
+export interface LinkCandidate {
+  /** vault-relative path */
+  path: string
+  /** project context for the disambiguation picker */
+  project: string
+}
+
 export interface LinkResolution {
-  link: string
-  resolvedPath: string | null
-  candidates: string[]
+  status: 'resolved' | 'ambiguous' | 'broken'
+  /** vault-relative path of the unique match (status 'resolved') */
+  target?: string
+  /** all matches with project context (status 'ambiguous') */
+  candidates?: LinkCandidate[]
 }
 
 export interface WizardInput {

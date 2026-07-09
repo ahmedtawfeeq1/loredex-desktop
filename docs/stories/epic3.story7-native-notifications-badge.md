@@ -79,3 +79,10 @@ Claude Fable 5 (claude-fable-5), BMAD dev agent
 - `src/renderer/src/App.tsx` (deep-navigation + nav open-count badge from story 3.2's `openCount`)
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: partially verified — decision logic (my-projects filter, first-snapshot suppression, dedupe, batch collapse) unit-tested in `notify.test.ts`; native display + click-to-open code-verified, not UI-verified (main-side `Notification` + deep-navigate over the bridge).
+- AC2: **concern (deferred by design)** — no poller (story 3.5 open), so "within one fetch cadence" cannot hold; new-handoff checks run on refresh actions only. Latency test rides story 6.3.
+- AC3: **concern (partial by design)** — badge counts open inbound only (verified in `notify.test.ts`); snooze respect deferred to story 3.6's app.db.
+- AC4: **concern (partial by design)** — notification log is in-memory, not app.db (3.6 deferred); batching (>3 → one summary) unit-tested.

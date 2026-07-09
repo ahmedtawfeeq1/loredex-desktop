@@ -75,3 +75,10 @@ claude-fable-5 (BMAD dev agent)
 - `src/renderer/src/App.tsx` (Activity nav/view), `stores/app.ts`, `styles.css` (feed block)
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — `activity.feed` runs `git log` with the lib's `ACTIVITY_LOG_ARGS` through `parseActivity` (zero app-side grammar); day headers + initials avatars code-verified; `feed-logic.test.ts` + `activity.test.ts` green; M1 driver returned the real 29-event feed.
+- AC2: code-verified, not UI-verified — handoffId → board, path → reader, sync → sync panel.
+- AC3: verified with recorded deviation — "Load older activity" doubling window instead of infinite scroll (sound, documented); reload on `sync.changed`/`vault.changed` replaces a cache layer (recorded simplification).
+- Non-repo vault → typed `GIT_FAILED` envelope, unit-tested.

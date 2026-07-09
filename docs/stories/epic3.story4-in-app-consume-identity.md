@@ -87,3 +87,11 @@ Claude Fable 5 (claude-fable-5), BMAD dev agent
 - `src/renderer/src/App.tsx` (Settings nav), `src/renderer/src/styles.css` (consume/receipt/settings)
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — `settings.identity.get/set` persist app-side (userData), never the vault; ambient default from lib.
+- AC2: verified — `handoffs.consume` → write-lock shim → `engine.consume` → lib `consumeHandoff`; app writes zero frontmatter (`consume.test.ts`).
+- AC3: code-verified, not UI-verified — `ConsumeReceiptView` renders the before→after diff and an honest amber "Recorded locally — will push on next sync" when unpushed.
+- AC4: **concern (recorded deviation)** — identity injected via `GIT_AUTHOR_*/GIT_COMMITTER_*` env scoped to the lib call, not `-c` argv (lib accepts no argv yet). Effect is equivalent per git docs; the promised lib PR threading `-c` should land before this counts as fully met.
+- AC5: verified — success emits `handoff.stateChanged` + `vault.changed`; optimistic stamp-press flip with revert-on-failure code-verified.

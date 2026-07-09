@@ -81,3 +81,10 @@ claude-fable-5 (BMAD dev agent)
 - `src/renderer/src/App.tsx` (Search nav, Cmd+K listener, palette mount), `src/renderer/src/stores/app.ts` (view union), `styles.css` (search + palette blocks)
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: code-verified — SearchView and the Cmd+K palette share one zustand store querying `vault.search`; global ⌘K handler in `App.tsx`.
+- AC2: verified — full text from lib `searchVault` (M1 driver: 10 real hits); facet narrowing unit-tested (`facets.test.ts`).
+- AC3: code-verified — title/project/snippet rows, Enter opens in reader (`palette-nav.test.ts` covers keyboard flow).
+- AC4: verified — 42.4 ms search+narrow on a generated 1,000-note vault (in-repo perf test), 12× under the 500 ms budget.

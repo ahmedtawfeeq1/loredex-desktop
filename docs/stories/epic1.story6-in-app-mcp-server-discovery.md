@@ -95,3 +95,12 @@ claude-fable-5 (BMAD dev agent)
 - `src/renderer/src/views/settings/McpSection.tsx` (new), `SettingsView.tsx`, `styles.css` (`.settings-error`)
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity). Strongest runtime verification of the batch — exercised live against the running dev app:
+
+- AC1: verified live — Streamable HTTP on `127.0.0.1:52017`; `tools/list` returned the lib tool set.
+- AC2: verified live — no token → 401; valid token → 200; cross-origin `Origin: https://evil.example` → 403.
+- AC3: unit-verified — port-conflict loud-error path covered in `mcp-server.test.ts`; settings override channel present.
+- AC4: verified live — `~/.loredex/desktop.json` written `-rw-------` (600) with `{port, token, engineVersion: 2.0.0, schemaVersion: 1}`; removed on clean shutdown (checked after SIGTERM).
+- AC5: verified live — `vault_search` response carried the trailing identity echo (`vault: …nimbus-vault · engine loredex 2.0.0 · source: vault-picker · remote: …`).
+- AC6: verified live — MCP results came from the same nimbus vault the UI serves.

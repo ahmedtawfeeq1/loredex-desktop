@@ -71,3 +71,9 @@ claude-fable-5 (Claude Code)
 - loredex-desktop: src/shared/types.ts
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — `listHandoffs(scope)` + `HandoffCard` exported; lib tests green; M1 driver listed 8 real handoffs (2 open, 6 consumed) across 4 projects.
+- AC2: verified — CLI + MCP rewired; byte-compatible output asserted by inline-snapshot parity test in the lib.
+- AC3: **concern** — lib tests pass, but no npm release/pin bump (file: dep, sanctioned); AND `HandoffCard.id` (note basename) is not unique across projects — two open `2026-07-09-handoff-nimbus-backend-2` exist in the real vault (board action item, lib fix needed).

@@ -1002,9 +1002,10 @@ a {
   gap: 8px;
 }
 
+/* section header, not reading surface — sans per DESIGN.md (serif is confined
+   to the reader and empty states); QA fix */
 .settings-title {
-  font-family: var(--font-serif);
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 600;
 }
 

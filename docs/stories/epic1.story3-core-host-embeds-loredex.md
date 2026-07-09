@@ -88,3 +88,11 @@ Claude Fable 5 (claude-fable-5) — BMAD dev agent
 - tests/fixtures/vault/** (new fixture: brief + 3 notes across 2 projects, one handoff)
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: **concern (known, sanctioned)** — `loredex` is `file:../loredex`, not an exact-pinned npm release. Direct `import` (no shell-outs) verified: `src/core/engine.ts` is the sole import site. Release blocker until the npm pin lands.
+- AC2: verified — `initEngine` resolves config exactly once (second call throws; unit-tested); M1 driver confirmed against the real vault.
+- AC3: verified — traversal/absolute escapes reject as `VAULT_OUTSIDE_PATH` (tested); M1 driver read a real note with frontmatter.
+- AC4: verified — `vault.search` proxies `searchVault`; M1 driver returned 10 hits on the nimbus vault.
+- AC5: verified — `tests/pinned-release.test.ts` asserts the F8 quoted-gitattributes fix and F6 project-local footer against the installed build.

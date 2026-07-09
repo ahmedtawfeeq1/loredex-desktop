@@ -82,3 +82,11 @@ claude-fable-5 (BMAD dev agent)
 - `src/renderer/src/components/IdentityBadge.tsx` (live sync dot), `App.tsx` (Sync nav/view), `stores/app.ts`, `styles.css` (sync blocks)
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — panel renders `sync.status` = lib `syncStatus` verbatim incl. the F8 gitattributes row; `sync.test.ts` + store `sync.test.ts` green.
+- AC2: **concern (recorded deviation)** — PR-5 has not landed, so the lib sync call still swallows stderr internally; the panel's warning net is health-diagnosis warnings + report warnings, not raw stderr. Nothing the engine *surfaces* is swallowed, but "every git stderr warning" is not literally met until PR-5.
+- AC3: verified — `sync.run` computes a structured `SyncReport` from before/after status under the write lock (shim, replaced by PR-5).
+- AC4: verified — handshake via lib `vaultSchemaStatus` + engine version; rust banner + `git.warning` on mismatch (code-verified).
+- AC5: verified — `mcp.status` `'port-conflict'` renders as a banner with an Open Settings action (code-verified); vault-chip dot semantics unit-tested.

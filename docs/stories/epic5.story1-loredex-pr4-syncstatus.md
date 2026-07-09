@@ -68,3 +68,9 @@ claude-fable-5 (Claude Code)
 - loredex-desktop: src/shared/types.ts
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — lib `syncStatus()` covers reachability/branch/ahead-behind/merge-driver/F8-gitattributes/reflog timestamps; lib tests cover clean/ahead/behind/diverged/wrong-branch/no-remote/broken-gitattributes/not-a-repo plus a strict read-only assertion. M1 driver on the real vault: `state ok, branch master, 0/0, 0 warnings`.
+- AC2: verified — `SyncHealth` is the IPC payload type (`import type` from loredex).
+- AC3: **concern** — lib tests pass but no npm release/pin bump (file: dep; release blocker). QA fix this pass: the flaky `handoff.test.ts` consume test (5 s default timeout under parallel git-fixture load) given the same explicit 30 s timeout as its sibling — suite now 115/115.

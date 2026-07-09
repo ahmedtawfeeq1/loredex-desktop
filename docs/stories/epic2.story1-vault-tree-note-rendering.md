@@ -74,3 +74,11 @@ Claude Fable 5 (claude-fable-5), BMAD dev agent, 2026-07-10.
 - `src/renderer/src/stores/reader.ts` (tree + refresh/invalidate), `src/renderer/src/views/reader/VaultTree.tsx` (new), `NoteView.tsx` (exported panel), `NoteView.test.ts` (new), `src/renderer/src/App.tsx`, `src/renderer/src/styles.css`
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — M1 driver walked the real nimbus vault: dot-entries hidden, dirs-first ordering, markdown-only (`tree.test.ts` + live run).
+- AC2: verified — unified pipeline with `rehype-sanitize` (pipeline tests cover sanitization); frontmatter metadata panel rendered.
+- AC3: code-verified — no edit affordances anywhere in the reader.
+- AC4: verified — 1 MB note renders through the full pipeline well under budget (`NoteView.test.ts`).
+- Recorded deviation (26px tree rows vs 38px list rows) is reasonable and documented.

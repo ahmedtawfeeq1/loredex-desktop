@@ -83,3 +83,10 @@ Claude Fable 5 (claude-fable-5), BMAD dev agent, 2026-07-10.
 - `package.json` / `package-lock.json`
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: code-verified, not UI-verified — native `dialog.showOpenDialog` in main (`src/main/dialogs.ts`), persisted to `userData/vault.json`, re-forked host with `--vault`. Runtime evidence the persisted choice works: the dev smoke's MCP identity echo reported `source: vault-picker` against the previously-picked nimbus vault.
+- AC2: verified — reader renders frontmatter panel + body via the sanctioned pipeline (pipeline tests; M1 driver parsed a real note).
+- AC3: verified — vault identity chip is permanent at the sidebar bottom (`IdentityBadge` rendered unconditionally in `App.tsx`), shows name/path/engine/config source, full identity in tooltip; matches DESIGN.md.
+- AC4: code-verified — the only directory walk (`walkVault`) roots at the chosen vault; no cold scans found.

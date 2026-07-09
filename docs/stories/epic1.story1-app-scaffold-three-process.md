@@ -93,3 +93,12 @@ Claude Fable 5 (claude-fable-5) — BMAD dev agent
 - src/shared/ipc-contract.ts, src/shared/ipc-contract.test.ts
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — `npm run dev` launches, window process stays alive (observed 3+ min), exits cleanly on SIGTERM.
+- AC2: runtime-verified — the forked core host was observed as a live `utilityProcess` (node.mojom.NodeService) during the smoke run; ping round-trip covered by unit tests.
+- AC3: code-verified — `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false` in `src/main/windows.ts`.
+- AC4: code-verified, not UI-verified — respawn + re-broker wiring in `src/main/index.ts` (`core.on('exit')` re-forks, windows stay open); not exercised by killing the host mid-session.
+- AC5: code-verified — `.github/workflows/ci.yml` builds an unsigned DMG on macos-latest; vitest wired (118 tests passing locally). CI execution itself not observable offline.
+- AC6: MIT LICENSE + README stub present; repo publicity not verifiable offline.

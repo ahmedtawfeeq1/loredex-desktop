@@ -82,3 +82,11 @@ Claude Fable 5 (claude-fable-5), BMAD dev agent, 2026-07-10.
 - `tests/fixtures/vault/projects/nimbus-api/meetings/2026-07-07 - meeting-notes.md`, `tests/fixtures/vault/projects/nimbus-web/meetings/2026-07-07 - meeting-notes.md`, `tests/fixtures/vault/projects/nimbus-web/2026-07-08 - nimbus-web - crosslinks.md` (new fixtures)
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — M1 driver on the real vault: `2026-07-09-streaming-design` resolved to its exact path.
+- AC2: verified — `2026-07-09-findings` returned status `ambiguous` with 3 candidates each carrying project context (nimbus-ai-engine / nimbus-backend / nimbus-mobile); picker UI code-verified, not UI-verified.
+- AC3: code-verified, not UI-verified — hover preview via cached `vault.readNote`, 350 ms debounce, sanctioned pipeline.
+- AC4: verified — broken link returned `broken` in the live driver; rust dotted-underline + diagnostics panel code-verified; nothing creates files.
+- AC5: verified — `links.test.ts` covers resolution/collision/broken (part of the 118 passing).

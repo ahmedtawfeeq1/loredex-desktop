@@ -78,3 +78,10 @@ claude-fable-5 (Claude Code)
 - loredex-desktop: src/shared/types.ts
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1/AC2: verified — `consumeHandoff` in lib `core/consume.ts`, CLI + MCP rewired; writes status/consumed_by/consumed_at and returns `ConsumeReceipt` (lib tests green).
+- AC3: **concern (recorded deviation)** — `loredex_schema: 1` stamping verified in lib tests, but `.loredex/engine.json` {minEngine, schema} is NOT written (v0.1 scope cut). NFR8's handshake leans on frontmatter stamps only.
+- AC4: verified — `vaultSchemaStatus` + doctor warning covered by lib tests.
+- AC5: **concern** — lib tests pass but no npm release/pin bump (file: dep; release blocker).

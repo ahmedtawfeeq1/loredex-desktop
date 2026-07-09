@@ -68,3 +68,9 @@ claude-fable-5 (Claude Code)
 - loredex-desktop: src/shared/types.ts
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — `parseActivity` + `ACTIVITY_LOG_ARGS` in the lib; tests cover every kind, unknown-commit fallback, malformed resilience, ordering, and a real-git end-to-end parse. M1 driver parsed 29 real events ({route: 9, handoff: 8, consume: 6, sync: 6}) from the nimbus vault with identity attribution.
+- AC2: verified — desktop `ActivityEvent` is the lib type.
+- AC3: lib tests green; no npm release/pin bump (file: dep — shared release blocker, tracked once in sprint-status).

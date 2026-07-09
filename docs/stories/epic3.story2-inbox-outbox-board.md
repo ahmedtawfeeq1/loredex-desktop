@@ -86,3 +86,11 @@ Claude Fable 5 (claude-fable-5), BMAD dev agent
 - `tests/fixtures/vault/projects/nimbus-web/handoffs/*.md`, `tests/fixtures/vault/projects/nimbus-api/handoffs/*.md` (new fixtures)
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — `handoffs.list` → `engine.handoffs` → lib `listHandoffs`; lane derivation pure and unit-tested (`handoffs.test.ts`, `handoff-lanes`); routing-slip card matches DESIGN.md (stamp chip, mono `from ⟶ to` (U+27F6) + right-aligned date, serif objective, mono footer).
+- AC2: verified — company-wide grouped view assembled against the real nimbus vault in tests.
+- AC3: code-verified, not UI-verified — card click opens the brief with reading-order notes inline (`ReadingOrderInline` via story-2.2 caches).
+- AC4: code-verified — skeleton/empty states + refetch on `vault.changed`/`handoff.*` events.
+- **Concern** — duplicate `HandoffCard.id` across projects collides React keys and consume targeting (known lib action item).

@@ -79,3 +79,11 @@ claude-fable-5 (BMAD dev agent)
 - `src/renderer/src/stores/home.ts` (new), `stores/app.ts` (default view 'home'), `App.tsx`, `styles.css` (home + freshness blocks)
 
 ## QA Results
+
+**Verdict: PASS with concerns** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1: verified — M1 driver returned the real curated `Start Here - Product.md` (mtime honest, `generated: false`); live-render fallback code-verified.
+- AC2: verified — SHA linkification unit-tested (`shaLinks.test.ts`) incl. false-positive guard and remote-form handling.
+- AC3: verified — freshness tiers unit-tested (`freshness.test.ts`).
+- AC4: **concern (directed scope cut)** — one-click re-curate NOT shipped; `dashboard.build` handler is registered (seam exists) but the UI ships a disk Refresh instead. AC as written is not met; deviation is recorded and deliberate. Carry to the v0.2 backlog.
+- AC5: verified — wikilinks inside the brief ride the same pipeline (story 2.2 path).

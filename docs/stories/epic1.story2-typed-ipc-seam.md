@@ -86,3 +86,10 @@ Claude Fable 5 (claude-fable-5) — BMAD dev agent
 - src/shared/ipc-contract.test.ts, src/core/ipc.test.ts (11 tests)
 
 ## QA Results
+
+**Verdict: PASS** — Evidence base (QA pass 2026-07-10, fresh-eyes BMAD QA agent): app vitest 118/118 (23 files), lib vitest 115/115, `npm run typecheck` clean, `npm run build` clean, time-boxed `npm run dev` smoke (alive 3+ min, clean exit), and an M1-DoD driver that exercised the core-host modules directly against the real nimbus simulation vault (tree/readNote/resolveLink/search/handoffs/homeBrief/syncStatus/activity).
+
+- AC1/AC2: code-verified + compile-checked — `src/shared/ipc-contract.ts` CoreApi/CoreEvent, typed `invoke`/`onEvent` on both sides; typecheck green enforces payload types.
+- AC3: code-verified — preload exposes only the `window.loredex` bridge via `contextBridge`.
+- AC4/AC5: verified by unit tests — `ipc.test.ts` / `ipc-contract.test.ts` cover round-trip, error envelope (unknown channel/malformed payload), event fan-out, port-swap buffering.
+- Recorded deviations (extra IpcCodes, `ipc-client.ts` placement) are documented in the Dev Agent Record and are sound.

@@ -5,8 +5,10 @@
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
+import type { SyncReport } from '../shared/types'
 import * as engine from './engine'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
+import { withGitIdentity } from './git'
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { getMcpStatus } from './mcp-server'
@@ -87,6 +89,45 @@ export function registerCoreHandlers(
     }
     saveIdentityProfile(identity)
   })
+  // Sync health (story 5.2). sync.status is read-only (lib syncStatus — never
+  // fetches); its warnings render in the panel grid. sync.run is a lib write
+  // op: write lock + per-command identity; every warning it produces is ALSO
+  // emitted as git.warning (F8: nothing git says goes unseen).
+  ipc.register('sync.status', () => engine.syncHealth())
+  ipc.register('sync.handshake', () => {
+    const status = engine.schemaStatus()
+    if (!status.ok) {
+      ipc.emit({
+        kind: 'git.warning',
+        text: `vault notes declare loredex schema ${status.declared} but this app supports ${status.supported} — a newer CLI/agent wrote here; update Loredex Desktop before writing (split-brain risk)`,
+      })
+    }
+    return {
+      engineVersion: engine.engineVersion(),
+      schemaSupported: status.supported,
+      schemaDeclared: status.declared,
+      ok: status.ok,
+    }
+  })
+  ipc.register('sync.run', () =>
+    withWriteLock((): SyncReport => {
+      const before = engine.syncHealth()
+      const profile = loadIdentityProfile()
+      const result = profile
+        ? withGitIdentity(profile, () => engine.pullPush())
+        : engine.pullPush()
+      const after = engine.syncHealth()
+      const report: SyncReport = {
+        pulled: result.pulled ? before.behind : 0,
+        pushed: result.pushed,
+        warnings: after.warnings,
+      }
+      for (const text of report.warnings) ipc.emit({ kind: 'git.warning', text })
+      ipc.emit({ kind: 'sync.changed', health: after })
+      if (report.pulled > 0) ipc.emit({ kind: 'vault.changed', paths: [] }) // integrated notes → refetch
+      return report
+    }),
+  )
   // MCP host state + port override (story 1.6). The override applies on the
   // next core-host start — no live rebind, the discovery file must stay true.
   ipc.register('mcp.status', () => getMcpStatus())

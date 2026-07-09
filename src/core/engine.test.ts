@@ -96,7 +96,8 @@ describe('core host answers over the typed IPC contract shape', () => {
       code: 'VAULT_OUTSIDE_PATH',
     })
     // channel not implemented until its lib-PR story lands
-    await expect(client.invoke('sync.status', undefined)).rejects.toMatchObject({
+    // (sync.status graduated to implemented in story 5.2)
+    await expect(client.invoke('route.preview', { file: 'x.md' })).rejects.toMatchObject({
       code: 'NOT_IMPLEMENTED',
     })
   })

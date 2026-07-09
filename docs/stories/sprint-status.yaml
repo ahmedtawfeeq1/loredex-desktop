@@ -49,7 +49,7 @@ development_status:
 
   epic-5: in-progress      # Onboarding, Registry & Sync Health
   5-1-loredex-pr4-syncstatus: done
-  5-2-sync-health-panel: ready-for-dev
+  5-2-sync-health-panel: done
   5-3-loredex-pr7a-registry-in-vault: ready-for-dev
   5-4-loredex-pr7b-cli-migration: ready-for-dev
   5-5-join-wizard-deep-link: ready-for-dev

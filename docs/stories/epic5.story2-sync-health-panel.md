@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,17 +20,17 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Core handlers (AC: 1, 3)
-  - [ ] Register `sync.status` → `syncStatus()` (PR-4); `sync.run` → async `gitPullPush` under the write lock, returning `SyncReport` (PR-5)
-  - [ ] Poller (Story 3.5) refreshes `SyncHealth` after each fetch/integrate and pushes `sync.changed`
-- [ ] Warning firehose (AC: 2)
-  - [ ] Audit every engine-facade git call site: stderr/warnings from `SyncReport`s, drift queries, poller ops all emit `git.warning` events; panel keeps a scrolling warning log (persist recent N in app.db prefs)
-- [ ] Panel UI (AC: 1, 3)
-  - [ ] `views/sync/SyncPanel.tsx`: status grid (reachable / branch / ahead-behind / last push-pull / merge driver) in GitHub-Desktop-widget style; "behind N, integrating…" state from the poller; Sync Now button + `SyncReport` result list
-- [ ] Handshake warnings (AC: 4)
-  - [ ] Compare app engine/schema (discovery values) vs vault `.loredex/engine.json` vs last-seen CLI writes (schema stamps observed in frontmatter); material mismatch → prominent panel banner + `git.warning` event
-- [ ] Port conflict (AC: 5)
-  - [ ] Render the `PORT_CONFLICT` state with the settings override link (Story 1.6's setting)
+- [x] Core handlers (AC: 1, 3)
+  - [x] Register `sync.status` → `syncStatus()` (PR-4); `sync.run` → async `gitPullPush` under the write lock, returning `SyncReport` (PR-5)
+  - [ ] Poller (Story 3.5) refreshes `SyncHealth` after each fetch/integrate and pushes `sync.changed` — N/A in v0.1 (poller scope-cut); sync.run pushes `sync.changed` instead
+- [x] Warning firehose (AC: 2)
+  - [x] Audit every engine-facade git call site: stderr/warnings from `SyncReport`s, drift queries, poller ops all emit `git.warning` events; panel keeps a scrolling warning log (in-memory ring buffer — app.db is story 3.6, scope-cut)
+- [x] Panel UI (AC: 1, 3)
+  - [x] `views/sync/SyncPanel.tsx`: status grid (reachable / branch / ahead-behind / last push-pull / merge driver) in GitHub-Desktop-widget style; Sync Now button + `SyncReport` result list ("integrating…" state N/A without the poller)
+- [x] Handshake warnings (AC: 4)
+  - [x] Compare app engine/schema (discovery values) vs vault `.loredex/engine.json` vs last-seen CLI writes (schema stamps observed in frontmatter); material mismatch → prominent panel banner + `git.warning` event
+- [x] Port conflict (AC: 5)
+  - [x] Render the `PORT_CONFLICT` state with the settings override link (Story 1.6's setting)
 
 ## Dev Notes
 
@@ -55,10 +55,30 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (BMAD dev agent)
+
 ### Debug Log References
+
+- `npx vitest run src/core/sync.test.ts src/renderer/src/stores/sync.test.ts` → 11 passed, incl. the executable F8 regression (broken gitattributes → INVALID + warning) and the handshake mismatch matrix over a real temp git repo
+- `npm test` → 111 passed; `npm run build` green
 
 ### Completion Notes List
 
+- `sync.status` = lib `syncStatus()` verbatim (PR-4 landed): remote/reachable/branch-match/ahead-behind/last pull-push/merge-driver/gitattributes — the F8 detector is first-class in the lib and rendered as its own grid rows.
+- `sync.run`: PR-5 (async git + structured SyncReport) has NOT landed — recorded deviation: wraps the lib's sync `gitPullPush` under the write lock, computes `SyncReport` from before/after `syncStatus` (pulled = behind-before when the pull ran), injects the identity profile per command (`withGitIdentity`, F7). The lib call still swallows stderr internally (`stdio: 'ignore'`) — the health-diagnosis warnings are the v0.1 stderr net; PR-5 threads real stderr through and replaces this shim.
+- Warning firehose audit (engine facade git call sites): `consumeHandoff` (via lib, emits through its receipt path), `syncStatus` (warnings → grid + re-emitted as `git.warning` by `sync.run`), `gitPullPush` (report warnings all emitted), `readOriginRemote` (pure file read, no git). Every emitted warning lands in the panel's session ring buffer (50, consecutive-dupe collapse); app.db persistence deferred to story 3.6 (scope cut).
+- Handshake (AC4): uses the lib's `vaultSchemaStatus` (declared frontmatter stamps vs `LOREDEX_SCHEMA`) + app `engineVersion` — the discovery file carries the same values (story 1.6). Deviation: vault `.loredex/engine.json` does not exist in the landed lib PR-2 shape; the frontmatter-stamp comparison is the authoritative lib check. Mismatch → rust banner + `git.warning` (not a log line).
+- Port conflict (AC5): panel renders `mcp.status` `'port-conflict'` as a banner with an Open Settings action.
+- Vault chip sync dot wired to health (`dotTone`): ink = clean, amber = ahead/behind/diverged, rust = error/unreachable — DESIGN.md semantics, unit-tested.
+- `sync.changed` pushed after every `sync.run`; a pull that integrated commits also emits `vault.changed` so board/tree refetch.
+
 ### File List
+
+- `src/core/engine.ts` (`syncHealth`, `pullPush`, `schemaStatus`), `src/core/handlers.ts` (`sync.status`, `sync.handshake`, `sync.run`)
+- `src/core/sync.test.ts` (new), `src/core/engine.test.ts` (stale NOT_IMPLEMENTED assertion moved to `route.preview`)
+- `src/shared/types.ts` (`HandshakeStatus`), `src/shared/ipc-contract.ts` (`sync.handshake`)
+- `src/renderer/src/stores/sync.ts` (new), `sync.test.ts` (new)
+- `src/renderer/src/views/sync/SyncPanel.tsx` (new)
+- `src/renderer/src/components/IdentityBadge.tsx` (live sync dot), `App.tsx` (Sync nav/view), `stores/app.ts`, `styles.css` (sync blocks)
 
 ## QA Results

@@ -10,6 +10,7 @@ import type {
   Facets,
   FacetValues,
   HandoffCard,
+  HandshakeStatus,
   HomeBrief,
   Identity,
   IdentitySettings,
@@ -58,6 +59,8 @@ export interface CoreApi {
   'route.undo': { in: { receiptId: string }; out: void } // (lib PR-3)
   'sync.status': { in: void; out: SyncHealth } // (lib PR-4)
   'sync.run': { in: void; out: SyncReport } // (lib PR-5)
+  /** app-local contract evolution (story 5.2): engine/schema handshake (NFR8) */
+  'sync.handshake': { in: void; out: HandshakeStatus }
   'dashboard.build': { in: void; out: ProductDashboard }
   /** app-local contract evolution (story 2.5): the Start Here brief + freshness */
   'home.brief': { in: void; out: HomeBrief }

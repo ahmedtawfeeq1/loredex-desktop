@@ -15,6 +15,7 @@ import {
   consumeHandoff,
   createLoredexMcpServer,
   type Doc,
+  gitPullPush,
   type HandoffCard,
   type HandoffScope,
   type Identity,
@@ -28,6 +29,10 @@ import {
   resolveNoteInsideVault,
   type SearchHit,
   searchVault,
+  type SyncHealth,
+  syncStatus,
+  type VaultSchemaStatus,
+  vaultSchemaStatus,
 } from 'loredex'
 import { abbreviatePath } from '../shared/identity'
 import { withGitIdentity } from './git'
@@ -127,6 +132,24 @@ export function registeredProjects(): string[] {
 export function consume(id: string, identity: Identity): ConsumeReceipt {
   const config = getConfig()
   return withGitIdentity(identity, () => consumeHandoff(config.vaultPath, config, id, identity))
+}
+
+/** Read-only sync health snapshot (story 5.2) — lib syncStatus, never fetches. */
+export function syncHealth(): SyncHealth {
+  return syncStatus(getConfig().vaultPath)
+}
+
+/**
+ * Pull+push the vault repo (story 5.2) — THE lib sync writer. Callers hold the
+ * write lock and inject identity per command (withGitIdentity), never ambient.
+ */
+export function pullPush(): { pulled: boolean; pushed: boolean } {
+  return gitPullPush(getConfig().vaultPath)
+}
+
+/** Vault schema vs this engine (story 5.2 handshake, NFR8) — lib check. */
+export function schemaStatus(): VaultSchemaStatus {
+  return vaultSchemaStatus(getConfig().vaultPath)
 }
 
 /** The vault repo's git config identity — the settings form's default. */

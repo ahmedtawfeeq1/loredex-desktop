@@ -12,8 +12,10 @@ import { useReader } from './stores/reader'
 import { openCount } from '../../shared/handoff-lanes'
 import { useHome } from './stores/home'
 import { useSearch } from './stores/search'
+import { useSync } from './stores/sync'
 import { Board } from './views/handoffs/Board'
 import { HomeView } from './views/home/HomeView'
+import { SyncPanel } from './views/sync/SyncPanel'
 import { Diagnostics } from './views/reader/Diagnostics'
 import { NoteView } from './views/reader/NoteView'
 import { VaultTree } from './views/reader/VaultTree'
@@ -49,6 +51,7 @@ export default function App(): React.JSX.Element {
       useHandoffs.getState().reset()
       useSearch.getState().reset()
       useHome.getState().reset()
+      useSync.getState().reset()
       void init()
     })
   }, [init])
@@ -123,6 +126,14 @@ export default function App(): React.JSX.Element {
           <button
             type="button"
             className="nav-item"
+            aria-current={view === 'sync'}
+            onClick={() => setView('sync')}
+          >
+            Sync
+          </button>
+          <button
+            type="button"
+            className="nav-item"
             aria-current={view === 'settings'}
             onClick={() => setView('settings')}
           >
@@ -143,6 +154,10 @@ export default function App(): React.JSX.Element {
         ) : view === 'search' ? (
           <main className="pane-board">
             <SearchView />
+          </main>
+        ) : view === 'sync' ? (
+          <main className="pane-board">
+            <SyncPanel />
           </main>
         ) : view === 'settings' ? (
           <main className="pane-board">

@@ -1063,6 +1063,140 @@ a {
   color: var(--rust);
 }
 
+/* ── sync health panel (story 5.2) ─────────────────────────────────────── */
+
+.sync {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* sync dot semantics: ink = clean, amber = ahead/behind, rust = error */
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.sync-dot-ink,
+.vault-chip-dot.sync-dot-ink {
+  background: var(--ink);
+}
+
+.sync-dot-amber,
+.vault-chip-dot.sync-dot-amber {
+  background: var(--stamp);
+}
+
+.sync-dot-rust,
+.vault-chip-dot.sync-dot-rust {
+  background: var(--rust);
+}
+
+.sync-banner {
+  margin: 8px 12px 0;
+  border: 1px solid var(--rust);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--rust);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.sync-banner-action {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.sync-grid {
+  max-width: 68ch;
+  margin: 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  padding: 4px 12px;
+}
+
+.sync-row {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.sync-row:last-child {
+  border-bottom: none;
+}
+
+.sync-row-label {
+  width: 120px;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  padding-top: 1px;
+}
+
+.sync-row-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sync-ok {
+  color: var(--ink);
+}
+
+.sync-warn {
+  color: var(--stamp);
+}
+
+.sync-bad {
+  color: var(--rust);
+}
+
+.sync-section {
+  max-width: 68ch;
+  padding: 8px 12px;
+}
+
+.sync-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-bottom: 4px;
+}
+
+.sync-report-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+}
+
+.sync-warning-row {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--rust);
+  padding: 2px 0;
+}
+
+.sync-warning-at {
+  color: var(--text-2);
+}
+
+.sync-log-empty {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
 /* ── product home (story 2.5) ──────────────────────────────────────────── */
 
 .home {

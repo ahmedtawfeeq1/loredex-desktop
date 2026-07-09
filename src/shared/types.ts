@@ -101,6 +101,19 @@ export interface IdentitySettings {
 }
 
 /**
+ * Engine/schema handshake (story 5.2, NFR8): what this app's engine supports
+ * vs what the vault's notes declare (lib vaultSchemaStatus). A vault written
+ * by a newer CLI than the app's pinned engine must warn LOUDLY (split-brain).
+ */
+export interface HandshakeStatus {
+  engineVersion: string
+  schemaSupported: number
+  /** highest loredex_schema any vault note declares; null = pre-versioning vault */
+  schemaDeclared: number | null
+  ok: boolean
+}
+
+/**
  * Product home payload (story 2.5): the Start Here brief as it sits on disk,
  * or a live-rendered deterministic dashboard when no brief file exists yet.
  */

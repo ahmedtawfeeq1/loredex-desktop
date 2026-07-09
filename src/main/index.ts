@@ -16,7 +16,8 @@ function forkCoreHost(): void {
   // The persisted vault crosses to the core host at fork time — config
   // resolves exactly once per core-host lifetime (F6).
   const vaultPath = loadVaultPath()
-  const args = vaultPath ? ['--vault', vaultPath] : []
+  const args = ['--user-data', app.getPath('userData')]
+  if (vaultPath) args.push('--vault', vaultPath)
   core = utilityProcess.fork(join(import.meta.dirname, 'core.js'), args, {
     serviceName: 'loredex-core',
   })

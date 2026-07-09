@@ -4,11 +4,14 @@
  * Card click opens the brief in the reader with reading order inline.
  */
 import { useEffect } from 'react'
+import { isValidIdentity } from '../../../../shared/identity'
 import type { HandoffCard } from '../../../../shared/types'
 import { onEvent } from '../../api'
+import { ConsumeReceiptView } from '../../components/ConsumeReceiptView'
 import { HandoffCardView } from '../../components/HandoffCardView'
 import { useApp } from '../../stores/app'
 import { useHandoffs } from '../../stores/handoffs'
+import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
 import {
   groupByProject,
@@ -25,22 +28,60 @@ export function openBrief(card: HandoffCard): void {
   void useReader.getState().open(toVaultRelative(card.path, vaultPath), card.readingOrder)
 }
 
+/** The consume affordance on an open inbound card (story 3.4). */
+function ConsumeAction({ card }: { card: HandoffCard }): React.JSX.Element {
+  const consume = useHandoffs((s) => s.consume)
+  const consumingId = useHandoffs((s) => s.consumingId)
+  const hasIdentity = useIdentity((s) => effectiveIdentity(s) !== null)
+  return (
+    <button
+      type="button"
+      className="consume-button"
+      disabled={!hasIdentity || consumingId !== null}
+      title={hasIdentity ? 'Consume this handoff (⌘⏎)' : 'Set your identity in Settings first'}
+      onClick={(e) => {
+        e.stopPropagation()
+        void consume(card)
+      }}
+    >
+      consume ⌘⏎
+    </button>
+  )
+}
+
 function Lane({
   title,
   cards,
   empty,
+  inbound,
 }: {
   title: string
   cards: HandoffCard[]
   empty: string
+  inbound?: boolean
 }): React.JSX.Element {
+  const consume = useHandoffs((s) => s.consume)
+  const pressedId = useHandoffs((s) => s.pressedId)
   return (
     <section className="board-lane" aria-label={title}>
       <h2 className="board-lane-title">{title}</h2>
       {cards.length === 0 ? (
         <p className="board-lane-empty">{empty}</p>
       ) : (
-        cards.map((card) => <HandoffCardView key={card.id} card={card} onOpen={openBrief} />)
+        cards.map((card) => (
+          <HandoffCardView
+            key={card.id}
+            card={card}
+            onOpen={openBrief}
+            pressed={pressedId === card.id}
+            {...(inbound && card.status === 'open'
+              ? {
+                  onConsume: (c: HandoffCard) => void consume(c),
+                  consumeSlot: <ConsumeAction card={card} />,
+                }
+              : {})}
+          />
+        ))
       )}
     </section>
   )
@@ -53,6 +94,7 @@ function ProjectLanes({ project, lanes }: { project: string; lanes: Lanes }): Re
         title={`Inbox — to ${project}`}
         cards={lanes.inbound}
         empty="No open handoffs for this vault."
+        inbound
       />
       <Lane
         title={`Outbox — from ${project}`}
@@ -81,8 +123,16 @@ export function Board(): React.JSX.Element {
   const cards = useHandoffs((s) => s.cards)
   const error = useHandoffs((s) => s.error)
   const project = useHandoffs((s) => s.project)
+  const receipt = useHandoffs((s) => s.receipt)
   const load = useHandoffs((s) => s.load)
   const setProject = useHandoffs((s) => s.setProject)
+  const dismissReceipt = useHandoffs((s) => s.dismissReceipt)
+  const identityLoaded = useIdentity((s) => s.loaded)
+  const loadIdentity = useIdentity((s) => s.load)
+
+  useEffect(() => {
+    if (!identityLoaded) void loadIdentity()
+  }, [identityLoaded, loadIdentity])
 
   useEffect(() => {
     if (cards === null) void load()
@@ -137,6 +187,7 @@ export function Board(): React.JSX.Element {
         </button>
       </div>
       {error && <div className="note-error">{error}</div>}
+      {receipt && <ConsumeReceiptView receipt={receipt} onDismiss={dismissReceipt} />}
       {cards === null ? (
         <Skeleton />
       ) : cards.length === 0 ? (

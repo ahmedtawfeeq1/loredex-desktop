@@ -8,10 +8,14 @@ import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import {
+  ambientGitIdentity,
   type Config,
+  type ConsumeReceipt,
+  consumeHandoff,
   type Doc,
   type HandoffCard,
   type HandoffScope,
+  type Identity,
   listHandoffs,
   loadConfig,
   parseDoc,
@@ -20,6 +24,7 @@ import {
   searchVault,
 } from 'loredex'
 import { abbreviatePath } from '../shared/identity'
+import { withGitIdentity } from './git'
 import { ipcError } from '../shared/ipc-contract'
 import type { VaultIdentity } from '../shared/types'
 
@@ -69,6 +74,21 @@ export function handoffs(scope: HandoffScope): HandoffCard[] {
 /** Registered project names from the resolved config ("my projects" — story 3.7 filter). */
 export function registeredProjects(): string[] {
   return [...new Set(Object.values(getConfig().projects).map((p) => p.name))]
+}
+
+/**
+ * Consume a handoff (story 3.4) — THE lib writer; the app never touches
+ * handoff frontmatter itself. Identity rides the git commands it triggers
+ * (per-command injection, never ambient config — F7/NFR11).
+ */
+export function consume(id: string, identity: Identity): ConsumeReceipt {
+  const config = getConfig()
+  return withGitIdentity(identity, () => consumeHandoff(config.vaultPath, config, id, identity))
+}
+
+/** The vault repo's git config identity — the settings form's default. */
+export function ambientIdentity(): Identity {
+  return ambientGitIdentity(getConfig().vaultPath)
 }
 
 /** Embedded engine version — read from the loredex package itself (F6 evidence). */

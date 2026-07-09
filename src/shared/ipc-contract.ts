@@ -10,6 +10,7 @@ import type {
   Facets,
   HandoffCard,
   Identity,
+  IdentitySettings,
   LinkResolution,
   RoutePreview,
   SyncHealth,
@@ -39,6 +40,10 @@ export interface CoreApi {
    *  the scope is company-wide and direction is ignored. */
   'handoffs.list': { in: { scope: 'inbox' | 'outbox' | 'all'; project?: string }; out: HandoffCard[] } // (lib PR-1)
   'handoffs.consume': { in: { id: string; identity: Identity }; out: ConsumeReceipt } // (lib PR-2)
+  /** app-local contract evolution (story 3.4): identity profile, app-side only —
+   *  persisted in the core host's settings JSON (app.db seam, story 3.6) */
+  'settings.identity.get': { in: void; out: IdentitySettings }
+  'settings.identity.set': { in: Identity; out: void }
   'route.preview': { in: { file: string }; out: RoutePreview } // (lib PR-3)
   'route.undo': { in: { receiptId: string }; out: void } // (lib PR-3)
   'sync.status': { in: void; out: SyncHealth } // (lib PR-4)

@@ -10,11 +10,14 @@ import { StatusChip } from './StatusChip'
 export function HandoffCardView({
   card,
   onOpen,
+  onConsume,
   consumeSlot,
   pressed,
 }: {
   card: HandoffCard
   onOpen: (card: HandoffCard) => void
+  /** ⌘⏎ on the focused card (story 3.4); the visible button lives in consumeSlot */
+  onConsume?: (card: HandoffCard) => void
   /** story 3.4 mounts the consume action here; 3.6 will add the read-state dot */
   consumeSlot?: React.ReactNode
   /** stamp-press animation trigger (story 3.4) */
@@ -28,7 +31,9 @@ export function HandoffCardView({
       tabIndex={0}
       onClick={() => onOpen(card)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && e.target === e.currentTarget) onOpen(card)
+        if (e.key !== 'Enter' || e.target !== e.currentTarget) return
+        if (e.metaKey && onConsume) onConsume(card)
+        else onOpen(card)
       }}
     >
       <div className="handoff-card-top">

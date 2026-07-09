@@ -14,6 +14,7 @@ import { Board } from './views/handoffs/Board'
 import { Diagnostics } from './views/reader/Diagnostics'
 import { NoteView } from './views/reader/NoteView'
 import { VaultTree } from './views/reader/VaultTree'
+import { SettingsView } from './views/settings/SettingsView'
 
 function EmptyVault(): React.JSX.Element {
   const openVaultPicker = useApp((s) => s.openVaultPicker)
@@ -67,6 +68,14 @@ export default function App(): React.JSX.Element {
             Handoffs
             {openInbound > 0 && <span className="nav-badge">{openInbound}</span>}
           </button>
+          <button
+            type="button"
+            className="nav-item"
+            aria-current={view === 'settings'}
+            onClick={() => setView('settings')}
+          >
+            Settings
+          </button>
         </nav>
         <IdentityBadge />
       </aside>
@@ -74,6 +83,10 @@ export default function App(): React.JSX.Element {
         view === 'handoffs' ? (
           <main className="pane-board">
             <Board />
+          </main>
+        ) : view === 'settings' ? (
+          <main className="pane-board">
+            <SettingsView />
           </main>
         ) : (
           <>

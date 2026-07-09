@@ -2,7 +2,23 @@
  * Formatting for the vault identity badge (story 1.4). Shared so the chrome
  * badge and the MCP server (story 1.6) echo the exact same strings (F6/FR14).
  */
-import type { VaultIdentity } from './types'
+import type { Identity, VaultIdentity } from './types'
+
+/**
+ * A usable consume identity (story 3.4): non-empty name + plausible email.
+ * The lib's ambientGitIdentity returns 'unknown' for missing config — that is
+ * not a usable identity, so it fails this check and disables consume.
+ */
+export function isValidIdentity(candidate: unknown): candidate is Identity {
+  if (typeof candidate !== 'object' || candidate === null) return false
+  const { name, email } = candidate as { name?: unknown; email?: unknown }
+  return (
+    typeof name === 'string' &&
+    name.trim().length > 0 &&
+    typeof email === 'string' &&
+    /^\S+@\S+\.\S+$/.test(email)
+  )
+}
 
 /** Abbreviate the user's home directory to `~` for display. */
 export function abbreviatePath(path: string, home?: string): string {

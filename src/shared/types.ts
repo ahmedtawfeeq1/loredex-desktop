@@ -8,6 +8,8 @@
 // ── loredex payload types (landed lib PRs re-exported; rest still stubbed) ──
 
 /** (lib PR-1, PR-2, PR-4, PR-6 — landed, local file: dep) */
+import type { Identity } from 'loredex'
+
 export type { ActivityEvent, ConsumeReceipt, HandoffCard, Identity, SyncHealth } from 'loredex'
 
 /** (lib PR-3) */
@@ -73,6 +75,15 @@ export interface LinkResolution {
   target?: string
   /** all matches with project context (status 'ambiguous') */
   candidates?: LinkCandidate[]
+}
+
+/**
+ * Identity settings payload (story 3.4). The profile is app-side state, never
+ * vault state; ambient is the vault repo's git config, offered as the default.
+ */
+export interface IdentitySettings {
+  profile: Identity | null
+  ambient: Identity | null
 }
 
 export interface WizardInput {

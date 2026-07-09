@@ -7,6 +7,7 @@ import type { PortLike } from '../shared/ipc-contract'
 import { initEngine } from './engine'
 import { registerCoreHandlers } from './handlers'
 import { createCoreIpc } from './ipc'
+import { initSettings } from './settings'
 
 // Config resolves exactly once, BEFORE any handler is registered (F6).
 // Main passes the picked vault (persisted userData JSON) as `--vault <path>`;
@@ -14,6 +15,9 @@ import { createCoreIpc } from './ipc'
 const vaultFlag = process.argv.indexOf('--vault')
 const vaultOverride = vaultFlag !== -1 ? process.argv[vaultFlag + 1] : undefined
 const config = initEngine(vaultOverride)
+// App-side settings (identity profile) live under main's userData dir (story 3.4).
+const userDataFlag = process.argv.indexOf('--user-data')
+initSettings(userDataFlag !== -1 ? process.argv[userDataFlag + 1] : undefined)
 const ipc = createCoreIpc()
 registerCoreHandlers(ipc)
 

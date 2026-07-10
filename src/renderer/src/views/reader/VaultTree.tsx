@@ -1,22 +1,27 @@
 /**
- * Collapsible vault folder tree (story 2.1). Native <details> folders (free
- * keyboard support), current-note highlight = 4px Archive Ink left rail +
- * raised fill per DESIGN.md. Header carries the manual refresh action
- * (v0.1 scope cut: no file watcher).
+ * Collapsible vault folder tree (story 2.1; sections re-skinned by story 16.3,
+ * DESIGN.md Addendum D1 "Vault tree sections"). Top-level groups (_index,
+ * projects) and each project render as rounded tinted section rows — tint is
+ * a deterministic hash of the name (sectionTint.ts), collapse state persists
+ * per vault (treeSections store). Notes under a project carry a 2px left rail
+ * in the project color; selection keeps the gold rail. Deeper folders stay
+ * native <details> (free keyboard support).
  */
 import { useEffect } from 'react'
 import type { TreeNode } from '../../../../shared/types'
 import { RailChevron } from '../../components/NavIcon'
 import { useRails } from '../../stores/rails'
 import { useReader } from '../../stores/reader'
+import { useTreeSections } from '../../stores/treeSections'
+import { sectionTint } from './sectionTint'
 
-function FileRow({ node }: { node: TreeNode }): React.JSX.Element {
+function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): React.JSX.Element {
   const selected = useReader((s) => s.selected)
   const open = useReader((s) => s.open)
   return (
     <button
       type="button"
-      className="tree-file"
+      className={inProject ? 'tree-file tree-file-project' : 'tree-file'}
       aria-current={selected === node.path}
       title={node.path}
       onClick={() => void open(node.path)}
@@ -26,21 +31,68 @@ function FileRow({ node }: { node: TreeNode }): React.JSX.Element {
   )
 }
 
-function Branch({ nodes }: { nodes: TreeNode[] }): React.JSX.Element {
+/** Rounded tinted section row (D1): dot solid, label 11px caps, chevron
+ *  collapses — the tint inherits to descendants as `--section-color`. */
+function SectionNode({ node, isProject }: { node: TreeNode; isProject: boolean }): React.JSX.Element {
+  const collapsed = useTreeSections((s) => s.collapsed.includes(node.path))
+  return (
+    <li
+      className="tree-section-item"
+      style={{ '--section-color': sectionTint(node.name) } as React.CSSProperties}
+    >
+      <button
+        type="button"
+        className="tree-section"
+        aria-expanded={!collapsed}
+        title={collapsed ? `Expand ${node.name}` : `Collapse ${node.name}`}
+        onClick={() => useTreeSections.getState().toggle(node.path)}
+      >
+        <span className="tree-section-dot" aria-hidden />
+        <span className="tree-section-label">{node.name}</span>
+        <span className="tree-section-chevron" aria-hidden>
+          <RailChevron dir={collapsed ? 'right' : 'down'} />
+        </span>
+      </button>
+      {!collapsed && node.children && (
+        <Branch
+          nodes={node.children}
+          sections={!isProject && node.name === 'projects' ? 'projects' : 'none'}
+          inProject={isProject}
+        />
+      )}
+    </li>
+  )
+}
+
+function Branch({
+  nodes,
+  sections = 'none',
+  inProject = false,
+}: {
+  nodes: TreeNode[]
+  /** which dirs at THIS level are D1 section rows: top-level groups, then
+   *  each project under the projects group; everything deeper is a plain dir */
+  sections?: 'groups' | 'projects' | 'none'
+  inProject?: boolean
+}): React.JSX.Element {
   return (
     <ul className="tree-branch">
-      {nodes.map((node) => (
-        <li key={node.path}>
-          {node.kind === 'dir' ? (
-            <details open>
-              <summary className="tree-dir">{node.name}</summary>
-              {node.children && <Branch nodes={node.children} />}
-            </details>
-          ) : (
-            <FileRow node={node} />
-          )}
-        </li>
-      ))}
+      {nodes.map((node) =>
+        node.kind === 'dir' && sections !== 'none' ? (
+          <SectionNode key={node.path} node={node} isProject={sections === 'projects'} />
+        ) : (
+          <li key={node.path}>
+            {node.kind === 'dir' ? (
+              <details open>
+                <summary className="tree-dir">{node.name}</summary>
+                {node.children && <Branch nodes={node.children} inProject={inProject} />}
+              </details>
+            ) : (
+              <FileRow node={node} inProject={inProject} />
+            )}
+          </li>
+        ),
+      )}
     </ul>
   )
 }
@@ -88,7 +140,7 @@ export function VaultTree(): React.JSX.Element {
       {tree && tree.length === 0 && !treeError ? (
         <div className="tree-empty">No markdown in this vault yet.</div>
       ) : (
-        tree && <Branch nodes={tree} />
+        tree && <Branch nodes={tree} sections="groups" />
       )}
     </div>
   )

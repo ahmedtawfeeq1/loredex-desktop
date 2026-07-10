@@ -9,9 +9,11 @@ import {
   loadIdentityProfile,
   loadRailsCollapsed,
   loadThemeSetting,
+  loadTreeSectionsCollapsed,
   saveIdentityProfile,
   saveRailsCollapsed,
   saveThemeSetting,
+  saveTreeSectionsCollapsed,
 } from './settings'
 
 function freshDir(): string {
@@ -77,6 +79,48 @@ describe('collapsible rails persistence — PER VAULT (story 16.2, Addendum D1)'
     expect(loadRailsCollapsed(db, 'vault-a')).toEqual({ sidebar: false, list: false })
     appSettingSet(db, 'vault-a', 'rails', JSON.stringify({ sidebar: 'yes', list: 1 }))
     expect(loadRailsCollapsed(db, 'vault-a')).toEqual({ sidebar: false, list: false })
+  })
+})
+
+describe('vault tree sections collapsed-state persistence — PER VAULT (story 16.3, Addendum D1)', () => {
+  const openDb = (): AppDb => {
+    const db = initAppDb(mkdtempSync(join(tmpdir(), 'loredex-tree-sections-')))
+    expect(db).not.toBeNull()
+    return db as AppDb
+  }
+
+  it('defaults to nothing collapsed when nothing is stored', () => {
+    expect(loadTreeSectionsCollapsed(openDb(), 'vault-a')).toEqual({ collapsed: [] })
+  })
+
+  it('round-trips the collapsed section paths (incl. back to empty)', () => {
+    const db = openDb()
+    saveTreeSectionsCollapsed(db, 'vault-a', { collapsed: ['projects', 'projects/nimbus-backend'] })
+    expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({
+      collapsed: ['projects', 'projects/nimbus-backend'],
+    })
+    saveTreeSectionsCollapsed(db, 'vault-a', { collapsed: [] })
+    expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: [] })
+  })
+
+  it('vaults never clobber each other — the state is keyed by vault id', () => {
+    const db = openDb()
+    saveTreeSectionsCollapsed(db, 'vault-a', { collapsed: ['_index'] })
+    saveTreeSectionsCollapsed(db, 'vault-b', { collapsed: ['projects/nimbus-mobile'] })
+    expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: ['_index'] })
+    expect(loadTreeSectionsCollapsed(db, 'vault-b')).toEqual({
+      collapsed: ['projects/nimbus-mobile'],
+    })
+  })
+
+  it('malformed or non-string rows degrade to nothing collapsed, never throw', () => {
+    const db = openDb()
+    appSettingSet(db, 'vault-a', 'treeSections', 'not json {')
+    expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: [] })
+    appSettingSet(db, 'vault-a', 'treeSections', JSON.stringify({ collapsed: 'projects' }))
+    expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: [] })
+    appSettingSet(db, 'vault-a', 'treeSections', JSON.stringify({ collapsed: [1, '_index', null] }))
+    expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: ['_index'] })
   })
 })
 

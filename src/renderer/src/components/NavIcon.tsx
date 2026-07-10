@@ -74,8 +74,9 @@ export function NavIcon({ view }: { view: AppView }): React.JSX.Element {
   )
 }
 
-/** Pane-header collapse/expand chevron — both rails share it (story 16.2). */
-export function RailChevron({ dir }: { dir: 'left' | 'right' }): React.JSX.Element {
+/** Pane-header collapse/expand chevron — rails (16.2) + tree sections (16.3)
+ *  share it: `down` = an expanded section row. */
+export function RailChevron({ dir }: { dir: 'left' | 'right' | 'down' }): React.JSX.Element {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -88,7 +89,13 @@ export function RailChevron({ dir }: { dir: 'left' | 'right' }): React.JSX.Eleme
       strokeLinejoin="round"
       aria-hidden
     >
-      {dir === 'left' ? <path d="M9.5 3.5 5 8l4.5 4.5" /> : <path d="M6.5 3.5 11 8l-4.5 4.5" />}
+      {dir === 'left' ? (
+        <path d="M9.5 3.5 5 8l4.5 4.5" />
+      ) : dir === 'right' ? (
+        <path d="M6.5 3.5 11 8l-4.5 4.5" />
+      ) : (
+        <path d="M3.5 6.5 8 11l4.5-4.5" />
+      )}
     </svg>
   )
 }

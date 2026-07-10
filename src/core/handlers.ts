@@ -45,10 +45,12 @@ import {
   loadIdentityProfile,
   loadRailsCollapsed,
   loadThemeSetting,
+  loadTreeSectionsCollapsed,
   saveIdentityProfile,
   saveMcpPortOverride,
   saveRailsCollapsed,
   saveThemeSetting,
+  saveTreeSectionsCollapsed,
 } from './settings'
 import { buildThread, collectComments } from './threads'
 import { listMarkdownFiles, walkVault } from './tree'
@@ -534,6 +536,17 @@ export function registerCoreHandlers(
   ipc.register('settings.rails.set', (rails) => {
     const { db, vid } = requireDb()
     saveRailsCollapsed(db, vid, { sidebar: rails.sidebar === true, list: rails.list === true })
+  })
+  // Vault tree sections (story 16.3, Addendum D1): per-vault collapsed set,
+  // app.db only — same placement rules as settings.rails.
+  ipc.register('settings.treeSections.get', () => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return db && vid ? loadTreeSectionsCollapsed(db, vid) : { collapsed: [] }
+  })
+  ipc.register('settings.treeSections.set', (state) => {
+    const { db, vid } = requireDb()
+    saveTreeSectionsCollapsed(db, vid, state)
   })
   ipc.register('settings.mcpPort.set', ({ port }) => {
     if (port !== null && (!Number.isInteger(port) || port < 1024 || port > 65535)) {

@@ -21,6 +21,7 @@ import { useRails } from './stores/rails'
 import { useReader } from './stores/reader'
 import { useRoute } from './stores/route'
 import { useSuggests } from './stores/suggests'
+import { useTreeSections } from './stores/treeSections'
 import { useWizard } from './stores/wizard'
 import { openCount } from '../../shared/handoff-lanes'
 import { useFeed } from './stores/feed'
@@ -64,6 +65,7 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     void init()
     void useRails.getState().load()
+    void useTreeSections.getState().load()
     // menu-driven vault change (main) → refresh identity + reset the stores
     return onVaultChanged(() => {
       useReader.getState().reset()
@@ -76,8 +78,10 @@ export default function App(): React.JSX.Element {
       useContracts.getState().reset()
       useSuggests.getState().reset()
       useRails.getState().reset()
+      useTreeSections.getState().reset()
       void init()
       void useRails.getState().load() // the NEW vault's persisted rail state
+      void useTreeSections.getState().load() // …and its collapsed sections (16.3)
     })
   }, [init])
 

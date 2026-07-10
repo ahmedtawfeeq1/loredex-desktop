@@ -271,6 +271,81 @@ a:hover {
   padding: 16px;
 }
 
+/* ── Addendum D1: vault tree sections, Notability-style (story 16.3) ───────
+   Rounded tinted rows for top-level groups and each project. The color rides
+   an inline --section-color (deterministic hash, sectionTint.ts) and inherits
+   to descendants; the row tint is that color at 12% alpha (light) / 20%
+   (dark), the dot stays solid. Gold budget: selection only. */
+
+.tree-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 8px 5px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--section-color) 12%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-1);
+  transition: background 100ms ease-out;
+}
+
+:root[data-theme='dark'] .tree-section {
+  background: color-mix(in srgb, var(--section-color) 20%, transparent);
+}
+
+.tree-section:hover {
+  background: color-mix(in srgb, var(--section-color) 20%, transparent);
+}
+
+:root[data-theme='dark'] .tree-section:hover {
+  background: color-mix(in srgb, var(--section-color) 30%, transparent);
+}
+
+.tree-section-item {
+  margin: 2px 0 2px 8px;
+}
+
+.tree-section-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--section-color); /* solid — the alpha tint never washes it */
+}
+
+.tree-section-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tree-section-chevron {
+  flex: none;
+  display: flex;
+  color: var(--text-2);
+}
+
+/* notes under a project inherit the project color as a 2px left rail
+   (D1-sanctioned); padding keeps the text flush with plain rows (16px) */
+.tree-file-project {
+  border-left: 2px solid var(--section-color);
+  padding-left: 14px;
+}
+
+/* selection keeps the gold rail — the project rail steps aside */
+.tree-file-project[aria-current='true'] {
+  border-left: 4px solid var(--gold);
+  padding-left: 12px;
+}
+
 /* ── vault identity chip: white card, permanent (the F6 fix visible) ────── */
 
 .vault-chip {

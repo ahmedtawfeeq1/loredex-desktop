@@ -12,7 +12,7 @@ import { existsSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting, type ThemeSetting } from '../shared/theme'
-import type { Identity, RailsCollapsed } from '../shared/types'
+import type { Identity, RailsCollapsed, TreeSectionsCollapsed } from '../shared/types'
 import { appSettingGet, appSettingSet, getAppDb, metaGet, metaSet, type AppDb } from './db/index'
 
 /** In-memory fallback when no app.db is open (bare unit tests, no userData). */
@@ -108,6 +108,35 @@ export function saveRailsCollapsed(db: AppDb, vaultId: string, rails: RailsColla
     'rails',
     JSON.stringify({ sidebar: rails.sidebar === true, list: rails.list === true }),
   )
+}
+
+// ── Vault tree sections (story 16.3, Addendum D1) ───────────────────────────
+// Collapsed section-row paths, PER VAULT — app_settings, beside `rails`.
+
+export function loadTreeSectionsCollapsed(db: AppDb, vaultId: string): TreeSectionsCollapsed {
+  const raw = appSettingGet(db, vaultId, 'treeSections')
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw) as { collapsed?: unknown }
+      if (Array.isArray(parsed.collapsed)) {
+        return { collapsed: parsed.collapsed.filter((p): p is string => typeof p === 'string') }
+      }
+    } catch {
+      // malformed row — fall through to nothing collapsed
+    }
+  }
+  return { collapsed: [] }
+}
+
+export function saveTreeSectionsCollapsed(
+  db: AppDb,
+  vaultId: string,
+  state: TreeSectionsCollapsed,
+): void {
+  const collapsed = Array.isArray(state.collapsed)
+    ? state.collapsed.filter((p): p is string => typeof p === 'string')
+    : []
+  appSettingSet(db, vaultId, 'treeSections', JSON.stringify({ collapsed }))
 }
 
 // ── MCP host settings (story 1.6) ───────────────────────────────────────────

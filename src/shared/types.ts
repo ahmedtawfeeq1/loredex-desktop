@@ -504,3 +504,11 @@ export interface RailsCollapsed {
   /** file-list pane collapsed to 0 (reader full-bleed) */
   list: boolean
 }
+
+// ── Vault tree sections (story 16.3, DESIGN.md Addendum D1) ─────────────────
+
+/** Per-vault collapsed tree-section state — UI pref, app.db only. */
+export interface TreeSectionsCollapsed {
+  /** vault-relative paths of the collapsed section rows (groups + projects) */
+  collapsed: string[]
+}

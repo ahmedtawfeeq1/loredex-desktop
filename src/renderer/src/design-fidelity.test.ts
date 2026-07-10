@@ -76,10 +76,11 @@ describe("the Don't list", () => {
   it('no border wider than 1px except the sanctioned left rails', () => {
     // any border-* width > 1px (radii are not borders) …
     const wide = css.match(/border(?!-radius)[a-z-]*:\s*[^;]*\b([2-9]|\d{2,})px[^;]*/g) ?? []
-    // … must be a border-left rail slot (transparent at rest, gold when active)
-    // or the thread rail's 2px hairline connector (DESIGN.md#signature, v2)
+    // … must be a border-left rail slot (transparent at rest, gold when active),
+    // the thread rail's 2px hairline connector (DESIGN.md#signature, v2), or
+    // the D1 project rail on notes under a project (story 16.3)
     for (const decl of wide) {
-      expect(decl).toMatch(/^border-left: (4px solid|2px solid var\(--hairline\))/)
+      expect(decl).toMatch(/^border-left: (4px solid|2px solid var\(--(hairline|section-color)\))/)
     }
   })
   it('serif never leaks into nav or buttons', () => {
@@ -154,6 +155,36 @@ describe('Addendum D1: collapsible rails (story 16.2)', () => {
   })
   it('the badge survives collapse as a gold dot', () => {
     expect(block('.nav-dot')).toContain('background: var(--gold);')
+  })
+})
+
+describe('Addendum D1: vault tree sections (story 16.3)', () => {
+  it('section row is a rounded pill: radius 8, 11px caps label', () => {
+    const row = block('.tree-section')
+    expect(row).toContain('border-radius: 8px;')
+    expect(row).toContain('font-size: 11px;')
+    expect(row).toContain('text-transform: uppercase;')
+  })
+  it('tint is the section color at 12% alpha light / 20% dark', () => {
+    expect(block('.tree-section')).toContain(
+      'background: color-mix(in srgb, var(--section-color) 12%, transparent);',
+    )
+    expect(css).toMatch(
+      /:root\[data-theme='dark'\] \.tree-section \{[^}]*var\(--section-color\) 20%, transparent/,
+    )
+  })
+  it('the color dot is solid 8px round in the section color', () => {
+    const dot = block('.tree-section-dot')
+    expect(dot).toContain('width: 8px;')
+    expect(dot).toContain('height: 8px;')
+    expect(dot).toContain('border-radius: 50%;')
+    expect(dot).toContain('background: var(--section-color);')
+  })
+  it('notes under a project carry the 2px project rail; selection keeps gold', () => {
+    expect(block('.tree-file-project')).toContain('border-left: 2px solid var(--section-color);')
+    expect(block(".tree-file-project[aria-current='true']")).toContain(
+      'border-left: 4px solid var(--gold);',
+    )
   })
 })
 

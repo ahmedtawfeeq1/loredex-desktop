@@ -39,6 +39,7 @@ import type {
   SyncReport,
   TourDef,
   TreeNode,
+  TreeSectionsCollapsed,
   VaultIdentity,
   WizardFlow,
   WizardStepStatus,
@@ -108,6 +109,11 @@ export interface CoreApi {
    *  expanded while no vault/db is open. */
   'settings.rails.get': { in: void; out: RailsCollapsed }
   'settings.rails.set': { in: RailsCollapsed; out: void }
+  /** app-local contract evolution (story 16.3, Addendum D1): collapsed vault
+   *  tree sections — PER-VAULT UI pref in app.db (never the vault); get
+   *  degrades to nothing-collapsed while no vault/db is open. */
+  'settings.treeSections.get': { in: void; out: TreeSectionsCollapsed }
+  'settings.treeSections.set': { in: TreeSectionsCollapsed; out: void }
   /** Story 7.4: read-only plan (lib previewRoute) for the confirm card; the
    *  in-shape gained mode/projectName over the v1 sketch (app-local evolution). */
   'route.preview': {

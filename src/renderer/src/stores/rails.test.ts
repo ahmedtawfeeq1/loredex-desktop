@@ -12,7 +12,7 @@ beforeEach(() => {
   invoke.mockReset()
   invoke.mockResolvedValue(undefined)
   vi.stubGlobal('window', { loredex: { invoke } })
-  useRails.setState({ sidebar: false, list: false })
+  useRails.setState({ sidebar: false, list: false, listWidth: 300 })
 })
 
 afterEach(() => vi.unstubAllGlobals())
@@ -67,8 +67,59 @@ describe('load applies the vault’s stored state', () => {
   })
 
   it('reset returns to expanded (vault switch, before the new load)', () => {
-    useRails.setState({ sidebar: true, list: true })
+    useRails.setState({ sidebar: true, list: true, listWidth: 420 })
     useRails.getState().reset()
-    expect(useRails.getState()).toMatchObject({ sidebar: false, list: false })
+    expect(useRails.getState()).toMatchObject({ sidebar: false, list: false, listWidth: 300 })
+  })
+
+  it('load also applies the vault’s stored list width (own app_settings row)', async () => {
+    invoke.mockImplementation((channel: string) =>
+      channel === 'settings.listWidth.get'
+        ? Promise.resolve({ width: 420 })
+        : Promise.resolve({ sidebar: false, list: false }),
+    )
+    await useRails.getState().load()
+    expect(invoke).toHaveBeenCalledWith('settings.listWidth.get', undefined)
+    expect(useRails.getState().listWidth).toBe(420)
+  })
+
+  it('load clamps a hand-widened stored width into the band', async () => {
+    invoke.mockImplementation((channel: string) =>
+      channel === 'settings.listWidth.get'
+        ? Promise.resolve({ width: 9000 })
+        : Promise.resolve({ sidebar: false, list: false }),
+    )
+    await useRails.getState().load()
+    expect(useRails.getState().listWidth).toBe(480)
+  })
+})
+
+describe('list-pane resize (story epic17.4)', () => {
+  it('dragListWidth clamps to the band and does NOT persist (live drag)', () => {
+    useRails.getState().dragListWidth(150) // below the 200 floor
+    expect(useRails.getState().listWidth).toBe(200)
+    useRails.getState().dragListWidth(999) // above the 480 ceiling
+    expect(useRails.getState().listWidth).toBe(480)
+    expect(invoke).not.toHaveBeenCalledWith('settings.listWidth.set', expect.anything())
+  })
+
+  it('commitListWidth persists the current width (drag-end)', () => {
+    useRails.getState().dragListWidth(360)
+    useRails.getState().commitListWidth()
+    expect(invoke).toHaveBeenCalledWith('settings.listWidth.set', { width: 360 })
+  })
+
+  it('resetListWidth returns to 300 and persists (double-click)', () => {
+    useRails.setState({ listWidth: 470 })
+    useRails.getState().resetListWidth()
+    expect(useRails.getState().listWidth).toBe(300)
+    expect(invoke).toHaveBeenCalledWith('settings.listWidth.set', { width: 300 })
+  })
+
+  it('a persist failure keeps the dragged width applied (best-effort)', () => {
+    invoke.mockRejectedValue(new Error('core gone'))
+    useRails.getState().dragListWidth(340)
+    useRails.getState().commitListWidth()
+    expect(useRails.getState().listWidth).toBe(340)
   })
 })

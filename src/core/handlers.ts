@@ -51,11 +51,13 @@ import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
   loadAtlasLegendSeen,
   loadIdentityProfile,
+  loadListPaneWidth,
   loadRailsCollapsed,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
   saveAtlasLegendSeen,
   saveIdentityProfile,
+  saveListPaneWidth,
   saveMcpPortOverride,
   saveRailsCollapsed,
   saveThemeSetting,
@@ -606,6 +608,17 @@ export function registerCoreHandlers(
   ipc.register('settings.treeSections.set', (state) => {
     const { db, vid } = requireDb()
     saveTreeSectionsCollapsed(db, vid, state)
+  })
+  // List-pane width (story epic17.4, D1 amendment 3): per-vault UI pref, app.db
+  // only — same placement rules as settings.rails. No vault/db → 300px default.
+  ipc.register('settings.listWidth.get', () => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return db && vid ? { width: loadListPaneWidth(db, vid) } : { width: 300 }
+  })
+  ipc.register('settings.listWidth.set', ({ width }) => {
+    const { db, vid } = requireDb()
+    saveListPaneWidth(db, vid, width)
   })
   // Atlas legend seen (story epic17.2, D1 amendment 3): app-global meta flag —
   // no vault/db needed to READ (defaults to unseen so the popover shows once);

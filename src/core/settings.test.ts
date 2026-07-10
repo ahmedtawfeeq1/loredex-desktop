@@ -8,11 +8,13 @@ import {
   initSettings,
   loadAtlasLegendSeen,
   loadIdentityProfile,
+  loadListPaneWidth,
   loadRailsCollapsed,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
   saveAtlasLegendSeen,
   saveIdentityProfile,
+  saveListPaneWidth,
   saveRailsCollapsed,
   saveThemeSetting,
   saveTreeSectionsCollapsed,
@@ -123,6 +125,59 @@ describe('vault tree sections collapsed-state persistence — PER VAULT (story 1
     expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: [] })
     appSettingSet(db, 'vault-a', 'treeSections', JSON.stringify({ collapsed: [1, '_index', null] }))
     expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: ['_index'] })
+  })
+})
+
+describe('list-pane width persistence — PER VAULT (story epic17.4, Addendum D1)', () => {
+  const openDb = (): AppDb => {
+    const db = initAppDb(mkdtempSync(join(tmpdir(), 'loredex-list-width-')))
+    expect(db).not.toBeNull()
+    return db as AppDb
+  }
+
+  it('defaults to 300 when nothing is stored', () => {
+    expect(loadListPaneWidth(openDb(), 'vault-a')).toBe(300)
+  })
+
+  it('round-trips a stored width inside the band', () => {
+    const db = openDb()
+    saveListPaneWidth(db, 'vault-a', 360)
+    expect(loadListPaneWidth(db, 'vault-a')).toBe(360)
+  })
+
+  it('clamps out-of-band widths on both save and load', () => {
+    const db = openDb()
+    saveListPaneWidth(db, 'vault-a', 9000)
+    expect(loadListPaneWidth(db, 'vault-a')).toBe(480)
+    saveListPaneWidth(db, 'vault-a', 10)
+    expect(loadListPaneWidth(db, 'vault-a')).toBe(200)
+    // a hand-edited row past the ceiling still reads back clamped
+    appSettingSet(db, 'vault-a', 'listWidth', JSON.stringify({ width: 2000 }))
+    expect(loadListPaneWidth(db, 'vault-a')).toBe(480)
+  })
+
+  it('vaults never clobber each other — keyed by vault id', () => {
+    const db = openDb()
+    saveListPaneWidth(db, 'vault-a', 240)
+    saveListPaneWidth(db, 'vault-b', 440)
+    expect(loadListPaneWidth(db, 'vault-a')).toBe(240)
+    expect(loadListPaneWidth(db, 'vault-b')).toBe(440)
+  })
+
+  it('malformed or non-number rows degrade to the 300 default, never throw', () => {
+    const db = openDb()
+    appSettingSet(db, 'vault-a', 'listWidth', 'not json {')
+    expect(loadListPaneWidth(db, 'vault-a')).toBe(300)
+    appSettingSet(db, 'vault-a', 'listWidth', JSON.stringify({ width: 'wide' }))
+    expect(loadListPaneWidth(db, 'vault-a')).toBe(300)
+  })
+
+  it('lives beside the rails row — neither disturbs the other', () => {
+    const db = openDb()
+    saveRailsCollapsed(db, 'vault-a', { sidebar: true, list: false })
+    saveListPaneWidth(db, 'vault-a', 400)
+    expect(loadRailsCollapsed(db, 'vault-a')).toEqual({ sidebar: true, list: false })
+    expect(loadListPaneWidth(db, 'vault-a')).toBe(400)
   })
 })
 

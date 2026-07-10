@@ -115,6 +115,11 @@ export interface CoreApi {
    *  degrades to nothing-collapsed while no vault/db is open. */
   'settings.treeSections.get': { in: void; out: TreeSectionsCollapsed }
   'settings.treeSections.set': { in: TreeSectionsCollapsed; out: void }
+  /** app-local contract evolution (story epic17.4, D1 amendment 3): list-pane
+   *  width — PER-VAULT UI pref in app.db (beside `rails`); clamped 200–480px,
+   *  get degrades to the 300px default while no vault/db is open. */
+  'settings.listWidth.get': { in: void; out: { width: number } }
+  'settings.listWidth.set': { in: { width: number }; out: void }
   /** app-local contract evolution (story epic17.2, D1 amendment 3): whether the
    *  Atlas "How to read this map" legend has been shown. APP-GLOBAL (meta, not
    *  per-vault) — the first-ever Atlas visit auto-opens it once, then set. */

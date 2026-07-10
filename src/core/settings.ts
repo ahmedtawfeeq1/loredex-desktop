@@ -110,6 +110,38 @@ export function saveRailsCollapsed(db: AppDb, vaultId: string, rails: RailsColla
   )
 }
 
+// ── List-pane width (story epic17.4, D1 amendment 3) ────────────────────────
+// PER-VAULT UI pref, app_settings beside `rails` — the file-list/reader divider
+// drags 200–480px, double-click resets to 300. Clamp is the renderer's pure
+// listPaneWidth util's band; core keeps a defensive copy so a hand-edited row
+// can never widen the pane past the design bounds.
+
+const MIN_LIST_WIDTH = 200
+const MAX_LIST_WIDTH = 480
+const DEFAULT_LIST_WIDTH = 300
+
+function clampWidth(px: number): number {
+  if (!Number.isFinite(px)) return DEFAULT_LIST_WIDTH
+  return Math.min(MAX_LIST_WIDTH, Math.max(MIN_LIST_WIDTH, Math.round(px)))
+}
+
+export function loadListPaneWidth(db: AppDb, vaultId: string): number {
+  const raw = appSettingGet(db, vaultId, 'listWidth')
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw) as { width?: unknown }
+      if (typeof parsed.width === 'number') return clampWidth(parsed.width)
+    } catch {
+      // malformed row — fall through to the default
+    }
+  }
+  return DEFAULT_LIST_WIDTH
+}
+
+export function saveListPaneWidth(db: AppDb, vaultId: string, width: number): void {
+  appSettingSet(db, vaultId, 'listWidth', JSON.stringify({ width: clampWidth(width) }))
+}
+
 // ── Vault tree sections (story 16.3, Addendum D1) ───────────────────────────
 // Collapsed section-row paths, PER VAULT — app_settings, beside `rails`.
 

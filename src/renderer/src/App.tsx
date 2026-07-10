@@ -17,6 +17,7 @@ import { ToastStack } from './components/ToastStack'
 import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
+import { useFileSearch } from './stores/fileSearch'
 import { useFind } from './stores/find'
 import { useHandoffs } from './stores/handoffs'
 import { useRails } from './stores/rails'
@@ -43,6 +44,7 @@ import { HomeView } from './views/home/HomeView'
 import { RouteConfirmCard } from './views/routes/RouteConfirmCard'
 import { SyncPanel } from './views/sync/SyncPanel'
 import { Diagnostics } from './views/reader/Diagnostics'
+import { ListResizeHandle } from './views/reader/ListResizeHandle'
 import { NoteView } from './views/reader/NoteView'
 import { RouteDropTarget } from './views/reader/RouteDropTarget'
 import { VaultTree } from './views/reader/VaultTree'
@@ -72,6 +74,7 @@ export default function App(): React.JSX.Element {
     return onVaultChanged(() => {
       useReader.getState().reset()
       useFind.getState().reset()
+      useFileSearch.getState().reset()
       useHandoffs.getState().reset()
       useSearch.getState().reset()
       useHome.getState().reset()
@@ -246,6 +249,9 @@ export default function App(): React.JSX.Element {
         ) : (
           <>
             <VaultTree />
+            {/* story epic17.4: the file-list/reader resize divider — only while
+                the list pane is expanded (collapsed = reader full-bleed) */}
+            {!listCollapsed && <ListResizeHandle />}
             <main className="pane-reader">
               {listCollapsed && (
                 <button

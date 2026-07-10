@@ -1952,3 +1952,27 @@ a:hover {
   margin: 4px 12px;
   text-align: left;
 }
+
+/* ── lifecycle v2 (story 8.1): expired-snooze treatment, snooze quick picks,
+   attribution history — status colors only, gold stays with actions ───────── */
+
+.snooze-expired {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rust);
+}
+
+.snooze-quick {
+  display: flex;
+  gap: 8px;
+}
+
+.handoff-history {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}

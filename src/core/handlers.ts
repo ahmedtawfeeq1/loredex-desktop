@@ -111,6 +111,27 @@ export function registerCoreHandlers(
       return result
     }),
   )
+  // Lifecycle v2 (story 8.1): accept/decline/snooze/reopen — one lib write op.
+  // The stateChanged event carries reason/until so boards can toast the detail.
+  ipc.register('handoffs.setStatus', ({ id, transition, identity }) =>
+    withWriteLock(() => {
+      requireIdentity(identity, 'a status change')
+      const receipt = engine.setStatus(id, transition, identity)
+      const rel = toVaultRelative(receipt.path, engine.getConfig().vaultPath)
+      ipc.emit({
+        kind: 'handoff.stateChanged',
+        id,
+        from: String(receipt.before.status ?? 'open'),
+        to: String(receipt.after.status ?? ''),
+        by: identity,
+        ...(transition.to === 'declined' ? { reason: transition.reason } : {}),
+        ...(transition.to === 'snoozed' ? { until: transition.until } : {}),
+      })
+      ipc.emit({ kind: 'vault.changed', paths: [rel] })
+      notifier.refresh()
+      return receipt
+    }),
+  )
   ipc.register('handoffs.annotate', ({ id, title, body, identity }) =>
     withWriteLock(() => {
       requireIdentity(identity, 'commenting')

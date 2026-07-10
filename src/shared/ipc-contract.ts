@@ -13,6 +13,7 @@ import type {
   FacetValues,
   HandoffCard,
   HandoffCreateResult,
+  HandoffTransition,
   HandshakeStatus,
   HomeBrief,
   Identity,
@@ -21,6 +22,7 @@ import type {
   McpStatus,
   ReplyHandoffInput,
   RoutePreview,
+  StatusReceipt,
   SyncHealth,
   SyncReport,
   TreeNode,
@@ -61,6 +63,12 @@ export interface CoreApi {
   'handoffs.annotate': {
     in: { id: string; title: string; body: string; identity: Identity }
     out: HandoffCreateResult
+  }
+  /** M2 lifecycle v2 (story 8.1): the one non-consume transition writer (lib
+   *  setHandoffStatus). Identity rides the payload — same pattern as consume. */
+  'handoffs.setStatus': {
+    in: { id: string; transition: HandoffTransition; identity: Identity }
+    out: StatusReceipt
   }
   /** app-local contract evolution (story 3.4): identity profile, app-side only —
    *  persisted in the core host's settings JSON (app.db seam, story 3.6) */
@@ -105,7 +113,17 @@ export type CoreEvent =
   /** M2 (stories 7.2/7.3): a write landed a new note. `card` carries the board
    *  card for optimistic insert; null for comments (thread data, never a card). */
   | { kind: 'handoff.created'; card: HandoffCard | null; relPath: string }
-  | { kind: 'handoff.stateChanged'; id: string; from: string; to: string; by: Identity }
+  /** M2 (story 8.1): payload gains reason?/until? — decline/snooze detail for
+   *  the board toast; absent on every other transition. */
+  | {
+      kind: 'handoff.stateChanged'
+      id: string
+      from: string
+      to: string
+      by: Identity
+      reason?: string
+      until?: string
+    }
   | { kind: 'route.completed'; receipt: RoutePreview }
   | { kind: 'vault.changed'; paths: string[] }
   | { kind: 'sync.changed'; health: SyncHealth }

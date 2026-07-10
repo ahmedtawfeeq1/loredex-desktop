@@ -11,6 +11,7 @@ export function Modal({
   onSubmit,
   submitLabel,
   submitDisabled,
+  destructive,
   children,
 }: {
   title: string
@@ -18,6 +19,8 @@ export function Modal({
   onSubmit: () => void
   submitLabel: string
   submitDisabled?: boolean
+  /** story 8.1 (decline): the confirm renders as a rust outline, not gold */
+  destructive?: boolean
   children: React.ReactNode
 }): React.JSX.Element {
   const cardRef = useRef<HTMLDivElement>(null)
@@ -59,7 +62,7 @@ export function Modal({
           </button>
           <button
             type="button"
-            className="button-primary"
+            className={destructive ? 'button-destructive' : 'button-primary'}
             disabled={submitDisabled}
             title={`${submitLabel} (⌘⏎)`}
             onClick={onSubmit}

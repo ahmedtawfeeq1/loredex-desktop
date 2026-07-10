@@ -16,7 +16,9 @@ export type {
   CreateHandoffInput,
   HandoffCard,
   HandoffCreateResult,
+  HandoffTransition,
   Identity,
+  StatusReceipt,
   SyncHealth,
 } from 'loredex'
 

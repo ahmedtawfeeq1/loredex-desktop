@@ -11,24 +11,25 @@ export function HandoffCardView({
   card,
   onOpen,
   onConsume,
-  consumeSlot,
+  actionsSlot,
   pressed,
   onReply,
   onComment,
 }: {
   card: HandoffCard
   onOpen: (card: HandoffCard) => void
-  /** ⌘⏎ on the focused card (story 3.4); the visible button lives in consumeSlot */
+  /** ⌘⏎ on the focused card (story 3.4); the visible buttons live in actionsSlot */
   onConsume?: (card: HandoffCard) => void
-  /** story 3.4 mounts the consume action here; 3.6 will add the read-state dot */
-  consumeSlot?: React.ReactNode
-  /** stamp-press animation trigger (story 3.4) */
+  /** lifecycle action row (stories 3.4/8.1) — state-legal recipient actions */
+  actionsSlot?: React.ReactNode
+  /** stamp-press animation trigger — every state change (stories 3.4/8.1) */
   pressed?: boolean
-  /** story 7.3: thread actions — secondary pills, the gold primary stays with consume */
+  /** story 7.3: thread actions — secondary pills, the gold primary stays with accept */
   onReply?: (card: HandoffCard) => void
   onComment?: (card: HandoffCard) => void
 }): React.JSX.Element {
   const notes = card.readingOrder.length
+  const snoozed = card.status === 'snoozed'
   return (
     <div
       className="handoff-card"
@@ -43,6 +44,9 @@ export function HandoffCardView({
     >
       <div className="handoff-card-top">
         <StatusChip status={card.status} pressed={pressed} />
+        {/* AC4 (story 8.1): expired snooze is a DERIVED treatment — the vault
+            status stays snoozed until a human reopens it */}
+        {snoozed && card.expired && <span className="snooze-expired">expired</span>}
         <span className="handoff-route">
           {card.from} ⟶ {card.to}
         </span>
@@ -52,6 +56,7 @@ export function HandoffCardView({
       <div className="handoff-foot">
         <span>
           {notes === 1 ? '1 note' : `${notes} notes`} · {formatAge(card.ageDays)}
+          {snoozed && card.snoozedUntil ? ` · until ${card.snoozedUntil}` : ''}
         </span>
         {(onReply || onComment) && (
           <span className="handoff-actions">
@@ -83,7 +88,7 @@ export function HandoffCardView({
             )}
           </span>
         )}
-        {consumeSlot}
+        {actionsSlot}
       </div>
     </div>
   )

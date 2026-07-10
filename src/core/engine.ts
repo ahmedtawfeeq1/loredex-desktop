@@ -15,6 +15,7 @@ import {
   buildDashboard,
   parseActivity,
   type Config,
+  type HandoffTransition,
   type ConsumeReceipt,
   consumeHandoff,
   createHandoff,
@@ -42,6 +43,8 @@ import {
   type RoutePlanPreview,
   type SearchHit,
   searchVault,
+  setHandoffStatus,
+  type StatusReceipt,
   type SyncHealth,
   syncStatus,
   type VaultSchemaStatus,
@@ -192,6 +195,24 @@ export function annotate(
   const config = getConfig()
   return mapHandoffError(() =>
     withGitIdentity(identity, () => annotateHandoff(config.vaultPath, config, id, comment, identity)),
+  )
+}
+
+/**
+ * Lifecycle transition (story 8.1) — the lib's one non-consume status writer
+ * (accept/decline/snooze/reopen). Legality is lib-enforced; illegal transitions
+ * surface as ILLEGAL_TRANSITION envelopes, never silent.
+ */
+export function setStatus(
+  id: string,
+  transition: HandoffTransition,
+  identity: Identity,
+): StatusReceipt {
+  const config = getConfig()
+  return mapHandoffError(() =>
+    withGitIdentity(identity, () =>
+      setHandoffStatus(config.vaultPath, config, id, transition, identity),
+    ),
   )
 }
 

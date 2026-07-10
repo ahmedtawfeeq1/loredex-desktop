@@ -14,6 +14,7 @@ import { useHandoffs } from '../../stores/handoffs'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
 import {
+  actionsFor,
   groupByProject,
   type Lanes,
   lanesFor,
@@ -28,24 +29,86 @@ export function openBrief(card: HandoffCard): void {
   void useReader.getState().open(toVaultRelative(card.path, vaultPath), card.readingOrder)
 }
 
-/** The consume affordance on an open inbound card (story 3.4). */
-function ConsumeAction({ card }: { card: HandoffCard }): React.JSX.Element {
+/**
+ * State-legal recipient actions on an inbound card (story 8.1 AC1):
+ * open → Accept (gold) / Decline / Snooze; accepted → Consume;
+ * declined/snoozed → Reopen; consumed → none. Legality stays lib-enforced.
+ */
+function LifecycleActions({ card }: { card: HandoffCard }): React.JSX.Element | null {
   const consume = useHandoffs((s) => s.consume)
-  const consumingId = useHandoffs((s) => s.consumingId)
+  const setStatus = useHandoffs((s) => s.setStatus)
+  const openDecline = useHandoffs((s) => s.openDecline)
+  const openSnooze = useHandoffs((s) => s.openSnooze)
+  const busy = useHandoffs((s) => s.consumingId !== null || s.transitioningId !== null)
   const hasIdentity = useIdentity((s) => effectiveIdentity(s) !== null)
+  const actions = actionsFor(card, true)
+  if (actions.length === 0) return null
+  const disabled = !hasIdentity || busy
+  const idleTitle = hasIdentity ? undefined : 'Set your identity in Settings first'
+  const stop =
+    (fn: () => void) =>
+    (e: React.MouseEvent): void => {
+      e.stopPropagation()
+      fn()
+    }
   return (
-    <button
-      type="button"
-      className="consume-button"
-      disabled={!hasIdentity || consumingId !== null}
-      title={hasIdentity ? 'Consume this handoff (⌘⏎)' : 'Set your identity in Settings first'}
-      onClick={(e) => {
-        e.stopPropagation()
-        void consume(card)
-      }}
-    >
-      consume ⌘⏎
-    </button>
+    <span className="handoff-actions">
+      {actions.includes('accept') && (
+        <button
+          type="button"
+          className="button-primary button-small"
+          disabled={disabled}
+          title={idleTitle ?? 'Accept — you will take this up'}
+          onClick={stop(() => void setStatus(card, { to: 'accepted' }))}
+        >
+          Accept
+        </button>
+      )}
+      {actions.includes('decline') && (
+        <button
+          type="button"
+          className="button-destructive button-small"
+          disabled={disabled}
+          title={idleTitle ?? 'Decline with a reason (reversible)'}
+          onClick={stop(() => openDecline(card))}
+        >
+          Decline
+        </button>
+      )}
+      {actions.includes('snooze') && (
+        <button
+          type="button"
+          className="button-secondary button-small"
+          disabled={disabled}
+          title={idleTitle ?? 'Snooze until a date'}
+          onClick={stop(() => openSnooze(card))}
+        >
+          Snooze
+        </button>
+      )}
+      {actions.includes('consume') && (
+        <button
+          type="button"
+          className="consume-button"
+          disabled={disabled}
+          title={idleTitle ?? 'Consume this handoff (⌘⏎)'}
+          onClick={stop(() => void consume(card))}
+        >
+          consume ⌘⏎
+        </button>
+      )}
+      {actions.includes('reopen') && (
+        <button
+          type="button"
+          className="button-secondary button-small"
+          disabled={disabled}
+          title={idleTitle ?? 'Reopen — back to the open lane'}
+          onClick={stop(() => void setStatus(card, { to: 'open' }))}
+        >
+          Reopen
+        </button>
+      )}
+    </span>
   )
 }
 
@@ -78,10 +141,11 @@ function Lane({
             pressed={pressedId === card.id}
             onReply={(c) => openCompose(c)}
             onComment={(c) => openAnnotate(c)}
-            {...(inbound && card.status === 'open'
+            {...(inbound && actionsFor(card, true).length > 0
               ? {
+                  actionsSlot: <LifecycleActions card={card} />,
+                  // ⌘⏎ keeps meaning consume; the store gates legality (open|accepted)
                   onConsume: (c: HandoffCard) => void consume(c),
-                  consumeSlot: <ConsumeAction card={card} />,
                 }
               : {})}
           />

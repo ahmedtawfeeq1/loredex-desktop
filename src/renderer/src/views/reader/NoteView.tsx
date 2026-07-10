@@ -7,6 +7,7 @@ import { renderMarkdown } from '../../markdown/pipeline'
 import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import { handoffRefFromNote } from '../handoffs/compose-form'
+import { attributionLines } from '../handoffs/lifecycle'
 import { ReadingOrderInline } from '../handoffs/ReadingOrderInline'
 
 export function formatValue(value: unknown): string {
@@ -64,6 +65,12 @@ export function NoteView(): React.JSX.Element {
   return (
     <article className="note">
       <h1 className="note-title">{title}</h1>
+      {handoffRef &&
+        attributionLines(doc.meta as Record<string, unknown>).map((line) => (
+          <p key={line} className="handoff-history">
+            {line}
+          </p>
+        ))}
       {handoffRef && (
         <div className="note-handoff-actions">
           <button

@@ -52,6 +52,32 @@ export function toVaultRelative(absPath: string, vaultPath: string): string {
 }
 
 /**
+ * Recipient lifecycle actions a card may offer (story 8.1 AC1) — state-legal
+ * only, per the v2 state machine. Lifecycle actions are recipient verbs, so
+ * they render on inbound lanes only; legality itself stays lib-enforced (the
+ * app merely offers, a race can still make one illegal).
+ */
+export type HandoffAction = 'accept' | 'decline' | 'snooze' | 'consume' | 'reopen'
+
+export function actionsFor(
+  card: Pick<HandoffCard, 'status'>,
+  inbound: boolean,
+): HandoffAction[] {
+  if (!inbound) return []
+  switch (card.status) {
+    case 'open':
+      return ['accept', 'decline', 'snooze']
+    case 'accepted':
+      return ['consume']
+    case 'declined':
+    case 'snoozed':
+      return ['reopen']
+    default:
+      return [] // consumed (terminal) and anything unknown: offer nothing
+  }
+}
+
+/**
  * Qualified handoff id `<project>/<name>` (stories 7.3/8.x): handoff notes live
  * in projects/<to>/handoffs/, so the owning project is the card's `to`. Bare
  * ids are a CLI-human affordance — the app always sends qualified ones so

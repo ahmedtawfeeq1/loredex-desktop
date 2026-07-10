@@ -20,6 +20,8 @@ import { FeedView } from './views/feed/FeedView'
 import { AnnotateModal } from './views/handoffs/AnnotateModal'
 import { Board } from './views/handoffs/Board'
 import { ComposeHandoffModal } from './views/handoffs/ComposeHandoffModal'
+import { DeclineReasonModal } from './views/handoffs/DeclineReasonModal'
+import { SnoozeUntilPicker } from './views/handoffs/SnoozeUntilPicker'
 import { HomeView } from './views/home/HomeView'
 import { RouteConfirmCard } from './views/routes/RouteConfirmCard'
 import { SyncPanel } from './views/sync/SyncPanel'
@@ -225,6 +227,8 @@ export default function App(): React.JSX.Element {
       <Palette />
       <ComposeHandoffModal />
       <AnnotateModal />
+      <DeclineReasonModal />
+      <SnoozeUntilPicker />
       <RouteConfirmCard />
       <ToastStack />
     </div>

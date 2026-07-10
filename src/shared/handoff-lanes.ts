@@ -11,6 +11,34 @@ export interface Lanes {
   outbound: HandoffCard[]
 }
 
+/**
+ * Board display filter (D1 amendment 6): the board opens as a work surface,
+ * not a history log. `active` (default) shows what still needs someone —
+ * open, accepted, and snoozed (expired snoozes are due again); `done` shows
+ * finished work — consumed and declined; `all` shows everything.
+ */
+export type BoardFilter = 'active' | 'done' | 'all'
+
+const ACTIVE_STATUSES = new Set(['open', 'accepted', 'snoozed'])
+const DONE_STATUSES = new Set(['consumed', 'declined'])
+
+/** True when a card belongs in the given display mode. */
+export function inDisplay(card: HandoffCard, mode: BoardFilter): boolean {
+  if (mode === 'all') return true
+  if (mode === 'active') return ACTIVE_STATUSES.has(card.status)
+  return DONE_STATUSES.has(card.status)
+}
+
+/** Cards visible in the given display mode — applied before laning/grouping. */
+export function filterByDisplay(cards: HandoffCard[], mode: BoardFilter): HandoffCard[] {
+  return mode === 'all' ? cards : cards.filter((c) => inDisplay(c, mode))
+}
+
+/** How many cards the current mode hides (the "N done hidden" affordance). */
+export function hiddenCount(cards: HandoffCard[], mode: BoardFilter): number {
+  return mode === 'all' ? 0 : cards.length - filterByDisplay(cards, mode).length
+}
+
 /** Every project that appears on either end of a handoff, sorted. */
 export function projectsOf(cards: HandoffCard[]): string[] {
   const names = new Set<string>()

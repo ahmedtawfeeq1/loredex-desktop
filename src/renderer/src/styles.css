@@ -635,6 +635,28 @@ a:hover {
   cursor: default;
 }
 
+/* board display filter (D1 amendment 6): sits with the right-hand controls;
+   the project switcher stays left. */
+.board-filter {
+  margin-left: auto;
+}
+
+/* "N done hidden — show all" affordance under the header (D1 amendment 6) */
+.board-hidden-hint {
+  align-self: flex-start;
+  margin: 8px 16px 0;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--bg-inset);
+  transition: color 100ms ease-out;
+}
+
+.board-hidden-hint:hover {
+  color: var(--text-1);
+}
+
 /* toggle/settings row: label left, control right, dense 38px */
 .toggle-row {
   display: flex;

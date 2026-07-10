@@ -15,13 +15,16 @@ import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
 import {
   actionsFor,
+  filterByDisplay,
   fulfilledByMap,
   groupByProject,
+  hiddenCount,
   type Lanes,
   lanesFor,
   projectsOf,
   toVaultRelative,
 } from '../../../../shared/handoff-lanes'
+import { useBoardFilter } from '../../stores/boardFilter'
 
 /** Open a handoff brief in the reader with its reading order rendered inline (F5). */
 export function openBrief(card: HandoffCard): void {
@@ -221,7 +224,14 @@ export function Board(): React.JSX.Element {
     if (cards === null) void load()
   }, [cards, load])
 
-  const projects = projectsOf(cards ?? [])
+  const filterMode = useBoardFilter((s) => s.mode)
+  const setFilterMode = useBoardFilter((s) => s.set)
+  const allCards = cards ?? []
+  const projects = projectsOf(allCards)
+  // D1 amendment 6: the board opens as a work surface — done handoffs hidden
+  // by default. The filter is display-only; nav badge / KPI counts are unchanged.
+  const shown = filterByDisplay(allCards, filterMode)
+  const hidden = hiddenCount(allCards, filterMode)
 
   return (
     <div className="board">
@@ -250,6 +260,21 @@ export function Board(): React.JSX.Element {
             </button>
           ))}
         </div>
+        {/* D1 amendment 6: Active (default) hides consumed/declined; the board
+            opens ready for new work. Display-only — counts never change. */}
+        <div className="seg-control board-filter" role="group" aria-label="Show">
+          {(['active', 'done', 'all'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`seg-option${filterMode === m ? ' seg-active' : ''}`}
+              aria-pressed={filterMode === m}
+              onClick={() => setFilterMode(m)}
+            >
+              {m === 'active' ? 'Active' : m === 'done' ? 'Done' : 'All'}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="button-quiet"
@@ -269,9 +294,19 @@ export function Board(): React.JSX.Element {
       </div>
       {error && <div className="note-error">{error}</div>}
       {receipt && <ConsumeReceiptView receipt={receipt} onDismiss={dismissReceipt} />}
+      {hidden > 0 && (
+        <button
+          type="button"
+          className="board-hidden-hint"
+          onClick={() => setFilterMode('all')}
+          title="Show done handoffs too"
+        >
+          {hidden} done hidden — show all
+        </button>
+      )}
       {cards === null ? (
         <Skeleton />
-      ) : cards.length === 0 ? (
+      ) : allCards.length === 0 ? (
         <div className="empty-state" style={{ border: 'none' }}>
           <p>No handoffs in this vault yet.</p>
           {/* secondary — the view's one gold primary is New handoff above */}
@@ -279,9 +314,22 @@ export function Board(): React.JSX.Element {
             Check again
           </button>
         </div>
+      ) : shown.length === 0 ? (
+        <div className="empty-state" style={{ border: 'none' }}>
+          <p>
+            {filterMode === 'active'
+              ? "No active handoffs — you're all caught up."
+              : 'Nothing here in this view.'}
+          </p>
+          {hidden > 0 && (
+            <button type="button" className="button-secondary" onClick={() => setFilterMode('all')}>
+              Show done ({hidden})
+            </button>
+          )}
+        </div>
       ) : project === 'all' ? (
         <div className="board-groups">
-          {groupByProject(cards).map(({ project: p, lanes }) => (
+          {groupByProject(shown).map(({ project: p, lanes }) => (
             <details key={p} open className="board-group">
               <summary className="board-group-title">{p}</summary>
               <ProjectLanes project={p} lanes={lanes} />
@@ -289,7 +337,7 @@ export function Board(): React.JSX.Element {
           ))}
         </div>
       ) : (
-        <ProjectLanes project={project} lanes={lanesFor(cards, project)} />
+        <ProjectLanes project={project} lanes={lanesFor(shown, project)} />
       )}
     </div>
   )

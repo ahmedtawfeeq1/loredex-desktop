@@ -8,8 +8,12 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
+  type BoardFilter,
+  filterByDisplay,
   formatAge,
   groupByProject,
+  hiddenCount,
+  inDisplay,
   lanesFor,
   openCount,
   projectsOf,
@@ -152,5 +156,47 @@ describe.skipIf(!existsSync(NIMBUS_VAULT))('board data assembly (nimbus simulati
         expect(inbound.slice(firstConsumed).every((c) => c.status !== 'open')).toBe(true)
       }
     }
+  })
+})
+
+// D1 amendment 6 — board display filter (default hides done)
+describe('board display filter', () => {
+  const mk = (status: string, expired = false) =>
+    ({
+      id: status,
+      name: status,
+      from: 'a',
+      to: 'b',
+      status,
+      expired,
+      readingOrder: [],
+      ageDays: 0,
+      date: '2026-07-10',
+      kind: 'delivery',
+      path: `/v/${status}.md`,
+    }) as unknown as Parameters<typeof inDisplay>[0]
+  const cards = [mk('open'), mk('accepted'), mk('snoozed'), mk('consumed'), mk('declined')]
+
+  it('active (default) shows only open/accepted/snoozed', () => {
+    const shown = filterByDisplay(cards, 'active')
+    expect(shown.map((c) => c.status).sort()).toEqual(['accepted', 'open', 'snoozed'])
+  })
+  it('done shows only consumed/declined', () => {
+    expect(filterByDisplay(cards, 'done').map((c) => c.status).sort()).toEqual([
+      'consumed',
+      'declined',
+    ])
+  })
+  it('all shows everything', () => {
+    expect(filterByDisplay(cards, 'all')).toHaveLength(5)
+  })
+  it('hiddenCount reports what active hides', () => {
+    expect(hiddenCount(cards, 'active')).toBe(2)
+    expect(hiddenCount(cards, 'all')).toBe(0)
+  })
+  it('active + done partition the whole set for these statuses', () => {
+    const modes: BoardFilter[] = ['active', 'done']
+    const total = modes.reduce((n, m) => n + filterByDisplay(cards, m).length, 0)
+    expect(total).toBe(cards.length)
   })
 })

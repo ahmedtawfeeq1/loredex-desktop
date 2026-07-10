@@ -117,9 +117,9 @@ development_status:
   12-2-gh-pr-status-merged-suggest: done
   epic-12-retrospective: optional
 
-  epic-13: backlog         # Wizards (paste-URL only; supersede 5-5/5-6)
-  13-1-create-vault-wizard: ready-for-dev
-  13-2-join-vault-wizard-first-run: ready-for-dev
+  epic-13: in-progress     # Wizards (paste-URL only; supersede 5-5/5-6)
+  13-1-create-vault-wizard: done
+  13-2-join-vault-wizard-first-run: in-progress
   epic-13-retrospective: optional
 
   epic-14: done            # DESIGN v2 Reskin & Defect Burn-down

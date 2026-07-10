@@ -11,6 +11,7 @@ import {
   pickProjectRootDialog,
   pickRouteFileDialog,
   pickVaultDialog,
+  pickWizardFolderDialog,
   saveExportDialog,
   saveVaultPath,
 } from './dialogs'
@@ -67,6 +68,16 @@ function brokerPorts(win: BrowserWindow): void {
 async function pickVault(win: BrowserWindow | null): Promise<string | null> {
   const picked = await pickVaultDialog(win)
   if (!picked) return null
+  await applyVault(picked)
+  return picked
+}
+
+/**
+ * Pivot to a vault path: persist the choice, restart the core host so config
+ * re-resolves (F6), notify renderers after the fresh port is brokered. Shared
+ * by the picker and the wizards (story 13.1 — the wizard's success pivot).
+ */
+async function applyVault(picked: string): Promise<void> {
   saveVaultPath(picked)
   if (core) {
     const old = core
@@ -80,7 +91,6 @@ async function pickVault(win: BrowserWindow | null): Promise<string | null> {
     for (const w of BrowserWindow.getAllWindows()) brokerPorts(w)
   }
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send('vault-changed', picked)
-  return picked
 }
 
 function buildMenu(): void {
@@ -124,6 +134,15 @@ app.whenReady().then(() => {
   ipcMain.handle('loredex:pick-project-root', (event) =>
     pickProjectRootDialog(BrowserWindow.fromWebContents(event.sender)),
   )
+  // story 13.1: wizard destination pick (create target / clone dest) + the
+  // success pivot — persist the wizard's vault and restart the core host on it
+  ipcMain.handle('loredex:pick-wizard-folder', (event, kind: 'create' | 'join') =>
+    pickWizardFolderDialog(BrowserWindow.fromWebContents(event.sender), kind),
+  )
+  ipcMain.handle('loredex:set-vault', async (_event, vaultPath: string) => {
+    await applyVault(String(vaultPath))
+    return vaultPath
+  })
   // story 10.7: atlas export — renderer sends finished bytes, main saves them
   ipcMain.handle(
     'loredex:save-export',

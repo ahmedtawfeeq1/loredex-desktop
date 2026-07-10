@@ -14,6 +14,8 @@ declare global {
       onOpenHandoff(cb: (relPath: string) => void): Unsubscribe
       pickRouteFile(): Promise<string | null>
       pickProjectRoot(): Promise<string | null>
+      pickWizardFolder(kind: 'create' | 'join'): Promise<string | null>
+      setVault(vaultPath: string): Promise<string>
       pathForFile(file: File): string
       saveExport(defaultName: string, data: string | ArrayBuffer): Promise<string | null>
     }
@@ -53,6 +55,17 @@ export function pickRouteFile(): Promise<string | null> {
 /** Native folder picker for contract project roots (story 11.1, main-owned). */
 export function pickProjectRoot(): Promise<string | null> {
   return window.loredex.pickProjectRoot()
+}
+
+/** Wizard destination pick (story 13.1, main-owned native panel). */
+export function pickWizardFolder(kind: 'create' | 'join'): Promise<string | null> {
+  return window.loredex.pickWizardFolder(kind)
+}
+
+/** Wizard success pivot (story 13.1): persist the vault choice + restart the
+ *  core host on it; resolves after the fresh port is brokered. */
+export function setVault(vaultPath: string): Promise<string> {
+  return window.loredex.setVault(vaultPath)
 }
 
 /** Real filesystem path of a dropped File (preload webUtils, story 7.4). */

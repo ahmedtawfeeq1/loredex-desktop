@@ -14,6 +14,7 @@ import type {
   ConsumeReceipt,
   ContractChange,
   CreateHandoffInput,
+  CreateVaultResult,
   Facets,
   FacetValues,
   HandoffCard,
@@ -28,6 +29,7 @@ import type {
   McpStatus,
   PrInfo,
   ProjectRootsMap,
+  RemoteCheck,
   ReplyHandoffInput,
   RoutePreview,
   StatusReceipt,
@@ -36,8 +38,10 @@ import type {
   TourDef,
   TreeNode,
   VaultIdentity,
+  WizardFlow,
   WizardInput,
   WizardResult,
+  WizardStepStatus,
 } from './types'
 
 // Payload types that exist in the pinned loredex are imported, never redefined.
@@ -160,6 +164,13 @@ export interface CoreApi {
    *  suggestion never re-fires. Apply is NOT a channel: it rides the ordinary
    *  handoffs.setStatus / handoffs.consume writers. */
   'suggest.dismiss': { in: { handoffId: string; sha: string }; out: void }
+  /** M2 wizards (story 13.1, m2 §7 verbatim): `git ls-remote` preflight — no
+   *  writes, no lock; a bad URL/credentials fails before the disk is touched. */
+  'wizard.validateRemote': { in: { url: string }; out: RemoteCheck }
+  /** Create-vault sequence (story 13.1): scaffold + config + git init, then
+   *  optional remote wiring + cursor seed. Steps stream as wizard.progress;
+   *  every failure after scaffold leaves a valid LOCAL vault (AC4). */
+  'wizard.createVault': { in: { dir: string; remoteUrl?: string }; out: CreateVaultResult }
   'vault.createOrJoin': { in: WizardInput; out: WizardResult }
   /** app-local contract evolution (story 6.2): optional window size for paging */
   'activity.feed': { in: { since?: string; limit?: number }; out: ActivityEvent[] } // (lib PR-6)
@@ -198,6 +209,16 @@ export type CoreEvent =
   /** M2 (story 11.1): the post-integrate scan found a new contract change —
    *  the Contracts view refreshes; never a notification (m2 §5 honesty rule). */
   | { kind: 'contract.changed'; project: string; file: string; sha: string }
+  /** M2 wizards (stories 13.1/13.2, m2 §8): step state for the stepped modal.
+   *  Steps stream in sequence order; 'failed' always precedes the envelope the
+   *  invoke rejects with, so the list shows WHERE the flow stopped. */
+  | {
+      kind: 'wizard.progress'
+      flow: WizardFlow
+      step: string
+      status: WizardStepStatus
+      detail?: string
+    }
   | { kind: 'route.completed'; receipt: RoutePreview }
   | { kind: 'vault.changed'; paths: string[] }
   | { kind: 'sync.changed'; health: SyncHealth }
@@ -247,6 +268,13 @@ export type IpcCode =
   | 'ILLEGAL_TRANSITION'
   | 'AMBIGUOUS_HANDOFF'
   | 'UNKNOWN_HANDOFF'
+  // M2 wizard codes (stories 13.1/13.2, architecture-m2.md#7 verbatim)
+  | 'DEST_NOT_EMPTY'
+  | 'REMOTE_UNREACHABLE'
+  | 'PUSH_REJECTED'
+  | 'IDENTITY_MISSING'
+  | 'CLONE_AUTH_FAILED'
+  | 'NOT_A_VAULT'
 
 export interface ErrEnvelope {
   code: IpcCode

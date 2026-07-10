@@ -39,6 +39,11 @@ contextBridge.exposeInMainWorld('loredex', {
   pickRouteFile: (): Promise<string | null> => ipcRenderer.invoke('loredex:pick-route-file'),
   // story 11.1: native folder picker for contract project roots (TCC rule)
   pickProjectRoot: (): Promise<string | null> => ipcRenderer.invoke('loredex:pick-project-root'),
+  // story 13.1: wizard folder pick + success pivot (persist + core restart)
+  pickWizardFolder: (kind: 'create' | 'join'): Promise<string | null> =>
+    ipcRenderer.invoke('loredex:pick-wizard-folder', kind),
+  setVault: (vaultPath: string): Promise<string> =>
+    ipcRenderer.invoke('loredex:set-vault', vaultPath),
   // story 10.7: atlas export — bytes rendered in the page, saved via a native panel
   saveExport: (defaultName: string, data: string | ArrayBuffer): Promise<string | null> =>
     ipcRenderer.invoke('loredex:save-export', defaultName, data),

@@ -24,11 +24,11 @@ import {
   scanContracts,
   timelineWithLinks,
 } from './contracts'
-import { appSettingGet, appSettingSet, getAppDb, vaultId } from './db/index'
+import { appSettingGet, appSettingSet, getAppDb, setPollCursor, vaultId } from './db/index'
 import { getReadState, markRead } from './db/read-state'
 import { reconcileSnoozeTimers } from './db/snooze'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
-import { gitAsync, withGitIdentity } from './git'
+import { gitAsync, NON_INTERACTIVE_GIT_ENV, withGitIdentity } from './git'
 import {
   dismissKey,
   ghCapability,
@@ -50,6 +50,7 @@ import {
 } from './settings'
 import { buildThread, collectComments } from './threads'
 import { listMarkdownFiles, walkVault } from './tree'
+import { createVault, validateRemote, type WizardDeps } from './wizard'
 import { withWriteLock } from './write-lock'
 
 /**
@@ -450,10 +451,17 @@ export function registerCoreHandlers(
   // its post-build snapshot here (callback point, not implemented in v0.1).
   ipc.register('dashboard.build', () => engine.dashboard(new Date().toISOString().slice(0, 10)))
   ipc.register('home.brief', () => engine.homeBrief())
-  ipc.register('settings.identity.get', () => ({
-    profile: loadIdentityProfile(),
-    ambient: engine.ambientIdentity(),
-  }))
+  ipc.register('settings.identity.get', () => {
+    // no vault yet (first run, story 13.2) → no ambient default, NOT an error:
+    // the wizard's identity step must work before any config exists
+    let ambient: Identity | null = null
+    try {
+      ambient = engine.ambientIdentity()
+    } catch {
+      ambient = null
+    }
+    return { profile: loadIdentityProfile(), ambient }
+  })
   ipc.register('settings.identity.set', (identity) => {
     if (!isValidIdentity(identity)) {
       throw ipcError('INTERNAL', 'identity needs a name and a valid email')
@@ -520,6 +528,35 @@ export function registerCoreHandlers(
     }
     saveMcpPortOverride(port)
   })
+
+  // M2 wizards (stories 13.1/13.2, m2 §7): core-host step sequences. They run
+  // against an EXPLICIT path (no config may exist yet — first run); all git is
+  // non-interactive (auth failures fail fast with git's own words, no OAuth);
+  // mutations hold the write lock; the cursor seed prevents the join storm.
+  const wizardDeps: WizardDeps = {
+    emit: (event) => ipc.emit(event),
+    git: (cwd, args) => gitAsync(cwd, args, { env: NON_INTERACTIVE_GIT_ENV }),
+    identity: () => loadIdentityProfile(),
+    scaffold: (path) => engine.scaffoldNewVault(path),
+    readConfig: () => engine.readConfigFile(),
+    writeConfig: (config) => engine.writeConfigFile(config),
+    ensureMergeDriver: (path) => engine.ensureMergeDriverAt(path),
+    syncHealth: (path) => engine.syncHealthAt(path),
+    seedCursor: (vaultPath, remoteUrl, cursor) => {
+      const db = getAppDb()
+      if (!db) return // bare test host — the poller needs the db anyway
+      setPollCursor(db, vaultId(vaultPath, remoteUrl), {
+        branch: cursor.branch,
+        lastSeenSha: cursor.sha,
+        lastFetchAt: new Date().toISOString(),
+      })
+    },
+    lock: withWriteLock,
+  }
+  ipc.register('wizard.validateRemote', ({ url }) => validateRemote(wizardDeps, url))
+  ipc.register('wizard.createVault', ({ dir, remoteUrl }) =>
+    createVault(wizardDeps, { dir, ...(remoteUrl ? { remoteUrl } : {}) }),
+  )
 
   return notifier
 }

@@ -37,7 +37,7 @@ const execFileAsync = promisify(execFile)
 export async function gitAsync(
   cwd: string,
   args: readonly string[],
-  opts: { timeoutMs?: number } = {},
+  opts: { timeoutMs?: number; env?: Record<string, string> } = {},
 ): Promise<string> {
   try {
     const { stdout } = await execFileAsync('git', [...args], {
@@ -45,12 +45,25 @@ export async function gitAsync(
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
       timeout: opts.timeoutMs ?? 60_000,
+      ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
     })
     return stdout
   } catch (e) {
     const stderr = (e as { stderr?: string }).stderr?.trim()
     throw new Error(stderr || (e instanceof Error ? e.message : String(e)))
   }
+}
+
+/**
+ * Env that keeps wizard git commands from hanging on interactive auth (story
+ * 13.1): terminal prompts off, ssh in batch mode — a private/unreachable
+ * remote FAILS with git's own words instead of freezing a step. The app never
+ * asks for GitHub login (m2 §7, no OAuth); credentials are the user's own
+ * SSH key / credential helper.
+ */
+export const NON_INTERACTIVE_GIT_ENV: Record<string, string> = {
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_SSH_COMMAND: 'ssh -oBatchMode=yes',
 }
 
 export function gitIdentityArgs(identity: Identity): string[] {

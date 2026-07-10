@@ -12,6 +12,7 @@ import type { CreateHandoffInput, Identity } from 'loredex'
 
 export type {
   ActivityEvent,
+  Config,
   ConsumeReceipt,
   CreateHandoffInput,
   HandoffCard,
@@ -453,4 +454,43 @@ export interface WizardResult {
   ok: boolean
   vaultPath: string
   message?: string
+}
+
+// ── Wizards (epic 13 — architecture-m2.md §7, paste-URL only, NO OAuth) ─────
+
+export type WizardFlow = 'create' | 'join'
+
+/** Step state for the modal's progress list. 'warn' = the step completed but
+ *  said something the user must see (SCHEMA_AHEAD, identity unset on join). */
+export type WizardStepStatus = 'running' | 'done' | 'warn' | 'failed'
+
+/**
+ * `git ls-remote` preflight result (story 13.1) — runs BEFORE any writes, so a
+ * bad URL or missing credentials fails while the disk is still untouched.
+ * `message` (app-local evolution over the m2 sketch) carries git's own words
+ * when unreachable, for the details expander.
+ */
+export interface RemoteCheck {
+  reachable: boolean
+  /** true when the remote has no refs (safe to push a brand-new vault into) */
+  empty: boolean
+  /** from the HEAD symref advertisement; null when the remote doesn't say */
+  defaultBranch: string | null
+  message?: string
+}
+
+export interface CreateVaultResult {
+  vaultPath: string
+  remoteWired: boolean
+}
+
+/**
+ * Failure detail every wizard envelope carries (story 13.1 AC4): failures
+ * after the scaffold step leave a valid LOCAL vault — the modal must say so
+ * and offer opening it (remote wiring retries from Sync settings).
+ */
+export interface WizardFailureDetail {
+  localVaultCreated: boolean
+  /** raw git stderr/stdout for the details expander — never the headline */
+  gitOutput?: string
 }

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,15 +20,15 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Core sequence (AC: 1, 5)
-  - [ ] `src/core/wizard.ts`: `createVault` step runner emitting `wizard.progress`; `validateRemote` (`git ls-remote` → `{reachable, empty, defaultBranch}`); write-lock + `-c` identity on every git op; poll_cursor seed on completion
-- [ ] Modal UI (AC: 2)
-  - [ ] `views/wizard/CreateVaultWizard.tsx`: stepped modal (folder pick via main dialog → remote paste (optional, skippable) → identity confirm → progress list with per-step status)
-- [ ] Failure UX (AC: 3, 4)
-  - [ ] Envelope-code → message + recovery action map; "local vault created, remote wiring failed — retry from Sync settings" terminal state; full git output behind a details expander
-- [ ] Channels + removal (AC: 1)
-  - [ ] Register `wizard.validateRemote` / `wizard.createVault`; remove the create arm of v0.1 `vault.createOrJoin` (fully removed once 13.2 lands)
-- [ ] Tests
+- [x] Core sequence (AC: 1, 5)
+  - [x] `src/core/wizard.ts`: `createVault` step runner emitting `wizard.progress`; `validateRemote` (`git ls-remote` → `{reachable, empty, defaultBranch}`); write-lock + `-c` identity on every git op; poll_cursor seed on completion
+- [x] Modal UI (AC: 2)
+  - [x] `views/wizard/CreateVaultWizard.tsx`: stepped modal (folder pick via main dialog → remote paste (optional, skippable) → identity confirm → progress list with per-step status)
+- [x] Failure UX (AC: 3, 4)
+  - [x] Envelope-code → message + recovery action map; "local vault created, remote wiring failed — retry from Sync settings" terminal state; full git output behind a details expander
+- [x] Channels + removal (AC: 1)
+  - [x] Register `wizard.validateRemote` / `wizard.createVault`; remove the create arm of v0.1 `vault.createOrJoin` (fully removed once 13.2 lands)
+- [x] Tests
 
 ## Dev Notes
 
@@ -54,10 +54,38 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (Claude Code)
+
 ### Debug Log References
+
+- `npm run typecheck` clean; `npx vitest run` 60 files / 465 tests green (before the integration test landed); `npx vitest run src/core/wizard.integration.test.ts` 1 passed (real bare remote: scaffold → config → push → cursor seed → F7 attribution); `npm run build` clean.
 
 ### Completion Notes List
 
+- Sequence implemented verbatim (m2 §7): destination → preflight (`git ls-remote --symref`, BEFORE any writes) → identity → scaffold (+`saveConfig` +`git init -b <branch>`) → remote wiring (remote add, merge driver, attributed commit, `push -u`) → seed (first `sync.status` + poll_cursor at pushed sha). Whole mutating flow under `withWriteLock`; wizard git runs with `GIT_TERMINAL_PROMPT=0` + `GIT_SSH_COMMAND='ssh -oBatchMode=yes'` so auth failures fail fast with git's own words instead of hanging (no OAuth anywhere).
+- Failure codes at their exact steps: `DEST_NOT_EMPTY` (Finder `.DS_Store` doesn't count), `REMOTE_UNREACHABLE` (decided no-OAuth message verbatim), `PUSH_REJECTED` (non-empty remote at preflight → offer join; rejected push after scaffold → same code with `localVaultCreated: true`), `IDENTITY_MISSING`. Every envelope after scaffold carries `detail.localVaultCreated + gitOutput`; the modal renders "local vault intact — retry remote wiring from Sync settings" + a details expander (AC3/AC4).
+- Non-empty-remote is caught at preflight (before any write) rather than at push — strictly better than the AC's minimum; the push-race case still maps PUSH_REJECTED post-scaffold.
+- App-local contract evolution: `RemoteCheck.message` (git's words for the inline retry), `wizard.progress` status includes `'warn'` (used by 13.2's handshake), and the remote's advertised default branch is adopted for `git init -b` (push never fights the remote's HEAD).
+- Success pivot: new main-owned `loredex:set-vault` (persist + core-host restart + `vault-changed`), sharing the picker's `applyVault` mechanics — main stays logic-free. Wizard folder pick = new native dialog with `createDirectory` (TCC rule kept).
+- Identity confirm reuses the ordinary `settings.identity.*` channels; `settings.identity.get` now degrades `ambient` to null instead of throwing NO_CONFIG so the step works on first run (13.2 dependency).
+- `vault.createOrJoin` had no registered handler (was NOT_IMPLEMENTED); channel + WizardInput/WizardResult removal happens in 13.2 as the story directs.
+- EmptyVault gained a temporary "Create a vault" primary — replaced by the 13.2 FirstRun screen.
+
 ### File List
+
+- `src/shared/ipc-contract.ts` — `wizard.validateRemote` / `wizard.createVault` channels, `wizard.progress` event, 6 wizard IpcCodes
+- `src/shared/types.ts` — `WizardFlow`, `WizardStepStatus`, `RemoteCheck`, `CreateVaultResult`, `WizardFailureDetail`; re-export lib `Config`
+- `src/core/wizard.ts` (new) — step runner, `ensureEmptyDir`, `parseLsRemote`, `validateRemote`, `createVault` (deps-injected)
+- `src/core/wizard.test.ts` (new), `src/core/wizard.integration.test.ts` (new)
+- `src/core/engine.ts` — explicit-path lib wrappers: `readConfigFile`, `writeConfigFile`, `scaffoldNewVault`, `ensureMergeDriverAt`, `syncHealthAt`
+- `src/core/git.ts` — `gitAsync` env option + `NON_INTERACTIVE_GIT_ENV`
+- `src/core/handlers.ts` — wizard deps + channel registration; identity.get ambient degrade
+- `src/main/index.ts` — `applyVault` extraction, `loredex:pick-wizard-folder`, `loredex:set-vault`
+- `src/main/dialogs.ts` — `pickWizardFolderDialog`
+- `src/preload/index.ts`, `src/renderer/src/api.ts` — `pickWizardFolder`, `setVault`
+- `src/renderer/src/stores/wizard.ts` (new)
+- `src/renderer/src/views/wizard/CreateVaultWizard.tsx`, `WizardSteps.tsx`, `IdentityConfirm.tsx`, `wizard-errors.ts`, `wizard-errors.test.ts` (all new)
+- `src/renderer/src/App.tsx` — modal mount, wizard.progress subscription, EmptyVault create button
+- `src/renderer/src/styles.css` — wizard step list / failure / identity styles (DESIGN v2 tokens)
 
 ## QA Results

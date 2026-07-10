@@ -36,6 +36,25 @@ export async function pickVaultDialog(win: BrowserWindow | null): Promise<string
 }
 
 /**
+ * Native folder picker for the wizards (stories 13.1/13.2): where the new
+ * vault is created / where the clone lands. createDirectory lets the user
+ * mint a fresh empty folder in the panel; emptiness is enforced core-side
+ * (DEST_NOT_EMPTY). Same TCC rule: access only via the panel.
+ */
+export async function pickWizardFolderDialog(
+  win: BrowserWindow | null,
+  kind: 'create' | 'join',
+): Promise<string | null> {
+  const opts = {
+    title: kind === 'create' ? 'Choose where to create the vault' : 'Choose where to clone the vault',
+    buttonLabel: kind === 'create' ? 'Create here' : 'Clone here',
+    properties: ['openDirectory' as const, 'createDirectory' as const],
+  }
+  const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+  return result.canceled ? null : (result.filePaths[0] ?? null)
+}
+
+/**
  * Native folder picker for contract project roots (story 11.1). Same TCC rule
  * as the vault picker: folder access ONLY via the panel — no cold scans.
  */

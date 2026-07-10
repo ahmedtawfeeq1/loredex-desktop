@@ -15,6 +15,7 @@ import { useHandoffs } from './stores/handoffs'
 import { useReader } from './stores/reader'
 import { useRoute } from './stores/route'
 import { useSuggests } from './stores/suggests'
+import { useWizard } from './stores/wizard'
 import { openCount } from '../../shared/handoff-lanes'
 import { useFeed } from './stores/feed'
 import { useHome } from './stores/home'
@@ -39,14 +40,19 @@ import { VaultTree } from './views/reader/VaultTree'
 import { Palette } from './views/search/Palette'
 import { SearchView } from './views/search/SearchView'
 import { SettingsView } from './views/settings/SettingsView'
+import { CreateVaultWizard } from './views/wizard/CreateVaultWizard'
 
 function EmptyVault(): React.JSX.Element {
   const openVaultPicker = useApp((s) => s.openVaultPicker)
+  const openCreate = useWizard((s) => s.openCreate)
   return (
     <div className="empty-state">
       <p>No vault open.</p>
-      <button type="button" className="button-primary" onClick={() => void openVaultPicker()}>
-        Open vault
+      <button type="button" className="button-primary" onClick={openCreate}>
+        Create a vault
+      </button>
+      <button type="button" className="button-secondary" onClick={() => void openVaultPicker()}>
+        Open an existing folder
       </button>
     </div>
   )
@@ -97,6 +103,10 @@ export default function App(): React.JSX.Element {
       onEvent((e) => {
         if (e.kind === 'handoff.created' && e.card) {
           useHandoffs.getState().applyCreated(e.card)
+        }
+        // story 13.1: wizard step state streams into the stepped modal
+        if (e.kind === 'wizard.progress') {
+          useWizard.getState().applyProgress(e)
         }
       }),
     [],
@@ -261,6 +271,7 @@ export default function App(): React.JSX.Element {
         <div className="empty-state" />
       )}
       <Palette />
+      <CreateVaultWizard />
       <ComposeHandoffModal />
       <AnnotateModal />
       <DeclineReasonModal />

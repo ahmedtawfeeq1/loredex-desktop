@@ -22,6 +22,7 @@ import {
   type CreateHandoffInput,
   createLoredexMcpServer,
   type Doc,
+  ensureGeneratedMergeDriver,
   gitPullPush,
   type HandoffCard,
   type HandoffCreateResult,
@@ -42,6 +43,8 @@ import {
   routeFile,
   type RouteOptions,
   type RoutePlanPreview,
+  saveConfig,
+  scaffoldVault,
   type SearchHit,
   searchVault,
   setHandoffStatus,
@@ -267,6 +270,37 @@ export function schemaStatus(): VaultSchemaStatus {
 /** Lib parseDoc for out-of-tree content (story 9.1: remote refs via git show). */
 export function parseMarkdown(raw: string): Doc {
   return parseDoc(raw)
+}
+
+// ── Wizard wrappers (stories 13.1/13.2): lib calls at an EXPLICIT path — the
+//    wizards run against a vault that is not the once-resolved config (there
+//    may be no config at all on first run). Vault writes stay lib exports. ───
+
+/** Fresh read of the loredex config file — the wizard merges onto the file's
+ *  own truth (editor, projects map survive), never the picker override. */
+export function readConfigFile(): Config | null {
+  return loadConfig()
+}
+
+/** Write the loredex config file (lib saveConfig) — CLI/agents on this machine
+ *  see the same vault the wizard just made (m2 §7 "register"). */
+export function writeConfigFile(next: Config): void {
+  saveConfig(next)
+}
+
+/** Scaffold the vault skeleton + `.loredex/engine.json` stamp (lib export). */
+export function scaffoldNewVault(path: string): void {
+  scaffoldVault(path)
+}
+
+/** Wire the generated-index merge driver into a repo at an explicit path. */
+export function ensureMergeDriverAt(vaultPath: string): void {
+  ensureGeneratedMergeDriver(vaultPath)
+}
+
+/** Read-only sync snapshot at an explicit path (wizard step 6 — pre-pivot). */
+export function syncHealthAt(vaultPath: string): SyncHealth {
+  return syncStatus(vaultPath)
 }
 
 /**

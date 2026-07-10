@@ -13,9 +13,20 @@ import type { CoreEvent, ProductDashboard } from '../../../../shared/ipc-contrac
 import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import type { ActivityEvent, ContractChange, SyncHealth } from '../../../../shared/types'
 import { invoke, onEvent, onVaultChanged } from '../../api'
-import { startOfTodayIso } from './insights'
+import { SPARKLINE_DAYS } from './insights'
 
 export const RECOMPUTE_DEBOUNCE_MS = 500
+
+/** Activity is pulled over the sparkline window (14d) so the 14-bar daily
+ *  strip, 7-day velocity, and WoW trend all fold from one feed load. */
+export const ACTIVITY_WINDOW_DAYS = SPARKLINE_DAYS
+
+/** Local-midnight instant `days` days before `now` — the activity.feed `since`. */
+export function activitySinceIso(now: Date, days: number): string {
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  midnight.setDate(midnight.getDate() - (days - 1))
+  return midnight.toISOString()
+}
 
 interface DashboardDataState {
   /** null until first load (skeleton tiles) */
@@ -52,7 +63,7 @@ export const useDashboardData = create<DashboardDataState>((set, get) => ({
     const [roots, timeline, feed, health] = await Promise.allSettled([
       invoke('settings.projectRoots.get', undefined),
       invoke('contracts.timeline', {}),
-      invoke('activity.feed', { since: startOfTodayIso(new Date()) }),
+      invoke('activity.feed', { since: activitySinceIso(new Date(), ACTIVITY_WINDOW_DAYS) }),
       invoke('sync.status', undefined),
     ])
     set({

@@ -17,14 +17,20 @@ import {
   attentionRows,
   changesInWindow,
   churnByFile,
+  dailyBuckets,
+  dayStringsEndingAt,
   isDueNow,
+  maxNoteCount,
   oldestOpen,
   openInbound,
   pulseRows,
+  rankedPulse,
   requestsWaiting,
   staleBriefs,
   startOfTodayIso,
   syncTile,
+  velocity,
+  wowTrend,
 } from './insights'
 
 const VAULT = join(import.meta.dirname, '../../../../../tests/fixtures/nimbus-vault')
@@ -194,6 +200,105 @@ describe("today's activity (real vault git log via lib parseActivity)", () => {
     const now = new Date(2026, 6, 10, 14, 30, 5)
     const midnightLocal = new Date(2026, 6, 10)
     expect(startOfTodayIso(now)).toBe(midnightLocal.toISOString())
+  })
+})
+
+describe('14-day activity sparkline buckets (amendment 7 §A)', () => {
+  it('day keys end at today, oldest→newest, exactly `days` long', () => {
+    const keys = dayStringsEndingAt(TODAY, 14)
+    expect(keys).toHaveLength(14)
+    expect(keys[0]).toBe('2026-06-27')
+    expect(keys[13]).toBe(TODAY)
+    // strictly ascending
+    expect([...keys].sort()).toEqual(keys)
+  })
+
+  it('buckets the real vault git log by calendar day (all 61 events land)', () => {
+    const b = dailyBuckets(activity, TODAY)
+    expect(b).toHaveLength(14)
+    expect(b.reduce((s, d) => s + d.total, 0)).toBe(61)
+    // the fixture spans two days; the older 12 are zero-filled
+    const nonzero = b.filter((d) => d.total > 0)
+    expect(nonzero.map((d) => [d.day, d.total])).toEqual([
+      ['2026-07-09', 28],
+      ['2026-07-10', 33],
+    ])
+    const today = b[13]!
+    expect(today.day).toBe(TODAY)
+    expect(today.byKind).toEqual({ handoff: 13, sync: 2, consume: 7, status: 9, route: 2 })
+  })
+
+  it('an empty feed still yields 14 zero buckets (no crash on fresh vault)', () => {
+    const b = dailyBuckets([], TODAY, 14)
+    expect(b).toHaveLength(14)
+    expect(b.every((d) => d.total === 0)).toBe(true)
+  })
+})
+
+describe('velocity strip: created vs consumed, 7-day window', () => {
+  it('counts handoff-created and consumed events from the vault log', () => {
+    // all fixture events fall inside the 7d window ending TODAY
+    expect(velocity(activity, TODAY, 10)).toEqual({ created: 21, consumed: 12, open: 10 })
+  })
+
+  it('the open count is a snapshot passed through, not derived from the feed', () => {
+    expect(velocity(activity, TODAY, 0).open).toBe(0)
+    expect(velocity([], TODAY, 5)).toEqual({ created: 0, consumed: 0, open: 5 })
+  })
+})
+
+describe('week-over-week trend (this window vs the one before)', () => {
+  it('all fixture activity is this week; last week is empty → up', () => {
+    expect(wowTrend(activity, TODAY, 'handoff')).toEqual({
+      current: 21,
+      previous: 0,
+      delta: 21,
+      direction: 'up',
+    })
+    expect(wowTrend(activity, TODAY, 'consume')).toEqual({
+      current: 12,
+      previous: 0,
+      delta: 12,
+      direction: 'up',
+    })
+  })
+
+  it('anchoring a week later pushes the same events into last week → down', () => {
+    // anchor 07-17: current window 07-11..07-17 (empty), previous 07-04..07-10
+    // holds every fixture handoff → the trend reads as declining
+    const t = wowTrend(activity, '2026-07-17', 'handoff')
+    expect(t.current).toBe(0)
+    expect(t.previous).toBe(21)
+    expect(t.direction).toBe('down')
+  })
+
+  it('flat when both windows are empty', () => {
+    expect(wowTrend([], TODAY, 'handoff')).toEqual({
+      current: 0,
+      previous: 0,
+      delta: 0,
+      direction: 'flat',
+    })
+  })
+})
+
+describe('ranked project pulse (busiest open-flow first)', () => {
+  it('reorders the fixture states by open flow, then size, then name', () => {
+    const ranked = rankedPulse(dash.states, cards)
+    // same rows as pulseRows, only reordered
+    expect(new Set(ranked.map((r) => r.project))).toEqual(
+      new Set(pulseRows(dash.states, cards).map((r) => r.project)),
+    )
+    // flow desc: each row's open-flow ≥ the next
+    const flow = ranked.map((r) => r.openIn + r.openOut)
+    expect([...flow].sort((a, b) => b - a)).toEqual(flow)
+    // nimbus-backend carries the most flow (5 in + 5 out) → leads
+    expect(ranked[0]!.project).toBe('nimbus-backend')
+  })
+
+  it('maxNoteCount is the bar denominator and never below 1', () => {
+    expect(maxNoteCount(rankedPulse(dash.states, cards))).toBe(18)
+    expect(maxNoteCount([])).toBe(1)
   })
 })
 

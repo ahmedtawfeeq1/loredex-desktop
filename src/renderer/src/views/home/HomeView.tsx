@@ -1,11 +1,19 @@
 /**
- * Home dashboard (story 15.5, spec: docs/plan/wireframe-home-dashboard.html):
- * Home stops rendering the Start-Here brief as a page of prose and becomes a
- * full-width insight dashboard — KPI row, attention/blocked band, project
- * pulse, churn/activity band, and the brief demoted to a link-out card.
- * Zero new backend asks: every number maps to an existing channel; this view
- * is a pure consumer of the insights aggregation module, and every tile is a
- * one-click jump into the view that acts on it.
+ * Home dashboard (epic21, D1 amendment 7 §A): a solution-grade operations
+ * dashboard for a team knowledge/handoff product — not a flat KPI row.
+ *   • Hero band — headline stat tiles WITH context + WoW trend arrows, each a
+ *     one-click jump into the view that acts on it.
+ *   • Velocity strip — handoffs created vs consumed over 7d (paired bars).
+ *   • Attention column (left, 2/3) — the ranked actionable-handoff list with
+ *     inline Consume/Snooze, and the Blocked/critical-path card beneath.
+ *   • Insight column (right, 1/3) — per-project pulse bars, a 14-day activity
+ *     sparkline, contract-churn-by-file, and a sync-health mini. The right
+ *     column stacks to fill the height beside the tall attention list.
+ * Zero new backend: every number folds from existing channels (dashboard.build
+ * / handoffs.list / activity.feed / contracts.timeline / sync.status / atlas
+ * blocked model) through the pure insights aggregation module. SVG only, no
+ * chart libs. One gold primary max; live-recompute (watcher + poller), never a
+ * Refresh button; empty/degraded states per amendment.
  */
 import { useEffect } from 'react'
 import { blockedRows } from '../../../../shared/blocked'
@@ -29,27 +37,29 @@ import { formatFreshness } from './freshness'
 import { useDashboardData } from './dashboard-data'
 import './home.css'
 import {
-  type ActivitySummary,
-  activityCounts,
   ageTone,
   attentionRows,
   changesInWindow,
   type ChurnRow,
   churnByFile,
+  type DayBucket,
+  dailyBuckets,
+  maxNoteCount,
   oldestOpen,
   openInbound,
   type PulseRow,
-  pulseRows,
+  rankedPulse,
   requestsWaiting,
-  staleBriefs,
-  startOfTodayIso,
   syncTile,
+  velocity,
+  type WowTrend,
+  wowTrend,
 } from './insights'
 
-/** Kinds in the feed's own vocabulary, fixed chip order (spec note 8). */
-const ACTIVITY_KINDS = ['route', 'handoff', 'consume', 'status', 'sync'] as const
+/** Feed kinds in fixed stack order — the sparkline/velocity tint order. */
+const SPARK_KINDS = ['route', 'handoff', 'consume', 'status', 'sync'] as const
 
-// ── deep links (spec §4 — each tile jumps into the view that acts on it) ────
+// ── deep links (each tile/row jumps into the view that acts on it) ───────────
 
 function goBoard(): void {
   useHandoffs.getState().setProject('all')
@@ -62,7 +72,7 @@ function goAtlasBlocked(): void {
   useApp.getState().setView('atlas')
 }
 
-/** Project pulse row → Atlas Learn scoped to the project (spec note 6). */
+/** Project pulse row → Atlas Learn scoped to the project. */
 function goAtlasLearn(project: string): void {
   useApp.getState().setView('atlas')
   void useAtlas.getState().drillProject(project)
@@ -120,28 +130,34 @@ export function HomeView(): React.JSX.Element {
   }, [cards, brief])
 
   const now = new Date()
+  const today = localDay(now)
+  const nowMs = now.getTime()
   const all = cards ?? []
+  const feed = activity ?? []
   const loading = dash === null
   const empty = !loading && dash.states.length === 0 && all.length === 0
 
   const inbound = openInbound(all)
   const waiting = requestsWaiting(all)
   const oldest = oldestOpen(all)
-  const briefs = staleBriefs(dash?.states ?? [])
-  const churn = churnByFile(changes ?? [], now.getTime())
-  const contractCount = changesInWindow(changes ?? [], now.getTime()).length
-  const today = activityCounts(activity ?? [], startOfTodayIso(now))
+  const churn = churnByFile(changes ?? [], nowMs)
+  const contractCount = changesInWindow(changes ?? [], nowMs).length
   const sync = syncTile(health)
   const attention = attentionRows(all)
   const blocked = blockedRows(all, vaultPath)
-  const pulse = pulseRows(dash?.states ?? [], all)
+  const pulse = rankedPulse(dash?.states ?? [], all)
+  const maxNotes = maxNoteCount(pulse)
+  const buckets = dailyBuckets(feed, today)
+  const vel = velocity(feed, today, inbound.open)
+  const inboundWow = wowTrend(feed, today, 'handoff')
+  const hasContracts = (rootsCount ?? 0) > 0
   const vaultName = vaultPath.split('/').filter(Boolean).pop() ?? 'vault'
   const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now)
 
   if (empty) {
     return (
       <div className="home-dash">
-        <Header vaultName={vaultName} sub={`${weekday} ${localDay(now)}`} />
+        <Header vaultName={vaultName} sub={`${weekday} ${today}`} />
         <div className="empty-state" style={{ border: 'none' }}>
           <p>Nothing filed yet — this dashboard fills itself as agents route notes.</p>
           <div className="dash-empty-actions">
@@ -167,16 +183,22 @@ export function HomeView(): React.JSX.Element {
 
   return (
     <div className="home-dash">
-      <Header vaultName={vaultName} sub={`${weekday} ${localDay(now)}`} />
+      <Header vaultName={vaultName} sub={`${weekday} ${today}`} />
       {dashError && <div className="note-error">{dashError}</div>}
 
-      <div className="dash-kpis">
-        <Kpi label="Open inbound" value={loading ? '…' : String(inbound.open)}
+      {/* ── hero band: headline stats WITH context + WoW trend ─────────────── */}
+      <div className="dash-hero">
+        <HeroTile
+          label="Open inbound"
+          value={loading ? '…' : String(inbound.open)}
           caption={`across ${inbound.projects} project${inbound.projects === 1 ? '' : 's'}`}
-          title="Open the handoff board" onClick={goBoard} />
-        <Kpi label="Requests waiting" value={loading ? '…' : String(waiting)} caption="no reply yet"
-          title="Open the handoff board" onClick={goBoard} />
-        <Kpi label="Oldest open" value={oldest ? formatAge(oldest.ageDays) : '—'}
+          trend={inboundWow}
+          title="Open the handoff board"
+          onClick={goBoard}
+        />
+        <HeroTile
+          label="Oldest open"
+          value={oldest ? formatAge(oldest.ageDays) : '—'}
           tone={oldest ? ageKpiTone(oldest.ageDays) : undefined}
           caption={oldest ? `${oldest.from} → ${oldest.to}` : 'nothing open'}
           title={oldest ? 'Open this handoff' : undefined}
@@ -187,20 +209,29 @@ export function HomeView(): React.JSX.Element {
                   if (card) openBrief(card)
                 }
               : undefined
-          } />
-        {(rootsCount ?? 0) > 0 && (
-          <Kpi label="Contract changes" value={String(contractCount)} caption="last 7 days"
-            title="Open the contract timeline" onClick={() => setView('contracts')} />
+          }
+        />
+        <HeroTile
+          label="Requests waiting"
+          value={loading ? '…' : String(waiting)}
+          caption="no reply yet"
+          title="Open the handoff board"
+          onClick={goBoard}
+        />
+        {hasContracts && (
+          <HeroTile
+            label="Contract changes"
+            value={String(contractCount)}
+            caption="last 7 days"
+            title="Open the contract timeline"
+            onClick={() => setView('contracts')}
+          />
         )}
-        <Kpi label="Stale briefs" value={loading ? '…' : String(briefs.attention)}
-          caption={`of ${briefs.total} project${briefs.total === 1 ? '' : 's'}`}
-          title="Open the Atlas overview" onClick={() => setView('atlas')} />
-        <Kpi label="Sync" value={sync.value} caption={sync.caption} tone={sync.tone}
-          title="Open sync health" onClick={() => setView('sync')} />
       </div>
+
       {/* degraded state (spec §3): local-only vault → one quiet wire-a-remote line */}
       {sync.localOnly && (
-        <div className="dash-mini">
+        <div className="dash-mini dash-degraded">
           This vault has no remote — notes stay local.{' '}
           <button type="button" className="button-quiet" onClick={() => setView('sync')}>
             Wire a remote
@@ -208,69 +239,94 @@ export function HomeView(): React.JSX.Element {
         </div>
       )}
 
-      <div className="dash-two-col">
-        <section className="dash-card" aria-label="Needs attention">
-          <div className="dash-card-title">Needs attention</div>
-          <div className="dash-card-desc">
-            Open + expired-snooze handoffs, oldest first. Click a row for its card.
-          </div>
-          {attention.length === 0 && <div className="dash-mini">nothing waiting — clean board</div>}
-          {attention.map((card) => (
-            <AttentionRow key={`${card.to}/${card.id}`} card={card} />
-          ))}
-        </section>
+      {/* ── velocity strip: created vs consumed, 7 days ───────────────────── */}
+      <VelocityStrip
+        days={buckets.slice(-7)}
+        created={vel.created}
+        consumed={vel.consumed}
+        open={vel.open}
+        onOpen={goBoard}
+      />
 
-        <section className="dash-card" aria-label="Blocked, critical path">
-          <div className="dash-card-title">Blocked · critical path</div>
-          <div className="dash-card-desc">The blocking sentences, verbatim.</div>
-          {blocked.length === 0 && <div className="dash-mini">no project is blocked right now</div>}
-          {blocked.map((row) => (
-            <div
-              key={row.id}
-              className="dash-row dash-row-link"
-              role="button"
-              tabIndex={0}
-              onClick={() => openByRelPath(row.relPath, row.id)}
-              onKeyDown={rowKey(() => openByRelPath(row.relPath, row.id))}
-            >
-              <span className="dash-txt">
-                {row.sentence} <span className="dash-mini">— {row.objective}</span>
-              </span>
+      {/* ── main: attention (2/3) · insight (1/3) ─────────────────────────── */}
+      <div className="dash-main">
+        <div className="dash-col-attention">
+          <section className="dash-card" aria-label="Needs attention">
+            <div className="dash-card-title">Needs attention</div>
+            <div className="dash-card-desc">
+              Open + expired-snooze handoffs, oldest first. Click a row for its card.
             </div>
-          ))}
-          <button type="button" className="button-quiet" onClick={goAtlasBlocked}>
-            Open Atlas → Blocked
-          </button>
-        </section>
-      </div>
-
-      <section className="dash-card" aria-label="Project pulse">
-        <div className="dash-card-title">Project pulse</div>
-        <div className="dash-card-desc">
-          One row per project — freshness, open flow, topics. Click for its Atlas Learn view.
-        </div>
-        {pulse.map((row) => (
-          <PulseRowView key={row.project} row={row} />
-        ))}
-      </section>
-
-      <div className="dash-two-col">
-        {(rootsCount ?? 0) > 0 && (
-          <section className="dash-card" aria-label="Contract churn">
-            <div className="dash-card-title">Contract churn</div>
-            <div className="dash-card-desc">Changes in registered contract files, 7-day window.</div>
-            {churn.length === 0 && <div className="dash-mini">no contract changes this week</div>}
-            {churn.map((row) => (
-              <ChurnRowView key={`${row.repoRoot} ${row.file}`} row={row} />
+            {attention.length === 0 && (
+              <div className="dash-mini">nothing waiting — clean board</div>
+            )}
+            {attention.map((card) => (
+              <AttentionRow key={`${card.to}/${card.id}`} card={card} />
             ))}
           </section>
-        )}
 
-        <section className="dash-card" aria-label="Today's activity">
-          <div className="dash-card-title">Today's activity</div>
-          <div className="dash-card-desc">Since midnight, from the vault's own git log.</div>
-          <ActivityStrip summary={today} onOpen={() => setView('feed')} />
-        </section>
+          <section className="dash-card" aria-label="Blocked, critical path">
+            <div className="dash-card-title">Blocked · critical path</div>
+            <div className="dash-card-desc">The blocking sentences, verbatim.</div>
+            {blocked.length === 0 && (
+              <div className="dash-mini">no project is blocked right now</div>
+            )}
+            {blocked.map((row) => (
+              <div
+                key={row.id}
+                className="dash-row dash-row-link"
+                role="button"
+                tabIndex={0}
+                onClick={() => openByRelPath(row.relPath, row.id)}
+                onKeyDown={rowKey(() => openByRelPath(row.relPath, row.id))}
+              >
+                <span className="dash-txt">
+                  {row.sentence} <span className="dash-mini">— {row.objective}</span>
+                </span>
+              </div>
+            ))}
+            {blocked.length > 0 && (
+              <button type="button" className="button-quiet" onClick={goAtlasBlocked}>
+                Open Atlas → Blocked
+              </button>
+            )}
+          </section>
+        </div>
+
+        <div className="dash-col-insight">
+          <section className="dash-card" aria-label="Project pulse">
+            <div className="dash-card-title">Project pulse</div>
+            <div className="dash-card-desc">Freshness, open flow, size — busiest first.</div>
+            {pulse.map((row) => (
+              <PulseRowView key={row.project} row={row} maxNotes={maxNotes} />
+            ))}
+          </section>
+
+          <section className="dash-card" aria-label="14-day activity">
+            <div className="dash-card-title">Activity · 14 days</div>
+            <div className="dash-card-desc">Per day, from the vault's own git log.</div>
+            <Sparkline buckets={buckets} onOpen={() => setView('feed')} />
+          </section>
+
+          {hasContracts && (
+            <section className="dash-card" aria-label="Contract churn">
+              <div className="dash-card-title">Contract churn</div>
+              <div className="dash-card-desc">Busiest contract files, 7-day window.</div>
+              {churn.length === 0 && (
+                <div className="dash-mini">no contract changes this week</div>
+              )}
+              {churn.slice(0, 6).map((row) => (
+                <ChurnRowView key={`${row.repoRoot} ${row.file}`} row={row} />
+              ))}
+            </section>
+          )}
+
+          <SyncMini
+            value={sync.value}
+            caption={sync.caption}
+            tone={sync.tone}
+            onOpen={() => setView('sync')}
+          />
+        </div>
       </div>
 
       <BriefCard />
@@ -285,7 +341,7 @@ function Header({ vaultName, sub }: { vaultName: string; sub: string }): React.J
       <span className="dash-sub">
         {vaultName} · {sub}
       </span>
-      {/* spec note 1: live via watcher + poller — no Refresh affordance */}
+      {/* live via watcher + poller — no Refresh affordance */}
       <span className="dash-live" title="Recomputes on vault watcher and remote poller events">
         live · watcher + poller
       </span>
@@ -298,11 +354,28 @@ function ageKpiTone(ageDays: number): 'warn' | 'err' | undefined {
   return tone === 'amber' ? 'warn' : tone === 'rust' ? 'err' : undefined
 }
 
-function Kpi({
+/** Week-over-week arrow: ▲ up / ▼ down / — flat, with the signed delta. Tone is
+ *  informational (navy/quiet), not judgemental — more inbound isn't "bad". */
+function TrendArrow({ trend }: { trend: WowTrend }): React.JSX.Element | null {
+  if (trend.current === 0 && trend.previous === 0) return null
+  const glyph = trend.direction === 'up' ? '▲' : trend.direction === 'down' ? '▼' : '—'
+  const sign = trend.delta > 0 ? `+${trend.delta}` : String(trend.delta)
+  return (
+    <span
+      className={`dash-trend dash-trend-${trend.direction}`}
+      title={`${trend.current} this week vs ${trend.previous} last week`}
+    >
+      {glyph} {trend.direction === 'flat' ? 'flat' : `${sign} wk`}
+    </span>
+  )
+}
+
+function HeroTile({
   label,
   value,
   caption,
   tone,
+  trend,
   title,
   onClick,
 }: {
@@ -310,20 +383,25 @@ function Kpi({
   value: string
   caption: string
   tone?: 'ok' | 'warn' | 'err' | 'off'
+  trend?: WowTrend
   title?: string
   onClick?: () => void
 }): React.JSX.Element {
-  const toneClass = tone === 'ok' ? ' kpi-ok' : tone === 'warn' ? ' kpi-warn' : tone === 'err' ? ' kpi-err' : ''
+  const toneClass =
+    tone === 'ok' ? ' kpi-ok' : tone === 'warn' ? ' kpi-warn' : tone === 'err' ? ' kpi-err' : ''
   const body = (
     <>
       <div className="dash-kpi-k">{label}</div>
-      <div className={`dash-kpi-v${toneClass}`}>{value}</div>
+      <div className="dash-hero-vrow">
+        <span className={`dash-kpi-v${toneClass}`}>{value}</span>
+        {trend && <TrendArrow trend={trend} />}
+      </div>
       <div className="dash-kpi-t">{caption}</div>
     </>
   )
-  if (!onClick) return <div className="dash-kpi">{body}</div>
+  if (!onClick) return <div className="dash-kpi dash-hero-tile">{body}</div>
   return (
-    <button type="button" className="dash-kpi" title={title} onClick={onClick}>
+    <button type="button" className="dash-kpi dash-hero-tile" title={title} onClick={onClick}>
       {body}
     </button>
   )
@@ -408,30 +486,35 @@ function AttentionRow({ card }: { card: HandoffCard }): React.JSX.Element {
   )
 }
 
-function PulseRowView({ row }: { row: PulseRow }): React.JSX.Element {
+/** Compact pulse row with a note-count bar (relative to the busiest project). */
+function PulseRowView({ row, maxNotes }: { row: PulseRow; maxNotes: number }): React.JSX.Element {
+  const pct = Math.round((row.noteCount / maxNotes) * 100)
   return (
     <div
-      className="dash-row dash-row-link"
+      className="dash-pulse dash-row-link"
       role="button"
       tabIndex={0}
       onClick={() => goAtlasLearn(row.project)}
       onKeyDown={rowKey(() => goAtlasLearn(row.project))}
     >
-      <span className="dash-strong">{row.project}</span>
+      <div className="dash-pulse-head">
+        <span className="dash-strong">{row.project}</span>
+        {row.openIn > 0 && <span className="dash-chip">{row.openIn} in</span>}
+        {row.openOut > 0 && <span className="dash-chip">{row.openOut} out</span>}
+        {row.brief === 'stale' ? (
+          <span className="dash-chip dash-chip-rust">brief stale · {row.newerNotes}</span>
+        ) : row.brief === 'none' ? (
+          <span className="dash-chip">no brief</span>
+        ) : (
+          <span className="dash-chip">brief fresh</span>
+        )}
+        <span className="dash-mini dash-pulse-date">{row.lastDate}</span>
+      </div>
+      <div className="dash-pulse-bar" aria-hidden="true">
+        <span className="dash-pulse-fill" style={{ width: `${pct}%` }} />
+      </div>
       <span className="dash-mini">
-        {row.noteCount} note{row.noteCount === 1 ? '' : 's'} · last {row.lastDate}
-      </span>
-      {row.openIn > 0 && <span className="dash-chip">{row.openIn} open in</span>}
-      {row.openOut > 0 && <span className="dash-chip">{row.openOut} out</span>}
-      {row.brief === 'stale' ? (
-        <span className="dash-chip dash-chip-rust">brief stale — {row.newerNotes} newer</span>
-      ) : row.brief === 'none' ? (
-        <span className="dash-chip">no brief</span>
-      ) : (
-        <span className="dash-chip">brief fresh</span>
-      )}
-      <span className="dash-mini" style={{ marginLeft: 'auto' }}>
-        {row.topics.filter((t) => t !== 'handoffs').slice(0, 3).join(' · ')}
+        {row.noteCount} note{row.noteCount === 1 ? '' : 's'}
       </span>
     </div>
   )
@@ -447,57 +530,172 @@ function ChurnRowView({ row }: { row: ChurnRow }): React.JSX.Element {
       onClick={() => goContractsFile(row)}
       onKeyDown={rowKey(() => goContractsFile(row))}
     >
-      <span className="dash-mini">{row.file}</span>
-      <span className="dash-txt">{row.project}</span>
+      <span className="dash-mini dash-txt">{row.file}</span>
       <span className="dash-chip">
         {row.changes} change{row.changes === 1 ? '' : 's'}
       </span>
       {row.linkedHandoffs > 0 && (
         <span className="dash-chip dash-chip-gold">
-          {row.linkedHandoffs} linked handoff{row.linkedHandoffs === 1 ? '' : 's'}
+          {row.linkedHandoffs} linked
         </span>
       )}
     </div>
   )
 }
 
-function ActivityStrip({
-  summary,
+/** 14 kind-tinted stacked day bars — one click target into the Activity feed. */
+function Sparkline({
+  buckets,
   onOpen,
 }: {
-  summary: ActivitySummary
+  buckets: DayBucket[]
   onOpen: () => void
 }): React.JSX.Element {
-  const max = Math.max(1, ...summary.hours)
+  const total = buckets.reduce((s, b) => s + b.total, 0)
+  const max = Math.max(1, ...buckets.map((b) => b.total))
+  const colW = 100 / buckets.length
+  const barW = colW * 0.66
+  const H = 40
+  const first = buckets[0]?.day.slice(5) ?? ''
+  const last = buckets[buckets.length - 1]?.day.slice(5) ?? ''
   return (
-    <button type="button" className="dash-activity" title="Open the activity feed" onClick={onOpen}>
-      <div className="dash-chip-row">
-        {summary.total === 0 && <span className="dash-mini">quiet so far today</span>}
-        {ACTIVITY_KINDS.filter((k) => (summary.byKind[k] ?? 0) > 0).map((k) => (
-          <span key={k} className="dash-chip">
-            {k} ×{summary.byKind[k]}
-          </span>
-        ))}
-      </div>
-      {/* per-hour density: 24 plain SVG rects, no chart lib (spec note 8) */}
-      <svg className="dash-density" viewBox="0 0 240 34" preserveAspectRatio="none" role="img"
-        aria-label={`${summary.total} events today`}>
-        {summary.hours.map((count, hour) => {
-          const h = count === 0 ? 2 : 4 + (count / max) * 28
+    <button
+      type="button"
+      className="dash-spark-wrap"
+      title="Open the activity feed"
+      onClick={onOpen}
+    >
+      <svg
+        className="dash-spark"
+        viewBox={`0 0 100 ${H}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label={`${total} events over 14 days`}
+      >
+        {buckets.map((b, i) => {
+          const x = i * colW + (colW - barW) / 2
+          if (b.total === 0) {
+            return (
+              <rect key={b.day} className="spark-empty" x={x} y={H - 1.5} width={barW} height={1.5}>
+                <title>{`${b.day} — no activity`}</title>
+              </rect>
+            )
+          }
+          let acc = 0
           return (
-            <rect key={hour} className={count > 0 ? 'hour-active' : undefined}
-              x={hour * 10} y={34 - h} width={8} height={h} rx={1}>
-              <title>{`${String(hour).padStart(2, '0')}:00 — ${count} event${count === 1 ? '' : 's'}`}</title>
-            </rect>
+            <g key={b.day}>
+              {SPARK_KINDS.map((k) => {
+                const c = b.byKind[k] ?? 0
+                if (c === 0) return null
+                const h = (c / max) * (H - 2)
+                const y = H - acc - h
+                acc += h
+                return (
+                  <rect key={k} className={`spark-${k}`} x={x} y={y} width={barW} height={h}>
+                    <title>{`${b.day} · ${k} ×${c}`}</title>
+                  </rect>
+                )
+              })}
+            </g>
           )
         })}
       </svg>
+      <div className="dash-spark-axis">
+        <span className="dash-mini">{first}</span>
+        <span className="dash-mini">today {last}</span>
+      </div>
     </button>
   )
 }
 
-/** The Start-Here brief, demoted to a link-out card (resolved Q4: the Reader
- *  owns prose). Freshness rides the existing home.brief payload. */
+/** Handoffs created vs consumed over 7 days — paired bars + the plain summary. */
+function VelocityStrip({
+  days,
+  created,
+  consumed,
+  open,
+  onOpen,
+}: {
+  days: DayBucket[]
+  created: number
+  consumed: number
+  open: number
+  onOpen: () => void
+}): React.JSX.Element {
+  const max = Math.max(
+    1,
+    ...days.flatMap((b) => [b.byKind.handoff ?? 0, b.byKind.consume ?? 0]),
+  )
+  const H = 34
+  const groupW = 100 / days.length
+  const barW = groupW * 0.28
+  return (
+    <section className="dash-card dash-velocity" aria-label="Handoff velocity">
+      <div className="dash-velocity-head">
+        <span className="dash-card-title">Velocity · 7 days</span>
+        <span className="dash-velocity-legend">
+          <span className="vel-key vel-created" /> handed off
+          <span className="vel-key vel-consumed" /> consumed
+        </span>
+      </div>
+      <button type="button" className="dash-spark-wrap" title="Open the handoff board" onClick={onOpen}>
+        <svg
+          className="dash-velbars"
+          viewBox={`0 0 100 ${H}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`${created} handed off, ${consumed} consumed over 7 days`}
+        >
+          {days.map((b, i) => {
+            const c = b.byKind.handoff ?? 0
+            const d = b.byKind.consume ?? 0
+            const base = i * groupW + groupW / 2
+            const ch = c === 0 ? 0 : (c / max) * (H - 2)
+            const dh = d === 0 ? 0 : (d / max) * (H - 2)
+            return (
+              <g key={b.day}>
+                <rect className="vel-created" x={base - barW - 0.6} y={H - ch} width={barW} height={ch}>
+                  <title>{`${b.day} — ${c} handed off`}</title>
+                </rect>
+                <rect className="vel-consumed" x={base + 0.6} y={H - dh} width={barW} height={dh}>
+                  <title>{`${b.day} — ${d} consumed`}</title>
+                </rect>
+              </g>
+            )
+          })}
+        </svg>
+      </button>
+      <div className="dash-velocity-sum">
+        <b>{created}</b> handed off · <b>{consumed}</b> consumed · <b>{open}</b> still open
+      </div>
+    </section>
+  )
+}
+
+function SyncMini({
+  value,
+  caption,
+  tone,
+  onOpen,
+}: {
+  value: string
+  caption: string
+  tone: 'ok' | 'warn' | 'err' | 'off'
+  onOpen: () => void
+}): React.JSX.Element {
+  return (
+    <button type="button" className="dash-card dash-syncmini" onClick={onOpen} title="Open sync health">
+      <span className={`dash-syncdot sync-${tone}`}>{value}</span>
+      <span className="dash-syncmini-body">
+        <span className="dash-card-title">Sync</span>
+        <span className="dash-mini">{caption}</span>
+      </span>
+    </button>
+  )
+}
+
+/** The Start-Here brief, demoted to a link-out card (the Reader owns prose).
+ *  Freshness rides the existing home.brief payload. */
 function BriefCard(): React.JSX.Element {
   const brief = useHome((s) => s.brief)
   const error = useHome((s) => s.error)

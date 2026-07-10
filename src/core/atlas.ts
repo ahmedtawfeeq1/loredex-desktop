@@ -28,14 +28,8 @@ import * as engine from './engine'
 import { resolveLink } from './links'
 import { listMarkdownFiles } from './tree'
 
-// ── layout constants (renderer consumes them for viewBox math only) ─────────
-
-export const NODE_W = 200
-export const NODE_H = 84
-/** overview cluster columns: left→right by route-dependency depth */
-export const COL_W = 300
-export const ROW_H = 130
-export const MARGIN = 40
+// layout constants live in shared/atlas-layout.ts (renderer draws with them)
+import { COL_W, MARGIN, NODE_W, ROW_H } from '../shared/atlas-layout'
 
 /** note freshness horizon — same rust-at-7-days rule as the home brief badge */
 export const STALE_AFTER_DAYS = 7

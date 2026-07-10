@@ -8,6 +8,7 @@ import { onEvent, onOpenHandoff, onVaultChanged } from './api'
 import { IdentityBadge } from './components/IdentityBadge'
 import { ToastStack } from './components/ToastStack'
 import { useApp } from './stores/app'
+import { useAtlas } from './stores/atlas'
 import { useHandoffs } from './stores/handoffs'
 import { useReader } from './stores/reader'
 import { useRoute } from './stores/route'
@@ -16,6 +17,7 @@ import { useFeed } from './stores/feed'
 import { useHome } from './stores/home'
 import { useSearch } from './stores/search'
 import { useSync } from './stores/sync'
+import { AtlasView } from './views/atlas/AtlasView'
 import { FeedView } from './views/feed/FeedView'
 import { AnnotateModal } from './views/handoffs/AnnotateModal'
 import { Board } from './views/handoffs/Board'
@@ -64,6 +66,7 @@ export default function App(): React.JSX.Element {
       useHome.getState().reset()
       useSync.getState().reset()
       useFeed.getState().reset()
+      useAtlas.getState().reset()
       void init()
     })
   }, [init])
@@ -141,6 +144,15 @@ export default function App(): React.JSX.Element {
           <button
             type="button"
             className="nav-item"
+            aria-current={view === 'atlas'}
+            title="Vault Atlas — the whole vault as a map (story 10.2)"
+            onClick={() => setView('atlas')}
+          >
+            Atlas
+          </button>
+          <button
+            type="button"
+            className="nav-item"
             aria-current={view === 'search'}
             title="Search the vault (⌘K)"
             onClick={() => setView('search')}
@@ -192,6 +204,10 @@ export default function App(): React.JSX.Element {
         ) : view === 'handoffs' ? (
           <main className="pane-board">
             <Board />
+          </main>
+        ) : view === 'atlas' ? (
+          <main className="pane-board">
+            <AtlasView />
           </main>
         ) : view === 'search' ? (
           <main className="pane-board">

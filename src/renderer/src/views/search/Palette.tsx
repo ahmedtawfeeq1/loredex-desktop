@@ -40,6 +40,12 @@ function actionItems(q: string): PaletteItem[] {
       title: 'Route a note…',
       run: () => void useRoute.getState().start(),
     },
+    // story 10.2: the Atlas is ⌘K-reachable like every view-level action
+    {
+      key: 'action:vault-atlas',
+      title: 'Vault Atlas',
+      run: () => useApp.getState().setView('atlas'),
+    },
   ]
   // reply/comment target the open reader note when it is a handoff (story 7.3)
   const { selected, doc } = useReader.getState()

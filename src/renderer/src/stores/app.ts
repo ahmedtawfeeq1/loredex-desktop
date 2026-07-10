@@ -7,7 +7,15 @@ import { isErrEnvelope } from '../../../shared/ipc-contract'
 import type { VaultIdentity } from '../../../shared/types'
 import { invoke, pickVault } from '../api'
 
-export type AppView = 'home' | 'reader' | 'handoffs' | 'search' | 'feed' | 'sync' | 'settings'
+export type AppView =
+  | 'home'
+  | 'reader'
+  | 'handoffs'
+  | 'atlas'
+  | 'search'
+  | 'feed'
+  | 'sync'
+  | 'settings'
 
 interface AppState {
   status: 'loading' | 'no-vault' | 'ready'

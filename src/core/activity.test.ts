@@ -54,7 +54,7 @@ beforeAll(async () => {
   const [a, b] = fakePortPair()
   ipc.attach(a)
   client.attach(b)
-})
+}, 30_000) // the suite's explicit 30s convention — git-heavy setup flakes at the 10s default under full-suite load
 
 afterAll(() => rmSync(vault, { recursive: true, force: true }))
 

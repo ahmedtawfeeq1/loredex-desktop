@@ -132,6 +132,7 @@ development_status:
   15-1-native-module-correctness: done          # dual-ABI staging (predev/postdist) + packaged 30s smoke PASS
   15-2-perf-pass: done                          # 6 budgets green (atlas cold 664ms/2s); fixture flushed a YAML-Date snoozed_until board crash — fixed
   15-3-keyboard-coverage: done                  # one action registry: ⌘1-9/⌘N/⇧⌘R/⇧⌘S/?, ⌘K hints, cheatsheet; coverage test guards it
+  15-4-public-docs: done                        # README rewrite (hero/tour/install/arch) + docs/USER-GUIDE.md; every claim code-verified, links checked
 
 qa:
   pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded

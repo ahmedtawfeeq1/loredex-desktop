@@ -210,3 +210,37 @@ describe('Addendum D1: wikilinks are always visibly links (story 16.1)', () => {
     expect(block('.ro-empty')).toContain('color: var(--rust);')
   })
 })
+
+describe('Addendum D1: edit mode + inline comments (story 16.4)', () => {
+  it('the editor is textarea-grade mono 13px — markdown in, no WYSIWYG', () => {
+    const editor = block('.note-editor')
+    expect(editor).toContain('font-family: var(--font-mono);')
+    expect(editor).toContain('font-size: 13px;')
+  })
+  it('the frontmatter panel is visibly locked in edit mode (caps mono label)', () => {
+    const label = block('.fm-locked-label')
+    expect(label).toContain('font-family: var(--font-mono);')
+    expect(label).toContain('text-transform: uppercase;')
+  })
+  it('the unsaved dot is gold (write pending — the one gold accent here)', () => {
+    expect(block('.unsaved-dot')).toContain('background: var(--gold);')
+  })
+  it('anchored text carries the soft gold underline-highlight', () => {
+    const highlight = block('::highlight(loredex-anchor)')
+    expect(highlight).toContain('color-mix(in srgb, var(--gold) 18%, transparent)')
+    expect(highlight).toContain('text-decoration: underline;')
+    expect(highlight).toContain('text-decoration-color: var(--gold);')
+  })
+  it('comment cards keep the card recipe: bg-card, hairline, shadow', () => {
+    const card = block('.comment-card')
+    expect(card).toContain('background: var(--bg-card);')
+    expect(card).toContain('border: 1px solid var(--hairline);')
+    expect(card).toContain('box-shadow: var(--shadow-card);')
+  })
+  it('orphaned anchors get the rust chip (quote gone from the note)', () => {
+    const chip = block('.orphan-chip')
+    expect(chip).toContain('color: var(--rust);')
+    expect(chip).toContain('border: 1px solid var(--rust);')
+    expect(chip).toContain('text-transform: uppercase;')
+  })
+})

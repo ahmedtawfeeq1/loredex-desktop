@@ -9,11 +9,15 @@
  * Store-driven (zustand getState), no React — unit-testable under node.
  */
 import { useApp, type AppView } from '../stores/app'
+import { useEditor } from '../stores/editor'
 import { useHandoffs } from '../stores/handoffs'
+import { effectiveIdentity, useIdentity } from '../stores/identity'
 import { useRails } from '../stores/rails'
+import { useReader } from '../stores/reader'
 import { useRoute } from '../stores/route'
 import { useSearch } from '../stores/search'
 import { useSync } from '../stores/sync'
+import { useToasts } from '../stores/toasts'
 
 export interface ActionCombo {
   /** KeyboardEvent.key, lowercase for letters ('k', '1', '?') */
@@ -100,6 +104,46 @@ export function appActions(): AppAction[] {
       shortcut: '⇧⌘\\',
       combo: { key: '|', meta: true, shift: true },
       run: () => useRails.getState().toggleList(),
+    },
+    {
+      // Addendum D1 edit mode (story 16.4): Read ⇄ Edit for the open note.
+      // Only acts from the reader with a note open — a no-op elsewhere.
+      id: 'action:edit-note',
+      title:
+        useEditor.getState().editing && useEditor.getState().path === useReader.getState().selected
+          ? 'Read mode'
+          : 'Edit note',
+      shortcut: '⌘E',
+      combo: { key: 'e', meta: true },
+      run: () => {
+        const editor = useEditor.getState()
+        const { selected, doc } = useReader.getState()
+        if (editor.editing && editor.path === selected) {
+          editor.exit()
+          return
+        }
+        if (useApp.getState().view !== 'reader' || !selected || !doc) return
+        editor.enter(selected, doc.body)
+      },
+    },
+    {
+      // story 16.4: ⌘S saves the edit-mode draft through the core host —
+      // meaningful only while editing (the matcher lets ⌘-chords fire from
+      // the textarea; shift-exactness keeps ⇧⌘S Sync now separate).
+      id: 'action:save-note',
+      title: 'Save note',
+      shortcut: '⌘S',
+      combo: { key: 's', meta: true },
+      run: () => {
+        const editor = useEditor.getState()
+        if (!editor.editing) return
+        const identity = effectiveIdentity(useIdentity.getState())
+        if (!identity) {
+          useToasts.getState().push('Saving needs an identity', 'Set name and email in Settings')
+          return
+        }
+        void editor.save(identity)
+      },
     },
     {
       id: 'action:shortcuts',

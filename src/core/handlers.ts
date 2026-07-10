@@ -6,7 +6,13 @@ import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting } from '../shared/theme'
 import { type CoreEvent, ipcError, type MainControlMessage } from '../shared/ipc-contract'
-import type { HandoffCard, Identity, ProjectRootsMap, SyncReport } from '../shared/types'
+import type {
+  HandoffCard,
+  Identity,
+  NoteComment,
+  ProjectRootsMap,
+  SyncReport,
+} from '../shared/types'
 import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import {
@@ -39,6 +45,7 @@ import {
 } from './github'
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
+import { commentView } from './notes'
 import { getMcpStatus } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
@@ -374,6 +381,56 @@ export function registerCoreHandlers(
       return result
     }),
   )
+  // Edit mode (story 16.4, Addendum D1): body-only write to an existing note —
+  // frontmatter preserved byte-for-byte (agents own it), path guarded by the
+  // lib's resolveNoteInsideVault, committed as `loredex: edit <note> (<name>)`.
+  ipc.register('note.save', ({ path, body, identity }) =>
+    withWriteLock(() => {
+      requireIdentity(identity, 'editing a note')
+      const result = engine.saveNoteBody(path, body, identity)
+      const vaultPath = engine.getConfig().vaultPath
+      const rel = toVaultRelative(result.path, vaultPath)
+      // body text changed — wikilinks/facets/atlas derive from it (F4 tier)
+      invalidateLinkIndex(vaultPath)
+      clearFacetCache()
+      invalidateAtlas()
+      ipc.emit({ kind: 'vault.changed', paths: [rel] })
+      return { path: rel }
+    }),
+  )
+  // Inline comments (story 16.4): a NEW anchored type:'comment' note beside
+  // the parent — the parent is never mutated; comments are never board cards.
+  ipc.register('note.comment.create', ({ path, anchor, body, identity }) =>
+    withWriteLock(() => {
+      requireIdentity(identity, 'commenting')
+      if (!anchor.trim() || !body.trim()) {
+        throw ipcError('INTERNAL', 'a comment needs anchored text and a body')
+      }
+      const result = engine.createNoteComment(path, { anchor, body }, identity)
+      announceCreated(result)
+      return result
+    }),
+  )
+  // Anchored comments replying to one note (story 16.4) — read-only scan,
+  // derived fresh per request (recomputed-cache tier, nothing persisted).
+  ipc.register('note.comments', ({ path }) => {
+    const vaultPath = engine.getConfig().vaultPath
+    const name = (path.split('/').pop() ?? path).replace(/\.md$/, '')
+    const comments: NoteComment[] = []
+    for (const rel of listMarkdownFiles(vaultPath)) {
+      if (rel === path) continue
+      try {
+        const doc = engine.readNote(rel)
+        const view = commentView(doc.meta as Record<string, unknown>, doc.body, name)
+        if (view) comments.push({ path: rel, ...view })
+      } catch {
+        // unreadable note — reader diagnostics own that story, not the rail
+      }
+    }
+    return comments.sort((a, b) =>
+      a.at === b.at ? a.path.localeCompare(b.path) : a.at.localeCompare(b.at),
+    )
+  })
   // Thread graph (story 8.2): derived read — listHandoffs + comment scan +
   // the story 2.2 shortest-path resolver; nothing persisted, no lock.
   ipc.register('handoffs.thread', ({ id }) => {

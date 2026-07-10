@@ -3,10 +3,10 @@
  * architecture.md#coding-standards #3). Config resolves exactly once per
  * core-host lifetime (F6 split-brain defense); a respawned host re-resolves.
  */
-import { readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { basename, dirname, isAbsolute, join } from 'node:path'
 import {
   ACTIVITY_LOG_ARGS,
   type ActivityEvent,
@@ -23,6 +23,7 @@ import {
   createLoredexMcpServer,
   type Doc,
   ensureGeneratedMergeDriver,
+  gitAutoCommit,
   gitPullPush,
   type HandoffCard,
   type HandoffCreateResult,
@@ -32,6 +33,7 @@ import {
   listHandoffs,
   loadConfig,
   LOREDEX_SCHEMA,
+  type Meta,
   parseDoc,
   previewRoute,
   PRODUCT_BRIEF_NAME,
@@ -47,7 +49,11 @@ import {
   scaffoldVault,
   type SearchHit,
   searchVault,
+  serializeDoc,
   setHandoffStatus,
+  slugify,
+  stampEngineSchema,
+  stampSchema,
   type StatusReceipt,
   type SyncHealth,
   syncStatus,
@@ -57,6 +63,7 @@ import {
 import { abbreviatePath } from '../shared/identity'
 import { gitLog, withGitIdentity } from './git'
 import { ipcError } from '../shared/ipc-contract'
+import { spliceBody } from './notes'
 import type { HomeBrief, ReplyHandoffInput, VaultIdentity } from '../shared/types'
 
 /** undefined = not yet initialized; null = initialized, no config on disk. */
@@ -97,13 +104,7 @@ export function configFileProjects(): { vaultPath: string; projects: Config['pro
 }
 
 export function readNote(path: string): Doc {
-  const vault = getConfig().vaultPath
-  const requested = isAbsolute(path) ? path : join(vault, path)
-  const resolved = resolveNoteInsideVault(vault, requested)
-  if (!resolved) {
-    throw ipcError('VAULT_OUTSIDE_PATH', `not a markdown note inside the vault: ${path}`)
-  }
-  return parseDoc(readFileSync(resolved, 'utf8'))
+  return parseDoc(readFileSync(resolveInVault(path), 'utf8'))
 }
 
 export function search(q: string, limit?: number): SearchHit[] {
@@ -247,6 +248,97 @@ export function routePlan(file: string, opts: RouteOptions): RoutePlanPreview {
 export function route(file: string, opts: RouteOptions): { written: string[] } {
   const config = getConfig()
   return routeFile(config.vaultPath, config, file, opts)
+}
+
+/** Resolve a note path (rel or abs) strictly inside the vault, or throw. */
+function resolveInVault(path: string): string {
+  const vault = getConfig().vaultPath
+  const requested = isAbsolute(path) ? path : join(vault, path)
+  const resolved = resolveNoteInsideVault(vault, requested)
+  if (!resolved) {
+    throw ipcError('VAULT_OUTSIDE_PATH', `not a markdown note inside the vault: ${path}`)
+  }
+  return resolved
+}
+
+/**
+ * Body-only note write (story 16.4, Addendum D1 edit mode): the original
+ * frontmatter block is preserved byte-for-byte (agents own frontmatter — a
+ * gray-matter round-trip would reformat it), the body is replaced, and the
+ * edit lands as `loredex: edit <note> (<name>)`. Path guarded via the lib's
+ * resolveNoteInsideVault; identity rides the commit (F7). Commit only —
+ * pushing stays the poller/Sync-now's job.
+ */
+export function saveNoteBody(path: string, body: string, identity: Identity): { path: string } {
+  const config = getConfig()
+  const resolved = resolveInVault(path)
+  const raw = readFileSync(resolved, 'utf8')
+  writeFileSync(resolved, spliceBody(raw, body.endsWith('\n') ? body : `${body}\n`))
+  withGitIdentity(identity, () =>
+    gitAutoCommit(config.vaultPath, config, `loredex: edit ${basename(resolved, '.md')} (${identity.name})`),
+  )
+  return { path: resolved }
+}
+
+/**
+ * Anchored inline comment (story 16.4): a NEW `type: 'comment'` note beside
+ * the parent — the lib annotateHandoff frontmatter/body contract extended
+ * with `anchor` (the exact quoted text), `author` and `created`, so agents
+ * read it natively via CLI/MCP. Works for ANY vault note; the parent is
+ * never mutated. Commit only (pushed: false) — sync pushes later.
+ */
+export function createNoteComment(
+  path: string,
+  input: { anchor: string; body: string },
+  identity: Identity,
+): HandoffCreateResult {
+  const config = getConfig()
+  const vault = config.vaultPath
+  const resolved = resolveInVault(path)
+  const parentName = basename(resolved, '.md')
+  const dir = dirname(resolved)
+  const rel = resolved.slice(vault.length + 1)
+  const project = /^projects\/([^/]+)\//.exec(rel)?.[1]
+  const segments = rel.split('/')
+  const topic = project && segments.length > 3 ? (segments[2] as string) : 'comments'
+  const today = new Date().toISOString().slice(0, 10)
+  const author = `${identity.name} <${identity.email}>`
+
+  const meta = stampSchema({
+    ...(project ? { project } : {}),
+    topic,
+    type: 'comment',
+    date: today,
+    replies_to: parentName,
+    anchor: input.anchor,
+    author,
+    created: new Date().toISOString(),
+    source: 'loredex',
+    loredex: 'routed',
+  } as Meta)
+  const body = [
+    `# Comment on ${parentName}`,
+    '',
+    `On [[${parentName}]]:`,
+    '',
+    `> ${input.anchor.replace(/\n/g, '\n> ')}`,
+    '',
+    input.body.trim(),
+    '',
+    `— ${author}`,
+  ].join('\n')
+
+  let dest = join(dir, `${today}-comment-${slugify(input.anchor)}.md`)
+  for (let i = 2; existsSync(dest); i += 1) {
+    dest = join(dir, `${today}-comment-${slugify(input.anchor)}-${i}.md`)
+  }
+  writeFileSync(dest, serializeDoc({ meta, body: `${body}\n` }))
+  stampEngineSchema(vault)
+  rebuildIndexes(vault)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(vault, config, `loredex: comment on ${parentName}`),
+  )
+  return { id: basename(dest, '.md'), path: dest, pushed: false }
 }
 
 /** Read-only sync health snapshot (story 5.2) — lib syncStatus, never fetches. */

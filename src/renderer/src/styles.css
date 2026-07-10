@@ -3752,3 +3752,243 @@ a.commit-chip-sha:hover {
   font-size: 12px;
   color: var(--text-1);
 }
+
+/* ── Addendum D1: edit mode + inline comments (story 16.4) ──────────────────
+   Read ⇄ Edit toggle, mono 13px editor + formatter bar (markdown insertion
+   only), LOCKED frontmatter, unsaved dot; Read-mode selection → Comment chip
+   → margin rail of comment cards; anchored text = soft gold underline-
+   highlight; orphaned anchors = rust chip at note end. ─────────────────── */
+
+.note-layout {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.note-layout > .note {
+  flex: 1;
+  min-width: 0;
+}
+
+.note-mode {
+  float: right;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.note-mode button {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.note-mode button[aria-pressed='true'] {
+  background: var(--bg-inset);
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.unsaved-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  margin: 0 8px;
+  flex: none;
+}
+
+.fm-locked {
+  opacity: 0.85;
+}
+
+.fm-locked-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+
+.formatter-bar {
+  display: flex;
+  gap: 4px;
+  margin: 16px 0 8px;
+}
+
+.formatter-bar button {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  min-width: 26px;
+  padding: 3px 7px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.formatter-bar button:hover {
+  color: var(--text-1);
+  background: var(--bg-inset);
+}
+
+/* the editor is textarea-grade on purpose: mono 13px, markdown in, no WYSIWYG */
+.note-editor {
+  width: 100%;
+  min-height: 55vh;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-1);
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.editor-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* D1: anchored text gets a soft gold underline-highlight (Custom Highlight
+   API — no DOM mutation of the sanctioned markdown output) */
+::highlight(loredex-anchor) {
+  background-color: color-mix(in srgb, var(--gold) 18%, transparent);
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+}
+
+.comment-chip {
+  position: absolute;
+  transform: translate(-50%, -100%) translateY(-6px);
+  z-index: 30;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: var(--bg-card);
+  color: var(--text-1);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+}
+
+.comment-chip:hover {
+  color: var(--gold);
+}
+
+.comment-rail {
+  flex: none;
+  width: 264px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 72px 24px 64px 0;
+}
+
+.comment-card {
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.comment-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.comment-author {
+  font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-time {
+  margin-left: auto;
+  flex: none;
+}
+
+.comment-quote {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-2);
+  border-left: 1px solid var(--gold); /* Don't list: never wider than 1px */
+  padding-left: 8px;
+  margin: 6px 0;
+}
+
+.comment-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-1);
+  white-space: pre-wrap;
+}
+
+.comment-input {
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: inherit;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 4px 0 8px;
+  resize: vertical;
+}
+
+.comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.orphaned-comments {
+  margin-top: 32px;
+  border-top: 1px solid var(--hairline);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 520px;
+}
+
+.orphaned-title {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* orphaned = the quote is gone from the note — rust, per D1 */
+.orphan-chip {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rust);
+  border: 1px solid var(--rust);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex: none;
+}

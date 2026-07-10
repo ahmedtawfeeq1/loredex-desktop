@@ -28,6 +28,7 @@ import type {
   JoinVaultResult,
   LinkResolution,
   McpStatus,
+  NoteComment,
   PrInfo,
   ProjectRootsMap,
   RailsCollapsed,
@@ -114,6 +115,24 @@ export interface CoreApi {
    *  degrades to nothing-collapsed while no vault/db is open. */
   'settings.treeSections.get': { in: void; out: TreeSectionsCollapsed }
   'settings.treeSections.set': { in: TreeSectionsCollapsed; out: void }
+  /** Edit mode (story 16.4, Addendum D1): body-only write to an EXISTING
+   *  vault note — frontmatter is preserved byte-for-byte (agents own it);
+   *  path guarded via the lib's resolveNoteInsideVault; git auto-commit
+   *  `loredex: edit <note> (<identity name>)`. Returns the vault-relative
+   *  path. Commit only — the poller/Sync now push (receipt says so). */
+  'note.save': { in: { path: string; body: string; identity: Identity }; out: { path: string } }
+  /** Inline comments (story 16.4): anchored comments replying to one note —
+   *  read-only vault scan, anchored (`anchor:`) comments only (non-anchored
+   *  handoff comments stay the thread rail's, story 8.2). */
+  'note.comments': { in: { path: string }; out: NoteComment[] }
+  /** Inline comments (story 16.4): create an anchored `type: comment` note
+   *  beside the parent — the annotateHandoff frontmatter contract extended
+   *  with anchor/author/created; plain vault markdown, agents read it via
+   *  CLI/MCP natively. The parent note is never mutated. */
+  'note.comment.create': {
+    in: { path: string; anchor: string; body: string; identity: Identity }
+    out: HandoffCreateResult
+  }
   /** Story 7.4: read-only plan (lib previewRoute) for the confirm card; the
    *  in-shape gained mode/projectName over the v1 sketch (app-local evolution). */
   'route.preview': {

@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { Doc } from '../../../../shared/ipc-contract'
 import { renderMarkdown } from '../../markdown/pipeline'
+import { NoteEditor } from './NoteEditor'
 import { formatValue, FrontmatterPanel, NoteArticle } from './NoteView'
 
 function renderNote(selected: string, body: string, meta: Record<string, unknown> = {}): string {
@@ -86,5 +87,90 @@ describe('1 MB note perf (AC4)', () => {
     expect(out).toContain('Big note')
     // budget: parse+sanitize+render server-side well under the UI freeze bar
     expect(elapsed).toBeLessThan(5_000)
+  })
+})
+
+describe('Addendum D1: edit mode + inline comments (story 16.4)', () => {
+  const editorProps = {
+    selected: 'projects/p/t/n.md',
+    doc: { meta: { project: 'p' }, body: 'original body' } as Doc,
+    draft: 'draft body',
+    unsaved: false,
+    busy: false,
+    error: null,
+    identity: { name: 'Dana Reyes', email: 'dana@nimbus.dev' },
+  }
+
+  it('Read mode renders the mode toggle with Read pressed and an Edit (\u2318E) affordance', () => {
+    const out = renderNote('projects/p/t/n.md', 'text\n')
+    expect(out).toContain('note-mode')
+    expect(out).toMatch(/aria-pressed="true"[^>]*>Read<\/button>/)
+    expect(out).toContain('>Edit</button>')
+    expect(out).not.toContain('unsaved-dot')
+  })
+
+  it('a kept draft shows the unsaved dot on the Read-mode toggle too', () => {
+    const out = renderToStaticMarkup(
+      createElement(NoteArticle, {
+        selected: 'n.md',
+        doc: { meta: {}, body: 'text' } as Doc,
+        readingOrder: [],
+        unsaved: true,
+      }),
+    )
+    expect(out).toContain('unsaved-dot')
+  })
+
+  it('the editor is a mono textarea with the six-format bar and a LOCKED frontmatter panel', () => {
+    const out = renderToStaticMarkup(createElement(NoteEditor, editorProps))
+    expect(out).toContain('note-editor')
+    expect(out).toContain('draft body')
+    expect(out).toContain('formatter-bar')
+    for (const hint of ['Bold', 'Italic', 'Code', 'Link', 'List', 'Heading']) {
+      expect(out, hint).toContain(`${hint} \u2014`)
+    }
+    expect(out).toContain('fm-locked-label')
+    expect(out).toContain('project') // the locked panel still shows frontmatter
+    expect(out).not.toContain('unsaved-dot') // clean draft — no dot
+  })
+
+  it('an edited draft shows the unsaved dot and arms Save', () => {
+    const out = renderToStaticMarkup(createElement(NoteEditor, { ...editorProps, unsaved: true }))
+    expect(out).toContain('unsaved-dot')
+    expect(out).not.toMatch(/<button[^>]*class="button-primary"[^>]*disabled/)
+  })
+
+  it('anchored comments render in the margin rail; missing anchors orphan with the rust chip', () => {
+    const comments = [
+      { path: 'c1.md', author: 'Dana Reyes <d@n.dev>', at: '2026-07-10', anchor: 'still here', body: 'ok' },
+      { path: 'c2.md', author: 'Omar Farouk <o@n.dev>', at: '2026-07-10', anchor: 'gone text', body: 'hm' },
+    ]
+    const out = renderToStaticMarkup(
+      createElement(NoteArticle, {
+        selected: 'projects/p/t/n.md',
+        doc: { meta: {}, body: 'the words still here remain\n' } as Doc,
+        readingOrder: [],
+        comments,
+      }),
+    )
+    expect(out).toContain('comment-rail')
+    expect(out).toContain('Dana Reyes')
+    expect(out).toContain('orphan-chip')
+    expect(out).toContain('Omar Farouk')
+    // the orphaned card sits at note end, inside the article
+    expect(out.indexOf('orphaned-comments')).toBeLessThan(out.indexOf('comment-rail'))
+  })
+
+  it('the margin composer opens on a composer anchor even with zero comments', () => {
+    const out = renderToStaticMarkup(
+      createElement(NoteArticle, {
+        selected: 'n.md',
+        doc: { meta: {}, body: 'text' } as Doc,
+        readingOrder: [],
+        composerAnchor: 'the exact selected text',
+      }),
+    )
+    expect(out).toContain('comment-composer')
+    expect(out).toContain('the exact selected text')
   })
 })

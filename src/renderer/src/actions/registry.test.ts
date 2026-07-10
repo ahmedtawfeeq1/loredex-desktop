@@ -6,7 +6,9 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useApp, type AppView } from '../stores/app'
+import { useEditor } from '../stores/editor'
 import { useHandoffs } from '../stores/handoffs'
+import { useReader } from '../stores/reader'
 import { useRails } from '../stores/rails'
 import { actionItems } from './palette-items'
 import { appActions, VIEW_ORDER } from './registry'
@@ -141,5 +143,41 @@ describe('⌘K palette coverage (AC2/AC5)', () => {
       ?.run()
     expect(useApp.getState().view).toBe('handoffs')
     expect(useHandoffs.getState().composeOpen).toBe(true)
+  })
+})
+
+describe('D1 writing surface: ⌘E edit toggle + ⌘S save (story 16.4)', () => {
+  it('⌘E enters edit mode only from the reader with a note open', () => {
+    useEditor.getState().reset()
+    useReader.setState({ selected: 'n.md', doc: { meta: {}, body: 'text' } as never })
+    useApp.setState({ view: 'home' })
+    appActions().find((a) => a.id === 'action:edit-note')?.run()
+    expect(useEditor.getState().editing).toBe(false) // not the reader — no-op
+    useApp.setState({ view: 'reader' })
+    appActions().find((a) => a.id === 'action:edit-note')?.run()
+    expect(useEditor.getState()).toMatchObject({ editing: true, path: 'n.md', draft: 'text' })
+    // the live title flips; a second ⌘E returns to Read
+    expect(appActions().find((a) => a.id === 'action:edit-note')?.title).toBe('Read mode')
+    appActions().find((a) => a.id === 'action:edit-note')?.run()
+    expect(useEditor.getState().editing).toBe(false)
+    useReader.setState({ selected: null, doc: null })
+    useEditor.getState().reset()
+  })
+
+  it('⌘E and ⌘S carry their hints; ⌘S is shift-exact vs ⇧⌘S Sync now', () => {
+    const actions = appActions()
+    expect(actions.find((a) => a.id === 'action:edit-note')?.shortcut).toBe('⌘E')
+    expect(actions.find((a) => a.id === 'action:save-note')?.combo).toEqual({ key: 's', meta: true })
+    expect(actions.find((a) => a.id === 'action:sync-now')?.combo).toEqual({
+      key: 's',
+      meta: true,
+      shift: true,
+    })
+  })
+
+  it('⌘S outside edit mode is a no-op (never a stray write)', () => {
+    useEditor.getState().reset()
+    expect(() => appActions().find((a) => a.id === 'action:save-note')?.run()).not.toThrow()
+    expect(useEditor.getState().busy).toBe(false)
   })
 })

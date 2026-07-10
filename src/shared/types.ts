@@ -512,3 +512,23 @@ export interface TreeSectionsCollapsed {
   /** vault-relative paths of the collapsed section rows (groups + projects) */
   collapsed: string[]
 }
+
+// ── Edit mode + inline comments (story 16.4, DESIGN.md Addendum D1) ─────────
+
+/**
+ * One anchored inline comment on a note — a plain `type: comment` vault note
+ * (annotate contract + `anchor`), surfaced for the reader's margin rail.
+ * Non-anchored comments stay the thread rail's (story 8.2) — never duplicated.
+ */
+export interface NoteComment {
+  /** vault-relative path of the comment note */
+  path: string
+  /** `Name <email>` from the `author` key, else the body attribution line */
+  author: string
+  /** ISO `created` timestamp when present, else the note's date */
+  at: string
+  /** the exact quoted text this comment anchors to */
+  anchor: string
+  /** the comment prose (contract scaffolding stripped) */
+  body: string
+}

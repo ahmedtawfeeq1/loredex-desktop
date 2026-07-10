@@ -1,12 +1,20 @@
 /**
- * Read-only note view: serif title, frontmatter metadata panel, body through
- * the sanctioned markdown pipeline. No edit affordances — v1 product cut.
+ * Note view: serif title, frontmatter metadata panel, body through the
+ * sanctioned markdown pipeline. Story 16.4 (Addendum D1) makes it a writing
+ * surface: Read ⇄ Edit mode toggle (⌘E) and Read-mode inline comments —
+ * selection → floating Comment chip → margin composer → an anchored
+ * `type: comment` vault note; anchored text carries a soft gold
+ * underline-highlight, orphaned anchors list at note end with a rust chip.
  */
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Doc } from '../../../../shared/ipc-contract'
+import type { NoteComment } from '../../../../shared/types'
 import { renderMarkdown } from '../../markdown/pipeline'
+import { useComments } from '../../stores/comments'
 import { useDiagnostics } from '../../stores/diagnostics'
+import { useEditor } from '../../stores/editor'
 import { useHandoffs } from '../../stores/handoffs'
+import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
 import { qualifiedId } from '../../../../shared/handoff-lanes'
 import { stripDuplicateH1 } from '../home/brief-title'
@@ -15,6 +23,10 @@ import { attributionLines } from '../handoffs/lifecycle'
 import { ContractChips } from '../contracts/ContractChips'
 import { ReadingOrderInline, readingOrderEmptied } from '../handoffs/ReadingOrderInline'
 import { ThreadRail } from '../handoffs/ThreadRail'
+import { applyAnchorHighlights, clearAnchorHighlights } from './anchorHighlight'
+import { byAnchorPosition, splitComments } from './comments'
+import { CommentsRail, OrphanedComments } from './InlineComments'
+import { ModeToggle, NoteEditor } from './NoteEditor'
 
 export function formatValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(', ')
@@ -51,6 +63,16 @@ export function NoteView(): React.JSX.Element {
   const doc = useReader((s) => s.doc)
   const docError = useReader((s) => s.docError)
   const readingOrder = useReader((s) => s.readingOrder)
+  // Addendum D1 (story 16.4): per-note mode — Edit replaces the article.
+  // Store state rides down as props (presentation stays statically testable).
+  const editing = useEditor((s) => s.editing && s.path === selected)
+  const draft = useEditor((s) => s.draft)
+  const unsaved = useEditor((s) => s.path === selected && s.draft !== s.saved)
+  const busy = useEditor((s) => s.busy)
+  const editError = useEditor((s) => s.error)
+  const identity = useIdentity((s) => effectiveIdentity(s))
+  const comments = useComments((s) => (s.path === selected ? s.list : null)) ?? []
+  const composerAnchor = useComments((s) => s.composerAnchor)
 
   if (!selected) {
     return (
@@ -61,18 +83,56 @@ export function NoteView(): React.JSX.Element {
   }
   if (docError) return <div className="note-error">{docError}</div>
   if (!doc) return <div />
-  return <NoteArticle selected={selected} doc={doc} readingOrder={readingOrder} />
+  if (editing) {
+    return (
+      <NoteEditor
+        selected={selected}
+        doc={doc}
+        draft={draft}
+        unsaved={unsaved}
+        busy={busy}
+        error={editError}
+        identity={identity}
+      />
+    )
+  }
+  return (
+    <NoteArticle
+      selected={selected}
+      doc={doc}
+      readingOrder={readingOrder}
+      comments={comments}
+      composerAnchor={composerAnchor}
+      unsaved={unsaved}
+    />
+  )
 }
 
-/** The note itself, props-driven (store-free below NoteView — testable). */
+/** Floating chip state: layout-relative position + the exact selected text. */
+interface ChipState {
+  x: number
+  y: number
+  anchor: string
+}
+
+/** The note itself, props-driven (store state stops at NoteView — testable). */
 export function NoteArticle({
   selected,
   doc,
   readingOrder,
+  comments = [],
+  composerAnchor = null,
+  unsaved = false,
 }: {
   selected: string
   doc: Doc
   readingOrder: string[]
+  /** this note's anchored comments (story 16.4) */
+  comments?: NoteComment[]
+  /** open margin composer's exact selected text; null = closed */
+  composerAnchor?: string | null
+  /** an edit-mode draft exists for this note — the toggle shows the dot */
+  unsaved?: boolean
 }): React.JSX.Element {
   const title = (selected.split('/').pop() ?? selected).replace(/\.md$/, '')
   // memoize per note content — a 1 MB note re-renders only when it changes.
@@ -83,59 +143,127 @@ export function NoteArticle({
     [doc, title],
   )
 
+  // story 16.4: anchors are matched against the RENDERED text (the space
+  // selections are captured in), markdown source as fallback
+  const [bodyText, setBodyText] = useState<string | null>(null)
+  const [chip, setChip] = useState<ChipState | null>(null)
+  const layoutRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+
+  const { anchored, orphaned } = splitComments(comments, [bodyText ?? doc.body, doc.body])
+  const railComments = byAnchorPosition(anchored, bodyText ?? doc.body)
+
+  useEffect(() => {
+    // rendered text + the D1 soft gold underline-highlight over anchors
+    const root = bodyRef.current
+    if (!root) return
+    const text = root.textContent ?? ''
+    setBodyText(text)
+    applyAnchorHighlights(
+      root,
+      comments.filter((c) => text.includes(c.anchor)).map((c) => c.anchor),
+    )
+    return clearAnchorHighlights
+  }, [rendered, comments])
+
+  function onMouseUp(): void {
+    // Read-mode selection inside the note body → the floating Comment chip
+    const sel = window.getSelection()
+    const layout = layoutRef.current
+    const body = bodyRef.current
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !layout || !body) {
+      setChip(null)
+      return
+    }
+    const range = sel.getRangeAt(0)
+    const anchor = sel.toString()
+    if (!anchor.trim() || !body.contains(range.commonAncestorContainer)) {
+      setChip(null)
+      return
+    }
+    const rect = range.getBoundingClientRect()
+    const layoutRect = layout.getBoundingClientRect()
+    setChip({
+      x: rect.left - layoutRect.left + rect.width / 2,
+      y: rect.top - layoutRect.top,
+      anchor,
+    })
+  }
+
   // story 7.3 AC1: the open handoff brief is the "detail view" — same actions
   const handoffRef = handoffRefFromNote(selected, doc.meta as Record<string, unknown>)
   return (
-    <article className="note">
-      <h1 className="note-title">{title}</h1>
-      {handoffRef &&
-        attributionLines(doc.meta as Record<string, unknown>).map((line) => (
-          <p key={line} className="handoff-history">
-            {line}
+    <div className="note-layout" ref={layoutRef} onMouseUp={onMouseUp}>
+      <article className="note">
+        <ModeToggle selected={selected} doc={doc} editing={false} unsaved={unsaved} />
+        <h1 className="note-title">{title}</h1>
+        {handoffRef &&
+          attributionLines(doc.meta as Record<string, unknown>).map((line) => (
+            <p key={line} className="handoff-history">
+              {line}
+            </p>
+          ))}
+        {/* story 11.3 AC3: the detail view carries the contract chips too */}
+        {handoffRef && (
+          <div className="note-contracts">
+            <ContractChips handoffId={handoffRef.id} />
+          </div>
+        )}
+        {handoffRef && (
+          <div className="note-handoff-actions">
+            <button
+              type="button"
+              className="button-secondary button-small"
+              onClick={() => useHandoffs.getState().openCompose(handoffRef)}
+            >
+              Reply
+            </button>
+            <button
+              type="button"
+              className="button-secondary button-small"
+              onClick={() => useHandoffs.getState().openAnnotate(handoffRef)}
+            >
+              Comment
+            </button>
+          </div>
+        )}
+        <FrontmatterPanel meta={doc.meta as Record<string, unknown>} />
+        <div className="note-body" ref={bodyRef}>
+          {rendered}
+        </div>
+        {/* Addendum D1: a Reading order section never renders as silence — the
+            2026-07-10 defect (writers emitted the heading with zero notes) */}
+        {readingOrderEmptied(doc.body) && (
+          <p className="ro-empty" role="note">
+            Reading order lists no notes — this handoff was written without any.{' '}
+            <button
+              type="button"
+              className="ro-empty-action"
+              onClick={() => useDiagnostics.getState().setOpen(true)}
+            >
+              Open Link Diagnostics
+            </button>
           </p>
-        ))}
-      {/* story 11.3 AC3: the detail view carries the contract chips too */}
-      {handoffRef && (
-        <div className="note-contracts">
-          <ContractChips handoffId={handoffRef.id} />
-        </div>
+        )}
+        <ReadingOrderInline targets={readingOrder} from={selected} />
+        <OrphanedComments comments={orphaned} />
+        {handoffRef && <ThreadRail id={qualifiedId(handoffRef)} />}
+      </article>
+      {chip && (
+        <button
+          type="button"
+          className="comment-chip"
+          style={{ left: chip.x, top: chip.y }}
+          onClick={() => {
+            useComments.getState().openComposer(chip.anchor)
+            setChip(null)
+            window.getSelection()?.removeAllRanges()
+          }}
+        >
+          Comment
+        </button>
       )}
-      {handoffRef && (
-        <div className="note-handoff-actions">
-          <button
-            type="button"
-            className="button-secondary button-small"
-            onClick={() => useHandoffs.getState().openCompose(handoffRef)}
-          >
-            Reply
-          </button>
-          <button
-            type="button"
-            className="button-secondary button-small"
-            onClick={() => useHandoffs.getState().openAnnotate(handoffRef)}
-          >
-            Comment
-          </button>
-        </div>
-      )}
-      <FrontmatterPanel meta={doc.meta as Record<string, unknown>} />
-      <div className="note-body">{rendered}</div>
-      {/* Addendum D1: a Reading order section never renders as silence — the
-          2026-07-10 defect (writers emitted the heading with zero notes) */}
-      {readingOrderEmptied(doc.body) && (
-        <p className="ro-empty" role="note">
-          Reading order lists no notes — this handoff was written without any.{' '}
-          <button
-            type="button"
-            className="ro-empty-action"
-            onClick={() => useDiagnostics.getState().setOpen(true)}
-          >
-            Open Link Diagnostics
-          </button>
-        </p>
-      )}
-      <ReadingOrderInline targets={readingOrder} from={selected} />
-      {handoffRef && <ThreadRail id={qualifiedId(handoffRef)} />}
-    </article>
+      <CommentsRail comments={railComments} composerAnchor={composerAnchor} />
+    </div>
   )
 }

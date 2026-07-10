@@ -29,7 +29,7 @@ Nine views, in sidebar order (⌘1–⌘9):
 | **Handoffs** | Inbox/outbox lanes per project. Compose (⌘N), reply, comment; accept / decline-with-reason / snooze-until / consume — every transition attributed in frontmatter and committed. Thread rail shows reply and fulfills lineage |
 | **Atlas** | The whole vault as a zoomable SVG graph: Overview → Learn → Deep Dive, tours from reading orders, path tracing, a blocked-on list, changed-since overlay, SVG/PNG export. Every node is a hyperlink — notes open the Reader, handoffs open their thread, commits open GitHub |
 | **Contracts** | Timeline of API-contract changes (OpenAPI / Postman / GraphQL files in your registered repos) from git history, with pinned unified diffs and labeled links to related handoffs |
-| **Search** | Full-text search with facets: project, topic, type, status, from |
+| **Search** | Full-text search with facets: project, topic, type, status, from, to |
 | **Activity** | The team's route/handoff/consume/sync history, day-grouped, from vault git log |
 | **Sync** | Ahead/behind vs the remote, status warnings, sync now (⇧⌘S) — plus a background poller that fetches every 60 s and integrates only when your work isn't mid-write |
 | **Settings** | Appearance, identity profile, contract repos and globs, GitHub (`gh`) integration, MCP server port |
@@ -62,7 +62,7 @@ git clone https://github.com/ahmedtawfeeq1/loredex-desktop && cd loredex-desktop
 npm install
 npm run dev        # launch (a predev script stages Electron-ABI natives automatically)
 npm test           # vitest unit + integration suites
-npm run test:e2e   # scripted end-to-end drive over the real IPC seam
+npm run test:e2e   # scripted end-to-end drive over the real IPC seam — the release gate
 npm run build      # typecheck + electron-vite build
 npm run dist       # unsigned DMG/ZIP (arm64)
 ```

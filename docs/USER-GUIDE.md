@@ -103,7 +103,7 @@ Changes link to handoffs in two labeled tiers: **mentioned** (the commit SHA lit
 
 ## Search
 
-Full-text search over the vault with facets: **project**, **topic**, **type**, **status**, **from**. Results rank the way the engine ranks (briefs above raw notes, stale sinks). ⏎ opens the hit in the Reader.
+Full-text search over the vault with facets: **project**, **topic**, **type**, **status**, **from**, **to**. Results rank the way the engine ranks (briefs above raw notes, stale sinks). ⏎ opens the hit in the Reader.
 
 ## Activity
 

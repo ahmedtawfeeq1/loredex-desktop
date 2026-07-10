@@ -98,4 +98,11 @@ Claude Fable 5 (claude-fable-5)
 
 ## QA Results
 
-(pending)
+**PASS** — fresh-eyes M3 QA, 2026-07-10.
+
+- **AC1 (dev launch, re-run by QA):** `npm run dev` time-boxed 40 s — predev staging no-op (`[natives] OK — electron: …/.loredex-natives/electron/better_sqlite3.node | node: build/Release (default)`), then `app.db open`, `core host started — config: …/nimbus-vault`, `vault watcher armed`, zero respawns, no `ERR_DLOPEN`. No manual electron-rebuild anywhere.
+- **AC1 non-interference:** `tests/native-smoke` re-run immediately after the dev launch — 2/2 (plain-node ABI intact; the staging never touches `build/Release`).
+- **AC3 (packaged smoke, reproduced by QA):** `dist/mac-arm64/Loredex.app/Contents/MacOS/Loredex` run 31 s — process ALIVE at 30 s, `app.db open` + `core host started` + `vault watcher armed` on stdout, 0 respawn lines. Artifact ships `app.asar.unpacked/node_modules/{better-sqlite3,@parcel}` as claimed.
+- **AC4:** app vitest 528/528 (67 files), lib 144/144 (22 files), typecheck (node+web) + production build clean — all re-run solo by QA.
+- **AC5:** mechanism documented in Dev Notes; `native-binding.test.ts` covers inert-under-node / staged-under-Electron / packaged fall-through.
+- Note for future QA: running the app suite and the lib suite **concurrently** on one machine flakes git-subprocess-heavy tests into their 30 s timeouts (observed, reproduced, disappears solo) — run suites sequentially.

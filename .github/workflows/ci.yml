@@ -43,3 +43,23 @@ jobs:
         with:
           name: loredex-desktop-dmg
           path: dist/*.dmg
+
+  # E2E Nimbus suite (story 6.3) — the executable M1+M2 DoD and the release
+  # gate. Module-level (no Electron, no display): a committed Nimbus-vault
+  # fixture seeded into sandboxed local bare remotes, driven over the real
+  # IPC seam. Deterministic — no LLM, no network beyond the runner's disk.
+  e2e:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # TODO(release): same sibling checkout as `build` until loredex 2.2.0
+      # is published and the file: pin is replaced.
+      - name: Check out and build sibling loredex (file: dependency)
+        run: |
+          git clone --depth 1 https://github.com/ahmedtawfeeq1/loredex ../loredex
+          cd ../loredex && npm ci && npm run build
+      - run: npm ci
+      - run: npm run test:e2e

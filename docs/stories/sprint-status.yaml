@@ -60,7 +60,7 @@ development_status:
   epic-6: in-progress      # Activity Feed & MVP Hardening
   6-1-loredex-pr6-activity-grammar: done
   6-2-activity-feed-view: done
-  6-3-e2e-nimbus-suite: ready-for-dev
+  6-3-e2e-nimbus-suite: review   # M3 re-scope: module-level release gate (npm run test:e2e), delivered 2026-07-10
   epic-6-retrospective: optional
 
   # ---- M2 cycle (docs/architecture-m2.md) ------------------------------------

@@ -129,7 +129,7 @@ development_status:
 
   # ---- M3 cycle (hardening) --------------------------------------------------
   epic-15: in-progress     # Hardening: natives, packaging, QA action items
-  15-1-native-module-correctness: in-progress   # dual-ABI staging (predev/postdist) + packaged smoke
+  15-1-native-module-correctness: done          # dual-ABI staging (predev/postdist) + packaged 30s smoke PASS
 
 qa:
   pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded

@@ -401,3 +401,16 @@ Optional suggestions — adopted: minimum macOS 14 declared (§6); `legal/` thir
 Fact-check pass 2026-07-09 (independent reviewer, see `docs/plan/REVIEW.md`) — three factual corrections applied: (1) §3.2 export inventory completed — the "exactly" list omitted the `PRODUCT_BRIEF_NAME` constant and the exported types beyond the five named in §3.3 (`Meta`, `ProductHandoff`, `StoreInput` also exist in `lib.ts`); §3.3 wording scoped accordingly. (2) §3.2/§5 M0: the F8 gitattributes fix and F6 npx-footer fix are already landed in loredex source (`core/router.ts` quoted pattern + broken-rule migration; `commands/handoff.ts` project-local footer) — M0 scope changed from "land" to "verify shipped in the pinned release". All other named-technology, version, CI-runner, simulation-evidence, and license claims verified correct.
 
 Optional suggestion — rejected: continuous idle-RAM CI budget check. Idle-RAM measurements on shared GitHub runners are too noisy to gate CI without a dedicated bare-metal lane we don't have; the ≤450 MB target stays a release-time measurement on real hardware (§10) and will be revisited if regressions appear.
+
+---
+
+## Amendment A1 (2026-07-10): Vault Atlas + road to "finished"
+
+**Atlas supersedes the M2 basic dependency graph.** Concept adapted (not ported) from Egonex-AI/Understand-Anything — full analysis and translation table in `ATLAS-CONCEPT.md`. One `AtlasGraph` cache computed in the core host: 6 node types (project, note, handoff, contract, source-file via provenance, commit) × 6 edge types (route, thread, wikilink, provenance, contract-link, topic affinity); discrete zoom (Overview → Learn → Deep Dive); tours generated from curate reading orders; **hyperlink-everything** — every node resolves to Reader / board / editor deep link / contract diff / GitHub, or it doesn't render. Their LLM+tree-sitter analysis pipeline is deliberately dropped: vault structure and note frontmatter already provide layers and summaries for free.
+
+**Revised milestones to a finished, tested app:**
+- **M2 (in flight)**: reskin v2 + defects, writing layer, lifecycle, live poller/watcher, contracts, GitHub chips, wizards — unchanged, except epic10 basic graph is replaced by ATLAS-1…4 (model+channel, cluster canvas, zoom/drill, node cards+hyperlinks) and ATLAS-5…7 (tours, path tracing/filters/search, changed-since overlay + export).
+- **M3 — Hardening & finish (next workflow)**: story 6.3 E2E Nimbus suite (executable DoD), performance pass (1k+ note vault), full keyboard map + palette coverage, accessibility pass, crash reporting opt-in, lib version bump + npm publish + pinned dep, README/docs for the app repo.
+- **M4 — Distribution**: signing/notarization (story 1.8, blocked on Apple Developer enrollment — the ONLY human-gated item), auto-update (1.9), Homebrew cask, updated public release.
+
+Autonomous execution: M2 workflow (running) → M3 workflow chains immediately on M2 QA pass → M4 runs when the Apple account exists. No user gates except npm publish + signing credentials.

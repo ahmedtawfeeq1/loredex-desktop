@@ -1,99 +1,65 @@
-# Loredex Desktop — Design System
+# Loredex Desktop — Design System v2
 
-Binding spec for all renderer UI. Dev agents implement tokens and component rules exactly; deviations go in the story's Dev Agent Record with a reason.
+Binding spec for all renderer UI. Dev agents implement tokens and component rules exactly; deviations go in the story's Dev Agent Record with a reason. v2 supersedes v1: **light-first**, brand palette from the loredex logo (navy / gold / paper), and the airy card-based layout language of modern team tools (reference: clean white cards on warm grey, pill buttons, modals with segmented controls and toggle rows).
 
 ## Direction
 
-**"Card catalog."** Loredex = lore + dex — an index of a team's engineering lore. The app reads as a modern macOS tool with an archival reading surface: native chrome, paper-quiet content, catalog-card handoffs. One signature element (the routing-slip handoff card); everything else disciplined and dense.
-
-This is an APP, not a web page: no hero sections, no marketing type scale, no scroll-triggered reveals. Keyboard-first, information-dense, native-feeling.
+**"Card catalog, daylight edition."** Surfaces are warm paper-grey with white cards; ink is the logo's deep navy; the one loud color is the logo's gold, spent only on primary actions and open-handoff state. Dark theme remains fully supported (the logo's navy ground) — same tokens, flipped. This is an APP: dense where data lives (lists, feeds), generous where decisions happen (modals, wizards).
 
 ## Tokens
 
-Implement as CSS custom properties on `:root` (light) and `@media (prefers-color-scheme: dark)` + `[data-theme]` override (app setting wins).
+CSS custom properties on `:root` (light default) + `[data-theme="dark"]` override (app setting; follow system by default).
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--bg-sidebar` | `rgba(236,236,238,0.72)` over vibrancy; fallback `#ECECEE` | `rgba(28,28,30,0.72)`; fallback `#1C1C1E` | sidebar (translucent, `vibrancy: 'sidebar'` on BrowserWindow) |
-| `--bg-content` | `#FFFFFF` | `#232326` | list pane + reader |
-| `--bg-raised` | `#FAFAF8` | `#2A2A2E` | cards, panels, palette |
-| `--hairline` | `#E3E3E0` | `#3A3A3E` | 1px borders only — never heavier |
-| `--text-1` | `#1D1D1F` | `#EDEDEF` | primary text |
-| `--text-2` | `#6E6E73` | `#98989E` | secondary, consumed state |
-| `--ink` | `#2E6E5E` | `#63B3A1` | **Archive Ink** — links, wikilinks, selection, focus, primary buttons |
-| `--stamp` | `#A16A1B` | `#D9A441` | **Stamp Amber** — open handoffs, badges, attention |
-| `--rust` | `#A63D2F` | `#D4715F` | stale, drift, sync errors |
+| `--bg-app` | `#F6F5F1` | `#131826` | window ground (warm paper-grey / logo navy) |
+| `--bg-card` | `#FFFFFF` | `#1C2536` | cards, panels, modals, list containers |
+| `--bg-inset` | `#EFEEE9` | `#182032` | inputs, segmented controls, code blocks |
+| `--hairline` | `#E4E2DB` | `#2A3347` | 1px borders; card borders always this + shadow-sm |
+| `--text-1` | `#131826` | `#F2EFE8` | primary text (logo navy / paper) |
+| `--text-2` | `#6E6E73` | `#98A0B0` | secondary, consumed state |
+| `--gold` | `#C08A2D` | `#E0A83E` | PRIMARY actions (buttons, active nav rail), open-handoff stamp, badges |
+| `--gold-ink` | `#131826` | `#131826` | text on gold |
+| `--navy` | `#131826` | `#F2EFE8` | headers, icons, secondary buttons (outline) |
+| `--rust` | `#A63D2F` | `#D4715F` | stale, drift, declined, sync errors |
+| `--ok` | `#2E6E5E` | `#63B3A1` | success receipts, in-sync dot (demoted from v1 accent to status-only) |
 
-Rules: interactive color is Archive Ink, never system blue. Amber is reserved for open/attention state — if everything is amber, nothing is. Sync dot semantics: ink = clean, amber = ahead/behind, rust = error/offline.
+Rules: gold is THE accent — one gold primary button per view maximum; secondary actions are navy outline pills. Links/wikilinks: navy, underline on hover (dark: paper). If everything is gold, nothing is.
 
 ## Type
 
-| Role | Stack | Size/weight |
-|---|---|---|
-| UI chrome (nav, lists, buttons, chips) | `-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif` | 13px/400 base, 11px captions, 600 for emphasis — never bold whole rows |
-| Reading surface (rendered note H1–H3, note titles in reader, empty-state lines) | `ui-serif, "New York", Georgia, serif` | H1 22px/600, H2 17px/600, H3 15px/600 |
-| Data (paths, hashes, dates, frontmatter keys, route lines) | `ui-monospace, "SF Mono", Menlo, monospace` | 11px/400 |
-
-The serif is the personality and it lives ONLY on the reading surface and empty states. Nav and lists stay sans. Rendered markdown body: sans 14px/1.6, measure ~68ch.
+Unchanged roles from v1: system sans (SF Pro) for chrome at 13px/11px; `ui-serif` (New York) for note titles, rendered markdown headings, empty-state lines; `ui-monospace` (SF Mono) for paths, hashes, dates, route lines, frontmatter. Rendered markdown body: sans 14px/1.6, measure 68–76ch, **centered in the pane — no dead left gutter** (v0.1 defect).
 
 ## Layout
 
-Three-pane, 8px spacing grid:
+Three-pane skeleton stays (sidebar 220px / contextual list 300px / detail), with v2 surface treatment:
 
-```
-┌─────────┬──────────────┬──────────────────────────────┐
-│ ⬤⬤⬤     │              │                              │
-│ Home    │  contextual  │   reader / board detail      │
-│ Inbox ③ │  list pane   │   (68ch measure, centered)   │
-│ Projects│  (300px)     │                              │
-│ Activity│              │                              │
-│ Search  │              │                              │
-│─────────│              │                              │
-│ ▣ vault │              │                              │
-│  chip   │              │                              │
-└─────────┴──────────────┴──────────────────────────────┘
-```
+- Window ground is `--bg-app`; every content region sits in a **card**: `--bg-card`, 1px `--hairline`, radius 12px, shadow `0 1px 3px rgba(19,24,38,0.06)`. Cards breathe: 16px padding, 12px gaps.
+- Sidebar: flat on `--bg-app` (no vibrancy dependency in light), active item = gold left rail (4px) + `--bg-inset` fill + navy 600 text. Traffic-light inset + 52px drag region unchanged. Inbox badge: gold pill, `--gold-ink` text.
+- Vault identity chip (bottom of sidebar): white card w/ sync dot, vault name 13px/600, engine version mono 11px. Permanent, unchanged mandate (F6).
+- List rows 38px, dense; day headers in feeds 11px caps `--text-2`.
+- **Buttons**: primary = gold pill (radius 10px, 32px height, 600); secondary = navy outline pill; destructive = rust outline. Same verb through a flow ("Publish" → "Published").
+- **Modals** (compose, wizards, decline-reason): centered card 480–560px, radius 16px, title 17px/600, segmented control (`--bg-inset` track, white active segment) for mode choices, **toggle rows** (label left, switch right — gold when on) for options, footer = Cancel (outline) left, primary gold right. Exactly the reference pattern.
+- **Toasts**: bottom-right card, receipt-style, mono details line, auto-dismiss 5s.
 
-- Sidebar 220px, translucent, `titleBarStyle: 'hiddenInset'` — traffic lights sit over it; top 52px is drag region (`-webkit-app-region: drag`).
-- Inbox nav item carries the open-count badge (amber pill, 10px mono).
-- **Vault identity chip** (bottom of sidebar, permanent — the F6 fix made visible): vault name 13px/600, engine version 11px mono `--text-2`, sync dot; full path + remote in tooltip. Never hidden, never truncated to ambiguity.
-- List rows 38px: title 13px, metadata line 11px mono `--text-2`. Selection = 4px Archive Ink left rail + `--bg-raised` fill, not a solid accent block.
+## Signature: routing-slip handoff card (kept, re-skinned)
 
-## Signature: the routing-slip handoff card
+White card, hairline, radius 12px. Stamp chip: 10px mono uppercase, letterspaced, 1px border + transparent fill — OPEN gold, ACCEPTED navy, DECLINED/STALE rust, CONSUMED/DONE `--text-2`, SNOOZED `--text-2` dashed border. Mono route line `from ⟶ to`, date right-aligned. Objective in serif 15px. Stamp-press animation on state change (scale 0.97→1, 120ms, disabled under reduced-motion) — still the app's one bespoke animation.
 
-The one memorable element. Card on `--bg-raised`, 1px `--hairline`, 8px radius, 12px padding:
+New in v2: **thread rail** — replies/fulfills render as a left-indented rail of connected cards (2px `--hairline` connector line), request cards get a `REQUEST` navy chip beside the stamp.
 
-```
-┌────────────────────────────────────────────────┐
-│ [ OPEN ]  nimbus-ai-engine ⟶ nimbus-backend    │
-│                                    2026-07-09  │
-│ Expose streaming replies over the public       │  ← serif, 15px
-│ API (SSE), update the API contract             │
-│ 3 notes · consume ⌘⏎                           │  ← 11px mono, --text-2
-└────────────────────────────────────────────────┘
-```
+## Data visualizations (dependency graph, contract timeline)
 
-- **Stamp chip**: 10px mono uppercase, letterspaced 0.08em, 1px border in state color, state-color text, transparent fill (a rubber stamp, not a pill). OPEN = amber, CONSUMED = slate (`--text-2`), STALE = rust.
-- **Route line**: mono, `from ⟶ to` (U+27F6), date right-aligned mono.
-- Objective in serif — the only serif outside the reader.
-- **Consume = stamp press**: on action, chip scales 0.97 → 1.0 over 120ms ease-out and flips to CONSUMED; disabled under `prefers-reduced-motion`. This is the app's ONE bespoke animation.
+- Graph: SVG, no chart lib. Nodes = mini routing-slip cards (project name navy 600 + open-count gold badge); edges = 1.5px `--hairline`, arrowheads navy; blocked-critical-path edges gold. Layout left→right by dependency depth. Hover = gold ring; click = detail panel.
+- Timeline: vertical rail, mono dates, one card per contract change (file, +/- counts, linked handoff chip, commit hash mono). Diff view: unified, `--bg-inset` ground, additions `--ok` tint, deletions rust tint, mono 12px.
 
-## Motion
+## Quality floor (non-negotiable, carried from v1)
 
-Hover/selection transitions 80–120ms ease-out on background/border only. The stamp press above. Nothing else — no page transitions, no reveals, no springs. Respect `prefers-reduced-motion: reduce` globally (transitions to 0).
-
-## Quality floor (non-negotiable)
-
-- Full dark mode from day one (both token columns wired).
-- `:focus-visible`: 2px Archive Ink ring, 2px offset, on every interactive element — keyboard-first users are the primary persona.
-- Every action has a shortcut; Cmd+K palette lists them.
-- Copy: sentence case, active verbs, action names stable through the flow ("Consume" → receipt says "Consumed"). Errors say what happened + what to do; no apologies, no "oops".
-- Empty states: one serif sentence + one button. Inbox empty: "No open handoffs for this vault." + [Check remote].
-- Wikilinks: Archive Ink, no underline at rest, underline on hover; broken links rust dotted-underline with diagnostic tooltip — never create files.
+Both themes wired and switchable (system/light/dark in Settings). `:focus-visible` 2px gold ring offset 2px everywhere. Every action keyboard-reachable; ⌘K palette lists all. Sentence case, active verbs, errors say what happened + what to do. Empty states: one serif sentence + one action. Live data (watcher/poller) means Refresh buttons become fallbacks, not primary UX. Reduced-motion respected.
 
 ## Don't
 
-- No system-blue accents, no purple gradients, no glassmorphism cards, no shadows heavier than `0 1px 3px rgba(0,0,0,0.08)`.
-- No serif in navigation or buttons. No bold table rows. No border heavier than 1px.
-- No emoji in chrome. Status is typography + the three state colors, not icon soup.
-- No web-app padding (24px+ everywhere) — this is a dense desktop tool.
+- No purple, no system blue. No gradients on surfaces (flat cards + shadow only).
+- No serif in nav/buttons. No border > 1px. No emoji in chrome.
+- Max one gold primary per view. No web-app 24px+ padding in dense lists.
+- No dead whitespace: reader content centered; wide views use the space (graph, board columns).

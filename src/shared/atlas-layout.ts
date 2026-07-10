@@ -88,6 +88,10 @@ export function truncateLabel(text: string, widthPx: number, charPx: number): st
  *  the panel's content top drops by this so a col-0 sub-card never rides its
  *  header bar */
 export const SUBCARD_LABEL_H = 22
+/** footer band reserved at the BOTTOM of a topic sub-card for the
+ *  `N notes · date` meta (D1 amendment 6) — the notes pack above it so the
+ *  deepest note card never sits under the footer text */
+export const SUBCARD_FOOTER_H = 18
 /** the `01 02 03…` order chip box on a note card's top-left corner */
 export const ORDER_CHIP_W = 20
 export const ORDER_CHIP_H = 14
@@ -122,7 +126,9 @@ export function subCardRect(members: Rect[]): Rect | null {
     x: box.x - SUBCARD_PAD,
     y: box.y - SUBCARD_PAD - SUBCARD_LABEL_H,
     w: box.w + SUBCARD_PAD * 2,
-    h: box.h + SUBCARD_PAD * 2 + SUBCARD_LABEL_H,
+    // reserve SUBCARD_LABEL_H above and SUBCARD_FOOTER_H below the notes so the
+    // header label and footer meta each own a band the notes never enter
+    h: box.h + SUBCARD_PAD * 2 + SUBCARD_LABEL_H + SUBCARD_FOOTER_H,
   }
 }
 

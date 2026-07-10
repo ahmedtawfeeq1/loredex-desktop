@@ -59,6 +59,7 @@ import {
   PILL_GUTTER,
   PILL_H,
   PILL_W,
+  SUBCARD_FOOTER_H,
   SUBCARD_LABEL_H,
   SUBCARD_PAD,
   TOPIC_COL_PITCH,
@@ -746,12 +747,14 @@ interface PanelCell {
 /** Uniform shelf pitch: every shelf is `wrapRows` note-rows tall, so cells on
  *  different shelves land on one shared column grid (the fill invariant stays
  *  as dense as the pre-wrap single row). A shelf's sub-cards clear the shelf
- *  above by V_GAP — a sub-card reaches SUBCARD_PAD below its deepest note and
- *  SUBCARD_PAD + SUBCARD_LABEL_H above its top note. */
+ *  above by V_GAP — a sub-card reaches SUBCARD_PAD + SUBCARD_FOOTER_H below its
+ *  deepest note (the footer band) and SUBCARD_PAD + SUBCARD_LABEL_H above its
+ *  top note. */
 const shelfStep = (wrapRows: number): number =>
   (wrapRows - 1) * NOTE_ROW_PITCH +
   NODE_H +
   SUBCARD_PAD +
+  SUBCARD_FOOTER_H +
   V_GAP +
   SUBCARD_PAD +
   SUBCARD_LABEL_H

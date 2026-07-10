@@ -170,6 +170,9 @@ export function AtlasView(): React.JSX.Element {
   return (
     <div className="atlas">
       <div className="atlas-header">
+        {/* D1 amendment 6: actions on row 1, breadcrumb navigation on its own
+            row below — the toolbar no longer overlaps the breadcrumb. */}
+        <div className="atlas-header-row">
         <div className="atlas-header-left">
           <span className="atlas-eyebrow">VAULT ATLAS</span>
           <div className="seg-control" role="tablist" aria-label="Zoom level">
@@ -196,9 +199,6 @@ export function AtlasView(): React.JSX.Element {
               </button>
             ))}
           </div>
-        </div>
-        <div className="atlas-header-center">
-          <AtlasBreadcrumbs />
         </div>
         <div className="atlas-toolbar">
           {TOOLBAR_GROUPS.map((group, gi) => (
@@ -268,6 +268,10 @@ export function AtlasView(): React.JSX.Element {
               </div>
             </Fragment>
           ))}
+        </div>
+        </div>
+        <div className="atlas-header-nav">
+          <AtlasBreadcrumbs />
         </div>
       </div>
       {legendOpen && <AtlasLegend />}

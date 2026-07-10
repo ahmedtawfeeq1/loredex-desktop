@@ -4125,6 +4125,85 @@ a.commit-chip-sha:hover {
   text-decoration-color: var(--gold);
 }
 
+/* story 17.3 (D1a3): Read-mode find bar — floats top-right of the note pane,
+   scans the rendered body. All matches paint --bg-inset (with a hairline
+   underline for the "ring" the Custom Highlight API can't box), the current
+   match gold — under find-only names so the anchor highlight is never touched. */
+::highlight(loredex-find) {
+  background-color: var(--bg-inset);
+  text-decoration: underline;
+  text-decoration-color: var(--hairline);
+}
+
+::highlight(loredex-find-current) {
+  background-color: var(--gold);
+  color: var(--gold-ink);
+}
+
+.find-bar {
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.find-input {
+  width: 160px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-app);
+  color: var(--text-1);
+}
+
+.find-counter {
+  min-width: 40px;
+  padding: 0 4px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.find-bar button {
+  height: 26px;
+  min-width: 26px;
+  padding: 0 6px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.find-bar button:hover:not(:disabled) {
+  color: var(--text-1);
+  background: var(--bg-inset);
+}
+
+.find-bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.find-case[aria-pressed='true'] {
+  color: var(--gold-ink);
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
 .comment-chip {
   position: absolute;
   transform: translate(-50%, -100%) translateY(-6px);

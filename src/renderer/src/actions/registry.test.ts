@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useApp, type AppView } from '../stores/app'
 import { useEditor } from '../stores/editor'
+import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
 import { useReader } from '../stores/reader'
 import { useRails } from '../stores/rails'
@@ -179,5 +180,41 @@ describe('D1 writing surface: ⌘E edit toggle + ⌘S save (story 16.4)', () => 
     useEditor.getState().reset()
     expect(() => appActions().find((a) => a.id === 'action:save-note')?.run()).not.toThrow()
     expect(useEditor.getState().busy).toBe(false)
+  })
+})
+
+describe('D1a3 find bar: ⌘F opens Read-mode find (story 17.3)', () => {
+  it('⌘F carries the hint and a unique meta+f combo', () => {
+    const find = appActions().find((a) => a.id === 'action:find-in-note')
+    expect(find?.shortcut).toBe('⌘F')
+    expect(find?.combo).toEqual({ key: 'f', meta: true })
+  })
+
+  it('opens only from the reader with a note open, and never in Edit mode', () => {
+    useFind.getState().reset()
+    useEditor.getState().reset()
+    const run = (): void => appActions().find((a) => a.id === 'action:find-in-note')?.run()
+
+    // off the reader → no-op
+    useApp.setState({ view: 'home' })
+    useReader.setState({ selected: 'n.md', doc: { meta: {}, body: 'text' } as never })
+    run()
+    expect(useFind.getState().open).toBe(false)
+
+    // reader, Read mode → opens the bar
+    useApp.setState({ view: 'reader' })
+    run()
+    expect(useFind.getState().open).toBe(true)
+
+    // Edit mode on the SAME note → CodeMirror keeps its own ⌘F, bar stays shut
+    useFind.getState().close()
+    useEditor.getState().enter('n.md', 'text')
+    run()
+    expect(useFind.getState().open).toBe(false)
+
+    useReader.setState({ selected: null, doc: null })
+    useEditor.getState().reset()
+    useFind.getState().reset()
+    useApp.setState({ view: 'home' })
   })
 })

@@ -43,6 +43,7 @@ import {
   type PopoverAnchorBox,
 } from './CommentPopover'
 import { CommentsRail, OrphanedComments } from './InlineComments'
+import { FindBar } from './FindBar'
 import { ModeToggle, NoteEditor } from './NoteEditor'
 
 export function formatValue(value: unknown): string {
@@ -273,6 +274,9 @@ export function NoteArticle({
   const filedDate = noteDate(title)
   return (
     <div className="note-layout" ref={layoutRef} onMouseUp={onMouseUp}>
+      {/* story epic17.3 (D1a3): ⌘F find bar — floats top-right, scans this
+          rendered body, coexists with the anchor highlight over the same text */}
+      <FindBar bodyRef={bodyRef} renderKey={renderKey} />
       <article className="note">
         <ModeToggle selected={selected} doc={doc} editing={false} unsaved={unsaved} />
         <h1 className="note-title" title={selected}>

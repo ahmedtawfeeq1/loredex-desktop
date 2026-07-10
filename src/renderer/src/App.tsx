@@ -17,6 +17,7 @@ import { ToastStack } from './components/ToastStack'
 import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
+import { useFind } from './stores/find'
 import { useHandoffs } from './stores/handoffs'
 import { useRails } from './stores/rails'
 import { useReader } from './stores/reader'
@@ -70,6 +71,7 @@ export default function App(): React.JSX.Element {
     // menu-driven vault change (main) → refresh identity + reset the stores
     return onVaultChanged(() => {
       useReader.getState().reset()
+      useFind.getState().reset()
       useHandoffs.getState().reset()
       useSearch.getState().reset()
       useHome.getState().reset()

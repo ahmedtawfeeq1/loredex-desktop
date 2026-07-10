@@ -10,6 +10,7 @@
  */
 import { useApp, type AppView } from '../stores/app'
 import { useEditor } from '../stores/editor'
+import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
 import { effectiveIdentity, useIdentity } from '../stores/identity'
 import { useRails } from '../stores/rails'
@@ -143,6 +144,22 @@ export function appActions(): AppAction[] {
           return
         }
         void editor.save(identity)
+      },
+    },
+    {
+      // D1 amendment 3 (story 17.3): ⌘F opens the Read-mode find bar over the
+      // rendered note. Edit mode keeps CodeMirror's own ⌘F (its search panel),
+      // so this no-ops while the open note is being edited or off the reader.
+      id: 'action:find-in-note',
+      title: 'Find in note',
+      shortcut: '⌘F',
+      combo: { key: 'f', meta: true },
+      run: () => {
+        const { selected } = useReader.getState()
+        const editor = useEditor.getState()
+        if (useApp.getState().view !== 'reader' || !selected) return
+        if (editor.editing && editor.path === selected) return // Edit → CM's ⌘F
+        useFind.getState().openBar()
       },
     },
     {

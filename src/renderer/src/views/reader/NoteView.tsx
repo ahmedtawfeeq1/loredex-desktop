@@ -4,7 +4,9 @@
  */
 import { useMemo } from 'react'
 import { renderMarkdown } from '../../markdown/pipeline'
+import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
+import { handoffRefFromNote } from '../handoffs/compose-form'
 import { ReadingOrderInline } from '../handoffs/ReadingOrderInline'
 
 export function formatValue(value: unknown): string {
@@ -57,9 +59,29 @@ export function NoteView(): React.JSX.Element {
   if (!doc) return <div />
 
   const title = (selected.split('/').pop() ?? selected).replace(/\.md$/, '')
+  // story 7.3 AC1: the open handoff brief is the "detail view" — same actions
+  const handoffRef = handoffRefFromNote(selected, doc.meta as Record<string, unknown>)
   return (
     <article className="note">
       <h1 className="note-title">{title}</h1>
+      {handoffRef && (
+        <div className="note-handoff-actions">
+          <button
+            type="button"
+            className="button-secondary button-small"
+            onClick={() => useHandoffs.getState().openCompose(handoffRef)}
+          >
+            Reply
+          </button>
+          <button
+            type="button"
+            className="button-secondary button-small"
+            onClick={() => useHandoffs.getState().openAnnotate(handoffRef)}
+          >
+            Comment
+          </button>
+        </div>
+      )}
       <FrontmatterPanel meta={doc.meta as Record<string, unknown>} />
       <div className="note-body">{rendered}</div>
       <ReadingOrderInline targets={readingOrder} from={selected} />

@@ -6,7 +6,7 @@
  */
 import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, Menu, MessageChannelMain, utilityProcess } from 'electron'
-import { loadVaultPath, pickVaultDialog, saveVaultPath } from './dialogs'
+import { loadVaultPath, pickRouteFileDialog, pickVaultDialog, saveVaultPath } from './dialogs'
 import { handleCoreMessage } from './notifications'
 import { createMainWindow } from './windows'
 
@@ -104,6 +104,10 @@ app.whenReady().then(() => {
   buildMenu()
   ipcMain.handle('loredex:pick-vault', (event) =>
     pickVault(BrowserWindow.fromWebContents(event.sender)),
+  )
+  // story 7.4: native markdown picker for route-a-note (no business logic here)
+  ipcMain.handle('loredex:pick-route-file', (event) =>
+    pickRouteFileDialog(BrowserWindow.fromWebContents(event.sender)),
   )
   forkCoreHost()
   const win = createMainWindow()

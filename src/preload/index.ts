@@ -3,7 +3,7 @@
  * touches ipcRenderer) and exposes exactly ONE global: window.loredex
  * (typed invoke/onEvent). Nothing else crosses the contextBridge.
  */
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { createIpcClient } from '../shared/ipc-client'
 import type { PortLike } from '../shared/ipc-contract'
 
@@ -34,6 +34,10 @@ contextBridge.exposeInMainWorld('loredex', {
   // Main-owned native capabilities (story 1.4): the vault picker lives in the
   // main process (native panel + persisted choice) — still ONE bridge global.
   pickVault: (): Promise<string | null> => ipcRenderer.invoke('loredex:pick-vault'),
+  // story 7.4: native markdown picker + drop-path extraction (webUtils is
+  // preload-only; the sandboxed page never sees a Node API)
+  pickRouteFile: (): Promise<string | null> => ipcRenderer.invoke('loredex:pick-route-file'),
+  pathForFile: (file: File): string => webUtils.getPathForFile(file),
   onVaultChanged: (cb: (vaultPath: string) => void): (() => void) => {
     const listener = (_e: unknown, vaultPath: string): void => cb(vaultPath)
     ipcRenderer.on('vault-changed', listener)

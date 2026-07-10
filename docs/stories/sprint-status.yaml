@@ -70,11 +70,11 @@ development_status:
   # (7.1 lib PR-11 gates every handoff-writing app story; contract/github/wizard
   # tracks may run parallel after 9.2 per architecture-m2.md section 8.)
 
-  epic-7: in-progress      # Handoff Writing
+  epic-7: done             # Handoff Writing
   7-1-loredex-pr11-write-apis-schema-v2: done   # loredex d92146d; pin = file:../loredex/loredex-2.1.0.tgz
-  7-2-compose-handoff-modal: ready-for-dev
-  7-3-reply-annotate-from-card: ready-for-dev
-  7-4-route-a-note: ready-for-dev
+  7-2-compose-handoff-modal: done               # M2 write seam + modal + receipt toasts
+  7-3-reply-annotate-from-card: done            # reply variant + AnnotateModal + qualified ids
+  7-4-route-a-note: done                        # lib previewRoute (loredex 7d7b9a6) + confirm card + drop; undo deferred to epic 4 (PR-3)
   epic-7-retrospective: optional
 
   epic-8: backlog          # Handoff Lifecycle v2

@@ -4,22 +4,28 @@
  * (open-count badge), Settings.
  */
 import { useEffect } from 'react'
-import { onOpenHandoff, onVaultChanged } from './api'
+import { onEvent, onOpenHandoff, onVaultChanged } from './api'
 import { IdentityBadge } from './components/IdentityBadge'
+import { ToastStack } from './components/ToastStack'
 import { useApp } from './stores/app'
 import { useHandoffs } from './stores/handoffs'
 import { useReader } from './stores/reader'
+import { useRoute } from './stores/route'
 import { openCount } from '../../shared/handoff-lanes'
 import { useFeed } from './stores/feed'
 import { useHome } from './stores/home'
 import { useSearch } from './stores/search'
 import { useSync } from './stores/sync'
 import { FeedView } from './views/feed/FeedView'
+import { AnnotateModal } from './views/handoffs/AnnotateModal'
 import { Board } from './views/handoffs/Board'
+import { ComposeHandoffModal } from './views/handoffs/ComposeHandoffModal'
 import { HomeView } from './views/home/HomeView'
+import { RouteConfirmCard } from './views/routes/RouteConfirmCard'
 import { SyncPanel } from './views/sync/SyncPanel'
 import { Diagnostics } from './views/reader/Diagnostics'
 import { NoteView } from './views/reader/NoteView'
+import { RouteDropTarget } from './views/reader/RouteDropTarget'
 import { VaultTree } from './views/reader/VaultTree'
 import { Palette } from './views/search/Palette'
 import { SearchView } from './views/search/SearchView'
@@ -71,6 +77,18 @@ export default function App(): React.JSX.Element {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
+  useEffect(
+    // stories 7.2/7.3: a write's new card lands on the board without a refetch,
+    // from any view (the modal may have been opened from the reader)
+    () =>
+      onEvent((e) => {
+        if (e.kind === 'handoff.created' && e.card) {
+          useHandoffs.getState().applyCreated(e.card)
+        }
+      }),
+    [],
+  )
 
   useEffect(
     // notification click (story 3.7): a handoff path opens the brief in the
@@ -151,6 +169,16 @@ export default function App(): React.JSX.Element {
             Settings
           </button>
         </nav>
+        {status === 'ready' && (
+          <button
+            type="button"
+            className="button-quiet sidebar-action"
+            title="Pick a markdown file to file into the vault (story 7.4)"
+            onClick={() => void useRoute.getState().start()}
+          >
+            Route a note…
+          </button>
+        )}
         <IdentityBadge />
       </aside>
       {status === 'ready' ? (
@@ -182,8 +210,10 @@ export default function App(): React.JSX.Element {
           <>
             <VaultTree />
             <main className="pane-reader">
-              <NoteView />
-              <Diagnostics />
+              <RouteDropTarget>
+                <NoteView />
+                <Diagnostics />
+              </RouteDropTarget>
             </main>
           </>
         )
@@ -193,6 +223,10 @@ export default function App(): React.JSX.Element {
         <div className="empty-state" />
       )}
       <Palette />
+      <ComposeHandoffModal />
+      <AnnotateModal />
+      <RouteConfirmCard />
+      <ToastStack />
     </div>
   )
 }

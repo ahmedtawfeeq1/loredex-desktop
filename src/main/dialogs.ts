@@ -34,3 +34,18 @@ export async function pickVaultDialog(win: BrowserWindow | null): Promise<string
   const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
   return result.canceled ? null : (result.filePaths[0] ?? null)
 }
+
+/**
+ * Native markdown-file picker for route-a-note (story 7.4). Same TCC rule:
+ * file access only via the panel or an explicit drop — never a cold scan.
+ */
+export async function pickRouteFileDialog(win: BrowserWindow | null): Promise<string | null> {
+  const opts = {
+    title: 'Route a note into the vault',
+    buttonLabel: 'Choose note',
+    properties: ['openFile' as const],
+    filters: [{ name: 'Markdown', extensions: ['md'] }],
+  }
+  const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+  return result.canceled ? null : (result.filePaths[0] ?? null)
+}

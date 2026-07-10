@@ -5,7 +5,12 @@
  * first provider; M2 actions slot in as more item sources.
  */
 import { useEffect, useRef, useState } from 'react'
+import { useApp } from '../../stores/app'
+import { useHandoffs } from '../../stores/handoffs'
+import { useReader } from '../../stores/reader'
+import { useRoute } from '../../stores/route'
 import { openSearchResult, useSearch } from '../../stores/search'
+import { handoffRefFromNote } from '../handoffs/compose-form'
 import { clampSelection, moveSelection } from './palette-nav'
 
 interface PaletteItem {
@@ -13,9 +18,51 @@ interface PaletteItem {
   title: string
   meta: string
   path: string
+  /** action items (M2): run instead of opening a note */
+  run?: () => void
 }
 
 const titleOf = (path: string): string => (path.split('/').pop() ?? path).replace(/\.md$/, '')
+
+/** M2 action provider: every write flow is ⌘K-reachable (stories 7.2-7.4). */
+function actionItems(q: string): PaletteItem[] {
+  const actions: Array<{ key: string; title: string; run: () => void }> = [
+    {
+      key: 'action:new-handoff',
+      title: 'New handoff…',
+      run: () => {
+        useApp.getState().setView('handoffs')
+        useHandoffs.getState().openCompose()
+      },
+    },
+    {
+      key: 'action:route-note',
+      title: 'Route a note…',
+      run: () => void useRoute.getState().start(),
+    },
+  ]
+  // reply/comment target the open reader note when it is a handoff (story 7.3)
+  const { selected, doc } = useReader.getState()
+  const ref = selected && doc ? handoffRefFromNote(selected, doc.meta as Record<string, unknown>) : null
+  if (ref) {
+    actions.push(
+      {
+        key: 'action:reply-handoff',
+        title: `Reply to “${ref.objective || ref.id}”…`,
+        run: () => useHandoffs.getState().openCompose(ref),
+      },
+      {
+        key: 'action:comment-handoff',
+        title: `Comment on “${ref.objective || ref.id}”…`,
+        run: () => useHandoffs.getState().openAnnotate(ref),
+      },
+    )
+  }
+  const needle = q.trim().toLowerCase()
+  return actions
+    .filter((a) => !needle || a.title.toLowerCase().includes(needle))
+    .map((a) => ({ ...a, meta: 'action', path: '' }))
+}
 
 export function Palette(): React.JSX.Element | null {
   const open = useSearch((s) => s.paletteOpen)
@@ -36,7 +83,7 @@ export function Palette(): React.JSX.Element | null {
 
   if (!open) return null
 
-  const items: PaletteItem[] = q.trim()
+  const noteItems: PaletteItem[] = q.trim()
     ? (hits ?? []).map((h) => ({
         key: h.path,
         title: h.name,
@@ -44,8 +91,18 @@ export function Palette(): React.JSX.Element | null {
         path: h.path,
       }))
     : recents.map((p) => ({ key: p, title: titleOf(p), meta: p, path: p }))
+  const items: PaletteItem[] = [...actionItems(q), ...noteItems]
 
   const selected = clampSelection(sel, items.length)
+
+  function pick(item: PaletteItem): void {
+    if (item.run) {
+      setPaletteOpen(false)
+      item.run()
+    } else {
+      openSearchResult(item.path)
+    }
+  }
 
   function onKeyDown(e: React.KeyboardEvent): void {
     if (e.key === 'Escape') {
@@ -55,7 +112,7 @@ export function Palette(): React.JSX.Element | null {
       setSel(moveSelection(selected, items.length, e.key))
     } else if (e.key === 'Enter') {
       const item = items[selected === -1 ? 0 : selected]
-      if (item) openSearchResult(item.path)
+      if (item) pick(item)
     }
   }
 
@@ -92,7 +149,7 @@ export function Palette(): React.JSX.Element | null {
                 className="palette-item"
                 aria-current={i === selected}
                 onMouseEnter={() => setSel(i)}
-                onClick={() => openSearchResult(item.path)}
+                onClick={() => pick(item)}
               >
                 <span className="palette-item-title">{item.title}</span>
                 <span className="palette-item-meta">{item.meta}</span>

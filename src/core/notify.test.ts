@@ -22,6 +22,8 @@ function card(over: Partial<HandoffCard>): HandoffCard {
     status: 'open',
     path: `/vault/projects/nimbus-web/handoffs/h${n}.md`,
     readingOrder: [],
+    kind: 'delivery',
+    expired: false,
     ...over,
   }
 }

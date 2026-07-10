@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
-    "loredex": "2.1.0",
+    "loredex": "file:../loredex/loredex-2.1.0.tgz",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "rehype-react": "8.0.0",

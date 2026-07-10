@@ -197,6 +197,7 @@ export function AtlasNodeCard({
   onSelect,
   nodeRef,
   describe,
+  decorClass = '',
 }: {
   node: AtlasNode
   selected: boolean
@@ -206,13 +207,15 @@ export function AtlasNodeCard({
   nodeRef?: (el: SVGGElement | null) => void
   /** accessible label ("project nimbus-backend, 3 open handoffs") */
   describe: string
+  /** ring decoration classes (tour/search/path/… — views/atlas/decor.ts) */
+  decorClass?: string
 }): React.JSX.Element {
   const disabledSource = node.type === 'source' && node.localPath == null
   return (
     // biome-ignore lint: SVG card is a button — full keyboard path via tabIndex/Enter
     <g
       ref={nodeRef}
-      className={`atlas-node atlas-node-${node.type}${disabledSource ? ' atlas-node-disabled' : ''}`}
+      className={`atlas-node atlas-node-${node.type}${disabledSource ? ' atlas-node-disabled' : ''}${decorClass}`}
       transform={`translate(${node.x}, ${node.y})`}
       tabIndex={0}
       role="button"

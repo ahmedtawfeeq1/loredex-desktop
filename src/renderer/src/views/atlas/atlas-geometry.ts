@@ -57,6 +57,39 @@ export function edgeAnchors(
   return { x1, y1, x2, y2, midX: (x1 + x2) / 2, midY: (y1 + y2) / 2 }
 }
 
+/** ViewBox fitted AROUND a highlighted subset (tour steps, story 10.5):
+ *  centered on the set's bounding box, pane aspect preserved, zoom clamped. */
+export function fitViewBoxAround(
+  targets: FocusTarget[],
+  paneW: number,
+  paneH: number,
+  pad = 80,
+): ViewBox | null {
+  if (targets.length === 0) return null
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const t of targets) {
+    minX = Math.min(minX, t.x)
+    minY = Math.min(minY, t.y)
+    maxX = Math.max(maxX, t.x + NODE_W)
+    maxY = Math.max(maxY, t.y + NODE_H)
+  }
+  const w0 = maxX - minX + pad * 2
+  const h0 = maxY - minY + pad * 2
+  const scale = Math.max(w0 / Math.max(paneW, 1), h0 / Math.max(paneH, 1))
+  let w = Math.max(paneW, 1) * scale
+  let h = Math.max(paneH, 1) * scale
+  if (w < MIN_ZOOM_W) {
+    h = (h * MIN_ZOOM_W) / w
+    w = MIN_ZOOM_W
+  }
+  const cx = (minX + maxX) / 2
+  const cy = (minY + maxY) / 2
+  return { x: cx - w / 2, y: cy - h / 2, w, h }
+}
+
 /** Anything focusable on the canvas: node cards and topic atoms alike. */
 export interface FocusTarget {
   id: string

@@ -11,7 +11,9 @@ import { useHandoffs } from '../../stores/handoffs'
 import { AtlasBreadcrumbs } from './AtlasBreadcrumbs'
 import { AtlasCanvas } from './AtlasCanvas'
 import { visibleAtlas } from './atlas-visibility'
+import type { AtlasDecor } from './decor'
 import { activateNode, performResolution, resolveEdgeTarget } from './resolve'
+import { TourPanel } from './TourPanel'
 
 const LEVEL_LABEL: Record<AtlasLevel, string> = {
   overview: 'Overview',
@@ -33,6 +35,10 @@ export function AtlasView(): React.JSX.Element {
   const drillProject = useAtlas((s) => s.drillProject)
   const toggleTopic = useAtlas((s) => s.toggleTopic)
   const up = useAtlas((s) => s.up)
+  const panel = useAtlas((s) => s.panel)
+  const setPanel = useAtlas((s) => s.setPanel)
+  const tourHighlight = useAtlas((s) => s.tourHighlight)
+  const activeTour = useAtlas((s) => s.activeTour)
 
   useEffect(() => {
     // live data (watcher/poller) keeps it fresh after this first fetch
@@ -54,6 +60,11 @@ export function AtlasView(): React.JSX.Element {
   const visibility = useMemo(
     () => (graph ? visibleAtlas(graph, expandedTopic) : { nodes: [], atoms: [] }),
     [graph, expandedTopic],
+  )
+
+  const decor = useMemo<AtlasDecor>(
+    () => ({ ...(tourHighlight.length > 0 ? { tour: new Set(tourHighlight) } : {}) }),
+    [tourHighlight],
   )
 
   // the selected node's project — lets the Learn segment work from Overview
@@ -99,6 +110,17 @@ export function AtlasView(): React.JSX.Element {
           ))}
         </div>
         <AtlasBreadcrumbs />
+        <div className="atlas-toolbar">
+          <button
+            type="button"
+            className="atlas-tool"
+            aria-pressed={panel === 'tour'}
+            title="Guided tours from reading orders"
+            onClick={() => setPanel(panel === 'tour' ? null : 'tour')}
+          >
+            Tours{activeTour ? ' ●' : ''}
+          </button>
+        </div>
       </div>
       {error && <div className="note-error">{error}</div>}
       {graph === null ? (
@@ -119,23 +141,28 @@ export function AtlasView(): React.JSX.Element {
           </button>
         </div>
       ) : (
-        <AtlasCanvas
-          graph={graph}
-          visibleNodes={visibility.nodes}
-          atoms={visibility.atoms}
-          selectedId={selectedId}
-          onSelect={(n) => select(n?.id ?? null)}
-          onActivate={onActivate}
-          onActivateEdge={(edge, nearerEnd) => {
-            const byId = new Map(graph.nodes.map((n) => [n.id, n]))
-            const target = resolveEdgeTarget(edge, byId, nearerEnd)
-            if (!target) return
-            if ('board' in target) performResolution({ kind: 'board', project: target.board })
-            else onActivate(target.node)
-          }}
-          onExpandTopic={toggleTopic}
-          onEscape={() => void up()}
-        />
+        <div className="atlas-body">
+          <AtlasCanvas
+            graph={graph}
+            visibleNodes={visibility.nodes}
+            atoms={visibility.atoms}
+            selectedId={selectedId}
+            onSelect={(n) => select(n?.id ?? null)}
+            onActivate={onActivate}
+            onActivateEdge={(edge, nearerEnd) => {
+              const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+              const target = resolveEdgeTarget(edge, byId, nearerEnd)
+              if (!target) return
+              if ('board' in target) performResolution({ kind: 'board', project: target.board })
+              else onActivate(target.node)
+            }}
+            onExpandTopic={toggleTopic}
+            onEscape={() => void up()}
+            decor={decor}
+            fitToIds={tourHighlight}
+          />
+          {panel === 'tour' && <TourPanel />}
+        </div>
       )}
     </div>
   )

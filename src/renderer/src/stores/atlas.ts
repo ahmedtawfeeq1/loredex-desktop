@@ -5,7 +5,8 @@
  */
 import { create } from 'zustand'
 import { isErrEnvelope } from '../../../shared/ipc-contract'
-import type { AtlasGraph, AtlasLevel, AtlasScope } from '../../../shared/types'
+import type { AtlasGraph, AtlasLevel, AtlasScope, TourDef } from '../../../shared/types'
+import { clampStep, playbackActionFor } from '../views/atlas/tour-playback'
 import { invoke, onEvent } from '../api'
 
 /** UA's MAX_HISTORY concept, kept verbatim (ATLAS-CONCEPT §1.4). */
@@ -30,6 +31,21 @@ interface AtlasState {
   /** visited levels/nodes — bounded back/forward stack (story 10.3) */
   history: AtlasHistoryEntry[]
   historyIndex: number
+  /** the one open side panel (story 10.5: tours) */
+  panel: 'tour' | null
+  /** tours from atlas.tours — recomputed with graph invalidation (10.5 AC5) */
+  tours: TourDef[] | null
+  activeTour: TourDef | null
+  tourStep: number
+  /** node ids the current step highlights (pulse ring + viewport fit) */
+  tourHighlight: string[]
+  setPanel(panel: 'tour' | null): void
+  loadTours(): Promise<void>
+  startTour(id: string): Promise<void>
+  goToStep(step: number): Promise<void>
+  nextTourStep(): Promise<void>
+  prevTourStep(): Promise<void>
+  endTour(): void
   load(): Promise<void>
   /** discrete zoom: push history, fetch the level's graph, carry selection */
   navigate(level: AtlasLevel, scope: AtlasScope): Promise<void>
@@ -68,6 +84,68 @@ export const useAtlas = create<AtlasState>((set, get) => ({
   expandedTopic: null,
   history: [{ level: 'overview', scope: {}, selectedId: null }],
   historyIndex: 0,
+  panel: null,
+  tours: null,
+  activeTour: null,
+  tourStep: 0,
+  tourHighlight: [],
+
+  setPanel(panel) {
+    set({ panel })
+  },
+
+  async loadTours() {
+    try {
+      const tours = await invoke('atlas.tours', {})
+      const active = get().activeTour
+      // re-point playback at the fresh def — steps may have shrunk (AC5)
+      const fresh = active ? (tours.find((t) => t.id === active.id) ?? null) : null
+      set({
+        tours,
+        activeTour: fresh,
+        tourStep: fresh ? clampStep(get().tourStep, fresh.steps.length) : 0,
+        ...(fresh ? {} : { tourHighlight: [] }),
+      })
+    } catch {
+      set({ tours: [] }) // panel shows the honest empty state
+    }
+  },
+
+  async startTour(id) {
+    const tour = (get().tours ?? []).find((t) => t.id === id)
+    if (!tour || tour.steps.length === 0) return
+    set({ activeTour: tour, panel: 'tour' })
+    await get().goToStep(0)
+  },
+
+  // step application = the story 10.3 primitives, decided by tour-playback.ts:
+  // auto-open the owning cluster, expand its topic atom, highlight + fit
+  async goToStep(step) {
+    const tour = get().activeTour
+    if (!tour) return
+    const i = clampStep(step, tour.steps.length)
+    const stepDef = tour.steps[i]
+    if (!stepDef) return
+    const action = playbackActionFor(stepDef, get().level, get().scope)
+    set({ tourStep: i, tourHighlight: action.highlight })
+    if (action.navigateTo) {
+      await get().navigate(action.navigateTo.level, { project: action.navigateTo.project })
+    }
+    // after navigate (which resets it) so the step's atom is open
+    if (action.expandTopic) set({ expandedTopic: action.expandTopic })
+  },
+
+  async nextTourStep() {
+    await get().goToStep(get().tourStep + 1)
+  },
+
+  async prevTourStep() {
+    await get().goToStep(get().tourStep - 1)
+  },
+
+  endTour() {
+    set({ activeTour: null, tourStep: 0, tourHighlight: [] })
+  },
 
   async load() {
     const { level, scope, selectedId } = get()
@@ -154,6 +232,11 @@ export const useAtlas = create<AtlasState>((set, get) => ({
       expandedTopic: null,
       history: [{ level: 'overview', scope: {}, selectedId: null }],
       historyIndex: 0,
+      panel: null,
+      tours: null,
+      activeTour: null,
+      tourStep: 0,
+      tourHighlight: [],
     })
   },
 }))
@@ -180,6 +263,9 @@ if (typeof window !== 'undefined' && window.loredex) {
       e.kind === 'handoff.stateChanged'
     ) {
       void s.load()
+      // tours recompute with graph invalidation (10.5 AC5); steps whose notes
+      // vanished were already dropped core-side — the tour shrinks, never errors
+      if (s.tours !== null) void s.loadTours()
     }
   })
 }

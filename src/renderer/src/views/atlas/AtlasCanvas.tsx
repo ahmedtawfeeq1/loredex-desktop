@@ -9,10 +9,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AtlasEdge, AtlasGraph, AtlasNode } from '../../../../shared/types'
 import { AtlasNodeCard } from './AtlasNodeCard'
 import type { TopicAtom } from './atlas-visibility'
+import { type AtlasDecor, nodeDecorClass } from './decor'
 import { TopicGroup } from './TopicGroup'
 import {
   edgeAnchors,
   fitViewBox,
+  fitViewBoxAround,
   type FocusTarget,
   nextFocus,
   panViewBox,
@@ -131,6 +133,8 @@ export function AtlasCanvas({
   onActivateEdge,
   onExpandTopic,
   onEscape,
+  decor,
+  fitToIds,
 }: {
   graph: AtlasGraph
   /** nodes after collapsed-atom filtering (atlas-visibility) */
@@ -144,6 +148,10 @@ export function AtlasCanvas({
   onActivateEdge: (edge: AtlasEdge, nearerEnd: 'source' | 'target') => void
   /** Esc/Backspace: one level up (story 10.3 keyboard map) */
   onEscape: () => void
+  /** ring decorations (tour pulse, story 10.5) — pure class computation */
+  decor?: AtlasDecor
+  /** fit the viewport AROUND these nodes (tour step, story 10.5 AC3) */
+  fitToIds?: string[]
 }): React.JSX.Element {
   const paneRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -168,6 +176,18 @@ export function AtlasCanvas({
     const pane = paneRef.current
     setViewBox(fitViewBox(ordered, pane?.clientWidth ?? 1200, pane?.clientHeight ?? 800))
   }, [fitKey])
+
+  // tour step: fit the viewport around the highlighted set (story 10.5 AC3)
+  const fitIdsKey = (fitToIds ?? []).join(',')
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refit exactly when the highlight set or discrete state changes
+  useEffect(() => {
+    if (!fitToIds || fitToIds.length === 0) return
+    const wanted = new Set(fitToIds)
+    const targets = ordered.filter((t) => wanted.has(t.id))
+    const pane = paneRef.current
+    const around = fitViewBoxAround(targets, pane?.clientWidth ?? 1200, pane?.clientHeight ?? 800)
+    if (around) setViewBox(around)
+  }, [fitIdsKey, fitKey])
 
   const vb = viewBox ?? fitViewBox(ordered, 1200, 800)
   const scale = (): number => {
@@ -289,6 +309,7 @@ export function AtlasCanvas({
               onSelect={(n) => onSelect(n)}
               onActivate={onActivate}
               nodeRef={refFor(node.id)}
+              decorClass={nodeDecorClass(node.id, decor)}
             />
           ))}
         </g>

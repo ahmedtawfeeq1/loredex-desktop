@@ -23,9 +23,11 @@ import type {
   AtlasScope,
   AtlasTopicGroup,
   HandoffCard,
+  TourDef,
 } from '../shared/types'
 import * as engine from './engine'
 import { resolveLink } from './links'
+import { buildTours, filterTours } from './tours'
 import { listMarkdownFiles } from './tree'
 
 // layout constants live in shared/atlas-layout.ts (renderer draws with them)
@@ -114,7 +116,7 @@ const WIKILINK = /\[\[([^\]]+)\]\]/g
 
 // ── the base model (level-independent truth) ────────────────────────────────
 
-interface BaseModel {
+export interface BaseModel {
   nodes: Map<string, AtlasNode>
   edges: AtlasEdge[]
   clusters: AtlasCluster[]
@@ -792,8 +794,9 @@ function productionSource(): AtlasSource {
 }
 
 let generation = 0
-let baseCache: { gen: number; model: BaseModel } | null = null
+let baseCache: { gen: number; model: BaseModel; source: AtlasSource } | null = null
 const graphCache = new Map<string, AtlasGraph>()
+let toursCache: TourDef[] | null = null
 
 /** Same invalidation discipline as the link index: vault.changed batches,
  *  post-pull reconcile (F4), and every in-app write announce. */
@@ -801,16 +804,31 @@ export function invalidateAtlas(): void {
   generation++
   baseCache = null
   graphCache.clear()
+  toursCache = null
+}
+
+function ensureBase(): { model: BaseModel; source: AtlasSource } {
+  if (!baseCache || baseCache.gen !== generation) {
+    const source = productionSource()
+    baseCache = { gen: generation, model: buildAtlasModel(source), source }
+  }
+  return baseCache
 }
 
 export function atlasGraph(level: AtlasLevel, scope: AtlasScope = {}): AtlasGraph {
   const key = `${level}|${scope.project ?? ''}|${scope.topic ?? ''}`
   const cached = graphCache.get(key)
   if (cached) return cached
-  if (!baseCache || baseCache.gen !== generation) {
-    baseCache = { gen: generation, model: buildAtlasModel(productionSource()) }
-  }
-  const graph = projectAtlas(baseCache.model, level, scope)
+  const graph = projectAtlas(ensureBase().model, level, scope)
   graphCache.set(key, graph)
   return graph
+}
+
+/** Tours recompute with the same invalidation as the graph (story 10.5 AC5). */
+export function atlasTours(scope: AtlasScope = {}): TourDef[] {
+  if (!toursCache || !baseCache || baseCache.gen !== generation) {
+    const { model, source } = ensureBase()
+    toursCache = buildTours(source, model)
+  }
+  return filterTours(toursCache, scope)
 }

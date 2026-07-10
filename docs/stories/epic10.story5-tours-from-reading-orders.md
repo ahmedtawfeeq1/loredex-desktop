@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,11 +20,11 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Extraction (AC: 1, 2, 5)
-  - [ ] Core host: parse `## Reading order` ordered lists (wikilinks resolved via core `links.ts`, same rule as everywhere); thread chains from `replies_to`/`fulfills`; topic date-order; BFS fallback with date tie-break; `atlas.tours` in contract + dispatcher
-- [ ] Playback (AC: 3, 4)
-  - [ ] `views/atlas/TourPanel.tsx`: prev/next, step state; store slice tour cursor; step → highlight set + auto-open cluster + viewport fit; gold Start button
-- [ ] Tests (AC: 5)
+- [x] Extraction (AC: 1, 2, 5)
+  - [x] Core host: parse `## Reading order` ordered lists (wikilinks resolved via core `links.ts`, same rule as everywhere); thread chains from `replies_to`/`fulfills`; topic date-order; BFS fallback with date tie-break; `atlas.tours` in contract + dispatcher
+- [x] Playback (AC: 3, 4)
+  - [x] `views/atlas/TourPanel.tsx`: prev/next, step state; store slice tour cursor; step → highlight set + auto-open cluster + viewport fit; gold Start button
+- [x] Tests (AC: 5)
 
 ## Dev Notes
 
@@ -49,10 +49,37 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (Claude Code)
+
 ### Debug Log References
+
+- `npx vitest run` — 46 files / 327 tests green (includes `src/core/tours.test.ts` 11 tests, real nimbus-vault reading-order suite, and `tour-playback.test.ts`)
+- `npx tsc --noEmit` clean; `npm run build` green
 
 ### Completion Notes List
 
+- Extraction rides the lib's already-parsed `HandoffCard.readingOrder` (names resolved via the story 2.2 resolver); `readingOrderProse` lifts only the same-line trailing prose of `## Reading order` list items as step descriptions — verbatim, no generation.
+- Heuristic fallback: BFS from the handoff over thread+wikilink edges, (depth, date, id)-ordered, `heuristic: true` in the payload and labeled in the panel + tour rows.
+- Thread tours walk replies_to/fulfills components oldest-first; topic tours = notes date-ordered + closing handoffs (handoffs whose resolved reading order intersects the topic).
+- Playback decisions are pure (`tour-playback.ts`): auto-open cluster via `navigate('learn', {project})`, expand the owning topic atom, highlight + `fitViewBoxAround` viewport fit. Gold spend: the panel's single "Start tour" button. Pulse ring is CSS-only; the global reduced-motion rule freezes it to a static gold ring.
+- Tours cache invalidates with `invalidateAtlas()`; renderer refetches tours on the same events as the graph and re-points active playback at the fresh (possibly shrunk) def.
+- DoD evidence: nimbus test asserts the real `2026-07-10-handoff-nimbus-ai-engine` reading order becomes a non-heuristic tour stepping to `note:nimbus-ai-engine/streaming/2026-07-09-streaming-design`.
+
 ### File List
+
+- src/shared/types.ts (TourKind/TourStep/TourDef)
+- src/shared/ipc-contract.ts (atlas.tours channel)
+- src/core/tours.ts (new: extraction + scope filter)
+- src/core/tours.test.ts (new)
+- src/core/atlas.ts (BaseModel exported; source cached; atlasTours + invalidation)
+- src/core/handlers.ts (atlas.tours dispatch)
+- src/renderer/src/stores/atlas.ts (panel/tours/playback state)
+- src/renderer/src/views/atlas/tour-playback.ts + .test.ts (new: pure playback)
+- src/renderer/src/views/atlas/TourPanel.tsx (new)
+- src/renderer/src/views/atlas/decor.ts (new: ring taxonomy seam)
+- src/renderer/src/views/atlas/atlas-geometry.ts (fitViewBoxAround)
+- src/renderer/src/views/atlas/AtlasCanvas.tsx, AtlasNodeCard.tsx, AtlasView.tsx (decor + fit + panel wiring)
+- src/renderer/src/views/search/Palette.tsx (⌘K tour actions)
+- src/renderer/src/styles.css (tour panel + pulse ring)
 
 ## QA Results

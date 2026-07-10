@@ -29,6 +29,7 @@ import type {
   StatusReceipt,
   SyncHealth,
   SyncReport,
+  TourDef,
   TreeNode,
   VaultIdentity,
   WizardInput,
@@ -117,6 +118,9 @@ export interface CoreApi {
    *  clusters, precomputed positions — built core-side from existing indexes.
    *  Memoized; invalidated on vault.changed / post-pull reconcile (F4 tier). */
   'atlas.graph': { in: { level: AtlasLevel; scope?: AtlasScope }; out: AtlasGraph }
+  /** Vault Atlas tours (story 10.5): reading-order / thread / topic tours
+   *  extracted core-side from existing truth — no LLM, no persistent state. */
+  'atlas.tours': { in: { scope?: AtlasScope }; out: TourDef[] }
   'vault.createOrJoin': { in: WizardInput; out: WizardResult }
   /** app-local contract evolution (story 6.2): optional window size for paging */
   'activity.feed': { in: { since?: string; limit?: number }; out: ActivityEvent[] } // (lib PR-6)

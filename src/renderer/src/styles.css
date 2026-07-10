@@ -2412,3 +2412,199 @@ button.atlas-crumb:hover {
   cursor: pointer;
   pointer-events: stroke;
 }
+
+/* ── Atlas tours (story 10.5): side panel + step pulse ─────────────────────── */
+
+.atlas-body {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* side panel: a card column next to the canvas (tours; filters/path ride it later) */
+.atlas-side {
+  width: 280px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(19, 24, 38, 0.06);
+  overflow-y: auto;
+}
+
+.atlas-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.atlas-side-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.atlas-side-close {
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.atlas-side-close:hover {
+  background: var(--bg-inset);
+}
+
+.atlas-side-empty {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  color: var(--text-2);
+}
+
+.atlas-toolbar {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.atlas-tool {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--bg-card);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.atlas-tool:hover {
+  border-color: var(--navy);
+}
+
+.atlas-tool[aria-pressed='true'] {
+  background: var(--bg-inset);
+  border-color: var(--navy);
+}
+
+.atlas-tour-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.atlas-tour-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.atlas-tour-row:hover {
+  border-color: var(--navy);
+}
+
+.atlas-tour-row[aria-checked='true'] {
+  border-color: var(--gold);
+  background: var(--bg-inset);
+}
+
+.atlas-tour-row-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.atlas-tour-row-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.atlas-tour-heuristic {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  border: 1px dashed var(--hairline);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.atlas-tour-progress {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.atlas-tour-step-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.atlas-tour-step-card:hover {
+  border-color: var(--gold);
+}
+
+.atlas-tour-step-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  color: var(--text-1);
+}
+
+.atlas-tour-step-desc {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.atlas-tour-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.atlas-tour-end {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--text-2);
+  text-decoration: underline;
+}
+
+/* tour step highlight: gold pulse ring; the global reduced-motion rule
+   freezes the animation, leaving the static gold ring (story 10.5 AC3) */
+.atlas-node-tour .atlas-card {
+  stroke: var(--gold);
+  stroke-width: 2;
+  animation: atlas-tour-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes atlas-tour-pulse {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.35;
+  }
+}

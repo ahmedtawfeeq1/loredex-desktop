@@ -80,6 +80,31 @@ function actionItems(q: string): PaletteItem[] {
         },
       )
     }
+    // story 10.5: tours are ⌘K-reachable — the panel, and playback while active
+    actions.push({
+      key: 'action:atlas-tours',
+      title: 'Atlas: Tours…',
+      run: () => atlas.setPanel('tour'),
+    })
+    if (atlas.activeTour) {
+      actions.push(
+        {
+          key: 'action:atlas-tour-next',
+          title: 'Atlas: Tour — next step',
+          run: () => void atlas.nextTourStep(),
+        },
+        {
+          key: 'action:atlas-tour-prev',
+          title: 'Atlas: Tour — previous step',
+          run: () => void atlas.prevTourStep(),
+        },
+        {
+          key: 'action:atlas-tour-end',
+          title: 'Atlas: End tour',
+          run: () => atlas.endTour(),
+        },
+      )
+    }
     if (atlas.historyIndex > 0) {
       actions.push({
         key: 'action:atlas-back',

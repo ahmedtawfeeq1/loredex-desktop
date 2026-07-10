@@ -331,6 +331,39 @@ export interface AtlasGraph {
   cyclic: boolean
 }
 
+/**
+ * Tours (story 10.5, ATLAS-5): the interactive form of curate reading orders.
+ * A tour is nothing more than an ordered list of (title, prose, nodeId[]) that
+ * drives the same navigation primitives a user has — extracted from existing
+ * truth (reading orders, threads, topic date-order), never generated.
+ */
+export type TourKind = 'reading-order' | 'thread' | 'topic'
+
+export interface TourStep {
+  title: string
+  /** surrounding prose from the handoff body (reading-order line), or the
+   *  step note's own authored summary — no generation step, ever */
+  description: string
+  /** atlas node ids highlighted by this step (first node = click resolution) */
+  nodeIds: string[]
+  /** owning project/topic of the first node — playback auto-opens the cluster */
+  project?: string
+  topic?: string
+}
+
+export interface TourDef {
+  id: string
+  kind: TourKind
+  title: string
+  description: string
+  /** deterministic BFS fallback ordering used (handoff had no reading order) */
+  heuristic: boolean
+  project?: string
+  /** topic tours: the topic walked (scope filtering) */
+  topic?: string
+  steps: TourStep[]
+}
+
 /** One contract-scan change row (story 11.1's provider shape). The Atlas
  *  consumes it verbatim; until 11.1 ships the production provider is empty and
  *  contract nodes are simply absent (story 10.1 AC5 degradation). */

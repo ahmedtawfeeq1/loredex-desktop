@@ -9,10 +9,10 @@
  * debounced (500 ms) reload — no Refresh button on Home, by design.
  */
 import { create } from 'zustand'
-import type { ProductDashboard } from '../../../../shared/ipc-contract'
+import type { CoreEvent, ProductDashboard } from '../../../../shared/ipc-contract'
 import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import type { ActivityEvent, ContractChange, SyncHealth } from '../../../../shared/types'
-import { invoke } from '../../api'
+import { invoke, onEvent, onVaultChanged } from '../../api'
 import { startOfTodayIso } from './insights'
 
 export const RECOMPUTE_DEBOUNCE_MS = 500
@@ -68,5 +68,50 @@ export const useDashboardData = create<DashboardDataState>((set, get) => ({
   },
 }))
 
-// Live recompute (spec note 1) lands with the build plan's fourth commit —
-// the debounced watcher/poller subscription replaces this marker.
+/** The renderer events that can change any dashboard number (spec §4 last
+ *  row): watcher writes, poller-integrated syncs, handoff lifecycle, the
+ *  post-integrate contract scan, snooze expiry. Pure — unit-tested. */
+export function isRecomputeEvent(kind: CoreEvent['kind']): boolean {
+  return (
+    kind === 'vault.changed' ||
+    kind === 'sync.changed' ||
+    kind === 'contract.changed' ||
+    kind === 'handoff.new' ||
+    kind === 'handoff.created' ||
+    kind === 'handoff.stateChanged' ||
+    kind === 'snooze.expired'
+  )
+}
+
+// Live, not Refresh (spec note 1): the existing watcher/poller events schedule
+// ONE debounced recompute of the loaded dashboard — a burst of writes (a sync
+// integrating ten notes) folds into a single re-pull. Cards and the brief
+// refresh through their own stores (useHandoffs subscribes to the same
+// events); sync.changed pushes health below without a round-trip.
+// (bridge guard keeps this importable from node unit tests)
+let recomputeTimer: ReturnType<typeof setTimeout> | null = null
+
+if (typeof window !== 'undefined' && window.loredex) {
+  onEvent((e) => {
+    if (e.kind === 'sync.changed') {
+      useDashboardData.setState({ health: e.health })
+    }
+    if (!isRecomputeEvent(e.kind)) return
+    if (useDashboardData.getState().dash === null) return // Home never visited
+    if (recomputeTimer) clearTimeout(recomputeTimer)
+    recomputeTimer = setTimeout(() => {
+      recomputeTimer = null
+      void useDashboardData.getState().load()
+    }, RECOMPUTE_DEBOUNCE_MS)
+  })
+
+  // menu-driven vault switch: this store is view-local (not in App.tsx's reset
+  // list), so it drops its own snapshot; HomeView reloads on the null dash
+  onVaultChanged(() => {
+    if (recomputeTimer) {
+      clearTimeout(recomputeTimer)
+      recomputeTimer = null
+    }
+    useDashboardData.getState().reset()
+  })
+}

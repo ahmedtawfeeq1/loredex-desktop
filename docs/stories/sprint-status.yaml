@@ -83,11 +83,11 @@ development_status:
   8-3-fulfills-close-the-loop: done
   epic-8-retrospective: optional
 
-  epic-9: backlog          # Live: poller, app-db, watcher/notifications
+  epic-9: done             # Live: poller, app-db, watcher/notifications — Refresh buttons are fallbacks now
   # 9.x are M2 upgrades of existing story FILES (updated in place, not duplicated):
-  9-1-remote-poller-single-flight-write-lock: ready-for-dev   # file: epic3.story5-remote-event-poller-write-lock.md (v2.0)
-  9-2-read-state-snooze-appdb: ready-for-dev                  # file: epic3.story6-read-state-store-appdb.md (v2.0)
-  9-3-watcher-live-refresh-notification-routing: ready-for-dev # file: epic2.story3-vault-watcher-live-refresh.md (v2.0)
+  9-1-remote-poller-single-flight-write-lock: done            # file: epic3.story5-remote-event-poller-write-lock.md (v2.0)
+  9-2-read-state-snooze-appdb: done                           # file: epic3.story6-read-state-store-appdb.md (v2.0)
+  9-3-watcher-live-refresh-notification-routing: done         # file: epic2.story3-vault-watcher-live-refresh.md (v2.0)
   epic-9-retrospective: optional
 
   epic-10: backlog         # Dependency Graph

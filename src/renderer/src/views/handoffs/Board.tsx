@@ -6,7 +6,6 @@
 import { useEffect } from 'react'
 import { isValidIdentity } from '../../../../shared/identity'
 import type { HandoffCard } from '../../../../shared/types'
-import { onEvent } from '../../api'
 import { ConsumeReceiptView } from '../../components/ConsumeReceiptView'
 import { HandoffCardView } from '../../components/HandoffCardView'
 import { useApp } from '../../stores/app'
@@ -214,17 +213,9 @@ export function Board(): React.JSX.Element {
   }, [identityLoaded, loadIdentity])
 
   useEffect(() => {
+    // live refresh moved to the store's module-level subscription (story 9.3)
+    // so the board stays fresh from every view; this effect only primes it
     if (cards === null) void load()
-    // board refreshes on vault changes and handoff events (AC4)
-    return onEvent((e) => {
-      if (
-        e.kind === 'vault.changed' ||
-        e.kind === 'handoff.new' ||
-        e.kind === 'handoff.stateChanged'
-      ) {
-        void load()
-      }
-    })
   }, [cards, load])
 
   const projects = projectsOf(cards ?? [])

@@ -34,10 +34,13 @@ export function groupByProject(cards: HandoffCard[]): Array<{ project: string; l
   return projectsOf(cards).map((project) => ({ project, lanes: lanesFor(cards, project) }))
 }
 
-/** Open-inbound count for a project ('all' = whole vault) — nav badge + lane header. */
+/** Open-inbound count for a project ('all' = whole vault) — nav badge + lane
+ *  header. Story 9.3 honesty: expired snoozes are due again and count with
+ *  open; snoozed-and-current never count (matches core-side openInbound). */
 export function openCount(cards: HandoffCard[], project: string | 'all'): number {
-  return cards.filter((c) => c.status === 'open' && (project === 'all' || c.to === project))
-    .length
+  return cards.filter(
+    (c) => (c.status === 'open' || c.expired) && (project === 'all' || c.to === project),
+  ).length
 }
 
 /**

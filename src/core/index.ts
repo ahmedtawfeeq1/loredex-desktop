@@ -6,7 +6,7 @@
 import { join } from 'node:path'
 import type { CoreControlMessage, PortLike } from '../shared/ipc-contract'
 import { getPollCursor, initAppDb, setPollCursor, vaultId } from './db/index'
-import { reconcileSnoozeTimers } from './db/snooze'
+import { reconcileSnoozeTimers, sweepExpiredSnoozes } from './db/snooze'
 import { removeDiscovery } from './discovery'
 import * as engine from './engine'
 import { clearFacetCache } from './facets'
@@ -22,6 +22,7 @@ import {
   loadMcpPortOverride,
   loadOrCreateMcpToken,
 } from './settings'
+import { startVaultWatcher } from './watcher'
 import { writeLock } from './write-lock'
 
 // Config resolves exactly once, BEFORE any handler is registered (F6).
@@ -44,16 +45,78 @@ const notifier = registerCoreHandlers(ipc, (msg) => process.parentPort.postMessa
 // Startup check: seed the snapshot + set the badge before any user action.
 notifier.refresh()
 
+// vault_id scopes every app-db row (story 9.2); null without a config or db.
+const vid = config && appDb ? vaultId(config.vaultPath, engine.identity().remote) : null
+
+/**
+ * The F4 reconcile everyone shares (stories 9.1/9.3): caches invalidated,
+ * badge + new-handoff check rerun, snooze_timers ← frontmatter. Callers decide
+ * what vault.changed to emit (batch paths vs full refresh).
+ */
+function reconcileState(): void {
+  invalidateLinkIndex()
+  clearFacetCache()
+  const cards = notifier.refresh()
+  if (appDb && vid) reconcileSnoozeTimers(appDb, vid, cards)
+}
+
+// Snooze expiry sweep (stories 9.2/9.3): once a minute, due un-notified timers
+// emit snooze.expired ONCE per machine (toast + board resort renderer-side;
+// status is never auto-written) and the badge recomputes (expired count open).
+function sweepSnoozes(): void {
+  if (!appDb || !vid) return
+  try {
+    reconcileSnoozeTimers(appDb, vid, engine.handoffs({ direction: 'all' }))
+    const due = sweepExpiredSnoozes(appDb, vid, new Date().toISOString().slice(0, 10))
+    for (const handoffId of due) ipc.emit({ kind: 'snooze.expired', handoffId })
+    if (due.length > 0) notifier.refresh()
+  } catch {
+    // no config / unreadable vault — nothing to sweep
+  }
+}
+if (appDb && vid) {
+  sweepSnoozes()
+  setInterval(sweepSnoozes, 60_000).unref?.()
+}
+
+// Vault watcher (story 9.3): CLI/agent/local edits surface live. Debounced
+// batches refresh the changed paths; storms (pull bursts) reconcile from disk
+// instead of trusting per-file events (F4). Refresh buttons become fallbacks.
+if (config) {
+  const vaultPath = config.vaultPath
+  void startVaultWatcher({
+    vaultPath,
+    sink: {
+      onBatch: (paths) => {
+        reconcileState()
+        sweepSnoozes() // a local snooze edit may expire/arm a timer right now
+        ipc.emit({ kind: 'vault.changed', paths })
+      },
+      onStorm: () => {
+        reconcileState()
+        ipc.emit({ kind: 'vault.changed', paths: [] }) // full refetch
+      },
+    },
+    onError: (text) => ipc.emit({ kind: 'git.warning', text }),
+  }).catch((e: unknown) => {
+    ipc.emit({
+      kind: 'git.warning',
+      text: `vault watcher failed to start — live refresh degraded to manual (${
+        e instanceof Error ? e.message : String(e)
+      })`,
+    })
+  })
+}
+
 // Remote-event poller (story 9.1): fetch → parse remote events → gated
 // integrate, only for a vault with an origin remote (identity() reads
 // .git/config). The db (cursor store) exists whenever main forked us with
 // --user-data; a bare test host has neither, hence no poller.
 let poller: Poller | null = null
-if (config && appDb) {
+if (config && appDb && vid) {
   const remoteUrl = engine.identity().remote
   if (remoteUrl) {
     const db = appDb
-    const vid = vaultId(config.vaultPath, remoteUrl)
     const vaultPath = config.vaultPath
     poller = createPoller({
       vaultPath,
@@ -71,17 +134,15 @@ if (config && appDb) {
       },
       parseRemoteMeta: (raw) => engine.parseMarkdown(raw).meta as Record<string, unknown>,
       tryLock: () => writeLock.tryAcquire(),
-      // UNDER the lock, clean tree: lib pull+push, then the F4 full reconcile —
-      // rebuilt indexes, invalidated caches, badge/notification check, and
-      // snooze_timers ← frontmatter (story 9.2 mirror).
+      // UNDER the lock, clean tree: lib pull+push, rebuilt indexes, then the
+      // shared F4 reconcile (caches, badge, snooze mirror) + expiry sweep.
       pullAndReconcile: async () => {
         const profile = loadIdentityProfile()
         if (profile) withGitIdentity(profile, () => engine.pullPush())
         else engine.pullPush()
         engine.rebuildVaultIndexes()
-        invalidateLinkIndex()
-        clearFacetCache()
-        reconcileSnoozeTimers(db, vid, notifier.refresh())
+        reconcileState()
+        sweepSnoozes()
       },
       syncHealth: () => engine.syncHealth(),
     })

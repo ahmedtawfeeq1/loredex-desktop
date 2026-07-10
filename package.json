@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.29.0",
+    "@parcel/watcher": "2.5.4",
     "better-sqlite3": "12.11.1",
     "loredex": "file:../loredex/loredex-2.1.0.tgz",
     "react": "19.2.7",

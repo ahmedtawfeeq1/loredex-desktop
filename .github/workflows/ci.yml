@@ -24,6 +24,17 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # Native-module smoke vs the PACKAGED Electron ABI (stories 9.2/9.3,
+      # risk 5): rebuild better-sqlite3 + @parcel/watcher for the pinned
+      # Electron, run the smoke suite inside Electron's own node
+      # (ELECTRON_RUN_AS_NODE keeps the Electron ABI), then restore the node
+      # ABI for the steps after. Reruns on every Electron/module bump by
+      # construction (npm ci installs the pins).
+      - name: Native smoke vs packaged Electron ABI
+        run: |
+          npx electron-builder install-app-deps
+          ELECTRON_RUN_AS_NODE=1 npx electron node_modules/vitest/vitest.mjs run tests/native-smoke
+          npm rebuild better-sqlite3 @parcel/watcher
       - name: Build unsigned DMG
         run: npm run dist
         env:

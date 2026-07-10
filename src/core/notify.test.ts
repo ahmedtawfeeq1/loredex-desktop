@@ -39,6 +39,35 @@ describe('openInbound (badge honesty: open inbound only)', () => {
     // no registered projects (picker-opened vault) → every project is mine
     expect(openInbound(cards, [])).toHaveLength(2)
   })
+
+  it('story 9.3: snoozed-and-current never count; expired snoozes count with open', () => {
+    const cards = [
+      card({ status: 'snoozed', snoozedUntil: '2099-01-01', expired: false }),
+      card({ status: 'snoozed', snoozedUntil: '2026-07-01', expired: true }),
+      card({ status: 'open' }),
+    ]
+    const counted = openInbound(cards, [])
+    expect(counted).toHaveLength(2)
+    expect(counted.some((c) => c.status === 'snoozed' && !c.expired)).toBe(false)
+  })
+})
+
+describe('notification routing respects snooze (story 9.3 AC4)', () => {
+  it('a snoozed-and-current handoff fires NO notification even when unseen', () => {
+    const snoozed = card({ status: 'snoozed', snoozedUntil: '2099-01-01', expired: false })
+    const d = decideNotifications(new Set(), [snoozed], [], '/vault')
+    expect(d.badge).toBe(0)
+    expect(d.newOpen).toEqual([])
+    expect(d.notifications).toEqual([])
+  })
+
+  it('an EXPIRED snooze badges but never fires a "new handoff" banner — its one ping is the snooze.expired toast', () => {
+    const expired = card({ status: 'snoozed', snoozedUntil: '2026-07-01', expired: true })
+    const d = decideNotifications(new Set(), [expired], [], '/vault')
+    expect(d.badge).toBe(1)
+    expect(d.newOpen).toEqual([]) // not "new" — no native notification
+    expect(d.notifications).toEqual([])
+  })
 })
 
 describe('decideNotifications', () => {

@@ -19,7 +19,8 @@ export interface HandoffNotification {
 }
 
 export interface NotifyDecision {
-  /** dock badge: open INBOUND handoffs only (Things discipline) */
+  /** dock badge: open ∪ expired-snoozed INBOUND handoffs (Things discipline,
+   *  story 9.3 AC5 — snoozed-and-current never count) */
   badge: number
   /** cards that became open since the last check — handoff.new events */
   newOpen: HandoffCard[]
@@ -33,10 +34,16 @@ export const BATCH_THRESHOLD = 3
  * Inbound = addressed to one of "my projects" (registered in config). A vault
  * opened via the picker registers none — then every project is mine and the
  * whole vault's open handoffs count.
+ *
+ * Story 9.3 (snooze honesty): open ∪ EXPIRED-snoozed count — an expired snooze
+ * is due again (the lib sorts it with open; status is never auto-written);
+ * snoozed-and-current cards never count and never notify.
  */
 export function openInbound(cards: HandoffCard[], myProjects: string[]): HandoffCard[] {
   return cards.filter(
-    (c) => c.status === 'open' && (myProjects.length === 0 || myProjects.includes(c.to)),
+    (c) =>
+      (c.status === 'open' || c.expired) &&
+      (myProjects.length === 0 || myProjects.includes(c.to)),
   )
 }
 
@@ -48,8 +55,11 @@ export function decideNotifications(
 ): NotifyDecision {
   const inbound = openInbound(cards, myProjects)
   const badge = inbound.length
-  // first snapshot (app start / vault switch): set the badge, never a storm
-  const newOpen = seen === null ? [] : inbound.filter((c) => !seen.has(c.id))
+  // first snapshot (app start / vault switch): set the badge, never a storm.
+  // Expired snoozes are NOT "new" — they badge here, but their one-per-machine
+  // ping is the snooze.expired toast (story 9.2 sweep), never a native banner.
+  const newOpen =
+    seen === null ? [] : inbound.filter((c) => c.status === 'open' && !seen.has(c.id))
 
   let notifications: HandoffNotification[]
   if (newOpen.length > BATCH_THRESHOLD) {

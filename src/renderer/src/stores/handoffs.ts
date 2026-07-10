@@ -6,7 +6,7 @@ import { create } from 'zustand'
 import { qualifiedId, toVaultRelative } from '../../../shared/handoff-lanes'
 import { isErrEnvelope } from '../../../shared/ipc-contract'
 import type { ConsumeReceipt, HandoffCard, HandoffTransition } from '../../../shared/types'
-import { invoke } from '../api'
+import { invoke, onEvent } from '../api'
 import { useApp } from './app'
 import { effectiveIdentity, useIdentity } from './identity'
 import { useToasts } from './toasts'
@@ -276,6 +276,30 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
     })
   },
 }))
+
+// Story 9.3 (live board): vault/handoff events refresh the loaded board from
+// ANY view — the nav badge derives from these cards, so they must not go stale
+// while the user reads. snooze.expired also resorts (expired sorts with open)
+// and toasts once — the once-per-machine gate is core-side (app-db notified).
+// (bridge guard keeps this importable from node unit tests)
+if (typeof window !== 'undefined' && window.loredex) {
+  onEvent((e) => {
+    const s = useHandoffs.getState()
+    if (e.kind === 'snooze.expired') {
+      useToasts
+        .getState()
+        .push('Snooze expired', `${e.handoffId} is due again — back with the open cards`)
+    }
+    if (
+      e.kind === 'vault.changed' ||
+      e.kind === 'handoff.new' ||
+      e.kind === 'handoff.stateChanged' ||
+      e.kind === 'snooze.expired'
+    ) {
+      if (s.cards !== null) void s.load()
+    }
+  })
+}
 
 /** Receipt-toast titles per transition (story 8.1 AC5). */
 export const TRANSITION_TITLE: Record<HandoffTransition['to'], string> = {

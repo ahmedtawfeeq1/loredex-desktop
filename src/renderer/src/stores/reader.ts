@@ -8,7 +8,7 @@ import { create } from 'zustand'
 import type { Doc } from '../../../shared/ipc-contract'
 import { isErrEnvelope } from '../../../shared/ipc-contract'
 import type { TreeNode } from '../../../shared/types'
-import { invoke } from '../api'
+import { invoke, onEvent } from '../api'
 import { clearLinkCaches } from '../markdown/resolveCache'
 import { useDiagnostics } from './diagnostics'
 
@@ -81,3 +81,16 @@ export const useReader = create<ReaderState>((set, get) => ({
     })
   },
 }))
+
+// Story 9.3 (live refresh): the watcher/poller's vault.changed replaces manual
+// refreshes — tree and the open note follow disk truth. `paths: []` = full
+// reconcile; a path batch only re-reads when it could touch what's on screen.
+// (bridge guard keeps this importable from node unit tests)
+if (typeof window !== 'undefined' && window.loredex) {
+  onEvent((e) => {
+    if (e.kind !== 'vault.changed') return
+    const s = useReader.getState()
+    if (s.tree === null) return // reader never opened — nothing to refresh
+    void s.refresh()
+  })
+}

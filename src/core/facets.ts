@@ -41,20 +41,33 @@ export function clearFacetCache(): void {
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : String(v))
 
+/** Frontmatter `tags` normalized to a lowercased set — accepts a YAML list or a
+ *  comma/space-separated scalar. */
+function tagSet(v: unknown): Set<string> {
+  const raw = Array.isArray(v) ? v.map(str) : str(v).split(/[\s,]+/)
+  return new Set(raw.map((t) => t.trim().toLowerCase()).filter(Boolean))
+}
+
 /**
- * One hit against the facet filter. project/topic/status ride the SearchHit
- * itself; type/from/to need the note's frontmatter (lazy — only parsed when
- * one of those facets is actually set).
+ * One hit against the facet filter (epic22 operators included). project/topic/
+ * status ride the SearchHit itself; type/from/to/tag need the note's frontmatter
+ * (lazy — only parsed when one of those is set); date bounds (before/after/on)
+ * compare the hit's own filed date (YYYY-MM-DD lexical) — an undated note is
+ * excluded whenever a date bound is active.
  */
 export function matchesFacets(hit: SearchHit, facets: Facets, load: MetaLoader): boolean {
   if (facets.project && hit.project !== facets.project) return false
   if (facets.topic && hit.topic !== facets.topic) return false
   if (facets.status && hit.status !== facets.status) return false
-  if (facets.type || facets.from || facets.to) {
+  if (facets.before && !(hit.date && hit.date < facets.before)) return false
+  if (facets.after && !(hit.date && hit.date > facets.after)) return false
+  if (facets.on && hit.date !== facets.on) return false
+  if (facets.type || facets.from || facets.to || facets.tag) {
     const meta = memoizedMeta(hit.path, load)
     if (facets.type && str(meta['type']) !== facets.type) return false
     if (facets.from && str(meta['from']) !== facets.from) return false
     if (facets.to && str(meta['to']) !== facets.to) return false
+    if (facets.tag && !tagSet(meta['tags']).has(facets.tag.toLowerCase())) return false
   }
   return true
 }

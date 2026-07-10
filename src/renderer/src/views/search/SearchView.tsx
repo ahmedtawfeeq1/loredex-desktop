@@ -1,14 +1,25 @@
 /**
- * Faceted search view (story 2.4): full-text via the lib's searchVault, facet
- * dropdowns aggregated from vault frontmatter, highlighted snippets, Enter →
- * reader. Same vault.search backend as the Cmd+K palette.
+ * Search view (story 2.4, upgraded epic22 / D1 amendment 7 §B). Beyond substring:
+ * a client-side operator parser (project:/topic:/type:/status:/tag:/from:/to:/
+ * before:/after:/on: + bare terms) drives ONE query string that is the source of
+ * truth. Parsed filters render as removable chips AND sync to the existing facet
+ * selects (both mutate the query). Ranked results carry a project tint dot,
+ * humanized title, matched-term-highlighted snippet, meta, count, keyboard nav,
+ * and a group-by-project toggle. Recent + saved searches chip in when idle. Same
+ * vault.search backend as the ⌘K palette.
  */
 import { useEffect, useRef, useState } from 'react'
 import type { SearchHit } from '../../../../shared/ipc-contract'
-import type { Facets } from '../../../../shared/types'
 import { humanizeTitle } from '../../humanize'
 import { openSearchResult, useSearch } from '../../stores/search'
+import { sectionTint } from '../reader/sectionTint'
 import { clampSelection, moveSelection, splitForHighlight } from './palette-nav'
+import {
+  activeFilters,
+  groupHitsByProject,
+  type OperatorKey,
+  type ParsedFilters,
+} from './query-parser'
 
 export function Highlight({ text, query }: { text: string; query: string }): React.JSX.Element {
   return (
@@ -25,22 +36,43 @@ export function Highlight({ text, query }: { text: string; query: string }): Rea
   )
 }
 
+/** A parsed operator as a removable chip; × clears it from the query string. */
+function FilterChip({ opKey, value }: { opKey: OperatorKey; value: string }): React.JSX.Element {
+  const setFilter = useSearch((s) => s.setFilter)
+  return (
+    <span className="search-chip">
+      <span className="search-chip-key">{opKey}:</span>
+      <span className="search-chip-val">{value}</span>
+      <button
+        type="button"
+        className="search-chip-x"
+        aria-label={`Remove ${opKey} filter`}
+        onClick={() => setFilter(opKey, '')}
+      >
+        ×
+      </button>
+    </span>
+  )
+}
+
+/** Facet select mirrors the parsed operator and writes back to the query. */
 function FacetSelect({
   label,
   facetKey,
+  filters,
   options,
 }: {
   label: string
-  facetKey: keyof Facets
+  facetKey: OperatorKey
+  filters: ParsedFilters
   options: string[]
 }): React.JSX.Element | null {
-  const value = useSearch((s) => s.facets[facetKey] ?? '')
-  const setFacet = useSearch((s) => s.setFacet)
+  const setFilter = useSearch((s) => s.setFilter)
   if (options.length === 0) return null
   return (
     <label className="facet">
       <span>{label}</span>
-      <select value={value} onChange={(e) => setFacet(facetKey, e.target.value)}>
+      <select value={filters[facetKey] ?? ''} onChange={(e) => setFilter(facetKey, e.target.value)}>
         <option value="">any</option>
         {options.map((o) => (
           <option key={o} value={o}>
@@ -56,10 +88,12 @@ function ResultRow({
   hit,
   query,
   selected,
+  onOpen,
 }: {
   hit: SearchHit
   query: string
   selected: boolean
+  onOpen: () => void
 }): React.JSX.Element {
   return (
     <button
@@ -67,11 +101,16 @@ function ResultRow({
       className="search-row"
       aria-current={selected}
       title={hit.path}
-      onClick={() => openSearchResult(hit.path)}
+      onClick={onOpen}
     >
-      {/* story 17.1: humanized title; the real filename rides the tooltip
-          and the date already renders in the meta line below */}
       <span className="search-row-title">
+        {/* project tint dot (deterministic, shared with the tree) */}
+        <span
+          className="file-search-dot"
+          aria-hidden
+          style={{ '--section-color': sectionTint(hit.project) } as React.CSSProperties}
+        />
+        {/* story 17.1: humanized title; the real filename rides the tooltip */}
         <Highlight text={humanizeTitle(hit.name)} query={query} />
       </span>
       <span className="search-row-meta">
@@ -86,13 +125,62 @@ function ResultRow({
   )
 }
 
+/** Recent + saved query chips, shown on the idle (empty-result) state. */
+function QuickChips(): React.JSX.Element | null {
+  const recent = useSearch((s) => s.recentSearches)
+  const saved = useSearch((s) => s.savedSearches)
+  const setQuery = useSearch((s) => s.setQuery)
+  if (recent.length === 0 && saved.length === 0) return null
+  return (
+    <div className="search-quick">
+      {saved.length > 0 && (
+        <div className="search-quick-group">
+          <span className="search-quick-label">Saved</span>
+          {saved.map((q) => (
+            <button
+              key={q}
+              type="button"
+              className="search-quick-chip is-saved"
+              onClick={() => setQuery(q)}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+      {recent.length > 0 && (
+        <div className="search-quick-group">
+          <span className="search-quick-label">Recent</span>
+          {recent.map((q) => (
+            <button
+              key={q}
+              type="button"
+              className="search-quick-chip"
+              onClick={() => setQuery(q)}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function SearchView(): React.JSX.Element {
   const q = useSearch((s) => s.q)
+  const parsed = useSearch((s) => s.parsed)
   const hits = useSearch((s) => s.hits)
   const values = useSearch((s) => s.values)
   const searching = useSearch((s) => s.searching)
   const error = useSearch((s) => s.error)
+  const groupBy = useSearch((s) => s.groupByProject)
   const setQuery = useSearch((s) => s.setQuery)
+  const setFilter = useSearch((s) => s.setFilter)
+  const toggleGroup = useSearch((s) => s.toggleGroupByProject)
+  const recordSearch = useSearch((s) => s.recordSearch)
+  const toggleSaved = useSearch((s) => s.toggleSaved)
+  const saved = useSearch((s) => s.savedSearches)
   const loadFacetValues = useSearch((s) => s.loadFacetValues)
   const [sel, setSel] = useState(-1)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -104,6 +192,13 @@ export function SearchView(): React.JSX.Element {
 
   const list = hits ?? []
   const selected = clampSelection(sel, list.length)
+  const filters = parsed.filters
+  const chips = activeFilters(filters)
+
+  function open(hit: SearchHit): void {
+    recordSearch()
+    openSearchResult(hit.path)
+  }
 
   function onKeyDown(e: React.KeyboardEvent): void {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -111,20 +206,30 @@ export function SearchView(): React.JSX.Element {
       setSel(moveSelection(selected, list.length, e.key))
     } else if (e.key === 'Enter' && list.length > 0) {
       const hit = list[selected === -1 ? 0 : selected]
-      if (hit) openSearchResult(hit.path)
+      if (hit) open(hit)
     }
   }
+
+  // flat, rank-ordered index so keyboard nav is stable whether grouped or not
+  const flat = groupBy ? groupHitsByProject(list).flatMap((g) => g.hits) : list
+  const indexOf = new Map(flat.map((h, i) => [h.path, i]))
+  const groups = groupBy ? groupHitsByProject(list) : [{ project: '', hits: list }]
 
   return (
     <div className="search">
       <div className="board-header">
         <span className="pane-list-title">Search</span>
+        {list.length > 0 && (
+          <span className="search-count">
+            {list.length} result{list.length === 1 ? '' : 's'}
+          </span>
+        )}
       </div>
       <div className="search-controls">
         <input
           ref={inputRef}
           className="search-input"
-          placeholder="Search the vault…"
+          placeholder="Search the vault — try project:nimbus-backend before:2026-07-01 auth…"
           value={q}
           onChange={(e) => {
             setSel(-1)
@@ -132,19 +237,69 @@ export function SearchView(): React.JSX.Element {
           }}
           onKeyDown={onKeyDown}
         />
+        {chips.length > 0 && (
+          <div className="search-chips">
+            {chips.map(([opKey, value]) => (
+              <FilterChip key={opKey} opKey={opKey} value={value} />
+            ))}
+          </div>
+        )}
         <div className="facet-row">
-          <FacetSelect label="project" facetKey="project" options={values?.projects ?? []} />
-          <FacetSelect label="topic" facetKey="topic" options={values?.topics ?? []} />
-          <FacetSelect label="type" facetKey="type" options={values?.types ?? []} />
-          <FacetSelect label="status" facetKey="status" options={values?.statuses ?? []} />
-          <FacetSelect label="from" facetKey="from" options={values?.projects ?? []} />
-          <FacetSelect label="to" facetKey="to" options={values?.projects ?? []} />
+          <FacetSelect
+            label="project"
+            facetKey="project"
+            filters={filters}
+            options={values?.projects ?? []}
+          />
+          <FacetSelect
+            label="topic"
+            facetKey="topic"
+            filters={filters}
+            options={values?.topics ?? []}
+          />
+          <FacetSelect label="type" facetKey="type" filters={filters} options={values?.types ?? []} />
+          <FacetSelect
+            label="status"
+            facetKey="status"
+            filters={filters}
+            options={values?.statuses ?? []}
+          />
+          <FacetSelect
+            label="from"
+            facetKey="from"
+            filters={filters}
+            options={values?.projects ?? []}
+          />
+          <FacetSelect label="to" facetKey="to" filters={filters} options={values?.projects ?? []} />
+          <div className="facet-spacer" />
+          {list.length > 0 && (
+            <button
+              type="button"
+              className={`facet-toggle${groupBy ? ' is-on' : ''}`}
+              aria-pressed={groupBy}
+              onClick={toggleGroup}
+            >
+              Group by project
+            </button>
+          )}
+          {q.trim() && (
+            <button
+              type="button"
+              className={`facet-toggle${saved.includes(q.trim()) ? ' is-on' : ''}`}
+              onClick={() => toggleSaved(q)}
+            >
+              Save search
+            </button>
+          )}
         </div>
       </div>
       {error && <div className="note-error">{error}</div>}
       {hits === null ? (
-        <div className="empty-state" style={{ border: 'none' }}>
-          <p>Ask the vault anything — no grep required.</p>
+        <div className="search-idle">
+          <div className="empty-state" style={{ border: 'none' }}>
+            <p>Ask the vault anything — operators, facets, no grep required.</p>
+          </div>
+          <QuickChips />
         </div>
       ) : hits.length === 0 && !searching ? (
         <div className="empty-state" style={{ border: 'none' }}>
@@ -152,8 +307,31 @@ export function SearchView(): React.JSX.Element {
         </div>
       ) : (
         <div className="search-results" role="listbox" aria-label="Search results">
-          {list.map((hit, i) => (
-            <ResultRow key={hit.path} hit={hit} query={q} selected={i === selected} />
+          {groups.map((group) => (
+            <div key={group.project || '_all'} className="search-group">
+              {groupBy && (
+                <div className="search-group-head">
+                  <span
+                    className="file-search-dot"
+                    aria-hidden
+                    style={{ '--section-color': sectionTint(group.project) } as React.CSSProperties}
+                  />
+                  {group.project} · {group.hits.length}
+                </div>
+              )}
+              {group.hits.map((hit) => {
+                const i = indexOf.get(hit.path) ?? -1
+                return (
+                  <ResultRow
+                    key={hit.path}
+                    hit={hit}
+                    query={parsed.terms}
+                    selected={i === selected}
+                    onOpen={() => open(hit)}
+                  />
+                )
+              })}
+            </div>
           ))}
         </div>
       )}

@@ -87,6 +87,12 @@ export interface Facets {
   /** handoff route facets: sending / receiving project */
   from?: string
   to?: string
+  /** epic22 query operators: a frontmatter tag, and filed-note date bounds
+   *  (YYYY-MM-DD, compared against the hit's date). */
+  tag?: string
+  before?: string
+  after?: string
+  on?: string
 }
 
 /** Facet vocabulary aggregated from vault frontmatter (story 2.4). */

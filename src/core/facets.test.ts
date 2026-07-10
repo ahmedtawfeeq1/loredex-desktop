@@ -121,6 +121,43 @@ describe('facet filtering matrix', () => {
   })
 })
 
+describe('epic22 operators: tag + date narrowing', () => {
+  it('tag: reads frontmatter tags (list or scalar), case-insensitively', () => {
+    const vault = tempVault()
+    const listed = note(vault, 'projects/api/a.md', { tags: '[auth, retry]' }, 'x')
+    const scalar = note(vault, 'projects/api/b.md', { tags: 'billing infra' }, 'x')
+    const none = note(vault, 'projects/api/c.md', { type: 'note' }, 'x')
+    const hits = [
+      hit({ name: 'a', path: listed }),
+      hit({ name: 'b', path: scalar }),
+      hit({ name: 'c', path: none }),
+    ]
+    expect(filterHits(hits, { tag: 'auth' }, loadMeta).map((h) => h.name)).toEqual(['a'])
+    expect(filterHits(hits, { tag: 'RETRY' }, loadMeta).map((h) => h.name)).toEqual(['a'])
+    expect(filterHits(hits, { tag: 'infra' }, loadMeta).map((h) => h.name)).toEqual(['b'])
+    expect(filterHits(hits, { tag: 'missing' }, loadMeta)).toHaveLength(0)
+  })
+
+  it('before:/after:/on: compare the hit date; undated notes drop under any bound', () => {
+    const noMeta = (): Record<string, unknown> => ({})
+    const hits = [
+      hit({ name: 'jun', date: '2026-06-15' }),
+      hit({ name: 'jul01', date: '2026-07-01' }),
+      hit({ name: 'jul09', date: '2026-07-09' }),
+      hit({ name: 'undated', date: '' }),
+    ]
+    expect(filterHits(hits, { before: '2026-07-01' }, noMeta).map((h) => h.name)).toEqual(['jun'])
+    expect(filterHits(hits, { after: '2026-07-01' }, noMeta).map((h) => h.name)).toEqual(['jul09'])
+    expect(filterHits(hits, { on: '2026-07-01' }, noMeta).map((h) => h.name)).toEqual(['jul01'])
+    // a date range ANDs before + after
+    expect(
+      filterHits(hits, { after: '2026-06-30', before: '2026-07-09' }, noMeta).map((h) => h.name),
+    ).toEqual(['jul01'])
+    // every date bound excludes the undated note
+    expect(filterHits(hits, { on: '' as string }, noMeta)).toHaveLength(4)
+  })
+})
+
 describe('memoization', () => {
   it('parses once per mtime and invalidates when the file changes', () => {
     const vault = tempVault()

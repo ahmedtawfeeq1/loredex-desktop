@@ -2272,6 +2272,157 @@ a:hover {
   border-radius: 2px;
 }
 
+/* ── epic22: operator chips, tint dots, group headers, quick chips ─────── */
+
+/* project tint dot — shared by the search view + the file-pane content rows */
+.file-search-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--section-color, var(--text-2));
+}
+
+.search-row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.search-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.search-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 1px 4px 1px 6px;
+}
+
+.search-chip-key {
+  color: var(--text-2);
+}
+
+.search-chip-val {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.search-chip-x {
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 4px;
+}
+
+.search-chip-x:hover {
+  color: var(--rust);
+  background: color-mix(in srgb, var(--rust) 12%, transparent);
+}
+
+.facet-spacer {
+  flex: 1;
+}
+
+.facet-toggle {
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 2px 8px;
+  transition:
+    background 100ms ease-out,
+    color 100ms ease-out;
+}
+
+.facet-toggle:hover {
+  color: var(--text-1);
+}
+
+.facet-toggle.is-on {
+  color: var(--gold-ink);
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.search-idle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-quick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.search-quick-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-quick-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.search-quick-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 2px 8px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: border-color 100ms ease-out;
+}
+
+.search-quick-chip:hover {
+  border-color: var(--gold);
+}
+
+.search-quick-chip.is-saved {
+  border-color: color-mix(in srgb, var(--gold) 50%, var(--hairline));
+}
+
+.search-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  padding: 8px 8px 4px;
+}
+
 /* ── Cmd+K palette (story 2.4): centered card overlay ──────────────────── */
 
 .palette-backdrop {

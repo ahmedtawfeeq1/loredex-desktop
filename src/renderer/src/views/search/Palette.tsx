@@ -8,8 +8,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { actionItems } from '../../actions/palette-items'
 import { humanizeTitle } from '../../humanize'
+import { useApp } from '../../stores/app'
 import { openSearchResult, useSearch } from '../../stores/search'
 import { clampSelection, moveSelection } from './palette-nav'
+
+/** ⌘K shows only the top few note hits; the rest live in the full Search view. */
+const PALETTE_HIT_LIMIT = 5
 
 interface PaletteItem {
   key: string
@@ -29,6 +33,7 @@ export function Palette(): React.JSX.Element | null {
   const recents = useSearch((s) => s.recents)
   const setQuery = useSearch((s) => s.setQuery)
   const setPaletteOpen = useSearch((s) => s.setPaletteOpen)
+  const recordSearch = useSearch((s) => s.recordSearch)
   const [sel, setSel] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -41,17 +46,31 @@ export function Palette(): React.JSX.Element | null {
 
   if (!open) return null
 
+  // epic22: ⌘K shows the TOP few hits; "see all in Search →" hands off the rest.
+  const allHits = hits ?? []
+  const seeAll = q.trim().length > 0 && allHits.length > PALETTE_HIT_LIMIT
   // story 17.1: note titles humanize; the real filename stays visible in the
   // meta line (recents) and the row tooltip (title={item.path})
   const noteItems: PaletteItem[] = q.trim()
-    ? (hits ?? []).map((h) => ({
+    ? allHits.slice(0, PALETTE_HIT_LIMIT).map((h) => ({
         key: h.path,
         title: humanizeTitle(h.name),
         meta: `${h.project || 'product'} · ${h.kind}${h.date ? ` · ${h.date}` : ''}`,
         path: h.path,
       }))
     : recents.map((p) => ({ key: p, title: humanizeTitle(p), meta: p, path: p }))
-  const items: PaletteItem[] = [...actionItems(q), ...noteItems]
+  const seeAllItem: PaletteItem[] = seeAll
+    ? [
+        {
+          key: '__see-all__',
+          title: `See all ${allHits.length} in Search →`,
+          meta: '',
+          path: '',
+          run: () => useApp.getState().setView('search'),
+        },
+      ]
+    : []
+  const items: PaletteItem[] = [...actionItems(q), ...noteItems, ...seeAllItem]
 
   const selected = clampSelection(sel, items.length)
 
@@ -60,6 +79,7 @@ export function Palette(): React.JSX.Element | null {
       setPaletteOpen(false)
       item.run()
     } else {
+      recordSearch()
       openSearchResult(item.path)
     }
   }

@@ -121,14 +121,35 @@ describe('Addendum D1: edit mode + inline comments (story 16.4)', () => {
     expect(out).toContain('unsaved-dot')
   })
 
-  it('the editor is a mono textarea with the six-format bar and a LOCKED frontmatter panel', () => {
+  it('editor v2 (story 16.7): CodeMirror host + full D1-amendment-2 toolbar + LOCKED frontmatter', () => {
     const out = renderToStaticMarkup(createElement(NoteEditor, editorProps))
-    expect(out).toContain('note-editor')
-    expect(out).toContain('draft body')
-    expect(out).toContain('formatter-bar')
-    for (const hint of ['Bold', 'Italic', 'Code', 'Link', 'List', 'Heading']) {
-      expect(out, hint).toContain(`${hint} \u2014`)
+    expect(out).toContain('note-editor-cm') // CodeMirror mounts into this host at effect time
+    expect(out).toContain('editor-toolbar')
+    // headings dropdown H1\u2013H4
+    expect(out).toContain('tb-heading')
+    for (const level of ['H1', 'H2', 'H3', 'H4']) expect(out, level).toContain(`>${level}</option>`)
+    // every specced action present, tooltips carrying the in-editor shortcuts
+    for (const hint of [
+      'Bold \u2014 \u2318B',
+      'Italic \u2014 \u2318I',
+      'Strikethrough',
+      'Inline code',
+      'Code block',
+      'Wikilink',
+      'Link \u2014 \u2318K',
+      'Quote',
+      'Bullet list',
+      'Numbered list',
+      'Task list',
+      'Table',
+      'Horizontal rule',
+      'Undo \u2014 \u2318Z',
+      'Redo \u2014 \u21e7\u2318Z',
+    ]) {
+      expect(out, hint).toContain(hint)
     }
+    // the scoped editor-v2 stylesheet rides theme tokens (both themes flip via vars)
+    expect(out).toContain('var(--hairline)')
     expect(out).toContain('fm-locked-label')
     expect(out).toContain('project') // the locked panel still shows frontmatter
     expect(out).not.toContain('unsaved-dot') // clean draft — no dot

@@ -2,10 +2,14 @@
  * Story 16.4 — edit-mode store: enter/exit keep the draft, unsaved is
  * draft ≠ saved, save writes through note.save with a receipt toast, and a
  * different note opening resets the draft (it belongs to nobody else).
+ * Story 16.7 — the dirty-guard: a note/view switch with a dirty draft goes
+ * through a save/discard prompt instead of dropping work silently.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Doc } from '../../../shared/ipc-contract'
+import { useApp } from './app'
 import { useEditor } from './editor'
+import { useIdentity } from './identity'
 import { useReader } from './reader'
 import { useToasts } from './toasts'
 
@@ -83,5 +87,76 @@ describe('save (⌘S → note.save)', () => {
     useEditor.getState().setDraft('new')
     expect(await useEditor.getState().save(dana)).toBe(false)
     expect(useEditor.getState()).toMatchObject({ error: 'nope', draft: 'new' })
+  })
+})
+
+describe('dirty-guard (story 16.7, D1 amendment 2)', () => {
+  afterEach(() => {
+    useIdentity.setState({ profile: null, ambient: null })
+    useReader.setState({ selected: null })
+    useApp.setState({ view: 'home' })
+  })
+
+  it('a dirty note switch prompts with the note name; Cancel discards', () => {
+    const confirm = vi.fn((_message?: string) => false)
+    vi.stubGlobal('confirm', confirm)
+    useEditor.getState().enter('projects/p/t/a.md', 'body')
+    useEditor.getState().setDraft('body changed')
+    useReader.setState({ selected: 'b.md' })
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(String(confirm.mock.calls[0]?.[0])).toContain('a.md')
+    expect(useEditor.getState()).toMatchObject({ path: null, editing: false, draft: '' })
+  })
+
+  it('OK saves the dirty draft through note.save, then resets', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    useIdentity.setState({ profile: dana })
+    useEditor.getState().enter('projects/p/t/a.md', 'body')
+    useEditor.getState().setDraft('body changed')
+    useReader.setState({ selected: 'b.md' })
+    expect(invoke).toHaveBeenCalledWith('note.save', {
+      path: 'projects/p/t/a.md',
+      body: 'body changed',
+      identity: dana,
+    })
+    await vi.waitFor(() => expect(useEditor.getState().path).toBeNull())
+  })
+
+  it('OK without an identity keeps the draft (toast, no write) — work is never lost', () => {
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    useEditor.getState().enter('a.md', 'body')
+    useEditor.getState().setDraft('changed')
+    useReader.setState({ selected: 'b.md' })
+    expect(invoke).not.toHaveBeenCalledWith('note.save', expect.anything())
+    expect(useEditor.getState().draft).toBe('changed')
+    expect(useToasts.getState().toasts.at(-1)?.title).toBe('Unsaved changes kept')
+  })
+
+  it('a clean draft never prompts — silent reset stays the 16.4 behavior', () => {
+    const confirm = vi.fn(() => true)
+    vi.stubGlobal('confirm', confirm)
+    useEditor.getState().enter('a.md', 'body')
+    useReader.setState({ selected: 'b.md' })
+    expect(confirm).not.toHaveBeenCalled()
+    expect(useEditor.getState().path).toBeNull()
+  })
+
+  it('leaving the reader view with a dirty draft prompts; Cancel reverts to saved', () => {
+    vi.stubGlobal('confirm', vi.fn(() => false))
+    useApp.setState({ view: 'reader' })
+    useEditor.getState().enter('a.md', 'body')
+    useEditor.getState().setDraft('changed')
+    useApp.setState({ view: 'atlas' })
+    expect(useEditor.getState()).toMatchObject({ draft: 'body', saved: 'body', editing: true })
+  })
+
+  it('leaving the reader with a clean draft never prompts', () => {
+    const confirm = vi.fn(() => true)
+    vi.stubGlobal('confirm', confirm)
+    useApp.setState({ view: 'reader' })
+    useEditor.getState().enter('a.md', 'body')
+    useApp.setState({ view: 'search' })
+    expect(confirm).not.toHaveBeenCalled()
+    expect(useEditor.getState()).toMatchObject({ draft: 'body', editing: true })
   })
 })

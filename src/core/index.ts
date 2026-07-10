@@ -39,6 +39,8 @@ const config = engine.initEngine(vaultOverride)
 const userDataFlag = process.argv.indexOf('--user-data')
 const userDataDir = userDataFlag !== -1 ? process.argv[userDataFlag + 1] : undefined
 const appDb = initAppDb(userDataDir)
+// boot evidence for packaged/dev smokes (story 15.1) — app.db is the ABI canary
+if (appDb && userDataDir) console.log(`[loredex-core] app.db open — ${join(userDataDir, 'app.db')}`)
 initSettings(userDataDir)
 const ipc = createCoreIpc()
 // Display requests (native notifications, dock badge) go to main over the
@@ -132,6 +134,9 @@ if (config) {
       },
     },
     onError: (text) => ipc.emit({ kind: 'git.warning', text }),
+  }).then(() => {
+    // boot evidence for packaged/dev smokes (story 15.1)
+    console.log(`[loredex-core] vault watcher armed — ${vaultPath}`)
   }).catch((e: unknown) => {
     ipc.emit({
       kind: 'git.warning',

@@ -7,6 +7,7 @@
 import { existsSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
+import { electronNativeBinding } from './native-binding'
 
 export type AppDb = Database.Database
 
@@ -65,7 +66,10 @@ export function openAppDb(userDataDir: string): AppDb {
 }
 
 function openAndMigrate(file: string): AppDb {
-  const db = new Database(file)
+  // story 15.1: under Electron in dev, load the staged Electron-ABI binary so
+  // build/Release can stay plain-node for vitest; undefined = default lookup
+  const nativeBinding = electronNativeBinding()
+  const db = nativeBinding ? new Database(file, { nativeBinding }) : new Database(file)
   try {
     db.pragma('journal_mode = WAL')
     runMigrations(db)

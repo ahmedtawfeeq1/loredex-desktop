@@ -4049,6 +4049,86 @@ a.commit-chip-sha:hover {
   color: var(--text-2);
 }
 
+/* ── D1 amendment: comment hover popover (story 16.4 v1.1) ──────────────────
+   Hover or keyboard-focus an anchored span → floating card above it: comment
+   body, author name, absolute time (mono 11px). Multiple comments on one
+   anchor stack inside the one popover; position clamps to the pane (flips
+   below the anchor instead of clipping off-window). ─────────────────────── */
+
+.anchor-target {
+  cursor: pointer;
+}
+
+.anchor-target:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+.comment-popover {
+  position: absolute;
+  z-index: 40;
+  max-width: 360px;
+  min-width: 200px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  padding: 10px 12px;
+  animation: popover-in 120ms ease;
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+/* reduced motion: the popover appears with no transition */
+@media (prefers-reduced-motion: reduce) {
+  .comment-popover {
+    animation: none;
+  }
+}
+
+.popover-comment + .popover-comment {
+  border-top: 1px solid var(--hairline);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.popover-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-1);
+  white-space: pre-wrap;
+}
+
+.popover-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.popover-author {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popover-time {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
 /* orphaned = the quote is gone from the note — rust, per D1 */
 .orphan-chip {
   font-family: var(--font-mono);

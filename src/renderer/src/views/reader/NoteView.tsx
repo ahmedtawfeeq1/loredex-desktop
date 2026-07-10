@@ -5,6 +5,8 @@
  * selection → floating Comment chip → margin composer → an anchored
  * `type: comment` vault note; anchored text carries a soft gold
  * underline-highlight, orphaned anchors list at note end with a rust chip.
+ * D1 amendment (v1.1): hovering/focusing an anchored span floats the comment
+ * popover above it — the fast path; the margin rail remains.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Doc } from '../../../../shared/ipc-contract'
@@ -24,8 +26,21 @@ import { attributionLines } from '../handoffs/lifecycle'
 import { ContractChips } from '../contracts/ContractChips'
 import { ReadingOrderInline, readingOrderEmptied } from '../handoffs/ReadingOrderInline'
 import { ThreadRail } from '../handoffs/ThreadRail'
-import { applyAnchorHighlights, clearAnchorHighlights } from './anchorHighlight'
-import { byAnchorPosition, splitComments } from './comments'
+import {
+  ANCHOR_TARGET_CLASS,
+  anchorFromEvent,
+  applyAnchorHighlights,
+  clearAnchorHighlights,
+  unwrapAnchorTargets,
+  wrapAnchorTargets,
+} from './anchorHighlight'
+import { byAnchorPosition, commentsForAnchor, splitComments } from './comments'
+import {
+  CommentPopover,
+  dismissOnEscape,
+  keepsPopoverOpen,
+  type PopoverAnchorBox,
+} from './CommentPopover'
 import { CommentsRail, OrphanedComments } from './InlineComments'
 import { ModeToggle, NoteEditor } from './NoteEditor'
 
@@ -122,6 +137,12 @@ interface ChipState {
   anchor: string
 }
 
+// D1 amendment (v1.1): wrapAnchorTargets mutates DOM under the note body, so
+// React must never diff INTO that subtree (text nodes move inside injected
+// spans). The body div is keyed per render tree — a new tree replaces the
+// whole subtree wholesale instead of reconciling a mutated one.
+let renderSeq = 0
+
 /** The note itself, props-driven (store state stops at NoteView — testable). */
 export function NoteArticle({
   selected,
@@ -145,8 +166,8 @@ export function NoteArticle({
   // memoize per note content — a 1 MB note re-renders only when it changes.
   // Addendum D1: index/MOC pages never render their H1 twice — a leading H1
   // equal to the chrome title (the filename) is stripped before the pipeline.
-  const rendered = useMemo(
-    () => renderMarkdown(stripDuplicateH1(doc.body, title)),
+  const [renderKey, rendered] = useMemo(
+    () => [(renderSeq += 1), renderMarkdown(stripDuplicateH1(doc.body, title))] as const,
     [doc, title],
   )
 
@@ -154,6 +175,8 @@ export function NoteArticle({
   // selections are captured in), markdown source as fallback
   const [bodyText, setBodyText] = useState<string | null>(null)
   const [chip, setChip] = useState<ChipState | null>(null)
+  // D1 amendment (v1.1): the hover/focus popover over an anchored span
+  const [popover, setPopover] = useState<{ anchor: string; box: PopoverAnchorBox } | null>(null)
   const layoutRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
 
@@ -161,17 +184,53 @@ export function NoteArticle({
   const railComments = byAnchorPosition(anchored, bodyText ?? doc.body)
 
   useEffect(() => {
-    // rendered text + the D1 soft gold underline-highlight over anchors
+    // rendered text + the D1 soft gold underline-highlight over anchors,
+    // plus (v1.1) focusable hover targets wrapped around the same anchors
     const root = bodyRef.current
     if (!root) return
     const text = root.textContent ?? ''
     setBodyText(text)
-    applyAnchorHighlights(
-      root,
-      comments.filter((c) => text.includes(c.anchor)).map((c) => c.anchor),
-    )
-    return clearAnchorHighlights
+    const anchors = [
+      ...new Set(comments.filter((c) => text.includes(c.anchor)).map((c) => c.anchor)),
+    ]
+    wrapAnchorTargets(root, anchors) // textContent unchanged — highlights still match
+    applyAnchorHighlights(root, anchors)
+    return () => {
+      clearAnchorHighlights()
+      unwrapAnchorTargets(root)
+    }
   }, [rendered, comments])
+
+  useEffect(() => {
+    // v1.1: Escape dismisses the popover wherever focus sits
+    if (!popover || typeof document === 'undefined') return
+    const onKey = (e: KeyboardEvent): void => dismissOnEscape(e.key, () => setPopover(null))
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [popover])
+
+  function showPopover(anchor: string): void {
+    // v1.1: attach the popover to the anchor's FIRST wrapped segment
+    const layout = layoutRef.current
+    const body = bodyRef.current
+    if (!layout || !body) return
+    const first = Array.from(body.querySelectorAll(`.${ANCHOR_TARGET_CLASS}`)).find(
+      (el) => el.getAttribute('data-anchor') === anchor,
+    )
+    if (!first) return
+    const rect = first.getBoundingClientRect()
+    const layoutRect = layout.getBoundingClientRect()
+    setPopover({
+      anchor,
+      box: {
+        centerX: rect.left - layoutRect.left + rect.width / 2,
+        top: rect.top - layoutRect.top,
+        bottom: rect.bottom - layoutRect.top,
+        viewportTop: rect.top,
+        paneWidth: layoutRect.width,
+      },
+    })
+  }
 
   function onMouseUp(): void {
     // Read-mode selection inside the note body → the floating Comment chip
@@ -235,7 +294,28 @@ export function NoteArticle({
           </div>
         )}
         <FrontmatterPanel meta={doc.meta as Record<string, unknown>} />
-        <div className="note-body" ref={bodyRef}>
+        <div
+          className="note-body"
+          ref={bodyRef}
+          key={renderKey}
+          // v1.1 popover, delegated (target spans are injected imperatively):
+          // hover/focus an anchored span opens it; leaving to anywhere but
+          // the popover or another segment of an anchor dismisses it
+          onMouseOver={(e) => {
+            const anchor = anchorFromEvent(e.target)
+            if (anchor) showPopover(anchor)
+          }}
+          onMouseOut={(e) => {
+            if (!keepsPopoverOpen(e.relatedTarget)) setPopover(null)
+          }}
+          onFocus={(e) => {
+            const anchor = anchorFromEvent(e.target)
+            if (anchor) showPopover(anchor)
+          }}
+          onBlur={(e) => {
+            if (!keepsPopoverOpen(e.relatedTarget)) setPopover(null)
+          }}
+        >
           {rendered}
         </div>
         {/* Addendum D1: a Reading order section never renders as silence — the
@@ -269,6 +349,13 @@ export function NoteArticle({
         >
           Comment
         </button>
+      )}
+      {popover && (
+        <CommentPopover
+          comments={commentsForAnchor(anchored, popover.anchor)}
+          box={popover.box}
+          onDismiss={() => setPopover(null)}
+        />
       )}
       <CommentsRail comments={railComments} composerAnchor={composerAnchor} />
     </div>

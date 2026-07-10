@@ -71,6 +71,7 @@ Done
 |---|---|---|---|
 | 2026-07-10 | 0.1 | Drafted from DESIGN.md Addendum D1 (M4 polish cycle) | Dev agent (BMAD) |
 | 2026-07-10 | 1.0 | Implemented + DoD drive on the live nimbus vault | Dev agent (BMAD) |
+| 2026-07-10 | 1.1 | D1 amendment: comment hover popover — hovering/keyboard-focusing an anchored span floats a `--bg-card` card above it (comment body, author name, absolute time mono 11px; multiple comments on one anchor stack in the one popover; pane-clamped, flips below rather than clipping off-window; Escape/mouseleave/blur dismiss; reduced-motion drops the animation). Anchors get focusable `.anchor-target` spans (tabindex 0 on the first segment); the margin rail remains | Dev agent (BMAD) |
 
 ## Dev Agent Record
 

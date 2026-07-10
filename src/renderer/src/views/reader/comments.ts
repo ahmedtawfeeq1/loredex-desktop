@@ -48,6 +48,20 @@ export function relativeTime(iso: string, nowMs: number): string {
   return iso.slice(0, 10)
 }
 
+/** All comments on one anchor, oldest first — they stack in one popover. */
+export function commentsForAnchor(comments: NoteComment[], anchor: string): NoteComment[] {
+  return comments.filter((c) => c.anchor === anchor).sort((a, b) => a.at.localeCompare(b.at))
+}
+
+/** Popover timestamp — absolute `2026-07-10 14:32` (local); date-only stays. */
+export function absoluteTime(iso: string): string {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return iso
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`
+}
+
 /** Truncated anchor quote for cards/chips — never a wall of text. */
 export function anchorPreview(anchor: string, max = 90): string {
   const flat = anchor.replace(/\s+/g, ' ').trim()

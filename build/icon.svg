@@ -1,0 +1,20 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBFBF9"/>
+      <stop offset="1" stop-color="#EEEEE8"/>
+    </linearGradient>
+  </defs>
+  <!-- macOS squircle-ish card -->
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#paper)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="none" stroke="#DEDED8" stroke-width="4"/>
+  <!-- double wikilink brackets, Archive Ink -->
+  <g stroke="#2E6E5E" stroke-width="30" fill="none">
+    <path d="M 294 372 H 234 V 652 H 294"/>
+    <path d="M 384 372 H 324 V 652 H 384"/>
+    <path d="M 730 372 H 790 V 652 H 730"/>
+    <path d="M 640 372 H 700 V 652 H 640"/>
+  </g>
+  <!-- serif L, New York-adjacent -->
+  <text x="512" y="655" font-family="Georgia, 'Times New Roman', serif" font-size="400" font-weight="500" fill="#2E6E5E" text-anchor="middle">L</text>
+</svg>

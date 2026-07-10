@@ -7,9 +7,11 @@ Native macOS companion for the [loredex](https://github.com/ahmedtawfeeq1/lorede
 Requires an Apple Silicon Mac (M1 or newer), macOS 14+.
 
 1. Download `Loredex-0.1.0-arm64.dmg` below, open it, drag **Loredex** to Applications.
-2. **This build is unsigned** (no Apple Developer certificate yet), so Gatekeeper will block the first launch. Either:
-   - Right-click Loredex.app → **Open** → **Open** in the dialog, or
-   - Terminal: `xattr -dr com.apple.quarantine /Applications/Loredex.app`
+2. **This build is unsigned** (no Apple Developer certificate yet), so Gatekeeper will say *"Loredex.app is damaged and can't be opened"* on first launch — it is not damaged, that is macOS quarantining an unsigned download. Fix in Terminal, then launch normally:
+   ```
+   xattr -dr com.apple.quarantine /Applications/Loredex.app
+   ```
+   (On most systems right-click → Open does NOT bypass this dialog for unsigned apps.)
 3. Launch, then **File → Open Vault… (⌘O)** and pick any loredex vault folder (a folder with `projects/` + `_index/` created by `npx -y loredex@latest init`).
 
 ## What to try

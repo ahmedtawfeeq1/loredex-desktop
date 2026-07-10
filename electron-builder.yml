@@ -3,11 +3,14 @@
 # entitlements allow-jit only, inside-out signing, notarytool + staple). Out of scope for v0.1.
 appId: dev.loredex.desktop
 productName: Loredex
+copyright: © 2026 Ahmed Tawfeeq — MIT license
 directories:
   output: dist
 files:
   - out/**
 mac:
+  icon: build/icon.icns
+  category: public.app-category.developer-tools
   target:
     - target: dmg
       arch: [arm64]

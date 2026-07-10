@@ -96,3 +96,10 @@ Reader gains a per-note mode toggle Read ⇄ Edit (⌘E). Edit = monospace 13px 
 
 ### D1 amendment — comment hover popover (user requirement, 2026-07-10)
 Anchored (commented) text MUST show a hover popover: comment body, author name, absolute time (mono 11px), rendered as a floating `--bg-card` card (hairline, radius 10, shadow-sm, max-width 360px) above the anchor; multiple comments on one anchor stack inside the popover. Popover is keyboard-reachable (focus the anchor → same popover). The margin rail remains; the popover is the fast path.
+
+### D1 amendment 2 — editor v2 (user requirement, 2026-07-10)
+The edit surface upgrades from plain textarea to **CodeMirror 6** (the standard; Obsidian's editor core; MIT, sanctioned new dependency: @codemirror/* + @lezer/highlight):
+- Markdown syntax highlighting (headings/bold/code/links tinted via theme tokens, both themes), active-line highlight, bracket match, markdown-aware list continuation on Enter, history (undo/redo), search panel (⌘F), multiple selections.
+- Toolbar (icon buttons, 28px, hairline group borders, tooltips with shortcuts): headings dropdown H1–H4 · bold ⌘B · italic ⌘I · strikethrough · inline code · code block · wikilink [[ ]] · md link ⌘K-in-editor · quote · bullet list · numbered list · task list · table snippet · horizontal rule · undo/redo. All insert/wrap markdown; selection-aware (wrap selection, toggle off when already applied).
+- Frontmatter stays locked (not part of the editable doc). Save semantics unchanged (⌘S → note.save, receipt, activity). Dirty-guard on view/note switch (save/discard prompt).
+- Editor fills the pane full-bleed like Read mode; 13px mono; gutter line numbers OFF by default (notes, not code).

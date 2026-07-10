@@ -104,13 +104,15 @@ describe('fitViewBox', () => {
 describe('zoom + pan', () => {
   const vb = { x: 0, y: 0, w: 1000, h: 750 }
 
-  it('zooms about the pointer and clamps to 0.5×–2× of the fit', () => {
+  it('zooms about the pointer and clamps to the 0.4×–2.5× band (D1a5)', () => {
     const zoomed = zoomViewBox(vb, 0.5, 500, 375, 1000)
-    expect(zoomed.w).toBe(500) // 2× zoom in — the clamp boundary
+    expect(zoomed.w).toBe(500) // 2× zoom in — inside the band
     expect(zoomed.x).toBe(250) // pointer point stays put
     expect(zoomed.y).toBe(187.5)
-    expect(zoomViewBox(vb, 0.0001, 0, 0, 1000).w).toBe(500) // never past 2×
-    expect(zoomViewBox(vb, 100000, 0, 0, 1000).w).toBe(2000) // never past 0.5×
+    // most zoomed IN: fitW / ZOOM_MAX_SCALE = 1000 / 2.5 = 400
+    expect(zoomViewBox(vb, 0.0001, 0, 0, 1000).w).toBe(400) // never past 2.5×
+    // most zoomed OUT: fitW / ZOOM_MIN_SCALE = 1000 / 0.4 = 2500
+    expect(zoomViewBox(vb, 100000, 0, 0, 1000).w).toBe(2500) // never past 0.4×
   })
 
   it('pans by deltas without touching the size', () => {

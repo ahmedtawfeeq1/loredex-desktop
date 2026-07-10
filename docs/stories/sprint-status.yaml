@@ -152,8 +152,47 @@ development_status:
   17-4-resizable-list-pane: done              # Resizable list pane (D1a3): col-resize drag handle on the file-list/reader divider, clamped 200–480px, double-click resets 300, persisted PER VAULT beside the rails row (own settings.listWidth app_settings key + channel — treeSections seam; RailsCollapsed contract untouched). ONE pure clampListWidth (listPaneWidth.ts, 200/480/300, rounds, non-finite→default) shared by store+handle+core. rails store gains listWidth/resizing/dragListWidth(live,no-persist)/commitListWidth(persist)/resetListWidth/setResizing; two-speed writes = one app.db write per drag not per pointermove; list-resizing class kills the 160ms width transition mid-drag. ListResizeHandle = pointer-capture flex divider (role=separator), rendered by App only while list expanded; VaultTree applies inline width only when NOT collapsed so rail-collapsed width:0 still wins. Deviation: flex divider not in-pane overlay (overflow scroller top-anchors an absolute handle) — adds one 12px .app gap; keyboard resize out of scope (collapse ⌘⇧\ is the keyboard path). Gate: typecheck clean, vitest 828/828 sequential, build clean, e2e 18/18
   17-5-file-pane-search-modes: done           # File-pane Name|Content search modes (D1a3): segmented toggle on the "Search files…" box (DESIGN --bg-inset track / --bg-card active). Name = existing filterTree (machine+humanized). Content = vault.search full-text (150ms debounce), tree REPLACED by a flat result list (project tint dot via sectionTint(hit.project), humanized title, Highlight'd snippet+title, date; filename in tooltip); Enter opens the TOP hit, Esc clears back to the tree. Dedicated fileSearch store (mode/query/results/searching/error; setMode/setQuery/runContentSearch seq-guarded/topHit/openTop(open)/escape/reset) SEPARATE from the search-view/⌘K store so file-pane typing never contaminates Search; reset on vault change. Reuses Highlight/openSearchResult/sectionTint/humanizeTitle — no re-impl. Deviation: content rows reuse .search-row recipe + tint-dot head. Gate: typecheck clean, vitest 828/828 sequential, build clean, e2e 18/18
 
+  # ---- M6 cycle (handoff reply model, DESIGN.md D1 amendment 4) ---------------
+  epic-18: not-started     # Handoff reply model per D1 amendment 4 — NOT BUILT (QA 2026-07-10)
+  # No story files authored, no code delivered. D1 amendment 4 asks: Comment = PRIMARY
+  # default reply (rename the prominent Reply so Comment is the obvious first action);
+  # "Hand back" (SECONDARY) = today's Reply that mints a type:handoff board card, with a
+  # compose-modal helper "Creates a new handoff the other team must consume. For a quick
+  # note, use Comment."; board + all counts list ONLY type:handoff. Fresh-eyes QA found:
+  # HandoffCardView still renders "Reply" FIRST + "Comment" second, both button-secondary
+  # (Comment NOT primary); no "Hand back" string anywhere in src/; ComposeHandoffModal
+  # still titled "Reply to handoff" with no helper copy. The board-excludes-comments +
+  # threading substrate ALREADY WORKS (epic7/8/10: annotateHandoff writes type:comment w/o
+  # status/from_project, listHandoffs skips it) and was proven green by a module drive on a
+  # nimbus-vault sandbox — but that is pre-epic18 code, not evidence epic18 shipped.
+  # Verdict: FAIL / NOT DELIVERED. Details: V3-STATUS.md "Handoff reply model (epic18) — QA".
+
+  # ---- M6 cycle (atlas navigation, DESIGN.md D1 amendment 5) ------------------
+  epic-19: in-progress     # Atlas navigation + header breathing room (D1 amendment 5, real-vault user feedback)
+  19-1-atlas-navigation: done                 # D1a5: trackpad-native Atlas. NATIVE non-passive wheel listener (React onWheel is passive → preventDefault would no-op & the pane-board would scroll): ctrlKey pinch = cursor-anchored zoom clamped to a widened 0.4–2.5 band (shared ZOOM_MIN/MAX_SCALE in atlas-layout; zoomViewBox re-clamped, tour fitViewBoxAround band untouched), plain two-finger wheel = pan (shift maps vertical→horizontal), every gesture preventDefault'd; drag-pan kept. Floating bottom-right pill stack (+/−/⌖ fit/1:1 reset; 28px mono; --bg-card/hairline/shadow-sm; tooltips) + ⌘=/⌘−/⌘0 registered as GLOBAL registry actions (ids action:zoom-* kept OUT of the action:atlas-* contextual namespace so the off-view leak guard stays green; run() self-guards on view). ONE viewBox owner (AtlasCanvas) + a module-level setZoomHandler/dispatchZoom command bus so pills+shortcuts+palette drive the live frame; ⌘0 moved off the canvas window-listener onto the registry. Header breathing room: .atlas>.atlas-header 16px/12px padding + hairline divider below the row, .atlas>.atlas-pane 16px side/bottom inset + position:relative anchor (child-combinator overrides win regardless of CSS load order); 8px inter-group gaps kept. Pure helpers (atlas-zoom.ts) unit-tested (clamp/cursor-anchor/pan-delta/1:1/bus bind+stale-unbind/registry wiring+off-view no-op); atlas.css asserted via the design-fidelity readFileSync pattern (atlas-fidelity.test.ts). Existing atlas invariants (shelf-wrap/no-overlap/clearance/density/readable-floor) green; only zoomViewBox clamp assertions updated to 0.4–2.5. Gate: typecheck clean, atlas+actions+fidelity vitest 172/172, build clean
+
 qa:
-  pass_date: 2026-07-10   # M5 comprehension pass (epic17 stories 1-5, fresh-eyes QA agent); M4/M3 passes below stay valid for their surfaces
+  pass_date: 2026-07-10   # M6 handoff-reply-model pass: epic18 NOT DELIVERED (see m6_verdict); M5/M4/M3 passes below stay valid for their surfaces
+  m6_verdict: >
+    epic18 (handoff reply model, D1 amendment 4) — VERDICT: FAIL, NOT DELIVERED.
+    No story files, no board entry, no code; working tree was clean at pass start and
+    the git log ends at epic17 + the amendment-5 docs commit. The amendment-4 UX layer is
+    entirely absent: Comment is NOT the primary action (HandoffCardView renders "Reply"
+    first + "Comment" second, both button-secondary); "Hand back" exists nowhere in src/
+    (grep clean); ComposeHandoffModal is still titled "Reply to handoff" with no
+    "must consume" helper. The board-filtering + threading substrate the amendment builds
+    on ALREADY works from epic7/8/10 (annotateHandoff writes type:comment with no
+    status/from_project; listHandoffs skips such notes; atlas carries the replies_to edge)
+    and was proven green by a module-level drive on a nimbus-vault sandbox — add a comment
+    to nimbus-backend/2026-07-10-handoff-nimbus-frontend-2 → board list unchanged (21->21),
+    comment absent from board, target thread grows by exactly one type:comment reply — but
+    that is pre-epic18 code, NOT evidence epic18 shipped, so it does not change the verdict.
+    Full gate all green on the delivered tree (typecheck clean, vitest 829/829, e2e 18/18,
+    build clean, named regressions 109/109, 30 s dev smoke PASS w/ node ABI intact after) —
+    baseline health is fine, there is simply no epic18 to accept. A concurrent D1-amendment-5
+    (atlas trackpad/zoom) batch landed uncommitted in the tree mid-pass; not epic18, left
+    untouched. Real _machine2/nimbus-vault never mutated (drive ran on a scratchpad copy).
+    Full status: V3-STATUS.md "Handoff reply model (epic18) — QA".
   m5_verdicts: >
     All five epic17 comprehension-pass stories (17.1-17.5) verified PASS against
     DESIGN.md "D1 amendment 3" verbatim (per-story evidence in each QA Results).

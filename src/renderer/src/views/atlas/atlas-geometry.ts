@@ -6,7 +6,14 @@
  * can never clip under a card, and keyboard traversal order.
  * No DOM, fully unit-tested; the canvas component just applies the numbers.
  */
-import { FIT_PAD, NODE_W, READABLE_CARD_MIN, type Rect } from '../../../../shared/atlas-layout'
+import {
+  FIT_PAD,
+  NODE_W,
+  READABLE_CARD_MIN,
+  type Rect,
+  ZOOM_MAX_SCALE,
+  ZOOM_MIN_SCALE,
+} from '../../../../shared/atlas-layout'
 
 // the geometry both sides of the seam must agree on (card boxes, overlap
 // test, orthogonal routing, chips, lanes, the panel card box) lives in
@@ -67,8 +74,9 @@ export function fitViewBox(rects: Rect[], paneW: number, paneH: number): ViewBox
   return { x: minX - FIT_PAD, y: minY - FIT_PAD, w, h }
 }
 
-/** Wheel/pinch zoom about a pointer position (SVG coords), clamped to
- *  0.5×–2× of the fitted view (`fitW` = the fit viewBox width). */
+/** Wheel/pinch zoom about a pointer position (SVG coords), clamped to the
+ *  ZOOM_MIN_SCALE–ZOOM_MAX_SCALE band (0.4×–2.5×, D1 amendment 5) of the fitted
+ *  view (`fitW` = the fit viewBox width). The anchor point stays fixed. */
 export function zoomViewBox(
   vb: ViewBox,
   factor: number,
@@ -76,7 +84,7 @@ export function zoomViewBox(
   atY: number,
   fitW: number,
 ): ViewBox {
-  const w = Math.min(Math.max(vb.w * factor, fitW / 2), fitW * 2)
+  const w = Math.min(Math.max(vb.w * factor, fitW / ZOOM_MAX_SCALE), fitW / ZOOM_MIN_SCALE)
   const scale = w / vb.w
   const h = vb.h * scale
   return { x: atX - (atX - vb.x) * scale, y: atY - (atY - vb.y) * scale, w, h }

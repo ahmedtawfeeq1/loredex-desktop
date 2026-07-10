@@ -22,6 +22,14 @@ import {
 import type { AtlasEdge, AtlasGraph, AtlasNode } from '../../../../shared/types'
 import { AtlasNodeCard, type AtlasNodeVariant } from './AtlasNodeCard'
 import { focusNeighborhood } from './atlas-filters'
+import {
+  resetOneToOne,
+  setZoomHandler,
+  wheelPan,
+  wheelZoomFactor,
+  type ZoomCommand,
+  zoomAtCenter,
+} from './atlas-zoom'
 import { type TopicAtom, visiblePanels } from './atlas-visibility'
 import { type AtlasDecor, edgeDecorClass, nodeDecorClass } from './decor'
 import { TopicGroup } from './TopicGroup'
@@ -203,6 +211,9 @@ export function AtlasCanvas({
   const [viewBox, setViewBox] = useState<ViewBox | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const drag = useRef<{ x: number; y: number } | null>(null)
+  // the live viewBox, mirrored so the native (non-passive) wheel listener and
+  // the zoom command bus read the current frame without re-subscribing
+  const vbRef = useRef<ViewBox>({ x: 0, y: 0, w: 1200, h: 800 })
 
   const level = graph.level
   const byId = useMemo(() => new Map(visibleNodes.map((n) => [n.id, n])), [visibleNodes])
@@ -322,18 +333,25 @@ export function AtlasCanvas({
     refit()
   }, [fitKey])
 
-  // ⌘0 refits to content (viewport spec) while the atlas is on screen
-  // biome-ignore lint/correctness/useExhaustiveDependencies: listener rebinds with the fit inputs
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      if ((e.metaKey || e.ctrlKey) && e.key === '0') {
-        e.preventDefault()
-        refit()
-      }
+  // D1 amendment 5: the on-canvas pills, the ⌘=/⌘−/⌘0 registry actions and the
+  // ⌘K palette all drive THIS canvas through the zoom command bus. The applier
+  // is reassigned each render so it always closes over the live viewBox + fit,
+  // while the registration itself is stable (one subscribe for the lifetime).
+  const applyZoom = (cmd: ZoomCommand): void => {
+    if (cmd === 'fit') {
+      refit()
+      return
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [fitKey, fitRects])
+    const paneW = paneRef.current?.clientWidth ?? 1200
+    if (cmd === 'reset') {
+      setViewBox(resetOneToOne(vbRef.current, paneW, fitW.current))
+      return
+    }
+    setViewBox(zoomAtCenter(vbRef.current, cmd, fitW.current))
+  }
+  const applyZoomRef = useRef(applyZoom)
+  applyZoomRef.current = applyZoom
+  useEffect(() => setZoomHandler((cmd) => applyZoomRef.current(cmd)), [])
 
   // tour step: fit the viewport around the highlighted set (story 10.5 AC3)
   const fitIdsKey = (fitToIds ?? []).join(',')
@@ -358,6 +376,7 @@ export function AtlasCanvas({
   }, [fitIdsKey, fitKey])
 
   const vb = viewBox ?? fitViewBox(fitRects, 1200, 800)
+  vbRef.current = vb
   const scale = (): number => {
     const pane = paneRef.current
     return vb.w / Math.max(pane?.clientWidth ?? 1200, 1)
@@ -373,16 +392,32 @@ export function AtlasCanvas({
   // parallel edges between the same pair fan out ±12px per lane
   const lanes = useMemo(() => laneOffsets(graph.edges), [graph.edges])
 
-  function onWheel(e: React.WheelEvent<SVGSVGElement>): void {
+  // D1 amendment 5 — trackpad gestures. A NATIVE, non-passive wheel listener so
+  // preventDefault actually holds (React's synthetic wheel is passive): pinch
+  // (ctrlKey-wheel) zooms toward the cursor; a plain two-finger scroll pans
+  // (shift maps a vertical wheel to horizontal). Either way the page/pane never
+  // scrolls. Reads vbRef so the listener stays subscribed for the lifetime.
+  useEffect(() => {
     const svg = svgRef.current
-    if (!svg) return
-    const rect = svg.getBoundingClientRect()
-    const atX = vb.x + ((e.clientX - rect.left) / Math.max(rect.width, 1)) * vb.w
-    const atY = vb.y + ((e.clientY - rect.top) / Math.max(rect.height, 1)) * vb.h
-    // trackpad pinch arrives as ctrlKey-wheel; both zoom about the pointer
-    const factor = e.deltaY > 0 ? 1.12 : 1 / 1.12
-    setViewBox(zoomViewBox(vb, factor, atX, atY, fitW.current))
-  }
+    if (!svg) return undefined
+    function onWheelNative(e: WheelEvent): void {
+      const el = svgRef.current
+      if (!el) return
+      e.preventDefault()
+      const cur = vbRef.current
+      const rect = el.getBoundingClientRect()
+      if (e.ctrlKey) {
+        const atX = cur.x + ((e.clientX - rect.left) / Math.max(rect.width, 1)) * cur.w
+        const atY = cur.y + ((e.clientY - rect.top) / Math.max(rect.height, 1)) * cur.h
+        setViewBox(zoomViewBox(cur, wheelZoomFactor(e.deltaY), atX, atY, fitW.current))
+      } else {
+        const pxToSvg = cur.w / Math.max(rect.width, 1)
+        setViewBox(wheelPan(cur, e.deltaX, e.deltaY, e.shiftKey, pxToSvg))
+      }
+    }
+    svg.addEventListener('wheel', onWheelNative, { passive: false })
+    return () => svg.removeEventListener('wheel', onWheelNative)
+  }, [])
 
   function onKeyDown(e: React.KeyboardEvent<SVGSVGElement>): void {
     if (e.key === 'Escape' || e.key === 'Backspace') {
@@ -424,7 +459,6 @@ export function AtlasCanvas({
         viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
         role="application"
         aria-label={`Vault atlas, ${level} level, ${visibleNodes.length} nodes`}
-        onWheel={onWheel}
         onKeyDown={onKeyDown}
         onPointerDown={(e) => {
           if (e.target === e.currentTarget || (e.target as Element).classList?.contains('atlas-grid')) {
@@ -577,6 +611,48 @@ export function AtlasCanvas({
           ))}
         </g>
       </svg>
+      {/* D1 amendment 5 — floating on-canvas zoom pill stack (bottom-right):
+          28px mono-glyph buttons, each with a tooltip + keyboard equivalent */}
+      <div className="atlas-zoom-controls" role="group" aria-label="Zoom controls">
+        <button
+          type="button"
+          className="atlas-zoom-btn"
+          title="Zoom in (⌘=)"
+          aria-label="Zoom in"
+          onClick={() => setViewBox(zoomAtCenter(vb, 'in', fitW.current))}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          className="atlas-zoom-btn"
+          title="Zoom out (⌘−)"
+          aria-label="Zoom out"
+          onClick={() => setViewBox(zoomAtCenter(vb, 'out', fitW.current))}
+        >
+          −
+        </button>
+        <button
+          type="button"
+          className="atlas-zoom-btn"
+          title="Fit to content (⌘0)"
+          aria-label="Fit to content"
+          onClick={refit}
+        >
+          ⌖
+        </button>
+        <button
+          type="button"
+          className="atlas-zoom-btn atlas-zoom-btn-reset"
+          title="Reset to actual size (1:1)"
+          aria-label="Reset to actual size"
+          onClick={() =>
+            setViewBox(resetOneToOne(vb, paneRef.current?.clientWidth ?? 1200, fitW.current))
+          }
+        >
+          1:1
+        </button>
+      </div>
     </div>
   )
 }

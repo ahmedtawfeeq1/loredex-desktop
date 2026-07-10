@@ -57,6 +57,13 @@ export const PANEL_ASPECT = 1.6
  *  (fitViewBox frames the top-left starting region). Matches the ≥140px density
  *  floor. (epic17.2 layout-fix) */
 export const READABLE_CARD_MIN = 140
+/** interactive zoom band (D1 amendment 5 — trackpad-native navigation): pinch /
+ *  ⌘=/⌘− zoom is clamped between these scales RELATIVE to the fitted view — so
+ *  the smallest viewBox (most zoomed in) is fitW / ZOOM_MAX_SCALE and the widest
+ *  (most zoomed out) is fitW / ZOOM_MIN_SCALE. Widened from the prior 0.5–2 band
+ *  so pinch has more travel without losing the map. */
+export const ZOOM_MIN_SCALE = 0.4
+export const ZOOM_MAX_SCALE = 2.5
 /** side-pill column → panel gutter (GRID-aligned, 24 × 9): fits a CHIP_W
  *  route chip mid-channel with real clearance to the pill AND the panel card
  *  (GUTTER left it exactly chip-tight — the clipped-label defect, story 16.5) */

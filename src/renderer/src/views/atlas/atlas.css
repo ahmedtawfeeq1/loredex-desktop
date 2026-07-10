@@ -135,3 +135,67 @@
 .atlas-edge {
   transition: opacity 120ms ease;
 }
+
+/* ── D1 amendment 5: header breathing room + on-canvas zoom controls ──────────
+   The atlas content used to sit flush to its card border. Give the 44px toolbar
+   row 16px horizontal + 12px vertical padding so the VAULT ATLAS eyebrow, the
+   segmented zoom control, the breadcrumb and the action pills never kiss the
+   edge, keep the hairline divider BELOW the row (not at the very top edge), and
+   inset the canvas card 16px from the ground on the sides + bottom. Child
+   combinator selectors win over the base .atlas-* rules regardless of load
+   order. */
+.atlas > .atlas-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.atlas > .atlas-pane {
+  position: relative; /* anchors the floating zoom pill stack */
+  margin: 0 16px 16px;
+}
+
+/* floating zoom pill stack: bottom-right, --bg-card / hairline / shadow-sm */
+.atlas-zoom-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(19, 24, 38, 0.06);
+  overflow: hidden;
+}
+
+/* 28px mono-glyph buttons; hairline between them; ≤120ms transition (the global
+   prefers-reduced-motion rule in styles.css disables it) */
+.atlas-zoom-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--hairline);
+  color: var(--navy);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.atlas-zoom-btn:last-child {
+  border-bottom: none;
+}
+
+.atlas-zoom-btn-reset {
+  font-size: 11px;
+}
+
+.atlas-zoom-btn:hover {
+  background: var(--bg-inset);
+}

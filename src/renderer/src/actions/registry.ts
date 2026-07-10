@@ -8,6 +8,7 @@
  *
  * Store-driven (zustand getState), no React — unit-testable under node.
  */
+import { dispatchZoom } from '../views/atlas/atlas-zoom'
 import { useApp, type AppView } from '../stores/app'
 import { useEditor } from '../stores/editor'
 import { useFind } from '../stores/find'
@@ -160,6 +161,40 @@ export function appActions(): AppAction[] {
         if (useApp.getState().view !== 'reader' || !selected) return
         if (editor.editing && editor.path === selected) return // Edit → CM's ⌘F
         useFind.getState().openBar()
+      },
+    },
+    {
+      // D1 amendment 5 (epic19.1): atlas zoom is keyboard-bound + palette-listed
+      // through the registry; run() no-ops off the Atlas, and the mounted canvas
+      // applies the command via the zoom bus (views/atlas/atlas-zoom).
+      // ids stay OUT of the `action:atlas-*` namespace: those are the
+      // Atlas-only contextual palette rows (palette-items) that must never leak
+      // off-view. These three are GLOBAL registry actions (so the shell binds
+      // ⌘=/⌘−/⌘0 and the palette lists them) whose run() self-guards on view.
+      id: 'action:zoom-in',
+      title: 'Atlas: zoom in',
+      shortcut: '⌘=',
+      combo: { key: '=', meta: true },
+      run: () => {
+        if (useApp.getState().view === 'atlas') dispatchZoom('in')
+      },
+    },
+    {
+      id: 'action:zoom-out',
+      title: 'Atlas: zoom out',
+      shortcut: '⌘−',
+      combo: { key: '-', meta: true },
+      run: () => {
+        if (useApp.getState().view === 'atlas') dispatchZoom('out')
+      },
+    },
+    {
+      id: 'action:zoom-fit',
+      title: 'Atlas: fit to content',
+      shortcut: '⌘0',
+      combo: { key: '0', meta: true },
+      run: () => {
+        if (useApp.getState().view === 'atlas') dispatchZoom('fit')
       },
     },
     {

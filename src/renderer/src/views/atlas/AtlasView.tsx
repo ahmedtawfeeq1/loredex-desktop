@@ -10,8 +10,12 @@ import { useAtlas } from '../../stores/atlas'
 import { useHandoffs } from '../../stores/handoffs'
 import { AtlasBreadcrumbs } from './AtlasBreadcrumbs'
 import { AtlasCanvas } from './AtlasCanvas'
+import { activeFilterCount, applyAtlasFilters, focusNeighborhood } from './atlas-filters'
+import { AtlasFilterPanel } from './AtlasFilterPanel'
 import { visibleAtlas } from './atlas-visibility'
+import { BlockedList } from './BlockedList'
 import type { AtlasDecor } from './decor'
+import { PathTrace } from './PathTrace'
 import { activateNode, performResolution, resolveEdgeTarget } from './resolve'
 import { TourPanel } from './TourPanel'
 
@@ -39,6 +43,12 @@ export function AtlasView(): React.JSX.Element {
   const setPanel = useAtlas((s) => s.setPanel)
   const tourHighlight = useAtlas((s) => s.tourHighlight)
   const activeTour = useAtlas((s) => s.activeTour)
+  const filters = useAtlas((s) => s.filters)
+  const toggleBlocked = useAtlas((s) => s.toggleBlocked)
+  const focusId = useAtlas((s) => s.focusId)
+  const setFocus = useAtlas((s) => s.setFocus)
+  const pathResult = useAtlas((s) => s.pathResult)
+  const searchRings = useAtlas((s) => s.searchRings)
 
   useEffect(() => {
     // live data (watcher/poller) keeps it fresh after this first fetch
@@ -57,15 +67,30 @@ export function AtlasView(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // filters narrow the rendered set live, composing AND across facets (10.6 AC2)
+  const shownGraph = useMemo(() => {
+    if (!graph) return null
+    const kept = applyAtlasFilters(graph.nodes, graph.edges, filters)
+    return { ...graph, nodes: kept.nodes, edges: kept.edges }
+  }, [graph, filters])
+
   const visibility = useMemo(
-    () => (graph ? visibleAtlas(graph, expandedTopic) : { nodes: [], atoms: [] }),
-    [graph, expandedTopic],
+    () => (shownGraph ? visibleAtlas(shownGraph, expandedTopic) : { nodes: [], atoms: [] }),
+    [shownGraph, expandedTopic],
   )
 
-  const decor = useMemo<AtlasDecor>(
-    () => ({ ...(tourHighlight.length > 0 ? { tour: new Set(tourHighlight) } : {}) }),
-    [tourHighlight],
-  )
+  const decor = useMemo<AtlasDecor>(() => {
+    const path = pathResult && pathResult !== 'none' ? pathResult : null
+    return {
+      ...(tourHighlight.length > 0 ? { tour: new Set(tourHighlight) } : {}),
+      ...(searchRings.size > 0 ? { search: searchRings } : {}),
+      ...(path ? { path: new Set(path.nodeIds), pathEdges: new Set(path.edgeIds) } : {}),
+      // focus composes with the filtered set (10.6 AC5): 1-hop over shown edges
+      ...(focusId && shownGraph
+        ? { focus: focusNeighborhood(focusId, shownGraph.edges) }
+        : {}),
+    }
+  }, [tourHighlight, searchRings, pathResult, focusId, shownGraph])
 
   // the selected node's project — lets the Learn segment work from Overview
   const selectedProject = useMemo(() => {
@@ -120,6 +145,33 @@ export function AtlasView(): React.JSX.Element {
           >
             Tours{activeTour ? ' ●' : ''}
           </button>
+          <button
+            type="button"
+            className="atlas-tool"
+            aria-pressed={panel === 'filters'}
+            title="Narrow the canvas by type, status, topic, edge, tier"
+            onClick={() => setPanel(panel === 'filters' ? null : 'filters')}
+          >
+            Filters{activeFilterCount(filters) > 0 ? ` (${activeFilterCount(filters)})` : ''}
+          </button>
+          <button
+            type="button"
+            className="atlas-tool"
+            aria-pressed={panel === 'path'}
+            title="Trace how one node reaches another"
+            onClick={() => setPanel(panel === 'path' ? null : 'path')}
+          >
+            Path
+          </button>
+          <button
+            type="button"
+            className="atlas-tool"
+            aria-pressed={filters.blocked}
+            title="Isolate blocking chains — who is blocked on whom"
+            onClick={toggleBlocked}
+          >
+            Blocked
+          </button>
         </div>
       </div>
       {error && <div className="note-error">{error}</div>}
@@ -143,7 +195,7 @@ export function AtlasView(): React.JSX.Element {
       ) : (
         <div className="atlas-body">
           <AtlasCanvas
-            graph={graph}
+            graph={shownGraph ?? graph}
             visibleNodes={visibility.nodes}
             atoms={visibility.atoms}
             selectedId={selectedId}
@@ -157,11 +209,22 @@ export function AtlasView(): React.JSX.Element {
               else onActivate(target.node)
             }}
             onExpandTopic={toggleTopic}
-            onEscape={() => void up()}
+            // Esc exits focus mode first (10.6 AC4), then walks up (10.3)
+            onEscape={() => {
+              if (focusId) setFocus(null)
+              else void up()
+            }}
+            // 'f' on a selected card toggles the 1-hop isolate
+            onFocusKey={() => {
+              if (selectedId) setFocus(focusId === selectedId ? null : selectedId)
+            }}
             decor={decor}
             fitToIds={tourHighlight}
           />
           {panel === 'tour' && <TourPanel />}
+          {panel === 'filters' && <AtlasFilterPanel />}
+          {panel === 'path' && <PathTrace />}
+          {panel === 'blocked' && <BlockedList />}
         </div>
       )}
     </div>

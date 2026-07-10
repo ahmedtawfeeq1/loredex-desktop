@@ -331,6 +331,13 @@ export interface AtlasGraph {
   cyclic: boolean
 }
 
+/** BFS shortest-path result (story 10.6, ATLAS-6) — rendered gold as a
+ *  clickable routing-slip chain; null crosses the seam when disconnected. */
+export interface AtlasPathResult {
+  nodeIds: string[]
+  edgeIds: string[]
+}
+
 /**
  * Tours (story 10.5, ATLAS-5): the interactive form of curate reading orders.
  * A tour is nothing more than an ordered list of (title, prose, nodeId[]) that

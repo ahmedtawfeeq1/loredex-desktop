@@ -482,6 +482,20 @@ describe('atlas.graph channel (fixture vault)', () => {
     // memoized: same request returns the identical cached object shape
     const again = await client.invoke('atlas.graph', { level: 'overview' })
     expect(again).toEqual(overview)
+
+    // story 10.6: atlas.path rides the same seam over the same cached model
+    const path = await client.invoke('atlas.path', {
+      from: 'project:nimbus-api',
+      to: 'project:nimbus-web',
+    })
+    expect(path).not.toBeNull()
+    expect(path?.nodeIds[0]).toBe('project:nimbus-api')
+    expect(path?.nodeIds[path.nodeIds.length - 1]).toBe('project:nimbus-web')
+    const nowhere = await client.invoke('atlas.path', {
+      from: 'project:nimbus-api',
+      to: 'note:ghost',
+    })
+    expect(nowhere).toBeNull()
   })
 })
 

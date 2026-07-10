@@ -4,10 +4,24 @@
  * renderer computes NO layout: positions arrive precomputed from atlas.graph.
  */
 import { create } from 'zustand'
+import { toVaultRelative } from '../../../shared/handoff-lanes'
 import { isErrEnvelope } from '../../../shared/ipc-contract'
-import type { AtlasGraph, AtlasLevel, AtlasScope, TourDef } from '../../../shared/types'
+import type {
+  AtlasGraph,
+  AtlasLevel,
+  AtlasPathResult,
+  AtlasScope,
+  TourDef,
+} from '../../../shared/types'
+import {
+  type AtlasFilters,
+  EMPTY_FILTERS,
+  searchRingTiers,
+} from '../views/atlas/atlas-filters'
 import { clampStep, playbackActionFor } from '../views/atlas/tour-playback'
 import { invoke, onEvent } from '../api'
+import { useApp } from './app'
+import { useSearch } from './search'
 
 /** UA's MAX_HISTORY concept, kept verbatim (ATLAS-CONCEPT §1.4). */
 export const MAX_HISTORY = 50
@@ -31,15 +45,33 @@ interface AtlasState {
   /** visited levels/nodes — bounded back/forward stack (story 10.3) */
   history: AtlasHistoryEntry[]
   historyIndex: number
-  /** the one open side panel (story 10.5: tours) */
-  panel: 'tour' | null
+  /** the one open side panel (10.5 tours; 10.6 filters/path/blocked) */
+  panel: 'tour' | 'filters' | 'path' | 'blocked' | null
   /** tours from atlas.tours — recomputed with graph invalidation (10.5 AC5) */
   tours: TourDef[] | null
   activeTour: TourDef | null
   tourStep: number
   /** node ids the current step highlights (pulse ring + viewport fit) */
   tourHighlight: string[]
-  setPanel(panel: 'tour' | null): void
+  setPanel(panel: 'tour' | 'filters' | 'path' | 'blocked' | null): void
+  /** story 10.6: AND-composed facets + the blocked preset */
+  filters: AtlasFilters
+  setFilters(patch: Partial<AtlasFilters>): void
+  clearFilters(): void
+  toggleBlocked(): void
+  /** focus mode: fade everything but the 1-hop neighborhood; Esc exits */
+  focusId: string | null
+  setFocus(id: string | null): void
+  /** path tracing: pick two nodes, BFS core-side, gold chain result */
+  pathFrom: string | null
+  pathTo: string | null
+  /** null = untraced; 'none' = honest no-path sentence */
+  pathResult: AtlasPathResult | 'none' | null
+  setPathEnd(end: 'from' | 'to', id: string | null): void
+  tracePath(): Promise<void>
+  clearPath(): void
+  /** ⌘K/vault.search hits → score-tiered highlight rings (10.6 AC3) */
+  searchRings: Map<string, 1 | 2 | 3>
   loadTours(): Promise<void>
   startTour(id: string): Promise<void>
   goToStep(step: number): Promise<void>
@@ -89,9 +121,57 @@ export const useAtlas = create<AtlasState>((set, get) => ({
   activeTour: null,
   tourStep: 0,
   tourHighlight: [],
+  filters: EMPTY_FILTERS,
+  focusId: null,
+  pathFrom: null,
+  pathTo: null,
+  pathResult: null,
+  searchRings: new Map(),
 
   setPanel(panel) {
     set({ panel })
+  },
+
+  setFilters(patch) {
+    set({ filters: { ...get().filters, ...patch } })
+  },
+
+  clearFilters() {
+    set({ filters: EMPTY_FILTERS })
+  },
+
+  // the blocked-on preset (10.6 AC4): one click isolates blocking chains and
+  // opens the oldest-first side list; replaces the superseded blocked-on view
+  toggleBlocked() {
+    const on = !get().filters.blocked
+    set({
+      filters: { ...get().filters, blocked: on },
+      panel: on ? 'blocked' : get().panel === 'blocked' ? null : get().panel,
+    })
+  },
+
+  setFocus(id) {
+    set({ focusId: id })
+  },
+
+  setPathEnd(end, id) {
+    set(end === 'from' ? { pathFrom: id } : { pathTo: id })
+    set({ pathResult: null })
+  },
+
+  async tracePath() {
+    const { pathFrom, pathTo } = get()
+    if (!pathFrom || !pathTo) return
+    try {
+      const result = await invoke('atlas.path', { from: pathFrom, to: pathTo })
+      set({ pathResult: result ?? 'none' })
+    } catch (e) {
+      set({ pathResult: 'none', error: errText(e) })
+    }
+  },
+
+  clearPath() {
+    set({ pathFrom: null, pathTo: null, pathResult: null })
   },
 
   async loadTours() {
@@ -237,9 +317,33 @@ export const useAtlas = create<AtlasState>((set, get) => ({
       activeTour: null,
       tourStep: 0,
       tourHighlight: [],
+      filters: EMPTY_FILTERS,
+      focusId: null,
+      pathFrom: null,
+      pathTo: null,
+      pathResult: null,
+      searchRings: new Map(),
     })
   },
 }))
+
+// Search integration (10.6 AC3): the Atlas subscribes to the SAME vault.search
+// the ⌘K palette runs — no second search engine. Hits tier node highlight
+// rings by score; clearing the query clears the rings.
+export function applySearchRings(
+  q: string,
+  hits: Array<{ path: string; score: number }> | null,
+  vaultPath: string,
+): void {
+  const s = useAtlas.getState()
+  if (!q.trim() || !hits) {
+    if (s.searchRings.size > 0) useAtlas.setState({ searchRings: new Map() })
+    return
+  }
+  if (!s.graph) return
+  const rel = hits.map((h) => ({ path: toVaultRelative(h.path, vaultPath), score: h.score }))
+  useAtlas.setState({ searchRings: searchRingTiers(rel, s.graph.nodes) })
+}
 
 // Live refresh (10.2 AC4): the core invalidates its cache on vault.changed /
 // handoff events — a loaded atlas refetches the same level/scope. Stamp chips
@@ -247,6 +351,9 @@ export const useAtlas = create<AtlasState>((set, get) => ({
 // so the stamp flips before (and regardless of) the refetch.
 // (bridge guard keeps this importable from node unit tests)
 if (typeof window !== 'undefined' && window.loredex) {
+  useSearch.subscribe((state) => {
+    applySearchRings(state.q, state.hits, useApp.getState().identity?.vaultPath ?? '')
+  })
   onEvent((e) => {
     const s = useAtlas.getState()
     if (s.graph === null) return // atlas never opened — nothing to refresh

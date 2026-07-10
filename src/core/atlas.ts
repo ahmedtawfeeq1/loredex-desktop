@@ -12,6 +12,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { isBlockingCard } from '../shared/blocked'
 import { toVaultRelative } from '../shared/handoff-lanes'
 import type {
   AtlasCluster,
@@ -20,6 +21,7 @@ import type {
   AtlasGraph,
   AtlasLevel,
   AtlasNode,
+  AtlasPathResult,
   AtlasScope,
   AtlasTopicGroup,
   HandoffCard,
@@ -141,12 +143,9 @@ const noteIdOf = (rel: string): string => `note:${rel.replace(/^projects\//, '')
 const handoffIdOf = (project: string, name: string): string => `handoff:${project}/${name}`
 const projectIdOf = (name: string): string => `project:${name}`
 
-/** blocking flag per the m2 lifecycle rules: open/accepted requests block
- *  their target; an expired snooze derives as open (never auto-written). */
-export function isBlocking(card: Pick<HandoffCard, 'kind' | 'status' | 'expired'>): boolean {
-  if (card.kind !== 'request') return false
-  return card.status === 'open' || card.status === 'accepted' || card.expired
-}
+/** blocking flag per the m2 lifecycle rules — THE shared rule (story 10.6
+ *  moved it to shared/blocked.ts so the blocked-on list can never disagree). */
+export const isBlocking = isBlockingCard
 
 export function buildAtlasModel(source: AtlasSource): BaseModel {
   const nodes = new Map<string, AtlasNode>()
@@ -577,6 +576,58 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
   return { nodes, edges, clusters, depth, cyclic, aggregated }
 }
 
+// ── path tracing (story 10.6, ATLAS-6): plain BFS, no weights ────────────────
+
+/**
+ * Shortest path over a bidirectional adjacency of the base model's edges —
+ * "how did this decision reach that repo?" A note → handoff → contract →
+ * commit walk is a provenance story; the renderer draws it gold as a
+ * routing-slip chain. Deterministic (neighbors visited in sorted edge order).
+ */
+export function shortestPath(
+  model: Pick<BaseModel, 'nodes' | 'edges'>,
+  from: string,
+  to: string,
+): AtlasPathResult | null {
+  if (!model.nodes.has(from) || !model.nodes.has(to)) return null
+  if (from === to) return { nodeIds: [from], edgeIds: [] }
+  const adjacency = new Map<string, Array<{ next: string; edgeId: string }>>()
+  const link = (a: string, b: string, edgeId: string): void => {
+    const list = adjacency.get(a) ?? []
+    list.push({ next: b, edgeId })
+    adjacency.set(a, list)
+  }
+  for (const e of [...model.edges].sort((a, b) => a.id.localeCompare(b.id))) {
+    link(e.source, e.target, e.id)
+    link(e.target, e.source, e.id)
+  }
+  const prev = new Map<string, { node: string; edgeId: string }>()
+  const queue = [from]
+  const seen = new Set([from])
+  while (queue.length > 0) {
+    const at = queue.shift() as string
+    for (const { next, edgeId } of adjacency.get(at) ?? []) {
+      if (seen.has(next)) continue
+      seen.add(next)
+      prev.set(next, { node: at, edgeId })
+      if (next === to) {
+        const nodeIds = [to]
+        const edgeIds: string[] = []
+        let walk = to
+        while (walk !== from) {
+          const step = prev.get(walk) as { node: string; edgeId: string }
+          edgeIds.unshift(step.edgeId)
+          nodeIds.unshift(step.node)
+          walk = step.node
+        }
+        return { nodeIds, edgeIds }
+      }
+      queue.push(next)
+    }
+  }
+  return null // disconnected — the UI says so in one honest sentence
+}
+
 // ── level projection + deterministic column layout ──────────────────────────
 
 function positionProjects(model: BaseModel, included: AtlasNode[]): void {
@@ -822,6 +873,11 @@ export function atlasGraph(level: AtlasLevel, scope: AtlasScope = {}): AtlasGrap
   const graph = projectAtlas(ensureBase().model, level, scope)
   graphCache.set(key, graph)
   return graph
+}
+
+/** BFS over the cached base model — the graph already lives here (10.6 AC1). */
+export function atlasPath(from: string, to: string): AtlasPathResult | null {
+  return shortestPath(ensureBase().model, from, to)
 }
 
 /** Tours recompute with the same invalidation as the graph (story 10.5 AC5). */

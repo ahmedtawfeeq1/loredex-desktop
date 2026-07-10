@@ -98,7 +98,7 @@ development_status:
   10-3-zoom-drill-navigation: done                     # ATLAS-3
   10-4-node-cards-hyperlink-resolution: done           # ATLAS-4 — full §3 resolution table
   10-5-tours-from-reading-orders: done                 # ATLAS-5 — atlas.tours + TourPanel playback
-  10-6-path-tracing-filters-search: ready-for-dev      # ATLAS-6 — may start after 10-2; absorbs old blocked-on view
+  10-6-path-tracing-filters-search: done               # ATLAS-6 — atlas.path + filters + search rings + focus/blocked preset
   10-7-changed-since-export: ready-for-dev             # ATLAS-7 — stretch
   # old Dependency Graph slices, superseded by the Atlas (files kept, marked Superseded):
   10-1-dependency-edge-model: superseded               # -> 10-1-atlas-model (ATLAS-1)

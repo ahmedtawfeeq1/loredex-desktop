@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,13 +20,13 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] `atlas.path` (AC: 1)
-  - [ ] Core BFS over the story 10.1 adjacency; channel in contract + dispatcher; `views/atlas/PathTrace.tsx` picker + gold chain rendering
-- [ ] Filters (AC: 2)
-  - [ ] `views/atlas/AtlasFilterPanel.tsx` + store slice; live set recompute; active count + clear
-- [ ] Search + focus + blocked (AC: 3, 4)
-  - [ ] ⌘K/`vault.search` subscription with score-tiered rings; focus action (1-hop fade, Esc); blocked preset + oldest-first side list
-- [ ] Tests (AC: 5)
+- [x] `atlas.path` (AC: 1)
+  - [x] Core BFS over the story 10.1 adjacency; channel in contract + dispatcher; `views/atlas/PathTrace.tsx` picker + gold chain rendering
+- [x] Filters (AC: 2)
+  - [x] `views/atlas/AtlasFilterPanel.tsx` + store slice; live set recompute; active count + clear
+- [x] Search + focus + blocked (AC: 3, 4)
+  - [x] ⌘K/`vault.search` subscription with score-tiered rings; focus action (1-hop fade, Esc); blocked preset + oldest-first side list
+- [x] Tests (AC: 5)
 
 ## Dev Notes
 
@@ -51,10 +51,34 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (Claude Code)
+
 ### Debug Log References
+
+- `npx vitest run` — 49 files / 350 tests green (atlas-path BFS suite, shared blocked suite incl. nimbus real open request, atlas-filters suite, fixture-channel atlas.path round-trip)
+- `npx tsc --noEmit` clean; `npm run build` green
 
 ### Completion Notes List
 
+- `shortestPath` is plain BFS over a bidirectional, sorted (deterministic) adjacency of the base model's edges, core-side; `atlas.path` rides the cached model. Disconnected/unknown → null → one honest sentence in `PathTrace.tsx`; result renders gold on canvas (`atlas-edge-path`/`atlas-node-path`) AND as a clickable routing-slip chain (each card resolves via `activateNode`).
+- The blocking rule moved to `src/shared/blocked.ts` (core `isBlocking` now delegates) so the atlas model and the blocked-on list can never disagree. Blocked rows are oldest-first with the AC-verbatim sentence "<to> is blocked on <from>"; rows resolve to the handoff board card. The preset (`filters.blocked`) isolates blocking handoffs + blocking route edges + their project endpoints and opens the side list — replacing the superseded blocked-on view.
+- Filters AND-compose; facets judge only nodes they speak about (statuses → handoffs, topics → topic-carrying nodes), edges filter at CATEGORY level plus confidence tier; edges always drop with hidden endpoints. Active-count + one-click clear in the panel header.
+- Search: no second engine — the atlas subscribes to `useSearch` (the same vault.search behind ⌘K) and tiers rings 1–3 by score relative to the best hit (navy, width by tier — distinct from selected/hover/tour/path). Clearing the query clears the rings.
+- Focus: `focusNeighborhood` (1-hop) computed over the FILTERED edge set (interop per AC5); 'f' toggles focus on the selected card, Esc exits focus before walking up a level. All of it ⌘K-listed (filters/path/blocked/focus/path-from/path-to).
+- Gold budget: path chain + blocked routes are this story's gold; no new gold buttons (Trace/Clear are navy outline).
+
 ### File List
+
+- src/shared/blocked.ts + blocked.test.ts (new: shared rule + oldest-first rows + nimbus DoD test)
+- src/shared/types.ts (AtlasPathResult), src/shared/ipc-contract.ts (atlas.path)
+- src/core/atlas.ts (shortestPath + atlasPath; isBlocking delegates to shared)
+- src/core/atlas-path.test.ts (new), src/core/atlas.test.ts (channel round-trip)
+- src/core/handlers.ts (atlas.path dispatch)
+- src/renderer/src/views/atlas/atlas-filters.ts + .test.ts (new: facets/focus/tiers)
+- src/renderer/src/views/atlas/AtlasFilterPanel.tsx, PathTrace.tsx, BlockedList.tsx (new)
+- src/renderer/src/views/atlas/decor.ts (search/path/focus classes), AtlasCanvas.tsx (edge decor, f key), AtlasView.tsx (filter pipeline, panels, Esc priority)
+- src/renderer/src/stores/atlas.ts (filters/focus/path/searchRings + search subscription)
+- src/renderer/src/views/search/Palette.tsx (⌘K actions)
+- src/renderer/src/styles.css (panel, chain, blocked rows, ring taxonomy)
 
 ## QA Results

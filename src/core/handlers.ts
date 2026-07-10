@@ -8,7 +8,7 @@ import { isThemeSetting } from '../shared/theme'
 import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
 import type { Identity, SyncReport } from '../shared/types'
 import * as engine from './engine'
-import { atlasGraph, atlasTours, invalidateAtlas } from './atlas'
+import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import { getAppDb, vaultId } from './db/index'
 import { getReadState, markRead } from './db/read-state'
 import { reconcileSnoozeTimers } from './db/snooze'
@@ -64,6 +64,8 @@ export function registerCoreHandlers(
   // Tours (story 10.5): extracted from reading orders/threads/topics — same
   // recomputed-cache tier and invalidation as the graph itself.
   ipc.register('atlas.tours', ({ scope }) => atlasTours(scope ?? {}))
+  // Path tracing (story 10.6): BFS in the core host — the graph lives here.
+  ipc.register('atlas.path', ({ from, to }) => atlasPath(from, to))
   ipc.register('vault.resolveLink', ({ link, from }) =>
     resolveLink(engine.getConfig().vaultPath, link, from),
   )

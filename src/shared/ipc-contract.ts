@@ -9,6 +9,7 @@ import type {
   ActivityEvent,
   AtlasGraph,
   AtlasLevel,
+  AtlasPathResult,
   AtlasScope,
   ConsumeReceipt,
   CreateHandoffInput,
@@ -121,6 +122,9 @@ export interface CoreApi {
   /** Vault Atlas tours (story 10.5): reading-order / thread / topic tours
    *  extracted core-side from existing truth — no LLM, no persistent state. */
   'atlas.tours': { in: { scope?: AtlasScope }; out: TourDef[] }
+  /** Path tracing (story 10.6): BFS shortest path over the core-side model's
+   *  bidirectional adjacency; null = disconnected (one honest sentence). */
+  'atlas.path': { in: { from: string; to: string }; out: AtlasPathResult | null }
   'vault.createOrJoin': { in: WizardInput; out: WizardResult }
   /** app-local contract evolution (story 6.2): optional window size for paging */
   'activity.feed': { in: { since?: string; limit?: number }; out: ActivityEvent[] } // (lib PR-6)

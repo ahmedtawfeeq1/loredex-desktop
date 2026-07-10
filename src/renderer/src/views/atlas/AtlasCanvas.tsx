@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AtlasEdge, AtlasGraph, AtlasNode } from '../../../../shared/types'
 import { AtlasNodeCard } from './AtlasNodeCard'
 import type { TopicAtom } from './atlas-visibility'
-import { type AtlasDecor, nodeDecorClass } from './decor'
+import { type AtlasDecor, edgeDecorClass, nodeDecorClass } from './decor'
 import { TopicGroup } from './TopicGroup'
 import {
   edgeAnchors,
@@ -64,10 +64,13 @@ function EdgeLine({
   edge,
   byId,
   onActivateEdge,
+  decorClass = '',
 }: {
   edge: AtlasEdge
   byId: Map<string, AtlasNode>
   onActivateEdge: (edge: AtlasEdge, nearerEnd: 'source' | 'target') => void
+  /** path gold / focus fade (views/atlas/decor.ts, story 10.6) */
+  decorClass?: string
 }): React.JSX.Element | null {
   const a = byId.get(edge.source)
   const b = byId.get(edge.target)
@@ -79,7 +82,7 @@ function EdgeLine({
     (edge.category === 'contract-link' && edge.confidence === 'heuristic')
   const aggregated = edge.totalCount !== undefined
   return (
-    <g className={`atlas-edge atlas-edge-${edge.category}`}>
+    <g className={`atlas-edge atlas-edge-${edge.category}${decorClass}`}>
       <line
         className={`atlas-edge-line${gold ? ' atlas-edge-blocking' : ''}${dashed ? ' atlas-edge-heuristic' : ''}`}
         x1={x1}
@@ -133,6 +136,7 @@ export function AtlasCanvas({
   onActivateEdge,
   onExpandTopic,
   onEscape,
+  onFocusKey,
   decor,
   fitToIds,
 }: {
@@ -148,6 +152,8 @@ export function AtlasCanvas({
   onActivateEdge: (edge: AtlasEdge, nearerEnd: 'source' | 'target') => void
   /** Esc/Backspace: one level up (story 10.3 keyboard map) */
   onEscape: () => void
+  /** 'f': toggle focus mode on the selected card (story 10.6 AC4) */
+  onFocusKey?: () => void
   /** ring decorations (tour pulse, story 10.5) — pure class computation */
   decor?: AtlasDecor
   /** fit the viewport AROUND these nodes (tour step, story 10.5 AC3) */
@@ -208,6 +214,11 @@ export function AtlasCanvas({
     if (e.key === 'Escape' || e.key === 'Backspace') {
       e.preventDefault()
       onEscape()
+      return
+    }
+    if (e.key === 'f' && !e.metaKey && !e.ctrlKey && onFocusKey) {
+      e.preventDefault()
+      onFocusKey() // story 10.6: toggle 1-hop focus on the selected card
       return
     }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -288,7 +299,13 @@ export function AtlasCanvas({
         </defs>
         <g className="atlas-edges" aria-hidden>
           {graph.edges.map((edge) => (
-            <EdgeLine key={edge.id} edge={edge} byId={byId} onActivateEdge={onActivateEdge} />
+            <EdgeLine
+              key={edge.id}
+              edge={edge}
+              byId={byId}
+              onActivateEdge={onActivateEdge}
+              decorClass={edgeDecorClass(edge, decor)}
+            />
           ))}
         </g>
         <g className="atlas-nodes">

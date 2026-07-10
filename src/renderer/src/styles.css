@@ -2608,3 +2608,188 @@ button.atlas-crumb:hover {
     stroke-opacity: 0.35;
   }
 }
+
+/* ── Atlas filters / path / blocked / focus (story 10.6) ───────────────────── */
+
+.atlas-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.atlas-filter-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.atlas-filter-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+
+.atlas-filter-check input {
+  accent-color: var(--gold);
+}
+
+.atlas-filter-select {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--bg-inset);
+  color: var(--text-1);
+  font-size: 12px;
+}
+
+.atlas-filter-clear {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--navy);
+  text-decoration: underline;
+}
+
+.atlas-path-end {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.atlas-path-end-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-1);
+  overflow-wrap: anywhere;
+}
+
+/* the traced path as a routing-slip chain: connected cards down a rail */
+.atlas-path-chain {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.atlas-path-chain li + li {
+  border-left: 2px solid var(--hairline);
+  margin-left: 14px;
+  padding-top: 8px;
+}
+
+.atlas-path-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.atlas-path-card:disabled {
+  border-color: var(--hairline);
+  color: var(--text-2);
+}
+
+.atlas-path-card-type {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.atlas-path-card-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.atlas-blocked-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+
+.atlas-blocked-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.atlas-blocked-row:hover {
+  border-color: var(--gold);
+}
+
+.atlas-blocked-sentence {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.atlas-blocked-objective {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.atlas-blocked-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-2);
+}
+
+/* ring taxonomy (distinct from selected/hover gold and tour pulse):
+   search = navy ring, width by tier; path = gold; focus fade for the rest */
+.atlas-ring-search-1 .atlas-card {
+  stroke: var(--navy);
+  stroke-width: 3;
+}
+
+.atlas-ring-search-2 .atlas-card {
+  stroke: var(--navy);
+  stroke-width: 2;
+}
+
+.atlas-ring-search-3 .atlas-card {
+  stroke: var(--navy);
+  stroke-width: 1.25;
+  stroke-dasharray: 4 3;
+}
+
+.atlas-node-path .atlas-card {
+  stroke: var(--gold);
+  stroke-width: 2.5;
+}
+
+.atlas-node-faded {
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.atlas-edge-faded {
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+.atlas-edge-path .atlas-edge-line {
+  stroke: var(--gold);
+  stroke-width: 2.5;
+}

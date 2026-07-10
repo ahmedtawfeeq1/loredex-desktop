@@ -86,6 +86,60 @@ function actionItems(q: string): PaletteItem[] {
       title: 'Atlas: Tours…',
       run: () => atlas.setPanel('tour'),
     })
+    // story 10.6: filters, path trace, blocked preset, focus — all ⌘K-listed
+    actions.push(
+      {
+        key: 'action:atlas-filters',
+        title: 'Atlas: Filters…',
+        run: () => atlas.setPanel('filters'),
+      },
+      {
+        key: 'action:atlas-path',
+        title: 'Atlas: Trace a path…',
+        run: () => atlas.setPanel('path'),
+      },
+      {
+        key: 'action:atlas-blocked',
+        title: atlas.filters.blocked
+          ? 'Atlas: Blocked on — show everything again'
+          : 'Atlas: Blocked on — isolate blocking chains',
+        run: () => atlas.toggleBlocked(),
+      },
+    )
+    if (selected) {
+      actions.push(
+        {
+          key: 'action:atlas-focus',
+          title:
+            atlas.focusId === selected.id
+              ? `Atlas: unfocus “${selected.label}”`
+              : `Atlas: focus “${selected.label}” (1-hop)`,
+          run: () => atlas.setFocus(atlas.focusId === selected.id ? null : selected.id),
+        },
+        {
+          key: 'action:atlas-path-from',
+          title: `Atlas: path FROM “${selected.label}”`,
+          run: () => {
+            atlas.setPathEnd('from', selected.id)
+            atlas.setPanel('path')
+          },
+        },
+        {
+          key: 'action:atlas-path-to',
+          title: `Atlas: path TO “${selected.label}”`,
+          run: () => {
+            atlas.setPathEnd('to', selected.id)
+            atlas.setPanel('path')
+          },
+        },
+      )
+    } else if (atlas.focusId) {
+      actions.push({
+        key: 'action:atlas-focus-clear',
+        title: 'Atlas: exit focus mode',
+        run: () => atlas.setFocus(null),
+      })
+    }
     if (atlas.activeTour) {
       actions.push(
         {

@@ -155,19 +155,25 @@ function ComposeForm({
 
   return (
     <Modal
-      title={replyTo ? 'Reply to handoff' : 'New handoff'}
+      title={replyTo ? 'Hand back' : 'New handoff'}
       onClose={onClose}
       onSubmit={() => void submit()}
       submitLabel={busy ? 'Publishing…' : 'Publish'}
       submitDisabled={problem !== null || !identity || busy}
     >
       {replyTo && (
-        <p className="modal-banner">
-          Replying to “{replyTo.objective || replyTo.id}”
-          <span className="modal-banner-route">
-            {state.fromProject} ⟶ {state.toProject}
-          </span>
-        </p>
+        <>
+          <p className="modal-banner">
+            Handing back to “{replyTo.objective || replyTo.id}”
+            <span className="modal-banner-route">
+              {state.fromProject} ⟶ {state.toProject}
+            </span>
+          </p>
+          {/* D1 amendment 4: make the cost of a board handoff explicit. */}
+          <p className="modal-helper">
+            Creates a new handoff the other team must consume. For a quick note, use Comment.
+          </p>
+        </>
       )}
       <div className="modal-row">
         <span className="modal-label">Kind</span>

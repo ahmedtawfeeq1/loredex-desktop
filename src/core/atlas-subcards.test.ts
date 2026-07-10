@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest'
 import {
   byRecencyDesc,
   nodeRect,
+  truncateLabel,
   orderChips,
   orthoRoute,
   type Rect,
@@ -249,5 +250,21 @@ describe.runIf(existsSync(NIMBUS_VAULT))('drilled sub-card invariants — nimbus
       assertAll(projectAtlas(model, 'learn', { project }))
       assertAll(projectAtlas(model, 'deep', { project }))
     }
+  })
+})
+
+// D1 amendment 6 — topic label truncation (footer meta no longer collides)
+describe('truncateLabel (D1 amendment 6)', () => {
+  it('leaves short labels untouched', () => {
+    expect(truncateLabel('ONBOARDING', 200, 6.2)).toBe('ONBOARDING')
+  })
+  it('ellipsizes a long label to the card width', () => {
+    const out = truncateLabel('OPPORTUNITY-MANAGEMENT', 60, 6.2)
+    expect(out.endsWith('…')).toBe(true)
+    expect(out.length).toBeLessThan('OPPORTUNITY-MANAGEMENT'.length)
+    expect(out.length).toBeLessThanOrEqual(Math.floor(60 / 6.2))
+  })
+  it('never returns an empty string for a tiny width', () => {
+    expect(truncateLabel('SPEC-MCP-SERVER-PAGE', 4, 6.2).length).toBeGreaterThan(0)
   })
 })

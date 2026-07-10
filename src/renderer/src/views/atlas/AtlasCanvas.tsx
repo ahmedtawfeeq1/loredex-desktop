@@ -18,6 +18,7 @@ import {
   orderChips,
   SUBCARD_PAD,
   subCardRect,
+  truncateLabel,
 } from '../../../../shared/atlas-layout'
 import type { AtlasEdge, AtlasGraph, AtlasNode } from '../../../../shared/types'
 import { AtlasNodeCard, type AtlasNodeVariant } from './AtlasNodeCard'
@@ -541,14 +542,17 @@ export function AtlasCanvas({
                 height={t.rect.h}
                 rx={10}
               />
+              {/* header row: topic label only, truncated to the card's inner
+                  width so long names never overrun (D1 amendment 6). The
+                  count · date meta moved to a bottom-left footer. */}
               <text className="atlas-topic-label" x={t.rect.x + SUBCARD_PAD} y={t.rect.y + 15}>
-                {t.text.toUpperCase()}
+                {truncateLabel(t.text.toUpperCase(), t.rect.w - 2 * SUBCARD_PAD, 6.2)}
+                <title>{t.text.toUpperCase()}</title>
               </text>
               <text
                 className="atlas-subcard-meta"
-                x={t.rect.x + t.rect.w - SUBCARD_PAD}
-                y={t.rect.y + 15}
-                textAnchor="end"
+                x={t.rect.x + SUBCARD_PAD}
+                y={t.rect.y + t.rect.h - 8}
               >
                 {t.count === 1 ? '1 note' : `${t.count} notes`}
                 {t.newest ? ` · ${t.newest}` : ''}

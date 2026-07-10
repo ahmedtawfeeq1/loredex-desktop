@@ -550,6 +550,26 @@ a:hover {
   transition: background 100ms ease-out;
 }
 
+/* Filled-navy emphasis: a prominent default action that is NOT the gold
+   primary (D1 amendment 4 — Comment leads on handoff cards without spending
+   the one-gold-primary-per-view budget the header's New handoff owns). */
+.button-emphasis {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--navy);
+  background: var(--navy);
+  color: var(--bg-card);
+  font-weight: 600;
+  transition: filter 100ms ease-out;
+}
+
+.button-emphasis:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
 .button-secondary:hover:not(:disabled) {
   background: color-mix(in srgb, var(--navy) 8%, transparent);
 }
@@ -2142,6 +2162,13 @@ a:hover {
   background: var(--bg-inset);
   font-size: 12px;
   color: var(--text-2);
+}
+
+.modal-helper {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.45;
 }
 
 .modal-banner-route {

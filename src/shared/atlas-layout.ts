@@ -72,6 +72,18 @@ export const PILL_GUTTER = 216
 // ── topic sub-cards + recency reading flow (story epic17.2, D1 amendment 3) ──
 /** topic sub-card inset around its member notes (tighter than PANEL_PAD) */
 export const SUBCARD_PAD = 12
+
+/**
+ * Ellipsize a label to fit `widthPx` at an approximate glyph advance
+ * (`charPx`) — SVG <text> has no CSS ellipsis, so long topic names must be
+ * clipped in code (D1 amendment 6: the header label and footer meta no longer
+ * share a baseline, but a very long name in a narrow card is still truncated).
+ */
+export function truncateLabel(text: string, widthPx: number, charPx: number): string {
+  const max = Math.max(1, Math.floor(widthPx / charPx))
+  if (text.length <= max) return text
+  return `${text.slice(0, Math.max(1, max - 1))}…`
+}
 /** label row reserved at the top of a topic sub-card (label + count + date);
  *  the panel's content top drops by this so a col-0 sub-card never rides its
  *  header bar */

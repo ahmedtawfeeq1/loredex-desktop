@@ -85,6 +85,36 @@ export function HandoffCardView({
         </span>
         {(onReply || onComment || onLinkRequest) && (
           <span className="handoff-actions">
+            {/* D1 amendment 4: Comment is the PRIMARY, first reply path — a
+                quick thread note that never mints a board handoff. */}
+            {onComment && (
+              <button
+                type="button"
+                className="button-emphasis button-small"
+                title="Comment — a quick note in the thread. The handoff stays untouched and no new card is created."
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onComment(card)
+                }}
+              >
+                Comment
+              </button>
+            )}
+            {/* Hand back is the deliberate, secondary action: it mints a NEW
+                handoff routed back that the other team must consume. */}
+            {onReply && (
+              <button
+                type="button"
+                className="button-secondary button-small"
+                title="Hand back — creates a new handoff the other team must consume. For a quick note, use Comment."
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onReply(card)
+                }}
+              >
+                Hand back
+              </button>
+            )}
             {onLinkRequest && (
               <button
                 type="button"
@@ -96,32 +126,6 @@ export function HandoffCardView({
                 }}
               >
                 Link request
-              </button>
-            )}
-            {onReply && (
-              <button
-                type="button"
-                className="button-secondary button-small"
-                title="Reply — a new handoff routed back"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onReply(card)
-                }}
-              >
-                Reply
-              </button>
-            )}
-            {onComment && (
-              <button
-                type="button"
-                className="button-secondary button-small"
-                title="Comment — thread note, the handoff stays untouched"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onComment(card)
-                }}
-              >
-                Comment
               </button>
             )}
           </span>

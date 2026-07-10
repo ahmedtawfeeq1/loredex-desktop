@@ -8,6 +8,7 @@ import { isThemeSetting } from '../shared/theme'
 import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
 import type { Identity, SyncReport } from '../shared/types'
 import * as engine from './engine'
+import { atlasGraph, invalidateAtlas } from './atlas'
 import { getAppDb, vaultId } from './db/index'
 import { getReadState, markRead } from './db/read-state'
 import { reconcileSnoozeTimers } from './db/snooze'
@@ -49,13 +50,17 @@ export function registerCoreHandlers(
   ipc.register('app.identity', () => engine.identity())
   ipc.register('vault.readNote', ({ path }) => engine.readNote(path))
   ipc.register('vault.tree', () => {
-    // the manual refresh re-walks the tree — rebuild the link index and the
-    // facet cache with it, and run the new-handoff check (story 3.7 trigger)
+    // the manual refresh re-walks the tree — rebuild the link index, facet
+    // cache and atlas with it, and run the new-handoff check (story 3.7)
     invalidateLinkIndex()
     clearFacetCache()
+    invalidateAtlas()
     notifier.refresh()
     return walkVault(engine.getConfig().vaultPath)
   })
+  // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
+  // same recomputed-cache tier as the link index (never authoritative).
+  ipc.register('atlas.graph', ({ level, scope }) => atlasGraph(level, scope ?? {}))
   ipc.register('vault.resolveLink', ({ link, from }) =>
     resolveLink(engine.getConfig().vaultPath, link, from),
   )
@@ -112,6 +117,7 @@ export function registerCoreHandlers(
       }
       const receipt = engine.consume(id, identity)
       const rel = toVaultRelative(receipt.path, engine.getConfig().vaultPath)
+      invalidateAtlas() // stamp flips before any renderer refetch can land
       ipc.emit({ kind: 'handoff.stateChanged', id, from: 'open', to: 'consumed', by: identity })
       ipc.emit({ kind: 'vault.changed', paths: [rel] })
       notifier.refresh() // badge drops immediately (story 3.7 AC3)
@@ -130,6 +136,7 @@ export function registerCoreHandlers(
     // a new note exists — the link index must see it NOW (thread edges, story
     // 8.2, resolve through it before any renderer tree refresh lands)
     invalidateLinkIndex(engine.getConfig().vaultPath)
+    invalidateAtlas()
     const rel = toVaultRelative(result.path, engine.getConfig().vaultPath)
     ipc.emit({ kind: 'handoff.created', card: engine.handoffCard(result.id), relPath: rel })
     ipc.emit({ kind: 'vault.changed', paths: [rel] })
@@ -158,6 +165,7 @@ export function registerCoreHandlers(
       requireIdentity(identity, 'a status change')
       const receipt = engine.setStatus(id, transition, identity)
       const rel = toVaultRelative(receipt.path, engine.getConfig().vaultPath)
+      invalidateAtlas() // stamp flips before any renderer refetch can land
       ipc.emit({
         kind: 'handoff.stateChanged',
         id,

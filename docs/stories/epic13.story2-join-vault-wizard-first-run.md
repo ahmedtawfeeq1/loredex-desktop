@@ -1,0 +1,62 @@
+# Story 13.2: Join-vault wizard & first-run screen
+
+## Status
+
+Approved
+
+## Story
+
+**As an** engineer joining a team,
+**I want** to join a vault from a pasted URL or deep link, starting from a real first-run screen,
+**so that** onboarding is minutes with zero git commands and the bare vault picker disappears.
+
+## Acceptance Criteria
+
+1. `wizard.joinVault {url, dest}` runs the decided sequence: paste clone URL (or `loredex://join?remote=…&branch=…` deep link, main → core) → native destination pick → `git clone` with streamed progress → shape validation (`projects/` or `.loredex/engine.json`, else `NOT_A_VAULT`, clone kept, user told) → schema handshake (`vaultSchemaStatus`; newer-than-supported → loud warning, join continues read-mostly) → register (`saveConfig` vaultPath + merge `projects` map when shipped) → seed `app_settings project_roots` prompt ("where do this team's repos live on this machine?" — skippable) → identity check (block writes, not reading) → `ensureGeneratedMergeDriver` + first fetch + seed `poll_cursor` (no notification storm).
+2. A **first-run screen replaces the bare vault picker**: logo, one serif sentence, and three cards — "Create a vault" (13.1), "Join a vault", "Open an existing folder" (the old picker path, kept); it shows whenever no vault is configured.
+3. Failures map to typed codes with actionable messages: `CLONE_AUTH_FAILED` (private repo — same no-OAuth credentials message), `DEST_NOT_EMPTY`, `NOT_A_VAULT`, `SCHEMA_AHEAD` (warning, not fatal).
+4. Steps report `wizard.progress` events rendered in the stepped modal; on completion the reader and board are immediately live against the joined vault.
+5. The v0.1 `vault.createOrJoin` channel is REMOVED in favor of the three wizard channels; all git ops under the write lock with `-c` identity injection.
+
+## Tasks / Subtasks
+
+- [ ] Core sequence (AC: 1, 5)
+  - [ ] `src/core/wizard.ts joinVault`: clone with progress streaming, shape validation, `vaultSchemaStatus` handshake, register + project_roots seed, merge driver + first fetch + fresh-cursor seed; delete `vault.createOrJoin`
+- [ ] Deep link (AC: 1)
+  - [ ] Main registers the `loredex://` protocol; `join?remote&branch` opens the wizard pre-filled (paste path always available)
+- [ ] First-run screen (AC: 2)
+  - [ ] `views/wizard/FirstRun.tsx`: three-card chooser on `--bg-app`, serif empty-state line, routes to CreateVaultWizard / JoinVaultWizard / native picker
+- [ ] Wizard UI + failures (AC: 3, 4)
+  - [ ] `JoinVaultWizard.tsx` stepped modal; code→message map; SCHEMA_AHEAD renders as a loud warning banner, join continues; post-join pivot (core host on the new vault, board live)
+- [ ] Tests
+
+## Dev Notes
+
+- Supersedes Story 5.5 (M1 join wizard) — deep-link params are now `remote`/`branch` (registry rides the vault itself per PR-7a/7b); the batch-repo-registration idea becomes the skippable `project_roots` seeding prompt, which also feeds contract discovery (Story 11.1). Mark 5.5 superseded on the board. [Source: architecture-m2.md#7-wizards] [Source: architecture-m2.md#5-contract-intelligence]
+- Step order, failure codes, the read-mostly SCHEMA_AHEAD behavior, and the no-storm cursor seed are decided verbatim. Clone-kept-on-NOT_A_VAULT matters: never delete what the user just downloaded. [Source: architecture-m2.md#7-wizards]
+- Identity check blocks WRITES, not reading — a joiner can browse immediately and set identity when they first act. [Source: architecture-m2.md#7-wizards]
+- First-run is renderer composition of existing pieces (picker, two wizards) — no new state; "wizard-driven join/create" is a PRD goal (F6/F7) finishing here. [Source: architecture-m2.md#7-wizards]
+- Depends on Story 13.1 (wizard runner, progress modal machinery, validateRemote). Files: `src/core/wizard.ts`, `src/renderer/src/views/wizard/JoinVaultWizard.tsx`, `FirstRun.tsx`, `src/main/index.ts` (protocol), `src/shared/ipc-contract.ts` (`wizard.joinVault`; remove `vault.createOrJoin`), `src/core/ipc.ts`.
+
+### Testing
+
+- Unit: code→message map, deep-link parse, shape-validation matrix (projects/ present / engine.json only / neither), handshake outcomes. Integration: join a fixture remote vault end-to-end → registered, cursor seeded, zero notifications, board live; NOT_A_VAULT leaves the clone. [Source: architecture-m2.md#7-wizards]
+
+## Change Log
+
+| Date | Version | Description | Author |
+|---|---|---|---|
+| 2026-07-10 | 0.1 | Drafted from architecture-m2.md (M2 cycle; supersedes Story 5.5) | Bob (SM) |
+| 2026-07-10 | 1.0 | Approved | Sarah (PO) |
+
+## Dev Agent Record
+
+### Agent Model Used
+
+### Debug Log References
+
+### Completion Notes List
+
+### File List
+
+## QA Results

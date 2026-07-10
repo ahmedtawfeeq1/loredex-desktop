@@ -5,7 +5,7 @@
 # All M0+M1 stories are authored and Approved (V4) == ready-for-dev here.
 # Workflow: one story at a time, in file order below; don't start N+1 until N is done.
 
-generated: 2026-07-10   # M2 board added (epics 7-14, per docs/architecture-m2.md)
+generated: 2026-07-10   # M2 board added (epics 7-14, per docs/architecture-m2.md); epic 10 rewritten as Vault Atlas (docs/plan/ATLAS-CONCEPT.md)
 project: loredex-desktop
 
 development_status:
@@ -65,8 +65,10 @@ development_status:
 
   # ---- M2 cycle (docs/architecture-m2.md) ------------------------------------
   # Implementation order (dependency-first): 7.1 -> 9.2 -> 9.1 -> 9.3 -> 7.2 ->
-  # 8.1 -> 7.3 -> 8.2 -> 8.3 -> 7.4 -> 10.1 -> 10.2 -> 10.3 -> 11.1 -> 11.2 ->
-  # 12.1 -> 11.3 -> 12.2 -> 13.1 -> 13.2 -> 14.1 -> 14.2
+  # 8.1 -> 7.3 -> 8.2 -> 8.3 -> 7.4 -> 10.1 -> 10.2 -> 10.3 -> 10.4 -> 10.5 ->
+  # 10.6 -> 10.7 -> 11.1 -> 11.2 -> 12.1 -> 11.3 -> 12.2 -> 13.1 -> 13.2 ->
+  # 14.1 -> 14.2   (epic 10 = Vault Atlas, ATLAS-1..7; 10.6 may start after
+  # 10.2, and 10.5-10.7 are mutually independent once 10.1-10.4 land)
   # (7.1 lib PR-11 gates every handoff-writing app story; contract/github/wizard
   # tracks may run parallel after 9.2 per architecture-m2.md section 8.)
 
@@ -90,10 +92,18 @@ development_status:
   9-3-watcher-live-refresh-notification-routing: done         # file: epic2.story3-vault-watcher-live-refresh.md (v2.0)
   epic-9-retrospective: optional
 
-  epic-10: backlog         # Dependency Graph
-  10-1-dependency-edge-model: ready-for-dev
-  10-2-svg-graph-view: ready-for-dev
-  10-3-blocked-on-list-view: ready-for-dev
+  epic-10: in-progress     # Vault Atlas — supersedes Dependency Graph; binding concept: docs/plan/ATLAS-CONCEPT.md (§5 slices)
+  10-1-atlas-model: done                               # ATLAS-1 — atlas.graph channel; blocks 10-2..10-7
+  10-2-cluster-layout-svg-canvas: ready-for-dev        # ATLAS-2 — Overview canvas
+  10-3-zoom-drill-navigation: ready-for-dev            # ATLAS-3
+  10-4-node-cards-hyperlink-resolution: ready-for-dev  # ATLAS-4 — full §3 resolution table
+  10-5-tours-from-reading-orders: ready-for-dev        # ATLAS-5 — independent once 10-1..10-4 land
+  10-6-path-tracing-filters-search: ready-for-dev      # ATLAS-6 — may start after 10-2; absorbs old blocked-on view
+  10-7-changed-since-export: ready-for-dev             # ATLAS-7 — stretch
+  # old Dependency Graph slices, superseded by the Atlas (files kept, marked Superseded):
+  10-1-dependency-edge-model: superseded               # -> 10-1-atlas-model (ATLAS-1)
+  10-2-svg-graph-view: superseded                      # -> 10-2-cluster-layout-svg-canvas (ATLAS-2)
+  10-3-blocked-on-list-view: superseded                # -> 10-6-path-tracing-filters-search (ATLAS-6)
   epic-10-retrospective: optional
 
   epic-11: backlog         # Contract Intelligence (read-only)

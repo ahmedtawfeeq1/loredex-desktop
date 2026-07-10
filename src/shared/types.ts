@@ -215,6 +215,133 @@ export interface HandoffThread {
   broken: BrokenThreadRef[]
 }
 
+// ── Vault Atlas (epic 10, ATLAS-1..4 — docs/plan/ATLAS-CONCEPT.md) ──────────
+
+export type AtlasLevel = 'overview' | 'learn' | 'deep'
+
+/** Discrete navigation scope — never camera zoom (ATLAS-3). */
+export interface AtlasScope {
+  project?: string
+  topic?: string
+}
+
+/** Exactly 6 node types — the taxonomy is binding (ATLAS-CONCEPT §2).
+ *  Hyperlink-everything corollary: a type with no resolution target does not
+ *  get to be a node, so every field below serves a card or its resolution. */
+export type AtlasNodeType = 'project' | 'note' | 'handoff' | 'contract' | 'source' | 'commit'
+
+export interface AtlasNode {
+  /** typed-prefixed stable id: `note:<project>/<topic>/<name>`, `project:<name>`, … */
+  id: string
+  type: AtlasNodeType
+  label: string
+  project?: string
+  topic?: string
+  date?: string
+  /** precomputed DESIGN layout position — deterministic, renderer never lays out */
+  x: number
+  y: number
+  /** note/handoff: vault-relative path (Reader open target) */
+  path?: string
+  /** note: frontmatter `type` chip; summary = objective or first body sentence
+   *  (already authored — no generation step, ever) */
+  noteType?: string
+  summary?: string
+  /** note freshness: stale renders rust per DESIGN token rules */
+  stale?: boolean
+  /** handoff stamp/route-line fields (mirrors the board card) */
+  status?: string
+  kind?: string
+  from?: string
+  to?: string
+  expired?: boolean
+  /** project cluster: open inbound count (gold badge) + contained note volume */
+  openCount?: number
+  noteCount?: number
+  /** source: recorded provenance; localPath = this-machine re-resolution via the
+   *  project-roots map first, recorded absolute path fallback; null = not local
+   *  (renderer shows the honest disabled state + copy-path affordance) */
+  sourcePath?: string
+  sourceProject?: string
+  sourceRel?: string
+  localPath?: string | null
+  /** commit: sha + normalized https commit-page base; null base = non-GitHub
+   *  remote → plain mono text + copy-sha, no link (architecture-m2 §6) */
+  sha?: string
+  commitBase?: string | null
+  /** contract: repo-relative file in a registered repo + change count */
+  file?: string
+  repoRoot?: string
+  changeCount?: number
+}
+
+/** Exactly 6 edge categories (ATLAS-CONCEPT §2) — filtered at category level. */
+export type AtlasEdgeCategory =
+  | 'route'
+  | 'thread'
+  | 'wikilink'
+  | 'provenance'
+  | 'contract-link'
+  | 'affinity'
+
+export interface AtlasEdge {
+  id: string
+  /** node ids; edges whose endpoint is absent from the level are dropped */
+  source: string
+  target: string
+  category: AtlasEdgeCategory
+  /** route: the handoff node that created it (edge click = click that node),
+   *  blocking = open/accepted request (expired snooze counts as open) */
+  handoffId?: string
+  status?: string
+  kind?: string
+  blocking?: boolean
+  /** overview aggregation: `N open / M total` count badge */
+  openCount?: number
+  totalCount?: number
+  /** thread: which frontmatter field made the edge */
+  field?: 'replies_to' | 'fulfills'
+  /** contract-link: m2 §5 tier VERBATIM — heuristic renders dashed --text-2 */
+  confidence?: 'mentioned' | 'heuristic'
+  /** affinity: the shared topic (the only computed category; weight = share) */
+  topic?: string
+  weight?: number
+}
+
+/** Topic folder container — explicit structure, no inference (ATLAS-CONCEPT §2). */
+export interface AtlasTopicGroup {
+  name: string
+  nodeIds: string[]
+  /** single-child groups are dissolved by the renderer (collapsed-atom rule) */
+  singleChild: boolean
+}
+
+export interface AtlasCluster {
+  project: string
+  topics: AtlasTopicGroup[]
+}
+
+export interface AtlasGraph {
+  level: AtlasLevel
+  scope: AtlasScope
+  nodes: AtlasNode[]
+  edges: AtlasEdge[]
+  clusters: AtlasCluster[]
+  /** a route cycle was detected and broken deterministically — never a hang */
+  cyclic: boolean
+}
+
+/** One contract-scan change row (story 11.1's provider shape). The Atlas
+ *  consumes it verbatim; until 11.1 ships the production provider is empty and
+ *  contract nodes are simply absent (story 10.1 AC5 degradation). */
+export interface AtlasContractChange {
+  repoRoot: string
+  file: string
+  sha: string
+  date: string
+  links: Array<{ handoffId: string; confidence: 'mentioned' | 'heuristic' }>
+}
+
 export interface WizardInput {
   mode: 'create' | 'join'
   vaultPath: string

@@ -7,6 +7,9 @@ import type { Config, Doc, ProductDashboard, SearchHit } from 'loredex'
 import type { ThemeSetting } from './theme'
 import type {
   ActivityEvent,
+  AtlasGraph,
+  AtlasLevel,
+  AtlasScope,
   ConsumeReceipt,
   CreateHandoffInput,
   Facets,
@@ -110,6 +113,10 @@ export interface CoreApi {
   'dashboard.build': { in: void; out: ProductDashboard }
   /** app-local contract evolution (story 2.5): the Start Here brief + freshness */
   'home.brief': { in: void; out: HomeBrief }
+  /** Vault Atlas (story 10.1): the whole derived graph — nodes, typed edges,
+   *  clusters, precomputed positions — built core-side from existing indexes.
+   *  Memoized; invalidated on vault.changed / post-pull reconcile (F4 tier). */
+  'atlas.graph': { in: { level: AtlasLevel; scope?: AtlasScope }; out: AtlasGraph }
   'vault.createOrJoin': { in: WizardInput; out: WizardResult }
   /** app-local contract evolution (story 6.2): optional window size for paging */
   'activity.feed': { in: { since?: string; limit?: number }; out: ActivityEvent[] } // (lib PR-6)

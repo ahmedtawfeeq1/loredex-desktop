@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import type { CoreControlMessage, PortLike } from '../shared/ipc-contract'
 import { getPollCursor, initAppDb, setPollCursor, vaultId } from './db/index'
 import { reconcileSnoozeTimers, sweepExpiredSnoozes } from './db/snooze'
+import { invalidateAtlas } from './atlas'
 import { removeDiscovery } from './discovery'
 import * as engine from './engine'
 import { clearFacetCache } from './facets'
@@ -56,6 +57,7 @@ const vid = config && appDb ? vaultId(config.vaultPath, engine.identity().remote
 function reconcileState(): void {
   invalidateLinkIndex()
   clearFacetCache()
+  invalidateAtlas()
   const cards = notifier.refresh()
   if (appDb && vid) reconcileSnoozeTimers(appDb, vid, cards)
 }

@@ -104,3 +104,16 @@ Claude Fable 5 (claude-fable-5)
 - src/renderer/src/design-fidelity.test.ts — 16.3 assertions + project-rail border sanction
 - docs/stories/epic16.story3-vault-tree-sections.md — this story
 - docs/stories/sprint-status.yaml — epic-16 row (16-3)
+
+## QA Results
+
+**PASS** — fresh-eyes M4 QA, 2026-07-10.
+
+- **AC1 (section rows):** `.tree-section` verified in styles.css — radius 8, 11px caps 600-weight label, solid 8px dot, chevron; fidelity 16.3 describe green.
+- **AC2 (deterministic tints):** `TREE_TINTS` read directly from sectionTint.ts — the 8 D1 hexes verbatim (sage/clay/slate/moss/rose/sand/teal/plum); FNV-1a mod 8 of the section NAME. Unit tests re-run solo: repeat-call determinism, pinned nimbus assignments (backend=slate, frontend=teal, mobile=sage, ai-engine=sand — a hash change cannot silently recolor), 24-name distribution covers all 8. Green.
+- **AC3 (both themes):** styles.css lines 288/298 — `color-mix(in srgb, var(--section-color) 12%, transparent)` light, 20% under `:root[data-theme='dark']`; dot stays solid. Verified by eye in the sheet + fidelity assertions.
+- **AC4 (project rail / gold budget):** `.tree-file-project` 2px `var(--section-color)` rail, selection re-widens to 4px gold (`aria-current`) — order-dependent cascade pinned by the fidelity test; the >1px border sanction list gained exactly the D1 project rail.
+- **AC5 (persistence):** treeSections round-trip per vault id in a temp app.db (default, back-to-empty, vault isolation, malformed degrade) — settings.test.ts + treeSections store test re-run solo, green.
+- **AC6/Gate (re-run by QA, sequential):** typecheck clean → app vitest 725/725 → e2e 18/18 → build clean.
+
+Verdict: PASS — no defects found.

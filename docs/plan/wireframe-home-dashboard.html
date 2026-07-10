@@ -1,0 +1,323 @@
+<title>Home Dashboard — Wireframe Concept</title>
+<style>
+  :root {
+    --bg: #F7F6F4;
+    --panel: #FFFFFF;
+    --ink: #1F1D1B;
+    --muted: #6E6862;
+    --line: #DDD9D3;
+    --ph: #ECE9E4;
+    --ph-line: #B9B3AB;
+    --note: #1D4ED8;
+    --note-bg: #EAF0FE;
+    --good: #15803D;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1B1A18; --panel: #242220; --ink: #EDEAE6; --muted: #A39C93;
+      --line: #3A3733; --ph: #2E2B28; --ph-line: #57524C;
+      --note: #8AB0FF; --note-bg: #1E2A45; --good: #4ADE80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1B1A18; --panel: #242220; --ink: #EDEAE6; --muted: #A39C93;
+    --line: #3A3733; --ph: #2E2B28; --ph-line: #57524C;
+    --note: #8AB0FF; --note-bg: #1E2A45; --good: #4ADE80;
+  }
+  :root[data-theme="light"] {
+    --bg: #F7F6F4; --panel: #FFFFFF; --ink: #1F1D1B; --muted: #6E6862;
+    --line: #DDD9D3; --ph: #ECE9E4; --ph-line: #B9B3AB;
+    --note: #1D4ED8; --note-bg: #EAF0FE; --good: #15803D;
+  }
+
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px; line-height: 1.55;
+    padding: 48px 24px 96px;
+  }
+  .wrap { max-width: 1020px; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--note); margin-bottom: 10px;
+  }
+  h1 { font-size: 30px; font-weight: 750; letter-spacing: -0.02em; text-wrap: balance; margin-bottom: 8px; }
+  .lede { color: var(--muted); max-width: 62ch; margin-bottom: 8px; }
+  h2 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin: 56px 0 6px; }
+  h2 .num { color: var(--note); font-family: var(--mono); font-size: 15px; margin-right: 8px; }
+  .sub { color: var(--muted); font-size: 13.5px; max-width: 68ch; margin-bottom: 18px; }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--ph); padding: 1px 5px; border-radius: 4px; }
+
+  .spread { display: grid; grid-template-columns: minmax(0, 1fr) 264px; gap: 20px; align-items: start; }
+  @media (max-width: 800px) { .spread { grid-template-columns: 1fr; } }
+
+  .frame {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 22px; position: relative; overflow-x: auto;
+  }
+  .frame-label {
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 16px;
+  }
+
+  .ph { background: var(--ph); border-radius: 5px; height: 12px; }
+  .input {
+    border: 1px solid var(--ph-line); border-radius: 7px; height: 34px;
+    display: flex; align-items: center; padding: 0 10px; gap: 6px;
+    font-size: 13px; color: var(--ink); background: var(--panel); white-space: nowrap;
+  }
+  .input.select::after { content: "▾"; color: var(--muted); margin-left: auto; padding-left: 8px; }
+  .ghost-btn {
+    border: 1.5px dashed var(--ph-line); border-radius: 7px; height: 34px;
+    display: inline-flex; align-items: center; padding: 0 14px; gap: 6px;
+    font-size: 13px; color: var(--muted); width: fit-content;
+  }
+  .toggle { width: 34px; height: 19px; border-radius: 10px; background: var(--good); position: relative; flex: none; }
+  .toggle::after { content: ""; position: absolute; top: 2.5px; right: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+  .toggle.off { background: var(--ph-line); }
+  .toggle.off::after { right: auto; left: 3px; }
+  .trash { color: var(--muted); font-size: 14px; flex: none; }
+
+  .dot {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; border-radius: 50%; flex: none;
+    background: var(--note); color: var(--panel);
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    vertical-align: 2px;
+  }
+  .notes { display: flex; flex-direction: column; gap: 12px; }
+  .note-item {
+    display: grid; grid-template-columns: 18px 1fr; gap: 10px;
+    background: var(--note-bg); border-radius: 8px; padding: 10px 12px;
+    font-size: 13px; line-height: 1.5;
+  }
+  .note-item b { font-weight: 650; }
+
+  .wf-h2 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .wf-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .tabbar { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-top: 18px; font-size: 13.5px; }
+  .tab { padding: 8px 2px 10px; color: var(--muted); display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .tab.active { color: var(--ink); font-weight: 650; box-shadow: inset 0 -2px 0 var(--ink); }
+  .tab.future { border: 1px dashed var(--ph-line); border-bottom: none; border-radius: 6px 6px 0 0; padding: 8px 10px 10px; font-style: italic; }
+
+  .wf-section { padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .wf-section:last-child { border-bottom: none; }
+  .wf-section-title { font-size: 13.5px; font-weight: 650; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .wf-section-desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 480px; }
+  .field-grid .ph { height: 32px; border-radius: 7px; }
+
+  .rcard { border: 1px solid var(--line); border-radius: 10px; padding: 16px 16px 14px; margin-top: 14px; }
+  .rrow { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 13px; flex-wrap: wrap; }
+  .rrow:last-of-type { border-bottom: none; }
+  .rrow .txt { color: var(--ink); white-space: nowrap; }
+  .rrow.disabled .txt, .rrow.disabled .input { opacity: 0.45; }
+  .val { width: 64px; justify-content: center; font-variant-numeric: tabular-nums; }
+  .unit { width: 96px; }
+
+  .states { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 800px) { .states { grid-template-columns: 1fr; } }
+  .state-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; font-size: 12.5px; }
+  .state-card .frame-label { margin-bottom: 10px; }
+  .state-card p { color: var(--muted); margin-top: 10px; }
+
+  .tbl-wrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 640px; }
+  th { text-align: left; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  th, td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .plan { display: flex; flex-direction: column; gap: 10px; counter-reset: step; }
+  .step {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 13px 16px; display: grid; grid-template-columns: 26px 1fr; gap: 12px; font-size: 13.5px;
+  }
+  .step::before {
+    counter-increment: step; content: counter(step);
+    width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--note); color: var(--note);
+    font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px;
+  }
+  .step b { font-weight: 650; }
+  .step .d { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+  .oq { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--note); border-radius: 8px; padding: 12px 16px; font-size: 13.5px; margin-top: 10px; }
+  .oq b { font-weight: 650; }
+
+  /* dashboard-specific wireframe helpers (grey primitives only) */
+  .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  @media (max-width: 800px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi { border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; }
+  .kpi .k { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+  .kpi .v { font-size: 21px; font-weight: 750; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .kpi .t { font-size: 11px; color: var(--muted); }
+  .two-col { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; margin-top: 12px; }
+  @media (max-width: 800px) { .two-col { grid-template-columns: 1fr; } }
+  .chip { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.07em; border: 1px solid var(--ph-line); border-radius: 5px; padding: 1px 6px; color: var(--muted); white-space: nowrap; }
+  .mini { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Wireframe Concept · Loredex Desktop · 2026-07-10</div>
+  <h1>Home becomes a directional dashboard, not a document</h1>
+  <p class="lede">The Home view stops rendering the Start-Here brief as a narrow page of prose and becomes a <b>full-width insight dashboard</b>: what needs attention, who blocks whom, where contracts churn, and how fresh each project's knowledge is — every tile a one-click jump into the view that acts on it. <b>Zero new backend asks</b>: every number maps to an existing core-host channel (<code>dashboard.build</code> alone carries per-project state, open handoffs with <code>ageDays</code>, and flow edges).</p>
+
+  <!-- ================= 1. PAGE SHELL ================= -->
+  <h2><span class="num">1</span>Page shell — Home, full width</h2>
+  <p class="sub">Same sidebar nav; the Home pane drops the reading measure entirely — dashboards are data, not prose. The Start-Here brief demotes to a card that links into the Reader.</p>
+
+  <div class="spread">
+    <div class="frame">
+      <div class="frame-label">Frame A · Home (dashboard)</div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+        <div>
+          <div class="wf-h2">Home</div>
+          <div class="wf-sub">nimbus-vault · Thursday 2026-07-10</div>
+        </div>
+        <span class="chip">Refreshed live (watcher + poller) <span class="dot">1</span></span>
+      </div>
+
+      <div style="margin-top:16px" class="kpis">
+        <div class="kpi"><div class="k">Open inbound</div><div class="v">10</div><div class="t">across 4 projects</div></div>
+        <div class="kpi"><div class="k">Requests waiting</div><div class="v">3</div><div class="t">no reply yet <span class="dot">2</span></div></div>
+        <div class="kpi"><div class="k">Oldest open</div><div class="v">6d</div><div class="t">backend → mobile <span class="dot">3</span></div></div>
+        <div class="kpi"><div class="k">Contract changes</div><div class="v">4</div><div class="t">last 7 days</div></div>
+        <div class="kpi"><div class="k">Stale briefs</div><div class="v">2</div><div class="t">of 4 projects</div></div>
+        <div class="kpi"><div class="k">Sync</div><div class="v">✓</div><div class="t">pushed 02:48</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="rcard" style="margin-top:0">
+          <div class="wf-section-title">Needs attention <span class="dot">4</span></div>
+          <div class="wf-section-desc">Open + expired-snooze handoffs, oldest first. Row click → its board card.</div>
+          <div class="rrow"><span class="chip">OPEN</span><span class="chip">REQUEST</span><span class="mini">mobile ⟶ backend</span><span class="txt">FCM payload contract, device-token registration…</span><span class="chip" style="margin-left:auto">6d</span></div>
+          <div class="rrow"><span class="chip">OPEN</span><span class="mini">backend ⟶ frontend</span><span class="txt">agent-config v2 fields live — build the builder UI</span><span class="chip" style="margin-left:auto">1d</span></div>
+          <div class="rrow"><span class="chip">SNOOZED*</span><span class="mini">backend ⟶ mobile</span><span class="txt">GitHub-remote sync test…</span><span class="chip" style="margin-left:auto">expired</span></div>
+        </div>
+        <div class="rcard" style="margin-top:0">
+          <div class="wf-section-title">Blocked · critical path <span class="dot">5</span></div>
+          <div class="wf-section-desc">The Atlas blocked-on sentences, verbatim. Click → Atlas blocked view.</div>
+          <div class="rrow"><span class="txt">nimbus-frontend is blocked on nimbus-ai-engine (schema v2 request, 1d)</span></div>
+          <div class="rrow"><span class="txt">nimbus-backend owes mobile the escalation push contract (6d)</span></div>
+          <div class="ghost-btn" style="margin-top:10px">Open Atlas → Blocked</div>
+        </div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note-item"><span class="dot">1</span><span><b>Live, not Refresh.</b> Watcher (<code>vault.changed</code>) and the remote poller already emit events; the dashboard recomputes on them. No manual refresh affordance.</span></div>
+      <div class="note-item"><span class="dot">2</span><span><b>Requests waiting.</b> <code>handoffs.list</code> scope <code>all</code>, filtered <code>kind === 'request' && status === 'open'</code> — the request/delivery split shipped in schema v2.</span></div>
+      <div class="note-item"><span class="dot">3</span><span><b>Age is precomputed.</b> <code>ProductHandoff.ageDays</code> comes from the lib; tile shows the max over open handoffs with its route. Severity: ≥2d amber, ≥5d rust (open question Q1).</span></div>
+      <div class="note-item"><span class="dot">4</span><span><b>One list, ranked.</b> Sort: expired-snooze first, then <code>ageDays</code> desc. Stamps reuse the board's chip components — same vocabulary everywhere.</span></div>
+      <div class="note-item"><span class="dot">5</span><span><b>Reuses blocked model.</b> <code>src/shared/blocked.ts</code> <code>BlockedRow.sentence</code> is already "the PM sentence, verbatim" — render as-is, link via <code>relPath</code>.</span></div>
+    </div>
+  </div>
+
+  <!-- ================= 2. FEATURE DETAIL ================= -->
+  <h2><span class="num">2</span>Second band — project pulse, contract churn, activity, brief</h2>
+  <p class="sub">Everything below the fold answers "where is the product moving": per-project freshness from <code>ProjectState</code> (the lib already computes <code>staleCount</code> and <code>notesNewerThanBrief</code>), contract churn from the timeline channel, and a 24h activity strip.</p>
+
+  <div class="spread">
+    <div class="frame">
+      <div class="frame-label">Frame B · Home (dashboard, lower band)</div>
+
+      <div class="wf-section" style="padding-top:0">
+        <div class="wf-section-title">Project pulse <span class="dot">6</span></div>
+        <div class="wf-section-desc">One row per project. Row click → Atlas Learn view for that project.</div>
+        <div class="rrow"><span class="txt" style="font-weight:650">nimbus-backend</span><span class="mini">18 notes · last 2026-07-10</span><span class="chip">5 open in</span><span class="chip">2 out</span><span class="chip">brief stale — 6 newer notes</span><span class="mini" style="margin-left:auto">channels · agent-config</span></div>
+        <div class="rrow"><span class="txt" style="font-weight:650">nimbus-frontend</span><span class="mini">6 notes · last 2026-07-10</span><span class="chip">2 open in</span><span class="chip">brief fresh</span><span class="mini" style="margin-left:auto">streaming · agent-config</span></div>
+        <div class="rrow"><span class="txt" style="font-weight:650">nimbus-mobile</span><span class="mini">6 notes · last 2026-07-09</span><span class="chip">3 open in</span><span class="chip">no brief</span><span class="mini" style="margin-left:auto">channels</span></div>
+      </div>
+
+      <div class="two-col" style="margin-top:0">
+        <div class="wf-section" style="border-bottom:none">
+          <div class="wf-section-title">Contract churn <span class="dot">7</span></div>
+          <div class="wf-section-desc">Changes in registered contract files, 7-day window. Click → Contracts timeline scoped to the file.</div>
+          <div class="rrow"><span class="mini">openapi.yaml</span><span class="txt">nimbus-backend</span><span class="chip">3 changes</span><span class="chip">2 linked handoffs</span></div>
+          <div class="rrow"><span class="mini">postman_collection.json</span><span class="txt">nimbus-backend</span><span class="chip">1 change</span></div>
+        </div>
+        <div class="wf-section" style="border-bottom:none">
+          <div class="wf-section-title">Today's activity <span class="dot">8</span></div>
+          <div class="wf-section-desc">Condensed 24h counts; strip click → Activity feed.</div>
+          <div class="rrow"><span class="chip">route ×9</span><span class="chip">handoff ×8</span><span class="chip">consume ×6</span><span class="chip">status ×4</span><span class="chip">sync ×6</span></div>
+          <div class="ph" style="height:34px;margin-top:8px"></div>
+        </div>
+      </div>
+
+      <div class="wf-section" style="border-bottom:none">
+        <div class="wf-section-title">Product brief <span class="dot">9</span></div>
+        <div class="rrow"><span class="txt">Start Here — Product</span><span class="chip">generated 2026-07-09 · 14 newer notes</span><span class="ghost-btn" style="height:28px">Open in Reader</span><span class="ghost-btn" style="height:28px">Re-curate…</span></div>
+      </div>
+    </div>
+    <div class="notes">
+      <div class="note-item"><span class="dot">6</span><span><b>All from one call.</b> <code>dashboard.build</code> → <code>ProjectState[]</code>: <code>noteCount</code>, <code>lastDate</code>, <code>activeTopics</code>, <code>staleCount</code>, <code>briefDate</code>, <code>notesNewerThanBrief</code>. "brief stale" chip = <code>notesNewerThanBrief &gt; 0</code>; "no brief" = <code>briefPath === null</code>.</span></div>
+      <div class="note-item"><span class="dot">7</span><span><b>Churn = grouped timeline.</b> <code>contracts.timeline</code> grouped by <code>file</code>, filtered to 7 days client-side. Linked-handoff count from the existing chip linker. Section hides when no project roots are registered.</span></div>
+      <div class="note-item"><span class="dot">8</span><span><b>Counts by kind.</b> <code>activity.feed</code> with <code>since</code> = midnight; grey bar is a per-hour density strip (no chart lib — 24 SVG rects).</span></div>
+      <div class="note-item"><span class="dot">9</span><span><b>Brief demoted, not deleted.</b> <code>home.brief</code> keeps powering freshness (<code>mtime</code>, <code>generated</code>); "Open in Reader" navigates to the brief note. Re-curate keeps the existing async seam.</span></div>
+    </div>
+  </div>
+
+  <!-- ================= 3. KEY STATES ================= -->
+  <h2><span class="num">3</span>Key states</h2>
+  <p class="sub">Loading is skeleton tiles (standard). These three are the ones that change behavior.</p>
+
+  <div class="states">
+    <div class="state-card">
+      <div class="frame-label">Fresh vault (empty)</div>
+      <div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><div class="k">Open inbound</div><div class="v">0</div></div><div class="kpi"><div class="k">Projects</div><div class="v">0</div></div><div class="kpi"><div class="k">Sync</div><div class="v">—</div></div></div>
+      <p>"Nothing filed yet — this dashboard fills itself as agents route notes. Register a project or route your first note." Buttons: Route a note… · Join a vault…</p>
+    </div>
+    <div class="state-card">
+      <div class="frame-label">Degraded (no remote / no repos)</div>
+      <div class="rrow"><span class="chip">SYNC —</span><span class="txt">no remote configured</span></div>
+      <p>Sync tile shows local-only with a "Wire a remote" link to Sync view. Contract churn section hides entirely when no project roots are registered (never an empty error).</p>
+    </div>
+    <div class="state-card">
+      <div class="frame-label">Attention actions (inline)</div>
+      <div class="rrow"><span class="chip">OPEN</span><span class="txt">row hover → Consume · Snooze ▾</span></div>
+      <p>Consume/snooze act inline via the same channels as the board, receipt toast + instant recompute. No destructive actions exist on this page — nothing deletes.</p>
+    </div>
+  </div>
+
+  <!-- ================= 4. API MAPPING ================= -->
+  <h2><span class="num">4</span>UI → API mapping</h2>
+  <p class="sub">Maps to <code>src/shared/ipc-contract.ts</code> — every channel already exists; the dashboard is a pure consumer plus one client-side aggregation module.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>UI element</th><th>Call</th><th>Mapping</th></tr></thead>
+      <tbody>
+        <tr><td>KPI: open inbound · Project pulse · flow numbers</td><td><code>dashboard.build</code></td><td><code>ProductDashboard.states</code> (ProjectState per row), <code>.handoffs</code> (status/ageDays), <code>.edges</code></td></tr>
+        <tr><td>KPI: requests waiting · Needs-attention list</td><td><code>handoffs.list</code></td><td><code>{ scope: 'all' }</code> → filter <code>status==='open' || expired</code>; requests = <code>kind==='request'</code>; sort ageDays desc</td></tr>
+        <tr><td>Blocked · critical path card</td><td><code>atlas.graph</code></td><td>existing <code>blockedRows()</code> from <code>src/shared/blocked.ts</code> → <code>sentence</code>, link via <code>relPath</code></td></tr>
+        <tr><td>KPI + Contract churn</td><td><code>contracts.timeline</code></td><td><code>{ }</code> (all projects) → group by <code>file</code>, window 7d, count + linked handoffs</td></tr>
+        <tr><td>Today's activity strip</td><td><code>activity.feed</code></td><td><code>{ since: &lt;midnight ISO&gt; }</code> → counts by <code>kind</code>, per-hour density</td></tr>
+        <tr><td>KPI: sync</td><td><code>sync.status</code></td><td><code>SyncHealth</code> → in-sync dot, last push time; degraded when no remote</td></tr>
+        <tr><td>Product brief card</td><td><code>home.brief</code></td><td><code>mtime</code>/<code>generated</code> for freshness chip; Open in Reader routes to <code>path</code></td></tr>
+        <tr><td>Inline consume / snooze on attention rows</td><td><code>handoffs.consume</code> / <code>handoffs.status</code></td><td>same payloads as the board — shared action module, receipt toast</td></tr>
+        <tr><td>Live recompute</td><td>events</td><td>existing <code>vault.changed</code> + poller events already pushed to the renderer trigger re-pull</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ================= 5. BUILD PLAN ================= -->
+  <h2><span class="num">5</span>Build plan</h2>
+  <p class="sub">Five commits, each green on its own. Story file first per BMAD convention.</p>
+
+  <div class="plan">
+    <div class="step"><span><b>Story + insights module.</b><div class="d">New <code>docs/stories/epic15.story5-home-dashboard.md</code> (V4 anatomy). <code>src/renderer/src/views/home/insights.ts</code>: pure functions folding the five channel payloads into tile models (requestsWaiting, oldestOpen, staleBriefs, churnByFile, activityCounts) + vitest against nimbus-vault fixtures.</div></span></div>
+    <div class="step"><span><b>Dashboard layout.</b><div class="d">Rebuild <code>src/renderer/src/views/home/HomeView.tsx</code>: KPI row (6 tiles), two-col attention/blocked band, project pulse, churn/activity band, brief card. Full-width: no reading measure on this view; grid per DESIGN.md v2 cards, one gold primary max.</div></span></div>
+    <div class="step"><span><b>Row actions + deep links.</b><div class="d">Row click targets: board card (existing handoff route), Atlas blocked/Learn, Contracts scoped timeline, Reader brief. Inline consume/snooze reuses the board's action module — no duplicated logic.</div></span></div>
+    <div class="step"><span><b>Live recompute.</b><div class="d">Subscribe to the existing watcher/poller renderer events; debounce 500ms; drop the Refresh button from Home.</div></span></div>
+    <div class="step"><span><b>QA + docs.</b><div class="d">Insights unit tests + e2e stage in <code>tests/e2e</code> (dashboard numbers match vault ground truth); USER-GUIDE.md Home section rewrite; sprint-status update.</div></span></div>
+  </div>
+
+  <!-- ================= OPEN QUESTIONS ================= -->
+  <h2><span class="num">?</span>Open questions (product)</h2>
+  <div class="oq"><b>Q1 — Age severity thresholds?</b> Attention chips amber at ≥2 days, rust at ≥5? Safe default: 2/5, configurable later in Settings. Affects only chip color, not ranking.</div>
+  <div class="oq"><b>Q2 — Company-wide or "my projects" first?</b> Identity carries no project membership today, so v1 is company-wide with a project filter chip row. Per-user scoping would need a membership concept (vault or app-db) — deferred unless you want it now.</div>
+  <div class="oq"><b>Q3 — Churn window.</b> 7 days fixed, or follow a Settings value shared with the Contracts view? Default: fixed 7d, revisit with usage.</div>
+  <div class="oq"><b>Q4 — Does the rendered brief survive anywhere on Home?</b> Current plan: link-out card only (the Reader owns prose). Alternative: collapsible preview under the brief card. Default: link-out only — keeps the dashboard a dashboard.</div>
+</div>

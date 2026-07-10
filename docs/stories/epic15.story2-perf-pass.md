@@ -96,4 +96,14 @@ Claude Fable 5 (claude-fable-5)
 
 ## QA Results
 
-(pending)
+**PASS (with one trivial fix applied)** — fresh-eyes M3 QA, 2026-07-10.
+
+- Perf suite re-run solo by QA, 6/6 in ~5.7 s; numbers reproduce the story's within noise:
+  cold vault open 38.1 ms / tree build 9.5 ms / search 74.6 ms / atlas cold 665.4 ms /
+  atlas warm 20.2 ms / poller tick (min of 3) 409.8 ms — all six budgets green. Also green
+  inside the full parallel suite (528/528).
+- Generator determinism asserted in-suite (two 60-note runs, identical sha256).
+- Snooze YAML-Date regression verified: `src/core/db/snooze.ts` normalizes `string | Date`
+  before the sqlite bind; regression test present in `src/core/db/db.test.ts` and green.
+- **QA fix:** the poller test title still said "< 1.5 s" from before the min-of-3 re-spec;
+  retitled to "< 3 s (min of 3)" to match the asserted `BUDGET_MS` (title only, re-run 6/6).

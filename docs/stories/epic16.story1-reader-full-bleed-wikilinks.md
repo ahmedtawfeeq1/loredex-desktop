@@ -87,3 +87,15 @@ Claude Fable 5 (claude-fable-5)
 - docs/stories/epic16.story1-reader-full-bleed-wikilinks.md — this story
 - docs/stories/sprint-status.yaml — epic-16 rows
 - (lib, local commit b5c3ffc, no push) loredex: src/core/handoff.ts, src/commands/handoff.ts, tests/handoff-v2.test.ts
+
+## QA Results
+
+**PASS** — fresh-eyes M4 QA, 2026-07-10.
+
+- **AC1 (full-bleed):** `.note` verified in styles.css — `padding: 32px 32px 64px`, no `max-width` anywhere on the note column; design-fidelity D1 describe asserts it (no measure cap survives). Gate re-run green.
+- **AC2 (duplicate H1):** `stripDuplicateH1` unit cases (equal → stripped, different → kept, case-insensitive) + NoteView regression asserting exactly one `<h1>` for an index page — re-run solo, green.
+- **AC3 (wikilink colors):** `--wikilink` token read directly from styles.css: `#8a6116` light (line 20), `#e0a83e` dark (line 36, equals `--gold` dark) — BOTH themes; `.note-body a.wikilink` 500 weight, no underline at rest, underline on hover; broken = rust dotted. Fidelity assertions green.
+- **AC4 (empty reading order):** root-cause fix confirmed in the lib repo at local commit `b5c3ffc` ("fix(handoff): never write an empty Reading order section") — `createHandoff` writes the section only when notes exist. Renderer rust `ro-empty`/`ro-unresolved` states pinned by NoteView + ReadingOrderInline tests (re-run solo, 55/55 across the story-1 renderer files). Repin caveat (desktop pins 2.1.0 tgz) already tracked as the release blocker.
+- **Gate (re-run by QA, sequential):** typecheck clean → app vitest 725/725 (82 files) → e2e 18/18 (~26 s) → production build clean.
+
+Verdict: PASS — no defects found.

@@ -57,10 +57,10 @@ development_status:
   5-7-registry-company-overview: ready-for-dev
   epic-5-retrospective: optional
 
-  epic-6: in-progress      # Activity Feed & MVP Hardening
+  epic-6: done             # Activity Feed & MVP Hardening
   6-1-loredex-pr6-activity-grammar: done
   6-2-activity-feed-view: done
-  6-3-e2e-nimbus-suite: review   # M3 re-scope: module-level release gate (npm run test:e2e), delivered 2026-07-10
+  6-3-e2e-nimbus-suite: done     # M3 re-scope: module-level release gate (npm run test:e2e); QA PASS 2026-07-10 (windowed harness + update smoke stay future hardening)
   epic-6-retrospective: optional
 
   # ---- M2 cycle (docs/architecture-m2.md) ------------------------------------
@@ -128,7 +128,7 @@ development_status:
   epic-14-retrospective: optional
 
   # ---- M3 cycle (hardening) --------------------------------------------------
-  epic-15: in-progress     # Hardening: natives, packaging, QA action items
+  epic-15: done            # Hardening: natives, packaging, QA action items — M3 QA PASS 2026-07-10
   15-1-native-module-correctness: done          # dual-ABI staging (predev/postdist) + packaged 30s smoke PASS
   15-2-perf-pass: done                          # 6 budgets green (atlas cold 664ms/2s); fixture flushed a YAML-Date snoozed_until board crash — fixed
   15-3-keyboard-coverage: done                  # one action registry: ⌘1-9/⌘N/⇧⌘R/⇧⌘S/?, ⌘K hints, cheatsheet; coverage test guards it
@@ -149,7 +149,44 @@ development_status:
   17-1-humanized-titles: done                 # ONE pure humanizeTitle/noteDate util (renderer-shared) on all 6 title surfaces: reader header (+mono date line), tree rows (+right-aligned date, flex), search view + ⌘K palette, atlas note cards (SVG <title> filename), reading-order lists, home attention rows; filename kept in frontmatter `file` row + tooltips; drift-guard test pins every surface; rider: tree filter matches humanized titles
 
 qa:
-  pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded
+  pass_date: 2026-07-10   # M4 UI-polish pass (epic16 stories 1-6, fresh-eyes QA agent); supersedes the M3 pass below for the epic16 surface
+  m4_verdicts: >
+    All six epic16 UI-polish stories (16.1-16.6) verified PASS (per-story evidence in
+    each QA Results). Test matrix, all re-run solo by QA sequentially: typecheck
+    (node+web) clean, app vitest 725/725 (82 files, ~36 s), e2e release gate 18/18
+    (~26 s), production build clean, dev-launch smoke alive at 35 s (app.db open +
+    watcher armed). D1 design fidelity spot-checked to the stylesheet itself: full-bleed
+    .note (no measure cap), --wikilink #8a6116/#e0a83e both themes, 56px rail + list->0
+    + 160ms ease-out, the exact 8 TREE_TINTS hexes with 12%/20% color-mix both themes.
+    Live-vault claims independently reproduced: edit-comments drive 3/3 NOT skipped on
+    the real nimbus vault (frontmatter byte-identical, comment note cat-readable with
+    type/replies_to/anchor/author, vault restored to 4f77cce clean); atlas drilled
+    invariants on real nimbus-backend (18 members fill > 0.5, cards >= 140px readable,
+    layout-v2 invariants intact all levels); feed churn x5 collapse pinned on the real
+    git-log fixture. Lib root-cause fix confirmed at loredex local commit b5c3ffc
+    (empty Reading order never written). Regression: v0.1 five defects, atlas
+    contract-node resolution (resolve.test.ts), layout-v2 invariants, home dashboard
+    tests — all green. NO defects found; zero QA fixes needed. 16.7 (editor v2) is done
+    on the board but OUTSIDE this pass's scope — needs its own QA before release.
+    Full status: V3-STATUS.md "UI polish (epic16)".
+  m3_verdicts: >
+    All five M3-cycle stories verified PASS (15.1-15.4 + the re-scoped 6.3; per-story
+    evidence in each QA Results). Test matrix, all re-run solo by QA: app vitest 528/528
+    (67 files), lib vitest 144/144 (22 files), typecheck (node+web) + production build
+    clean, e2e release gate 18/18 (~25 s), perf 6/6 with all six budgets green (cold open
+    38.1 ms, tree 9.5 ms, search 74.6 ms, atlas cold 665.4 ms, atlas warm 20.2 ms, poller
+    min-of-3 409.8 ms). M3 claims independently reproduced: `npm run dev` boots with NO
+    manual electron-rebuild (predev staging no-op; app.db open + watcher armed, 0 respawns
+    in 40 s; native-smoke still 2/2 after), packaged dist/mac-arm64/Loredex.app alive at
+    30 s with both native canaries on stdout. Palette coverage test spot-checked to real
+    store wiring (5 actions). README/USER-GUIDE claims each traced to code. Regression:
+    all five v0.1 defects still pinned green (brief-title/feed-logic/design-fidelity/
+    diagnostics) and the M2 QA fix (atlas contract-node -> pre-scoped Contracts timeline)
+    still holds (resolve.test.ts). QA fixes applied: perf poller test title matched to its
+    re-specced 3 s budget; Search facet lists in README+USER-GUIDE gained the missing
+    `to`; README names the e2e suite the release gate again (6.3 AC3). Ops note: running
+    app+lib suites CONCURRENTLY on one machine flakes git-heavy tests into timeouts —
+    sequential runs are clean. Full status: V3-STATUS.md.
   verdicts: >
     All 26 M2-cycle done stories verified (epics 7-14 + upgraded 2.3/3.5/3.6;
     see each story's QA Results): 23 clean PASS, 3 PASS-with-notes (7.1 pin/publish
@@ -190,10 +227,10 @@ action_items:
     needs cert secrets + channel wiring)."
   - "MINOR (from 10.4 QA fix): contract timeline filters by project, not per-file —
     a file-level filter needs a small contracts store/view extension."
-  - "dev-launch env note (unchanged): node natives are built for system node —
-    `npm run dev` needs a one-off `npx electron-rebuild` (Electron ABI 148) or
-    the core host crash-loops on app.db import; packaging unaffected. Consider
-    a predev script."
+  - "RESOLVED in M3 (15.1): dev-launch ABI caveat — predev/postdist dual-ABI
+    staging landed; `npm run dev` boots with no manual electron-rebuild and the
+    tree stays test-green after `npm run dist` (verified in M3 QA)."
   - "M1 leftovers still open: 1-5 (PR-5 async git) partial, 1-7 proxy/doctor,
     2-6 changed-since brief, epic 4 routing safety (undo receipts — 7.4 depends
-    on it for undo), 5-3/5-4/5-7 registry, 6-3 e2e suite."
+    on it for undo), 5-3/5-4/5-7 registry. 6-3 delivered (M3 re-scope); the
+    windowed Playwright harness + update-check smoke remain future hardening."

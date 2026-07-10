@@ -91,3 +91,14 @@ Claude Fable 5 (claude-fable-5)
 - src/renderer/src/design-fidelity.test.ts — Addendum D1 activity-cards describe block
 - docs/stories/epic16.story6-activity-cards.md — this story
 - docs/stories/sprint-status.yaml — epic-16 row (16-6)
+
+## QA Results
+
+**PASS** — fresh-eyes M4 QA, 2026-07-10.
+
+- **AC1/AC2 (card anatomy):** `.feed-card` recipe (radius 10, 12px padding, hairline, shadow), `.feed-kind` mono 9px kind-tinted chips, relative time (absolute on hover), middle-truncated mono paths, sha chips — design-fidelity activity-cards describe green.
+- **AC3 (churn collapse, re-run VERBOSE by QA on the real fixture):** `feed-logic.test.ts` — the reported 5-flip run on `…-frontend-4` (Rae Ito, 06:42:23→06:42:37, real nimbus git-log fixture `nimbus-activity.json`, head 4f77cce) collapses to ONE ×5 card; ai-engine-2 pair → ×2; lone flips stay single; every event kept exactly once in feed order. Synthetic edges (>10 min split, 10-min-exact joins, actor/handoff split, foreign-kind break) all green.
+- **AC4/AC5 (per-kind actions):** descriptor table asserted per kind — route→Open note, handoff→View card + Consume (only when the board card is open inbound; expired-snoozed correctly NOT offered), consume/status→View card, sync→Open Sync, contract-linked View diff capped at 2. `performFeedAction` wiring rides existing stores/routes.
+- **AC6 + regression:** the 14.2-2 `dedupeBySha` pins are kept and green (one commit = one row). Gate re-run by QA, sequential: typecheck clean → app vitest 725/725 → e2e 18/18 → build clean.
+
+Verdict: PASS — no defects found.

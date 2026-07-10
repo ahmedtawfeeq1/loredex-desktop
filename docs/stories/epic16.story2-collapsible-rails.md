@@ -104,3 +104,15 @@ Claude Fable 5 (claude-fable-5)
 - src/renderer/src/design-fidelity.test.ts — D1 rails assertions (widths, timing, gold dot)
 - docs/stories/epic16.story2-collapsible-rails.md — this story
 - docs/stories/sprint-status.yaml — epic-16 row (16-2)
+
+## QA Results
+
+**PASS** — fresh-eyes M4 QA, 2026-07-10.
+
+- **AC1/AC2/AC3:** chevrons in both pane headers, 56px icon rail (inline SVG `NavIcon`, gold `.nav-dot` badge, identity chip → dot+tooltip), list → 0 width with the `.rail-expander` chevron — all pinned by design-fidelity rails assertions (green) and the App/VaultTree wiring in the File List.
+- **AC4 (per-vault persistence):** `src/core/settings.test.ts` re-run solo — rails round-trip in a temp app.db, two vault ids never clobber each other, malformed JSON degrades to expanded, get degrades with no db/vault. Green.
+- **AC5 (motion):** `transition: width 160ms ease-out` asserted by fidelity; global reduced-motion rule kills it.
+- **AC6 (registry):** `action:toggle-sidebar` ⌘\ and `action:toggle-list` ⌘⇧\ (`|` key, US-layout convention documented) asserted in registry.test.ts — combos unique, hints present, run() flips the store; the story-15.3 palette-coverage net (every registered action = palette row + hint) inherits both entries. Targeted re-run: settings + rails store + registry + shortcuts, 49/49 green.
+- **Gate (re-run by QA, sequential):** typecheck clean → app vitest 725/725 → e2e 18/18 → build clean. Launch smoke: `npm run dev` alive at 35 s (app.db open, watcher armed).
+
+Verdict: PASS — no defects found.

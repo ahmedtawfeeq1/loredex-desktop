@@ -87,4 +87,19 @@ Claude Fable 5 (claude-fable-5)
 
 ## QA Results
 
-(pending)
+**PASS** — fresh-eyes M3 QA, 2026-07-10.
+
+- Coverage test is meaningful, not ceremonial: `registry.test.ts` asserts every registered
+  action appears in `actionItems('')` by id with its hint, combo uniqueness, all nine views
+  covered in sidebar order with ⌘1-9, and `action:palette` as the *only* sanctioned
+  palette hole (asserted exactly — a second hidden action fails).
+- Five actions spot-checked to real wiring (QA): `view:atlas` → `useApp.setView('atlas')`
+  (asserted in test), `action:new-handoff` → `useHandoffs.openCompose()` (`composeOpen`
+  asserted), `action:route-note` → `useRoute.start()` → native picker → `startWithFile`,
+  `action:sync-now` → `useSync.syncNow()`, `action:shortcuts` → `cheatsheetOpen` asserted.
+  Consumers verified in code: App.tsx keydown uses `matchShortcut(e, appActions(), …)`, nav
+  maps over `VIEW_ORDER` with `title` + `aria-keyshortcuts`, Palette rows come from
+  `actionItems` with kbd hint chips, `ShortcutCheatsheet` mounted in App.
+- Context keys verified: ⌘[/⌘] in `AtlasView.tsx`, ⏎/⌘⏎ open/consume in
+  `HandoffCardView.tsx` (target-guarded), guards covered by `shortcuts.test.ts`.
+- Suites 528/528, typecheck + build clean (QA re-run).

@@ -104,3 +104,16 @@ Claude Fable 5 (claude-fable-5)
 - src/renderer/src/views/atlas/AtlasCanvas.tsx — panels via `visiblePanels`; topic labels only for visible members, flow-first anchored
 - docs/stories/epic16.story5-atlas-learn-deep-density.md — this story
 - docs/stories/sprint-status.yaml — epic-16 row (16-5)
+
+## QA Results
+
+**PASS** — fresh-eyes M4 QA, 2026-07-10.
+
+- **AC1/AC2 (fill + visibility-derived panels):** core atlas suite re-run VERBOSE by QA — the nimbus block ran against the REAL vault (not skipped): "nimbus-backend at learn: 18 members fill the panel (> 0.5), never a strip" green (the user's exact case); `visiblePanels` tests pin that hidden atom members never inflate the panel; `panelWrapRows` aspect/anti-fragmentation units green.
+- **AC3 (pill gutter):** chip-clearance invariant re-used with 8px inflation — "drilled density invariants (16.5) hold for every project at learn and deep" green on nimbus + fixture.
+- **AC4 (own lanes):** wrap test ("a many-note topic wraps into panel rows instead of one unbounded column") + own-lane packing covered in `assertDrilledInvariants` runs. Green.
+- **AC5 (readability bound):** "nimbus-backend at learn fits READABLE: full-size cards stay ≥ 140px in a 1280×800 pane" green.
+- **AC6 (determinism + prior invariants):** "positions are deterministic across runs" and **layout-v2 invariants at every level** (fixture AND all three zoom levels on nimbus) re-run green — the pre-16.5 contract is intact.
+- **Gate (re-run by QA, sequential):** typecheck clean → app vitest 725/725 → e2e 18/18 → build clean.
+
+Verdict: PASS — no defects found.

@@ -192,7 +192,7 @@ describe('perf pass — 1,200-note synthetic vault (story 15.2)', () => {
     expect(deep.nodes.length).toBeGreaterThan(0)
   }, 60_000)
 
-  it('poller tick — fetch + parse + gate with no remote changes < 1.5 s', async () => {
+  it('poller tick — fetch + parse + gate with no remote changes < 3 s (min of 3)', async () => {
     poller = createPoller({
       vaultPath: vault,
       remote: 'origin',

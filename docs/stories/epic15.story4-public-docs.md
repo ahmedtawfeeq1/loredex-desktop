@@ -76,4 +76,19 @@ Claude Fable 5 (claude-fable-5)
 
 ## QA Results
 
-(pending)
+**PASS (with two one-word doc fixes applied)** — fresh-eyes M3 QA, 2026-07-10.
+
+- Claims spot-checked against code (QA, independent of the dev pass): MCP port 52017
+  (`mcp-server.ts` `PREFERRED_MCP_PORT`), discovery file shape `{port, token,
+  engineVersion, schemaVersion}` chmod 600 removed on quit (`discovery.ts`), six tools in
+  `loredex/src/mcp/server.ts`, poller 60 s focused / 5 min blurred (`poller.ts`
+  `FOCUSED_INTERVAL_MS`/`BLURRED_INTERVAL_MS`), ⌘O Open Vault menu accelerator
+  (`main/index.ts`), keyboard table matches `registry.ts` + AtlasView/HandoffCardView
+  context keys, `--via-desktop` honestly marked not shipped, tarball-pin caveat present.
+- Relative links re-checked by QA script over both files — all resolve;
+  `#mcp-connect-your-agents` anchor exists in USER-GUIDE.
+- **QA fixes:** the Search facet list said "project, topic, type, status, from" in both
+  files but the view + `Facets` type ship six facets — added `to` (README tour row,
+  USER-GUIDE Search). README's `test:e2e` line now names it the release gate (story 6.3
+  AC3 said the README documents that; the 15.4 rewrite had dropped the phrase).
+- Gate re-run after fixes: suites green, links green.

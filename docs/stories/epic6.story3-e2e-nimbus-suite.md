@@ -2,7 +2,7 @@
 
 ## Status
 
-Ready for Review
+Done
 
 ## Story
 
@@ -110,3 +110,19 @@ Fable 5 (claude-fable-5)
 - lib repo `loredex`: `src/core/activity.ts`, `tests/activity.test.ts` (commit `915cd86`, not pushed)
 
 ## QA Results
+
+**PASS (against the M3 re-scoped ACs)** — fresh-eyes M3 QA, 2026-07-10.
+
+- `npm run test:e2e` re-run by QA: 18/18 in ~25 s (budget ~3 min), deterministic —
+  sandboxed clones + local bare remotes only, no network, no Electron; the simulation
+  vault untouched.
+- Re-scope judged sound: the friction assertions (F1/F7/F8/F9) live on the core/seam,
+  which the suite drives production-shaped (`fileParallelism: false`, real git remotes,
+  second-clone push for the poller stage); the windowed Playwright harness + update-check
+  smoke stay visibly deferred on the board (rides 1-9).
+- CI wiring verified: `.github/workflows/ci.yml` has the separate `e2e` job running
+  `npm run test:e2e`; README names the suite the release gate (restored by QA in the
+  15.4 pass — the README rewrite had dropped the phrase).
+- Original ACs 1-4 (Playwright window, nightly, update smoke) are explicitly NOT delivered
+  and correctly recorded as future hardening — anyone reading this story should read the
+  M3 re-scope note as binding.

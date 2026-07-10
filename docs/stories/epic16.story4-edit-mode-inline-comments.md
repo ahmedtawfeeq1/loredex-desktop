@@ -127,3 +127,15 @@ Claude Fable 5 (claude-fable-5)
 - src/renderer/src/styles.css — D1 16.4 block (editor, toggle, ::highlight, chip/rail/cards, orphan chip)
 - src/renderer/src/design-fidelity.test.ts — 16.4 assertions
 - tests/edit-comments-drive.test.ts — NEW: live nimbus vault DoD drive (self-restoring)
+
+## QA Results
+
+**PASS** — fresh-eyes M4 QA, 2026-07-10.
+
+- **AC1 (note.save):** core/notes + note-save channel drives re-run inside the full gate — traversal rejection, frontmatter byte-preservation (no gray-matter re-serialization), commit message + identity author. Green.
+- **AC2 (edit mode):** ⌘E/⌘S registered actions asserted in registry.test (palette-coverage net inherits them; ⌘S shift-exact so ⇧⌘S Sync never collides); editor store / editorFormat / NoteEditor markup tests green in the full suite.
+- **AC3+AC5 (agent-visibility, re-run VERBOSE by QA):** `tests/edit-comments-drive.test.ts` against the LIVE nimbus vault — 3/3, NOT skipped: edit+save round-trip with the frontmatter block byte-identical and the edit commit in activity.feed; comment create then **plain `cat` via execFileSync** shows `type: comment`, `replies_to: <parent>`, `anchor: <exact quote>`, `author: Dana Reyes <dana@nimbus.dev>` — agents read it with zero tooling; second edit orphans the anchor. Vault verified restored afterward: `git status --porcelain` empty, HEAD back at `4f77cce`.
+- **AC4 (rendering):** gold `::highlight(loredex-anchor)`, margin-rail cards, rust orphan chip — fidelity 16.4 assertions green; `splitComments` orphaning units green.
+- **Gate (re-run by QA, sequential):** typecheck clean → app vitest 725/725 (82 files) → e2e 18/18 → build clean.
+
+Verdict: PASS — no defects found. (Recorded deviation — commit-only push semantics — already sanctioned in Dev Notes.)

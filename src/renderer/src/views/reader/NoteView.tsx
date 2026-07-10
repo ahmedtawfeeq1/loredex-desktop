@@ -45,6 +45,10 @@ import {
 import { CommentsRail, OrphanedComments } from './InlineComments'
 import { FindBar } from './FindBar'
 import { ModeToggle, NoteEditor } from './NoteEditor'
+import { PropertiesPanel } from './PropertiesPanel'
+
+/** Notes past this render length collapse the Properties panel by default (§C). */
+const LONG_NOTE_CHARS = 1500
 
 export function formatValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(', ')
@@ -313,7 +317,12 @@ export function NoteArticle({
             </button>
           </div>
         )}
-        <FrontmatterPanel meta={doc.meta as Record<string, unknown>} path={selected} />
+        <PropertiesPanel
+          key={selected}
+          meta={doc.meta as Record<string, unknown>}
+          path={selected}
+          defaultCollapsed={doc.body.length > LONG_NOTE_CHARS}
+        />
         <div
           className="note-body"
           ref={bodyRef}

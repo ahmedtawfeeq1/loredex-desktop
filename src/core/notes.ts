@@ -8,8 +8,34 @@
  * quoting/order/comments). An unedited save is a byte-identical file.
  */
 
+import { ipcError } from '../shared/ipc-contract'
+import { isManagedKey } from '../shared/properties'
+
 /** The leading frontmatter block including its closing delimiter line. */
 const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/
+
+/**
+ * Compute the next frontmatter meta for a `note.setFrontmatter` edit (epic20,
+ * D1 amendment 7 §C). Pure — no fs, no serialize; engine.ts round-trips the
+ * result through the lib. Agents own frontmatter: managed keys are REJECTED
+ * (the panel already locks them; this is the server-side guard). `remove`
+ * deletes the key; otherwise it is set to `value`.
+ */
+export function applyFrontmatterEdit(
+  meta: Record<string, unknown>,
+  key: string,
+  value: unknown,
+  remove: boolean,
+): Record<string, unknown> {
+  if (!key.trim()) throw ipcError('INTERNAL', 'a property needs a key')
+  if (isManagedKey(key)) {
+    throw ipcError('INTERNAL', `"${key}" is managed by loredex and cannot be edited`)
+  }
+  const next = { ...meta }
+  if (remove) delete next[key]
+  else next[key] = value
+  return next
+}
 
 /**
  * Replace a note's body, preserving the frontmatter block verbatim.

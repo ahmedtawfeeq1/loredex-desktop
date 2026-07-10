@@ -63,7 +63,7 @@ import {
 import { abbreviatePath } from '../shared/identity'
 import { gitLog, withGitIdentity } from './git'
 import { ipcError } from '../shared/ipc-contract'
-import { spliceBody } from './notes'
+import { applyFrontmatterEdit, spliceBody } from './notes'
 import type { HomeBrief, ReplyHandoffInput, VaultIdentity } from '../shared/types'
 
 /** undefined = not yet initialized; null = initialized, no config on disk. */
@@ -278,6 +278,38 @@ export function saveNoteBody(path: string, body: string, identity: Identity): { 
     gitAutoCommit(config.vaultPath, config, `loredex: edit ${basename(resolved, '.md')} (${identity.name})`),
   )
   return { path: resolved }
+}
+
+/**
+ * Frontmatter property write (epic20, D1 amendment 7 §C): set or remove ONE
+ * user-owned frontmatter key on an existing note. The body is preserved (it
+ * round-trips through the lib's parseDoc → serializeDoc unchanged); the
+ * frontmatter block is re-serialized because it is exactly what changed.
+ * Managed keys are rejected in applyFrontmatterEdit (agents own frontmatter).
+ * Path guarded via resolveNoteInsideVault; identity rides the commit (F7).
+ * Commit only — pushing stays the poller/Sync-now's job.
+ */
+export function setFrontmatter(
+  path: string,
+  key: string,
+  value: unknown,
+  remove: boolean,
+  identity: Identity,
+): { path: string; body: string } {
+  const config = getConfig()
+  const resolved = resolveInVault(path)
+  const doc = parseDoc(readFileSync(resolved, 'utf8'))
+  const nextMeta = applyFrontmatterEdit(doc.meta as Record<string, unknown>, key, value, remove)
+  writeFileSync(resolved, serializeDoc({ meta: nextMeta as Meta, body: doc.body }))
+  const verb = remove ? 'remove' : 'set'
+  withGitIdentity(identity, () =>
+    gitAutoCommit(
+      config.vaultPath,
+      config,
+      `loredex: ${verb} property ${key} on ${basename(resolved, '.md')}`,
+    ),
+  )
+  return { path: resolved, body: doc.body }
 }
 
 /**

@@ -711,6 +711,288 @@ a:hover {
   padding-right: 12px;
 }
 
+/* ── Properties panel (epic20, D1 amendment 7 §C) ──────────────────────────
+   Typed rows, managed keys locked, collapsible, dense mono. DESIGN v2. */
+.properties {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-inset);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.prop-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.prop-caret {
+  font-size: 9px;
+  color: var(--text-2);
+}
+
+.prop-count {
+  color: var(--text-2);
+  opacity: 0.7;
+}
+
+.prop-rows {
+  padding: 4px 12px 8px;
+  border-top: 1px solid var(--hairline);
+}
+
+.prop-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  padding: 1px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.prop-icon {
+  width: 12px;
+  text-align: center;
+  color: var(--text-2);
+  opacity: 0.7;
+  flex: none;
+}
+
+.prop-key {
+  width: 116px;
+  flex: none;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prop-value,
+.prop-value-file {
+  color: var(--text-1);
+  word-break: break-word;
+}
+
+.prop-value-file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.prop-value-edit {
+  border: none;
+  background: transparent;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  border-radius: 4px;
+  font: inherit;
+  color: var(--text-1);
+  text-align: left;
+  cursor: text;
+  min-width: 0;
+}
+
+.prop-value-edit:hover:not(:disabled) {
+  background: var(--bg-card);
+}
+
+.prop-value-edit:disabled {
+  cursor: default;
+}
+
+.prop-edit,
+.prop-add-key,
+.prop-add-val,
+.prop-add-type {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text-1);
+}
+
+.prop-edit {
+  flex: 1;
+  min-width: 0;
+}
+
+.prop-managed .prop-key,
+.prop-managed .prop-value {
+  color: var(--text-2);
+}
+
+.prop-lock {
+  margin-left: auto;
+  color: var(--text-2);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.prop-remove {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.prop-row:hover .prop-remove {
+  opacity: 0.7;
+}
+
+.prop-remove:hover {
+  color: var(--rust);
+  opacity: 1;
+}
+
+.prop-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.prop-tag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.prop-tag-label {
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: var(--text-1);
+  padding: 1px 5px;
+  cursor: pointer;
+}
+
+.prop-tag-label:hover {
+  color: var(--gold);
+}
+
+.prop-tag-x {
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  padding: 0 4px 0 0;
+  cursor: pointer;
+}
+
+.prop-tag-x:hover {
+  color: var(--rust);
+}
+
+.prop-tag-add {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  width: 52px;
+  border: none;
+  background: transparent;
+  color: var(--text-1);
+  padding: 1px 2px;
+}
+
+.prop-link {
+  color: var(--gold);
+  text-decoration: none;
+}
+
+.prop-link:hover {
+  text-decoration: underline;
+}
+
+.prop-chip {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  color: var(--text-1);
+}
+
+.prop-add {
+  display: inline-block;
+  margin-top: 4px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.prop-add:hover {
+  color: var(--gold);
+}
+
+.prop-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.prop-add-key {
+  width: 110px;
+}
+
+.prop-add-val {
+  flex: 1;
+  min-width: 80px;
+}
+
+.prop-add-go {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 10px;
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  background: var(--gold);
+  color: var(--gold-ink);
+  cursor: pointer;
+}
+
+.prop-add-cancel {
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.prop-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--rust);
+  padding: 4px 0;
+}
+
 .note-body {
   font-size: 14px;
   line-height: 1.6;

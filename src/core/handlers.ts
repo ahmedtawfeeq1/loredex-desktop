@@ -402,6 +402,23 @@ export function registerCoreHandlers(
       return { path: rel }
     }),
   )
+  // Properties panel (epic20, D1 amendment 7 §C): set/remove one user-owned
+  // frontmatter key. Body preserved, managed keys rejected in the engine
+  // (agents own frontmatter), path guarded, committed as the identity (F7).
+  ipc.register('note.setFrontmatter', ({ path, key, value, remove, identity }) =>
+    withWriteLock(() => {
+      requireIdentity(identity, 'editing a property')
+      const result = engine.setFrontmatter(path, key, value, remove ?? false, identity)
+      const vaultPath = engine.getConfig().vaultPath
+      const rel = toVaultRelative(result.path, vaultPath)
+      // frontmatter drives facets/atlas/links (F4 tier) — invalidate like a save
+      invalidateLinkIndex(vaultPath)
+      clearFacetCache()
+      invalidateAtlas()
+      ipc.emit({ kind: 'vault.changed', paths: [rel] })
+      return { path: rel }
+    }),
+  )
   // Inline comments (story 16.4): a NEW anchored type:'comment' note beside
   // the parent — the parent is never mutated; comments are never board cards.
   ipc.register('note.comment.create', ({ path, anchor, body, identity }) =>

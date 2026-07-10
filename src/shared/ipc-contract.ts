@@ -131,6 +131,16 @@ export interface CoreApi {
    *  `loredex: edit <note> (<identity name>)`. Returns the vault-relative
    *  path. Commit only — the poller/Sync now push (receipt says so). */
   'note.save': { in: { path: string; body: string; identity: Identity }; out: { path: string } }
+  /** Properties panel (epic20, D1 amendment 7 §C): set or remove ONE
+   *  user-owned frontmatter key on an existing note. Body preserved (parseDoc→
+   *  serializeDoc round-trip), managed keys rejected (agents own frontmatter),
+   *  path guarded via resolveNoteInsideVault, git auto-commit
+   *  `loredex: set|remove property <key> on <note> (<name>)`. `remove: true`
+   *  deletes the key. Returns the vault-relative path. */
+  'note.setFrontmatter': {
+    in: { path: string; key: string; value?: unknown; remove?: boolean; identity: Identity }
+    out: { path: string }
+  }
   /** Inline comments (story 16.4): anchored comments replying to one note —
    *  read-only vault scan, anchored (`anchor:`) comments only (non-anchored
    *  handoff comments stay the thread rail's, story 8.2). */

@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Doc } from '../../../../shared/ipc-contract'
 import type { NoteComment } from '../../../../shared/types'
 import { BrandMark } from '../../components/BrandMark'
+import { humanizeTitle, noteDate } from '../../humanize'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useComments } from '../../stores/comments'
 import { useDiagnostics } from '../../stores/diagnostics'
@@ -53,15 +54,24 @@ export function formatValue(value: unknown): string {
 
 export function FrontmatterPanel({
   meta,
+  path,
 }: {
   meta: Record<string, unknown>
+  /** story 17.1: the REAL filename stays visible here while titles humanize */
+  path?: string
 }): React.JSX.Element | null {
   const entries = Object.entries(meta).filter(([, v]) => v !== undefined && v !== null)
-  if (entries.length === 0) return null
+  if (entries.length === 0 && !path) return null
   return (
     <div className="frontmatter">
       <table>
         <tbody>
+          {path && (
+            <tr>
+              <td className="fm-key">file</td>
+              <td>{path}</td>
+            </tr>
+          )}
           {entries.map(([key, value]) => (
             <tr key={key}>
               <td className="fm-key">{key}</td>
@@ -258,11 +268,17 @@ export function NoteArticle({
 
   // story 7.3 AC1: the open handoff brief is the "detail view" — same actions
   const handoffRef = handoffRefFromNote(selected, doc.meta as Record<string, unknown>)
+  // story 17.1 (D1 amendment 3): the header humanizes the machine name; the
+  // stripped date is a mono line under the serif title; filename → tooltip
+  const filedDate = noteDate(title)
   return (
     <div className="note-layout" ref={layoutRef} onMouseUp={onMouseUp}>
       <article className="note">
         <ModeToggle selected={selected} doc={doc} editing={false} unsaved={unsaved} />
-        <h1 className="note-title">{title}</h1>
+        <h1 className="note-title" title={selected}>
+          {humanizeTitle(title)}
+        </h1>
+        {filedDate && <p className="note-date">{filedDate}</p>}
         {handoffRef &&
           attributionLines(doc.meta as Record<string, unknown>).map((line) => (
             <p key={line} className="handoff-history">
@@ -293,7 +309,7 @@ export function NoteArticle({
             </button>
           </div>
         )}
-        <FrontmatterPanel meta={doc.meta as Record<string, unknown>} />
+        <FrontmatterPanel meta={doc.meta as Record<string, unknown>} path={selected} />
         <div
           className="note-body"
           ref={bodyRef}

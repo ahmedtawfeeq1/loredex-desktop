@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { actionItems } from '../../actions/palette-items'
+import { humanizeTitle } from '../../humanize'
 import { openSearchResult, useSearch } from '../../stores/search'
 import { clampSelection, moveSelection } from './palette-nav'
 
@@ -20,8 +21,6 @@ interface PaletteItem {
   /** action items (M2): run instead of opening a note */
   run?: () => void
 }
-
-const titleOf = (path: string): string => (path.split('/').pop() ?? path).replace(/\.md$/, '')
 
 export function Palette(): React.JSX.Element | null {
   const open = useSearch((s) => s.paletteOpen)
@@ -42,14 +41,16 @@ export function Palette(): React.JSX.Element | null {
 
   if (!open) return null
 
+  // story 17.1: note titles humanize; the real filename stays visible in the
+  // meta line (recents) and the row tooltip (title={item.path})
   const noteItems: PaletteItem[] = q.trim()
     ? (hits ?? []).map((h) => ({
         key: h.path,
-        title: h.name,
+        title: humanizeTitle(h.name),
         meta: `${h.project || 'product'} · ${h.kind}${h.date ? ` · ${h.date}` : ''}`,
         path: h.path,
       }))
-    : recents.map((p) => ({ key: p, title: titleOf(p), meta: p, path: p }))
+    : recents.map((p) => ({ key: p, title: humanizeTitle(p), meta: p, path: p }))
   const items: PaletteItem[] = [...actionItems(q), ...noteItems]
 
   const selected = clampSelection(sel, items.length)
@@ -107,6 +108,7 @@ export function Palette(): React.JSX.Element | null {
                 type="button"
                 className="palette-item"
                 aria-current={i === selected}
+                title={item.path || undefined}
                 onMouseEnter={() => setSel(i)}
                 onClick={() => pick(item)}
               >

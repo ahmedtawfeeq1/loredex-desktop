@@ -144,6 +144,10 @@ development_status:
   16-6-activity-cards: done                   # D1 activity cards: card recipe + kind chips + relative time + middle-truncated paths + sha chips; status-churn ×5 collapse proven on the real nimbus git-log fixture; per-kind outline-pill actions (max 2) wired to reader/board/consume/sync/diff
   16-7-editor-v2: done                        # D1 amendment 2: CodeMirror 6 editor — token-themed md highlighting (both themes), selection-aware toolbar + H1-H4 dropdown, ⌘B/⌘I/⌘K in-editor, ⌘F, list continuation, history, dirty-guard save/discard; 16.4 save/frontmatter semantics untouched; rider: per-file search in the reader file pane (user request)
 
+  # ---- M5 cycle (comprehension pass, DESIGN.md D1 amendment 3) ----------------
+  epic-17: in-progress     # Comprehension pass per D1 amendment 3 (real-vault user feedback)
+  17-1-humanized-titles: done                 # ONE pure humanizeTitle/noteDate util (renderer-shared) on all 6 title surfaces: reader header (+mono date line), tree rows (+right-aligned date, flex), search view + ⌘K palette, atlas note cards (SVG <title> filename), reading-order lists, home attention rows; filename kept in frontmatter `file` row + tooltips; drift-guard test pins every surface; rider: tree filter matches humanized titles
+
 qa:
   pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded
   verdicts: >

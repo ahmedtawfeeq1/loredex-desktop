@@ -12,6 +12,7 @@ import { blockedRows } from '../../../../shared/blocked'
 import { formatAge } from '../../../../shared/handoff-lanes'
 import type { HandoffCard } from '../../../../shared/types'
 import { StatusChip } from '../../components/StatusChip'
+import { humanizeTitle } from '../../humanize'
 import { useApp } from '../../stores/app'
 import { useAtlas } from '../../stores/atlas'
 import { useContracts } from '../../stores/contracts'
@@ -361,7 +362,10 @@ function AttentionRow({ card }: { card: HandoffCard }): React.JSX.Element {
       <span className="dash-mini">
         {card.from} ⟶ {card.to}
       </span>
-      <span className="dash-txt">{card.objective || card.name}</span>
+      {/* story 17.1: the name fallback humanizes; filename stays in the tooltip */}
+      <span className="dash-txt" title={card.name}>
+        {card.objective || humanizeTitle(card.name)}
+      </span>
       <span className="dash-row-actions">
         {(card.status === 'open' || card.status === 'accepted') && (
           <button

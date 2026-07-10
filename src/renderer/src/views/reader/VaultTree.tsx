@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import type { TreeNode } from '../../../../shared/types'
 import { RailChevron } from '../../components/NavIcon'
+import { humanizeTitle, noteDate } from '../../humanize'
 import { useRails } from '../../stores/rails'
 import { useReader } from '../../stores/reader'
 import { useTreeSections } from '../../stores/treeSections'
@@ -38,6 +39,9 @@ const TREE_FILTER_CSS = `
 function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): React.JSX.Element {
   const selected = useReader((s) => s.selected)
   const open = useReader((s) => s.open)
+  // story 17.1 (D1 amendment 3): humanized title + small right-aligned date;
+  // the real filename stays in the tooltip (title={node.path})
+  const date = noteDate(node.name)
   return (
     <button
       type="button"
@@ -46,7 +50,8 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
       title={node.path}
       onClick={() => void open(node.path)}
     >
-      {node.name}
+      <span className="tree-file-name">{humanizeTitle(node.name)}</span>
+      {date && <span className="tree-file-date">{date}</span>}
     </button>
   )
 }

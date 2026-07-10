@@ -9,6 +9,7 @@
  */
 import { CLUSTER_W, NODE_H, NODE_W, PILL_H, PILL_W } from '../../../../shared/atlas-layout'
 import type { AtlasNode } from '../../../../shared/types'
+import { humanizeTitle, noteDate } from '../../humanize'
 
 /** How a node renders (layout-v2): `card` = mini routing-slip; `cluster` =
  *  wide overview project card; `pill` = collapsed neighbor at learn/deep;
@@ -95,10 +96,13 @@ function ProjectPillBody({ node, header }: { node: AtlasNode; header: boolean })
 }
 
 function NoteBody({ node }: { node: AtlasNode }): React.JSX.Element {
+  // story 17.1 (D1 amendment 3): the serif title humanizes; the stripped
+  // date rides the EXISTING date line; native SVG tooltip keeps the filename
   return (
     <>
+      <title>{node.label}</title>
       <text className="atlas-note-title" x={14} y={22}>
-        {truncate(node.label, 26)}
+        {truncate(humanizeTitle(node.label), 26)}
       </text>
       <Chip x={14} y={30} text={node.noteType || 'note'} variant="atlas-chip-type" />
       {node.topic && (
@@ -119,7 +123,7 @@ function NoteBody({ node }: { node: AtlasNode }): React.JSX.Element {
         x={14}
         y={NODE_H - 12}
       >
-        {node.date ?? ''}
+        {node.date ?? noteDate(node.label) ?? ''}
         {node.stale ? ' · stale' : ''}
       </text>
     </>

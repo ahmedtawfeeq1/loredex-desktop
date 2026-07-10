@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SearchHit } from '../../../../shared/ipc-contract'
 import type { Facets } from '../../../../shared/types'
+import { humanizeTitle } from '../../humanize'
 import { openSearchResult, useSearch } from '../../stores/search'
 import { clampSelection, moveSelection, splitForHighlight } from './palette-nav'
 
@@ -65,10 +66,13 @@ function ResultRow({
       type="button"
       className="search-row"
       aria-current={selected}
+      title={hit.path}
       onClick={() => openSearchResult(hit.path)}
     >
+      {/* story 17.1: humanized title; the real filename rides the tooltip
+          and the date already renders in the meta line below */}
       <span className="search-row-title">
-        <Highlight text={hit.name} query={query} />
+        <Highlight text={humanizeTitle(hit.name)} query={query} />
       </span>
       <span className="search-row-meta">
         {hit.project || 'product'} · {hit.kind}

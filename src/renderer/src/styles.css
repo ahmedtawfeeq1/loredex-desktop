@@ -239,7 +239,9 @@ a:hover {
 }
 
 .tree-file {
-  display: block;
+  display: flex; /* story 17.1: humanized name + right-aligned date */
+  align-items: center;
+  gap: 8px;
   width: 100%;
   min-height: 38px;
   text-align: left;
@@ -4184,4 +4186,42 @@ a.commit-chip-sha:hover {
 .empty-state-hint {
   font-size: 12px;
   color: var(--text-2);
+}
+
+/* ── humanized note titles (story 17.1, D1 amendment 3) ─────────────────────
+   machine names humanize on every title surface (humanize.ts); the stripped
+   YYYY-MM-DD renders as mono --text-2 metadata. The REAL filename stays in
+   tooltips + the frontmatter panel. */
+
+/* reader: mono date line directly under the serif title */
+.note-date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  margin: -8px 0 16px;
+}
+
+/* tree rows: name ellipsizes, the small date sits right-aligned and quiet */
+.tree-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-file-date {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 400; /* selection bolds the row — the date stays quiet */
+  color: var(--text-2);
+}
+
+/* reading-order titles: mono date after the humanized serif title */
+.ro-date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-2);
+  margin-left: 8px;
 }

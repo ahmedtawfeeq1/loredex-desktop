@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Doc } from '../../../../shared/ipc-contract'
 import type { LinkResolution } from '../../../../shared/types'
+import { humanizeTitle, noteDate } from '../../humanize'
 import { previewCached, resolveCached } from '../../markdown/resolveCache'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useDiagnostics } from '../../stores/diagnostics'
@@ -59,9 +60,15 @@ function InlineNote({ target, from }: { target: string; from: string }): React.J
   const resolution: LinkResolution | undefined = useCacheEntry(resolveCached(target, from))
   if (resolution?.status === 'broken') return <UnresolvedName name={target} from={from} />
   const path = resolution?.status === 'resolved' ? resolution.target : undefined
+  // story 17.1 (D1 amendment 3): reading-order titles humanize — the wikilink
+  // name stays in the tooltip, the stripped date as mono metadata
+  const date = noteDate(target)
   return (
     <details className="ro-item" open={false}>
-      <summary className="ro-title">{target}</summary>
+      <summary className="ro-title" title={target}>
+        {humanizeTitle(target)}
+        {date && <span className="ro-date">{date}</span>}
+      </summary>
       {resolution === undefined ? (
         <p className="ro-meta">resolving…</p>
       ) : path ? (

@@ -5,18 +5,23 @@
  * keeps its whole subtree. Pure — unit-testable under node.
  */
 import type { TreeNode } from '../../../../shared/types'
+import { humanizeTitle } from '../../humanize'
 
 export function filterTree(nodes: TreeNode[], query: string): TreeNode[] {
   const q = query.trim().toLowerCase()
   if (!q) return nodes
+  // story 17.1: rows display humanized titles, so the filter matches what the
+  // user SEES ("error handling") as well as the machine name (error-handling)
+  const matches = (name: string): boolean =>
+    name.toLowerCase().includes(q) || humanizeTitle(name).toLowerCase().includes(q)
   const walk = (list: TreeNode[]): TreeNode[] =>
     list.flatMap((node) => {
       if (node.kind === 'dir') {
-        if (node.name.toLowerCase().includes(q)) return [node] // whole subtree stays
+        if (matches(node.name)) return [node] // whole subtree stays
         const children = walk(node.children ?? [])
         return children.length > 0 ? [{ ...node, children }] : []
       }
-      return node.name.toLowerCase().includes(q) ? [node] : []
+      return matches(node.name) ? [node] : []
     })
   return walk(nodes)
 }

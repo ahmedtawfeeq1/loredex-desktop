@@ -119,3 +119,18 @@ The edit surface upgrades from plain textarea to **CodeMirror 6** (the standard;
 **Resizable list pane.** Drag handle on the file-list/reader divider: 200–480px, cursor col-resize, double-click resets to 300, persisted per vault next to the rails state. Collapse behavior (⌘⇧\) unchanged.
 
 **File-pane search modes.** The "Search files…" box gains a segmented mode toggle: **Name** (current filter) | **Content** (vault.search full-text) — content mode shows a flat result list (humanized title, project tint dot, snippet with highlighted term, date) replacing the tree while active; Enter opens the top hit; Esc clears back to the tree.
+
+### D1 amendment 4 — handoff reply model (user feedback on real vault, 2026-07-10)
+
+**The core rule: a new note = "a distinct thing someone must separately consume." Everything else is a state change or a thread comment.** Git already versions every note, so updating in place never loses history — note-minting is reserved for consumable units, not edits.
+
+Three distinct actions on a handoff card, clearly separated:
+- **Comment** (PRIMARY, lightweight — the default reply path): `type: comment` note, `replies_to` parent, author identity. Threads under the parent in the thread rail + Atlas. **NEVER a board card.** This is for "done", "got it", questions, acknowledgements, discussion. Rename the current prominent "Reply" affordance so Comment is the obvious first action.
+- **Hand back** (SECONDARY, deliberate — the real return deliverable): what today's "Reply" does — mints a new `type: handoff` note, inverted route, `replies_to` set, appears on the board as a consumable unit. Label it "Hand back" (or "Reply with deliverable"), visually secondary to Comment, with a one-line helper on the compose modal: "Creates a new handoff the other team must consume. For a quick note, use Comment."
+- **Status transitions** (accept/decline/snooze/consume/fulfill): update the SAME note's frontmatter. Unchanged — already correct.
+
+Board filtering: the Handoffs board and its counts list ONLY `type: handoff` notes. `type: comment` notes never appear as board cards or in open/consumed counts — they live in the thread rail (reader), the Atlas thread edges, and the Activity feed. This is the de-clutter fix for the user's "board full of tiny consumed notes" complaint.
+
+In-place edit (nice-to-have this cycle if cheap): a handoff YOU authored that no one has consumed yet is editable in place (fix objective/typo) via the editor — no new note, no reply. Skip if it needs new plumbing.
+
+Migration: existing `type: handoff` notes that were really conversational replies stay as-is (never rewrite the vault); the model applies going forward. Thread rail already renders `replies_to` chains regardless of type, so past replies still thread correctly.

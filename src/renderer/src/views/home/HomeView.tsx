@@ -4,7 +4,8 @@
  * full-width insight dashboard — KPI row, attention/blocked band, project
  * pulse, churn/activity band, and the brief demoted to a link-out card.
  * Zero new backend asks: every number maps to an existing channel; this view
- * is a pure consumer of the insights aggregation module.
+ * is a pure consumer of the insights aggregation module, and every tile is a
+ * one-click jump into the view that acts on it.
  */
 import { useEffect } from 'react'
 import { blockedRows } from '../../../../shared/blocked'
@@ -12,10 +13,15 @@ import { formatAge } from '../../../../shared/handoff-lanes'
 import type { HandoffCard } from '../../../../shared/types'
 import { StatusChip } from '../../components/StatusChip'
 import { useApp } from '../../stores/app'
+import { useAtlas } from '../../stores/atlas'
+import { useContracts } from '../../stores/contracts'
 import { useHandoffs } from '../../stores/handoffs'
 import { useHome } from '../../stores/home'
+import { effectiveIdentity, useIdentity } from '../../stores/identity'
+import { useReader } from '../../stores/reader'
 import { useRoute } from '../../stores/route'
 import { useWizard } from '../../stores/wizard'
+import { openBrief } from '../handoffs/Board'
 import { localDay } from '../handoffs/lifecycle'
 import { DEFAULT_BRIEF_TITLE, splitLeadingH1 } from './brief-title'
 import { formatFreshness } from './freshness'
@@ -42,6 +48,54 @@ import {
 /** Kinds in the feed's own vocabulary, fixed chip order (spec note 8). */
 const ACTIVITY_KINDS = ['route', 'handoff', 'consume', 'status', 'sync'] as const
 
+// ── deep links (spec §4 — each tile jumps into the view that acts on it) ────
+
+function goBoard(): void {
+  useHandoffs.getState().setProject('all')
+  useApp.getState().setView('handoffs')
+}
+
+function goAtlasBlocked(): void {
+  const atlas = useAtlas.getState()
+  if (!atlas.filters.blocked) atlas.toggleBlocked() // opens the blocked side list
+  useApp.getState().setView('atlas')
+}
+
+/** Project pulse row → Atlas Learn scoped to the project (spec note 6). */
+function goAtlasLearn(project: string): void {
+  useApp.getState().setView('atlas')
+  void useAtlas.getState().drillProject(project)
+}
+
+/** Churn row → Contracts scoped to the file's project, focus-ringed on its
+ *  newest change — the atlas resolve.ts contract-timeline pattern. */
+function goContractsFile(row: ChurnRow): void {
+  const contracts = useContracts.getState()
+  useApp.getState().setView('contracts')
+  contracts.setProject(row.project)
+  void contracts.load().then(() => {
+    useContracts.getState().focus(row.latestSha)
+  })
+}
+
+/** Blocked row → the handoff's board card (brief + reading order), via relPath. */
+function openByRelPath(relPath: string, id: string): void {
+  const card = (useHandoffs.getState().cards ?? []).find((c) => c.id === id)
+  if (card) {
+    openBrief(card)
+    return
+  }
+  useApp.getState().setView('reader')
+  void useReader.getState().open(relPath)
+}
+
+/** Row-as-button keyboard contract (the handoff-card pattern): ⏎ activates. */
+function rowKey(run: () => void): (e: React.KeyboardEvent) => void {
+  return (e) => {
+    if (e.key === 'Enter' && e.target === e.currentTarget) run()
+  }
+}
+
 export function HomeView(): React.JSX.Element {
   const dash = useDashboardData((s) => s.dash)
   const changes = useDashboardData((s) => s.changes)
@@ -53,6 +107,7 @@ export function HomeView(): React.JSX.Element {
   const cards = useHandoffs((s) => s.cards)
   const brief = useHome((s) => s.brief)
   const vaultPath = useApp((s) => s.identity?.vaultPath ?? '')
+  const setView = useApp((s) => s.setView)
 
   useEffect(() => {
     if (!dash) void loadDash()
@@ -116,23 +171,48 @@ export function HomeView(): React.JSX.Element {
 
       <div className="dash-kpis">
         <Kpi label="Open inbound" value={loading ? '…' : String(inbound.open)}
-          caption={`across ${inbound.projects} project${inbound.projects === 1 ? '' : 's'}`} />
-        <Kpi label="Requests waiting" value={loading ? '…' : String(waiting)} caption="no reply yet" />
+          caption={`across ${inbound.projects} project${inbound.projects === 1 ? '' : 's'}`}
+          title="Open the handoff board" onClick={goBoard} />
+        <Kpi label="Requests waiting" value={loading ? '…' : String(waiting)} caption="no reply yet"
+          title="Open the handoff board" onClick={goBoard} />
         <Kpi label="Oldest open" value={oldest ? formatAge(oldest.ageDays) : '—'}
           tone={oldest ? ageKpiTone(oldest.ageDays) : undefined}
-          caption={oldest ? `${oldest.from} → ${oldest.to}` : 'nothing open'} />
+          caption={oldest ? `${oldest.from} → ${oldest.to}` : 'nothing open'}
+          title={oldest ? 'Open this handoff' : undefined}
+          onClick={
+            oldest
+              ? () => {
+                  const card = all.find((c) => c.id === oldest.id && c.to === oldest.to)
+                  if (card) openBrief(card)
+                }
+              : undefined
+          } />
         {(rootsCount ?? 0) > 0 && (
-          <Kpi label="Contract changes" value={String(contractCount)} caption="last 7 days" />
+          <Kpi label="Contract changes" value={String(contractCount)} caption="last 7 days"
+            title="Open the contract timeline" onClick={() => setView('contracts')} />
         )}
         <Kpi label="Stale briefs" value={loading ? '…' : String(briefs.attention)}
-          caption={`of ${briefs.total} project${briefs.total === 1 ? '' : 's'}`} />
-        <Kpi label="Sync" value={sync.value} caption={sync.caption} tone={sync.tone} />
+          caption={`of ${briefs.total} project${briefs.total === 1 ? '' : 's'}`}
+          title="Open the Atlas overview" onClick={() => setView('atlas')} />
+        <Kpi label="Sync" value={sync.value} caption={sync.caption} tone={sync.tone}
+          title="Open sync health" onClick={() => setView('sync')} />
       </div>
+      {/* degraded state (spec §3): local-only vault → one quiet wire-a-remote line */}
+      {sync.localOnly && (
+        <div className="dash-mini">
+          This vault has no remote — notes stay local.{' '}
+          <button type="button" className="button-quiet" onClick={() => setView('sync')}>
+            Wire a remote
+          </button>
+        </div>
+      )}
 
       <div className="dash-two-col">
         <section className="dash-card" aria-label="Needs attention">
           <div className="dash-card-title">Needs attention</div>
-          <div className="dash-card-desc">Open + expired-snooze handoffs, oldest first.</div>
+          <div className="dash-card-desc">
+            Open + expired-snooze handoffs, oldest first. Click a row for its card.
+          </div>
           {attention.length === 0 && <div className="dash-mini">nothing waiting — clean board</div>}
           {attention.map((card) => (
             <AttentionRow key={`${card.to}/${card.id}`} card={card} />
@@ -144,18 +224,30 @@ export function HomeView(): React.JSX.Element {
           <div className="dash-card-desc">The blocking sentences, verbatim.</div>
           {blocked.length === 0 && <div className="dash-mini">no project is blocked right now</div>}
           {blocked.map((row) => (
-            <div key={row.id} className="dash-row">
+            <div
+              key={row.id}
+              className="dash-row dash-row-link"
+              role="button"
+              tabIndex={0}
+              onClick={() => openByRelPath(row.relPath, row.id)}
+              onKeyDown={rowKey(() => openByRelPath(row.relPath, row.id))}
+            >
               <span className="dash-txt">
                 {row.sentence} <span className="dash-mini">— {row.objective}</span>
               </span>
             </div>
           ))}
+          <button type="button" className="button-quiet" onClick={goAtlasBlocked}>
+            Open Atlas → Blocked
+          </button>
         </section>
       </div>
 
       <section className="dash-card" aria-label="Project pulse">
         <div className="dash-card-title">Project pulse</div>
-        <div className="dash-card-desc">One row per project — freshness, open flow, topics.</div>
+        <div className="dash-card-desc">
+          One row per project — freshness, open flow, topics. Click for its Atlas Learn view.
+        </div>
         {pulse.map((row) => (
           <PulseRowView key={row.project} row={row} />
         ))}
@@ -176,7 +268,7 @@ export function HomeView(): React.JSX.Element {
         <section className="dash-card" aria-label="Today's activity">
           <div className="dash-card-title">Today's activity</div>
           <div className="dash-card-desc">Since midnight, from the vault's own git log.</div>
-          <ActivityStrip summary={today} />
+          <ActivityStrip summary={today} onOpen={() => setView('feed')} />
         </section>
       </div>
 
@@ -210,31 +302,101 @@ function Kpi({
   value,
   caption,
   tone,
+  title,
+  onClick,
 }: {
   label: string
   value: string
   caption: string
   tone?: 'ok' | 'warn' | 'err' | 'off'
+  title?: string
+  onClick?: () => void
 }): React.JSX.Element {
   const toneClass = tone === 'ok' ? ' kpi-ok' : tone === 'warn' ? ' kpi-warn' : tone === 'err' ? ' kpi-err' : ''
-  return (
-    <div className="dash-kpi">
+  const body = (
+    <>
       <div className="dash-kpi-k">{label}</div>
       <div className={`dash-kpi-v${toneClass}`}>{value}</div>
       <div className="dash-kpi-t">{caption}</div>
-    </div>
+    </>
+  )
+  if (!onClick) return <div className="dash-kpi">{body}</div>
+  return (
+    <button type="button" className="dash-kpi" title={title} onClick={onClick}>
+      {body}
+    </button>
   )
 }
 
+/**
+ * One needs-attention row: click opens the card's brief exactly like the
+ * board; hover/focus reveals the state-legal inline actions riding the
+ * board's own store (handoffs.consume / handoffs.setStatus — receipt toast +
+ * instant recompute, no duplicated logic). Nothing here deletes.
+ */
 function AttentionRow({ card }: { card: HandoffCard }): React.JSX.Element {
+  const consume = useHandoffs((s) => s.consume)
+  const setStatus = useHandoffs((s) => s.setStatus)
+  const openSnooze = useHandoffs((s) => s.openSnooze)
+  const busy = useHandoffs((s) => s.consumingId !== null || s.transitioningId !== null)
+  const hasIdentity = useIdentity((s) => effectiveIdentity(s) !== null)
+  const disabled = !hasIdentity || busy
+  const idleTitle = hasIdentity ? undefined : 'Set your identity in Settings first'
+  const stop =
+    (fn: () => void) =>
+    (e: React.MouseEvent): void => {
+      e.stopPropagation()
+      fn()
+    }
   return (
-    <div className="dash-row">
+    <div
+      className="dash-row dash-row-link"
+      role="button"
+      tabIndex={0}
+      onClick={() => openBrief(card)}
+      onKeyDown={rowKey(() => openBrief(card))}
+    >
       <StatusChip status={card.status} />
       {card.kind === 'request' && <span className="status-chip chip-request">request</span>}
       <span className="dash-mini">
         {card.from} ⟶ {card.to}
       </span>
       <span className="dash-txt">{card.objective || card.name}</span>
+      <span className="dash-row-actions">
+        {(card.status === 'open' || card.status === 'accepted') && (
+          <button
+            type="button"
+            className="button-secondary button-small"
+            disabled={disabled}
+            title={idleTitle ?? 'Consume this handoff'}
+            onClick={stop(() => void consume(card))}
+          >
+            Consume
+          </button>
+        )}
+        {card.status === 'open' && (
+          <button
+            type="button"
+            className="button-secondary button-small"
+            disabled={disabled}
+            title={idleTitle ?? 'Snooze until a date'}
+            onClick={stop(() => openSnooze(card))}
+          >
+            Snooze ▾
+          </button>
+        )}
+        {card.status === 'snoozed' && card.expired && (
+          <button
+            type="button"
+            className="button-secondary button-small"
+            disabled={disabled}
+            title={idleTitle ?? 'Reopen — back with the open cards'}
+            onClick={stop(() => void setStatus(card, { to: 'open' }))}
+          >
+            Reopen
+          </button>
+        )}
+      </span>
       <span className={`age-chip age-${ageTone(card.ageDays)}`}>
         {card.expired ? 'expired' : formatAge(card.ageDays)}
       </span>
@@ -244,7 +406,13 @@ function AttentionRow({ card }: { card: HandoffCard }): React.JSX.Element {
 
 function PulseRowView({ row }: { row: PulseRow }): React.JSX.Element {
   return (
-    <div className="dash-row">
+    <div
+      className="dash-row dash-row-link"
+      role="button"
+      tabIndex={0}
+      onClick={() => goAtlasLearn(row.project)}
+      onKeyDown={rowKey(() => goAtlasLearn(row.project))}
+    >
       <span className="dash-strong">{row.project}</span>
       <span className="dash-mini">
         {row.noteCount} note{row.noteCount === 1 ? '' : 's'} · last {row.lastDate}
@@ -267,7 +435,14 @@ function PulseRowView({ row }: { row: PulseRow }): React.JSX.Element {
 
 function ChurnRowView({ row }: { row: ChurnRow }): React.JSX.Element {
   return (
-    <div className="dash-row">
+    <div
+      className="dash-row dash-row-link"
+      role="button"
+      tabIndex={0}
+      title="Open the timeline scoped to this file's project"
+      onClick={() => goContractsFile(row)}
+      onKeyDown={rowKey(() => goContractsFile(row))}
+    >
       <span className="dash-mini">{row.file}</span>
       <span className="dash-txt">{row.project}</span>
       <span className="dash-chip">
@@ -282,10 +457,16 @@ function ChurnRowView({ row }: { row: ChurnRow }): React.JSX.Element {
   )
 }
 
-function ActivityStrip({ summary }: { summary: ActivitySummary }): React.JSX.Element {
+function ActivityStrip({
+  summary,
+  onOpen,
+}: {
+  summary: ActivitySummary
+  onOpen: () => void
+}): React.JSX.Element {
   const max = Math.max(1, ...summary.hours)
   return (
-    <div>
+    <button type="button" className="dash-activity" title="Open the activity feed" onClick={onOpen}>
       <div className="dash-chip-row">
         {summary.total === 0 && <span className="dash-mini">quiet so far today</span>}
         {ACTIVITY_KINDS.filter((k) => (summary.byKind[k] ?? 0) > 0).map((k) => (
@@ -307,7 +488,7 @@ function ActivityStrip({ summary }: { summary: ActivitySummary }): React.JSX.Ele
           )
         })}
       </svg>
-    </div>
+    </button>
   )
 }
 
@@ -318,6 +499,11 @@ function BriefCard(): React.JSX.Element {
   const error = useHome((s) => s.error)
   const freshness = brief ? formatFreshness(brief.mtime) : null
   const title = brief ? (splitLeadingH1(brief.markdown).title ?? DEFAULT_BRIEF_TITLE) : DEFAULT_BRIEF_TITLE
+  const open = (): void => {
+    if (!brief?.path) return
+    useApp.getState().setView('reader')
+    void useReader.getState().open(brief.path)
+  }
   return (
     <section className="dash-card" aria-label="Product brief">
       <div className="dash-card-title">Product brief</div>
@@ -332,6 +518,20 @@ function BriefCard(): React.JSX.Element {
             live snapshot — run <span className="mono">loredex product</span> to curate
           </span>
         )}
+        <button
+          type="button"
+          className="button-secondary button-small"
+          style={{ marginLeft: 'auto' }}
+          disabled={!brief?.path}
+          title={
+            brief?.path
+              ? 'Read the brief with working links'
+              : 'No curated brief file yet — the dashboard above is the live state'
+          }
+          onClick={open}
+        >
+          Open in Reader
+        </button>
       </div>
     </section>
   )

@@ -242,6 +242,13 @@ button.dash-kpi:hover {
 
 /* ── activity density strip (24 SVG rects, no chart lib) ─────────────────── */
 
+/* the whole strip is one click target into the Activity feed */
+.dash-activity {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
 .dash-density {
   width: 100%;
   height: 34px;

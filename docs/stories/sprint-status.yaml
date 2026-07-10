@@ -133,6 +133,7 @@ development_status:
   15-2-perf-pass: done                          # 6 budgets green (atlas cold 664ms/2s); fixture flushed a YAML-Date snoozed_until board crash — fixed
   15-3-keyboard-coverage: done                  # one action registry: ⌘1-9/⌘N/⇧⌘R/⇧⌘S/?, ⌘K hints, cheatsheet; coverage test guards it
   15-4-public-docs: done                        # README rewrite (hero/tour/install/arch) + docs/USER-GUIDE.md; every claim code-verified, links checked
+  15-5-home-dashboard: done                     # Home = full-width insight dashboard (docs/plan/wireframe-home-dashboard.html); pure insights module + nimbus-fixture vitest, debounced live recompute, no Refresh
 
 qa:
   pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded

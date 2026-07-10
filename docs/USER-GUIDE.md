@@ -42,7 +42,17 @@ Light and dark themes are both first-class; the app follows the system by defaul
 
 ## Home
 
-The vault's **Start Here brief** — the curated "what is this work, what do I read first, what's next" — rendered with working wikilinks and commit links, plus a freshness badge showing how old the brief is. If the vault has no curated brief yet, Home shows a live snapshot of project states instead and says so; run the CLI's curation to produce a real brief. **Refresh** re-reads from disk (the file watcher usually beats you to it).
+A full-width **insight dashboard** — the morning answer to "where do I look next". Every number comes from data the app already has, and every tile is a one-click jump into the view that acts on it:
+
+- **KPI row** — open inbound (and across how many projects), requests still waiting for a reply, the oldest open handoff with its route (amber at 2 days, rust at 5), contract changes in the last 7 days, stale briefs, and sync health.
+- **Needs attention** — open and expired-snooze handoffs, oldest first. Click a row for its card; hover for inline **Consume / Snooze / Reopen** — the same actions as the board, receipt toast included.
+- **Blocked · critical path** — the blocking sentences, verbatim, with a jump to the Atlas blocked view.
+- **Project pulse** — one row per project: note count, last activity, open flow in/out, and whether its brief is fresh, stale, or missing. Click for that project's Atlas Learn view.
+- **Contract churn** — registered contract files changed in the last 7 days, with linked-handoff counts; click opens the Contracts timeline scoped to that file's project. The section only appears once project roots are registered.
+- **Today's activity** — counts by kind since midnight plus a per-hour density strip; click for the full feed.
+- **Product brief** — the curated Start Here brief demotes to a link-out card with its freshness badge; **Open in Reader** shows the prose with working links. No curated brief yet? The dashboard above *is* the live state; run the CLI's curation to produce one.
+
+There is no Refresh button here: the dashboard recomputes itself on vault watcher and remote poller events. A vault with no remote shows a quiet local-only line with a link to wire one; a fresh empty vault offers **Route a note…** and **Join a vault…** to get going.
 
 ## Reader
 

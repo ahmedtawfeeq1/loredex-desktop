@@ -2,7 +2,7 @@
 
 ## Status
 
-In Progress
+Done
 
 ## Story
 
@@ -53,6 +53,7 @@ Binding spec: `docs/plan/wireframe-home-dashboard.html` (layout, UI→channel ta
 | Date | Version | Description | Author |
 |---|---|---|---|
 | 2026-07-10 | 0.1 | Drafted from wireframe-home-dashboard.html | Dev Agent |
+| 2026-07-10 | 1.0 | Implemented per the spec's 5-commit plan; Done | Dev Agent |
 
 ## Dev Agent Record
 
@@ -62,15 +63,36 @@ Claude Fable 5 (claude-fable-5)
 
 ### Debug Log References
 
-(pending)
+- Insights suite solo: 21/21 (fixture ground truth: 10 due-now across 3 projects, 4 requests waiting, oldest 1d backend→mobile, 4/4 briefs missing, churn 4+4 rows latest 97d4b73, activity 33 since the simulation's midnight, busiest hour 06)
+- Full gate before every commit: vitest 549/549 → 552/552 (69 files) after the recompute test; typecheck (node+web) + electron-vite build clean each time
 
 ### Completion Notes List
 
-(pending)
+- **Pure consumer, one aggregation module.** `insights.ts` has no IPC and no `Date.now()` — every "now"/midnight anchor rides in as an argument, so the fixture tests are deterministic (hour buckets are offsets from the midnight anchor, timezone-independent).
+- **Fixtures from the real simulation.** Dashboard/handoff payloads are produced by the lib itself (`buildDashboard`/`listHandoffs`) over `tests/fixtures/nimbus-vault`; `views/home/fixtures/nimbus-activity.json` was captured from the live simulation vault's git log through the lib's own `parseActivity`, and `nimbus-contract-changes.json` from a real numstat scan of the simulation's nimbus-backend repo (shas incl. 97d4b73 match the M2 QA drive). The fixture vault contains no expired snooze, so ranking's expired-first tier is covered by synthetic cards.
+- **Blocked card = shared rule.** Rows come from `src/shared/blocked.ts` `blockedRows()` over the same `handoffs.list` cards the board holds — the spec's §4 mapping names that module; no separate `atlas.graph` pull is needed and the two surfaces cannot disagree.
+- **Inline actions are the board's actions.** `useHandoffs.consume/setStatus/openSnooze` (the snooze picker modal is app-mounted already); Home renders the same cards object, so the optimistic flip recomputes every tile instantly and the receipt toast is identical.
+- **Live, not Refresh.** `dashboard-data.ts` re-pulls its four channels on one 500 ms-debounced timer over the existing renderer events; `sync.changed` pushes health directly; a vault switch resets the view-local store via `onVaultChanged` (the store deliberately isn't in App.tsx's reset list — scope discipline, see below).
+- **Degraded honesty per spec §3:** churn section AND its KPI tile render only when project roots are registered (never an empty error); local-only vaults get the quiet wire-a-remote line; empty vault is one serif sentence + Route/Join.
+- **Gold budget:** no gold primary on this view — gold appears only as state (OPEN stamps, amber age chips, linked-handoff chips, focus ring). Stamps reuse `StatusChip`/`chip-request` verbatim.
+- **Deviations from the spec text, with reasons:**
+  - "Re-curate…" button omitted: no async curation seam exists in the app yet (v0.1 scope cut stands; the CLI hint renders instead) — a fake button would violate the honesty rule.
+  - The spec's e2e stage (build plan step 5) is delivered as the fixture-driven insights suite instead of a `tests/e2e` addition: a concurrent workflow owns paths outside `views/home/**` this sprint, and `tests/e2e/` was out of the sanctioned file set. The ground-truth assertion (dashboard numbers match the vault) is the same, executed at module level.
+  - `views/home/**` styles live in `home.css` (the atlas.css precedent) rather than `styles.css` — same scope-discipline reason; tokens/Don't-list respected (design-fidelity suite untouched and green).
 
 ### File List
 
-(pending)
+- src/renderer/src/views/home/insights.ts — NEW: pure tile aggregation (KPIs, ranking, churn, activity, sync tile, pulse)
+- src/renderer/src/views/home/insights.test.ts — NEW: 21 fixture-driven cases (nimbus ground truth + synthetic edge tiers)
+- src/renderer/src/views/home/fixtures/nimbus-activity.json — NEW: real vault git log via lib parseActivity
+- src/renderer/src/views/home/fixtures/nimbus-contract-changes.json — NEW: real nimbus-backend contract numstat rows
+- src/renderer/src/views/home/dashboard-data.ts — NEW: channel fetch store + debounced live recompute (+ vault-switch reset)
+- src/renderer/src/views/home/dashboard-data.test.ts — NEW: recompute-event predicate coverage
+- src/renderer/src/views/home/HomeView.tsx — REBUILT: full-width dashboard (KPI row, attention/blocked, pulse, churn/activity, brief card)
+- src/renderer/src/views/home/home.css — NEW: view-scoped dashboard styles (v2 tokens only)
+- docs/USER-GUIDE.md — Home section rewritten for the dashboard
+- docs/stories/sprint-status.yaml — board row 15-5
+- docs/stories/epic15.story5-home-dashboard.md — this story
 
 ## QA Results
 

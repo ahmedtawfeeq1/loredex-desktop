@@ -3132,3 +3132,35 @@ button.atlas-crumb:hover {
 .diff-meta {
   color: var(--text-2);
 }
+
+/* contract chips on handoff cards / detail view (story 11.3) — chip buttons
+   share the timeline tier styling; row hides itself when there are no links */
+.handoff-contracts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 6px;
+}
+
+.handoff-contracts .contract-link-chip {
+  cursor: pointer;
+  border: 1px solid transparent;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.handoff-contracts .contract-link-chip.chip-heuristic {
+  border: 1px dashed var(--hairline);
+  background: none;
+}
+
+.note-contracts {
+  margin: 4px 0 8px;
+}
+
+/* chip navigation target: the one gold ring vocabulary (quality floor) */
+.contract-card-focused {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}

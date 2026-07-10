@@ -9,6 +9,7 @@ import { useReader } from '../../stores/reader'
 import { qualifiedId } from '../../../../shared/handoff-lanes'
 import { handoffRefFromNote } from '../handoffs/compose-form'
 import { attributionLines } from '../handoffs/lifecycle'
+import { ContractChips } from '../contracts/ContractChips'
 import { ReadingOrderInline } from '../handoffs/ReadingOrderInline'
 import { ThreadRail } from '../handoffs/ThreadRail'
 
@@ -73,6 +74,12 @@ export function NoteView(): React.JSX.Element {
             {line}
           </p>
         ))}
+      {/* story 11.3 AC3: the detail view carries the contract chips too */}
+      {handoffRef && (
+        <div className="note-contracts">
+          <ContractChips handoffId={handoffRef.id} />
+        </div>
+      )}
       {handoffRef && (
         <div className="note-handoff-actions">
           <button

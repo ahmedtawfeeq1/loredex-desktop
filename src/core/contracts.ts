@@ -9,7 +9,13 @@
  * read-only — never a worktree diff, never a write.
  */
 import { readdirSync } from 'node:fs'
-import type { ContractChange, ProjectRootsMap } from '../shared/types'
+import type {
+  AtlasContractChange,
+  ContractChange,
+  ContractLink,
+  HandoffCard,
+  ProjectRootsMap,
+} from '../shared/types'
 import { type AppDb, appSettingGet, appSettingSet } from './db/index'
 import { insertScanRows, newestScanSha, readScanRows, type ScanRow } from './db/contract-scan'
 
@@ -252,6 +258,122 @@ export function readTimeline(
   }
   changes.sort((a, b) => epoch(b) - epoch(a) || (a.sha < b.sha ? -1 : 1))
   return changes
+}
+
+// ── contract ↔ handoff linking (story 11.3 — the tier is ALWAYS labeled) ────
+
+/** The linker's view of one handoff note: identity, route projects, date, and
+ *  the text surface the mention scan reads (objective + body). */
+export interface HandoffNoteView {
+  id: string
+  /** from + to project names — a change in either side's repo is "same project" */
+  projects: string[]
+  /** note frontmatter date, YYYY-MM-DD */
+  date: string
+  /** objective + body, scanned for sha mentions */
+  text: string
+}
+
+/** Word-bounded 7–40-hex tokens (m2 §5 verbatim): 6 hex never matches, a sha
+ *  embedded in a longer word never matches. Lowercased + deduped. */
+export function extractShaMentions(text: string): string[] {
+  return [...new Set((text.match(/\b[0-9a-f]{7,40}\b/gi) ?? []).map((t) => t.toLowerCase()))]
+}
+
+/**
+ * Both tiers, per commit sha (links are commit-level — every file row of the
+ * same commit carries them):
+ * - `mentioned`: a scanned token is a prefix (≥7 chars) of the change sha —
+ *   strong, solid chip.
+ * - `heuristic`: same project + same calendar date — display-only, explicitly
+ *   labeled, NEVER notifications or suggestions (the honesty rule).
+ * A note that qualifies for both gets `mentioned` only.
+ */
+export function computeLinks(
+  changes: ReadonlyArray<{ sha: string; project: string; date: string }>,
+  notes: readonly HandoffNoteView[],
+): Map<string, ContractLink[]> {
+  const scanned = notes.map((note) => ({ note, mentions: extractShaMentions(note.text) }))
+  const bySha = new Map<string, ContractLink[]>()
+  for (const change of changes) {
+    if (bySha.has(change.sha)) continue
+    const sha = change.sha.toLowerCase()
+    const day = change.date.slice(0, 10)
+    // one link per handoff id, strongest tier wins (duplicate basenames across
+    // projects share an id — the board card key — so dedupe here, not the UI)
+    const tiers = new Map<string, ContractLink['confidence']>()
+    for (const { note, mentions } of scanned) {
+      if (mentions.some((m) => sha.startsWith(m))) {
+        tiers.set(note.id, 'mentioned')
+      } else if (
+        note.date !== '' &&
+        note.date === day &&
+        note.projects.includes(change.project) &&
+        tiers.get(note.id) !== 'mentioned'
+      ) {
+        tiers.set(note.id, 'heuristic')
+      }
+    }
+    const links: ContractLink[] = [...tiers].map(([handoffId, confidence]) => ({
+      handoffId,
+      confidence,
+    }))
+    links.sort((a, b) => (a.confidence === b.confidence ? 0 : a.confidence === 'mentioned' ? -1 : 1))
+    bySha.set(change.sha, links)
+  }
+  return bySha
+}
+
+/** AC4 guardrail: the only shape epic 12's notify/suggest paths may consume —
+ *  heuristic links cannot pass this filter, by type. */
+export interface MentionedLink {
+  handoffId: string
+  confidence: 'mentioned'
+}
+
+export function mentionedOnly(links: readonly ContractLink[]): MentionedLink[] {
+  return links.filter((l): l is MentionedLink => l.confidence === 'mentioned')
+}
+
+/** Build the linker's note views from board cards + a body reader (engine
+ *  readNote in production; unreadable notes degrade to objective-only). */
+export function handoffNoteViews(
+  cards: readonly HandoffCard[],
+  readBody: (absPath: string) => string | null,
+): HandoffNoteView[] {
+  return cards.map((card) => ({
+    id: card.id,
+    projects: [card.from, card.to],
+    date: card.date,
+    text: `${card.objective}\n${readBody(card.path) ?? ''}`,
+  }))
+}
+
+/** The timeline with tiers computed — derived on demand, nothing persisted. */
+export function timelineWithLinks(
+  db: AppDb,
+  roots: ProjectRootsMap,
+  notes: readonly HandoffNoteView[],
+  project?: string,
+): ContractChange[] {
+  const changes = readTimeline(db, roots, project)
+  const links = computeLinks(changes, notes)
+  return changes.map((c) => ({ ...c, links: links.get(c.sha) ?? [] }))
+}
+
+/** The Atlas provider seam (story 10.1 AC5): cached rows + tiers, sync. */
+export function contractChangesForAtlas(
+  db: AppDb,
+  roots: ProjectRootsMap,
+  notes: readonly HandoffNoteView[],
+): AtlasContractChange[] {
+  return timelineWithLinks(db, roots, notes).map((c) => ({
+    repoRoot: c.repoRoot,
+    file: c.file,
+    sha: c.sha,
+    date: c.date,
+    links: c.links,
+  }))
 }
 
 // ── diff extraction (story 11.2 — pinned to commits, capped, never silent) ──

@@ -18,6 +18,7 @@ export function HandoffCardView({
   fulfilledBy,
   onLinkRequest,
   unread,
+  chipsSlot,
 }: {
   card: HandoffCard
   onOpen: (card: HandoffCard) => void
@@ -36,6 +37,8 @@ export function HandoffCardView({
   onLinkRequest?: (card: HandoffCard) => void
   /** story 9.2: never opened on this machine (app-db read-state) — gold dot */
   unread?: boolean
+  /** story 11.3: contract chips (ContractChips) — derived, renders when linked */
+  chipsSlot?: React.ReactNode
 }): React.JSX.Element {
   const notes = card.readingOrder.length
   const snoozed = card.status === 'snoozed'
@@ -74,6 +77,7 @@ export function HandoffCardView({
         <span className="handoff-date">{card.date || formatAge(card.ageDays)}</span>
       </div>
       <p className="handoff-objective">{card.objective || card.name}</p>
+      {chipsSlot}
       <div className="handoff-foot">
         <span>
           {notes === 1 ? '1 note' : `${notes} notes`} · {formatAge(card.ageDays)}

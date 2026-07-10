@@ -27,6 +27,13 @@ import type {
   HandoffCard,
   TourDef,
 } from '../shared/types'
+import {
+  contractChangesForAtlas,
+  handoffNoteViews,
+  loadProjectRoots,
+  resolveRoots,
+} from './contracts'
+import { getAppDb, vaultId } from './db/index'
 import * as engine from './engine'
 import { resolveLink } from './links'
 import { buildTours, filterTours } from './tours'
@@ -816,13 +823,41 @@ function readOriginRemote(rootAbs: string): string | null {
   }
 }
 
+/** Story 11.3: contract nodes come from the cached scan + link tiers — sync
+ *  reads only (cache + notes), no git; absent db degrades to no contract
+ *  nodes (story 10.1 AC5). */
+function productionContracts(cards: HandoffCard[]): AtlasContractChange[] {
+  const db = getAppDb()
+  if (!db) return []
+  try {
+    const config = engine.getConfig()
+    const vid = vaultId(config.vaultPath, engine.identity().remote)
+    const { roots } = resolveRoots({
+      openVaultPath: config.vaultPath,
+      fileConfig: engine.configFileProjects(),
+      appRoots: loadProjectRoots(db, vid),
+    })
+    const notes = handoffNoteViews(cards, (abs) => {
+      try {
+        return engine.readNote(abs).body
+      } catch {
+        return null
+      }
+    })
+    return contractChangesForAtlas(db, roots, notes)
+  } catch {
+    return []
+  }
+}
+
 function productionSource(): AtlasSource {
   const config = engine.getConfig()
   const vaultPath = config.vaultPath
+  const cards = engine.handoffs({ direction: 'all' })
   return {
     vaultPath,
     files: listMarkdownFiles(vaultPath),
-    cards: engine.handoffs({ direction: 'all' }),
+    cards,
     readDoc: (rel) => {
       try {
         const doc = engine.readNote(rel)
@@ -836,7 +871,7 @@ function productionSource(): AtlasSource {
       return r.status === 'resolved' ? (r.target ?? null) : null
     },
     projectRoots: config.projects,
-    contracts: [], // story 11.1's scan provider plugs in here
+    contracts: productionContracts(cards), // story 11.3: cached scan + tiers
     today: new Date().toISOString().slice(0, 10),
     fileExists: (abs) => existsSync(abs),
     readRepoRemote: readOriginRemote,

@@ -12,14 +12,15 @@ import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import {
   capDiff,
   diffArgs,
+  handoffNoteViews,
   isCommitSha,
   loadContractGlobs,
   loadProjectRoots,
-  readTimeline,
   resolveRoots,
   saveContractGlobs,
   saveProjectRoots,
   scanContracts,
+  timelineWithLinks,
 } from './contracts'
 import { getAppDb, vaultId } from './db/index'
 import { getReadState, markRead } from './db/read-state'
@@ -149,9 +150,17 @@ export function registerCoreHandlers(
     if (!db) return [] // bare test host — no cache, honest empty timeline
     const { roots, globs } = contractRoots()
     // on-demand incremental scan (only since the newest cached sha per file),
-    // then the merged cache — links stay [] until story 11.3
+    // then the merged cache with link tiers derived fresh (story 11.3 — the
+    // tier is ALWAYS labeled; nothing about links is persisted)
     await scanContracts({ db, roots, userGlobs: globs, git: gitAsync })
-    return readTimeline(db, roots, project)
+    const notes = handoffNoteViews(engine.handoffs({ direction: 'all' }), (abs) => {
+      try {
+        return engine.readNote(abs).body
+      } catch {
+        return null
+      }
+    })
+    return timelineWithLinks(db, roots, notes, project)
   })
   // Story 11.2: one commit's unified diff — `git show <sha> -- <file>` pinned
   // to the commit (never the worktree), 200 KB cap with a visible flag. The

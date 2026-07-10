@@ -106,10 +106,10 @@ development_status:
   10-3-blocked-on-list-view: superseded                # -> 10-6-path-tracing-filters-search (ATLAS-6)
   epic-10-retrospective: optional
 
-  epic-11: in-progress     # Contract Intelligence (read-only)
+  epic-11: done            # Contract Intelligence (read-only)
   11-1-contract-discovery-timeline-core: done
   11-2-timeline-ui-diff-viewer: done
-  11-3-handoff-link-heuristics-chips: ready-for-dev
+  11-3-handoff-link-heuristics-chips: done   # note: ran before 12.1 (batch order); hash chips stay plain mono until 12.1
   epic-11-retrospective: optional
 
   epic-12: backlog         # GitHub Layer (gh CLI, no OAuth)

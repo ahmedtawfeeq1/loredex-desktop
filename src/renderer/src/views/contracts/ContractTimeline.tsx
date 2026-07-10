@@ -38,7 +38,14 @@ function LinkChips({ links }: { links: ContractLink[] }): React.JSX.Element | nu
   )
 }
 
-function ChangeCard({ change }: { change: ContractChange }): React.JSX.Element {
+function ChangeCard({
+  change,
+  focused,
+}: {
+  change: ContractChange
+  /** story 11.3: chip navigation target — gold ring + scroll into view */
+  focused?: boolean
+}): React.JSX.Element {
   const openDiff = useContracts((s) => s.openDiff)
   const diffFor = useContracts((s) => s.diffFor)
   const toggleDiff = useContracts((s) => s.toggleDiff)
@@ -49,7 +56,10 @@ function ChangeCard({ change }: { change: ContractChange }): React.JSX.Element {
       <div className="timeline-body">
         <button
           type="button"
-          className="contract-card"
+          ref={(node) => {
+            if (focused && node) node.scrollIntoView({ block: 'center' })
+          }}
+          className={`contract-card${focused ? ' contract-card-focused' : ''}`}
           aria-expanded={open}
           title={open ? 'Hide the diff' : 'Show what changed in this commit'}
           onClick={() => void toggleDiff(change)}
@@ -85,6 +95,7 @@ export function ContractTimeline(): React.JSX.Element {
   const error = useContracts((s) => s.error)
   const diffError = useContracts((s) => s.diffError)
   const project = useContracts((s) => s.project)
+  const focusSha = useContracts((s) => s.focusSha)
   const load = useContracts((s) => s.load)
   const setProject = useContracts((s) => s.setProject)
   const setView = useApp((s) => s.setView)
@@ -159,7 +170,11 @@ export function ContractTimeline(): React.JSX.Element {
       ) : (
         <ul className="timeline-rail">
           {visible.map((change) => (
-            <ChangeCard key={`${change.repoRoot}/${change.file}@${change.sha}`} change={change} />
+            <ChangeCard
+              key={`${change.repoRoot}/${change.file}@${change.sha}`}
+              change={change}
+              focused={focusSha === change.sha}
+            />
           ))}
         </ul>
       )}

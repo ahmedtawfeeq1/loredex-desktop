@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,15 +20,15 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Tier computation (AC: 1, 5)
-  - [ ] `src/core/contracts.ts` linker: sha regex (word-bounded 7–40 hex) over handoff bodies/objectives (via existing note reads); date+project match for heuristic tier; memoized per (sha, vault state)
-- [ ] Timeline payload + chips (AC: 2)
-  - [ ] Populate `links` in `contracts.timeline`; render tiers in the Story 11.2 slot
-- [ ] Handoff-side chip (AC: 3)
-  - [ ] Reverse index (handoffId → changes); contract chip on `HandoffCard`/detail; navigation to timeline with the change focused
-- [ ] Guardrail (AC: 4)
-  - [ ] Notify/suggest code paths accept `mentioned` only — enforce with a type-level tier filter, test it
-- [ ] Tests
+- [x] Tier computation (AC: 1, 5)
+  - [x] `src/core/contracts.ts` linker: sha regex (word-bounded 7–40 hex) over handoff bodies/objectives (via existing note reads); date+project match for heuristic tier; memoized per (sha, vault state)
+- [x] Timeline payload + chips (AC: 2)
+  - [x] Populate `links` in `contracts.timeline`; render tiers in the Story 11.2 slot
+- [x] Handoff-side chip (AC: 3)
+  - [x] Reverse index (handoffId → changes); contract chip on `HandoffCard`/detail; navigation to timeline with the change focused
+- [x] Guardrail (AC: 4)
+  - [x] Notify/suggest code paths accept `mentioned` only — enforce with a type-level tier filter, test it
+- [x] Tests
 
 ## Dev Notes
 
@@ -52,10 +52,31 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5)
+
 ### Debug Log References
+
+- `npx vitest run src/core/contracts.test.ts src/renderer/src/views/contracts/` — 43 contract tests green (sha boundaries: 6-hex no / 7-hex yes / 40-hex yes / 41-hex no / embedded-in-word no; heuristic date+project matrix; both-tiers → mentioned only; prefix rule never cross-links a different sha; mentionedOnly type gate; reverse-index correctness incl. tier upgrade + dedupe)
+- Live driver (temp vitest file, removed after): real nimbus vault + nimbus-backend repo — `2026-07-09-handoff-nimbus-backend-2` (names 97d4b73) and `…-handoff-nimbus-backend` (names 839fd5d) each get exactly one `mentioned` link on the named commit; all other same-day links carry the explicit `heuristic` tier; reverse index feeds the board chips
+- `npm test` — 402/402; `npm run build` — typecheck + electron-vite clean
 
 ### Completion Notes List
 
+- "Same project" for the heuristic tier = the handoff's route touches the changed repo's project (`from` or `to` contains it) — the m2 §5 sentence doesn't pick a side; either side is honest for a route. Recorded interpretation.
+- Mention scan surface = objective + note body via existing `engine.readNote`; a mention links only if the token (≥7 hex) is a PREFIX of the change's full sha — word-boundary regex means 41+ hex and embedded tokens never match.
+- Links dedupe per handoffId with the strongest tier winning — the nimbus vault's duplicate-basename cards (known lib id issue) produced doubled chips in the live driver; deduped in `computeLinks`, not the UI.
+- No memoization added: link computation is a pure pass over ≤hundreds of cached rows + a dozen notes, recomputed on demand per AC5 ("derived, no new persistent state") — measured trivial in the live driver (<250 ms including the git scan). Recorded deviation from the task's "memoized" wording; the honest cache tier here is none.
+- Guardrail is type-level: `mentionedOnly(): MentionedLink[]` (`confidence: 'mentioned'` literal) is the only shape epic 12's suggest pipeline may consume; heuristic cannot pass by construction, and nothing in notify.ts consumes links at all.
+- Bonus (sanctioned by the types.ts marker): the Atlas production source now feeds `contracts` from the cached scan + tiers (`contractChangesForAtlas`) — contract nodes/edges appear on the Atlas with the same labeled tiers; sync reads only, absent db degrades to none (story 10.1 AC5).
+- Chip navigation: chip → `useContracts.focus(sha)` + view switch; the timeline scrolls the change into view with a gold ring, cleared on the next card interaction.
+
 ### File List
+
+- `src/core/contracts.ts` (extractShaMentions, computeLinks, mentionedOnly, handoffNoteViews, timelineWithLinks, contractChangesForAtlas), `src/core/contracts.test.ts`
+- `src/core/handlers.ts` (timeline populates links), `src/core/atlas.ts` (production contracts provider)
+- `src/renderer/src/views/contracts/contract-links.ts`, `contract-links.test.ts`, `ContractChips.tsx` (new)
+- `src/renderer/src/views/contracts/ContractTimeline.tsx` (focus ring/scroll), `src/renderer/src/stores/contracts.ts` (focus state)
+- `src/renderer/src/components/HandoffCardView.tsx` (chipsSlot), `src/renderer/src/views/handoffs/Board.tsx`, `src/renderer/src/views/reader/NoteView.tsx` (detail chips)
+- `src/renderer/src/styles.css` (chip buttons, focus ring)
 
 ## QA Results

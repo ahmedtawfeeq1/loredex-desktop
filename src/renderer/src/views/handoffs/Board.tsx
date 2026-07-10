@@ -8,6 +8,7 @@ import { isValidIdentity } from '../../../../shared/identity'
 import type { HandoffCard } from '../../../../shared/types'
 import { ConsumeReceiptView } from '../../components/ConsumeReceiptView'
 import { HandoffCardView } from '../../components/HandoffCardView'
+import { ContractChips } from '../contracts/ContractChips'
 import { useApp } from '../../stores/app'
 import { useHandoffs } from '../../stores/handoffs'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
@@ -147,6 +148,8 @@ function Lane({
             onReply={(c) => openCompose(c)}
             onComment={(c) => openAnnotate(c)}
             unread={readAt[card.id] === null}
+            // story 11.3 AC3: derived contract chips — recomputed on board load
+            chipsSlot={<ContractChips handoffId={card.id} />}
             {...(fulfilled.has(card.id) ? { fulfilledBy: fulfilled.get(card.id) } : {})}
             {...(!inbound && card.kind === 'delivery' && !card.fulfills
               ? { onLinkRequest: (c: HandoffCard) => openLinkRequest(c) }

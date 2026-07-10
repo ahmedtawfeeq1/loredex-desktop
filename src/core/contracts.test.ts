@@ -9,14 +9,20 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { openAppDb } from './db/index'
-import { readScanRows } from './db/contract-scan'
+import { insertScanRows, readScanRows } from './db/contract-scan'
 import {
   capDiff,
+  computeLinks,
   DIFF_CAP_BYTES,
   diffArgs,
   discoverContractFiles,
+  extractShaMentions,
   globToRegExp,
+  type HandoffNoteView,
+  handoffNoteViews,
   isCommitSha,
+  mentionedOnly,
+  timelineWithLinks,
   loadContractGlobs,
   loadProjectRoots,
   matchesContractFile,
@@ -182,6 +188,119 @@ describe('project roots + globs settings', () => {
       { '/a': { name: 'a' } },
     )
     expect(sanitizeGlobs('nope')).toEqual([])
+  })
+})
+
+// ── link tiers (story 11.3: mentioned vs heuristic, tier ALWAYS labeled) ────
+
+describe('extractShaMentions (word-bounded 7–40 hex)', () => {
+  it('6 hex never matches; 7 and 40 hex do', () => {
+    expect(extractShaMentions('see abc123 for detail')).toEqual([])
+    expect(extractShaMentions('see abc1234 for detail')).toEqual(['abc1234'])
+    expect(extractShaMentions(`full ${'d'.repeat(40)} sha`)).toEqual(['d'.repeat(40)])
+  })
+
+  it('embedded-in-word never matches; case folds; dedupes', () => {
+    expect(extractShaMentions('xdeadbeef1x')).toEqual([])
+    expect(extractShaMentions(`${'e'.repeat(41)}`)).toEqual([]) // 41 hex = not a sha token
+    expect(extractShaMentions('DeadBeef1 and deadbeef1')).toEqual(['deadbeef1'])
+  })
+
+  it('matches inside ordinary prose punctuation (word boundaries)', () => {
+    expect(extractShaMentions('landed in 839fd5d.')).toEqual(['839fd5d'])
+    expect(extractShaMentions('(commit 839fd5d)')).toEqual(['839fd5d'])
+  })
+})
+
+describe('computeLinks', () => {
+  const sha = '839fd5d' + 'a'.repeat(33)
+  const change = { sha, project: 'backend', date: '2026-07-09T22:00:00+03:00' }
+  const note = (over: Partial<HandoffNoteView>): HandoffNoteView => ({
+    id: 'h1',
+    projects: ['backend', 'frontend'],
+    date: '2026-07-08',
+    text: 'objective text',
+    ...over,
+  })
+
+  it('mentioned: a 7-hex prefix of the change sha in the note text', () => {
+    const links = computeLinks([change], [note({ text: 'shipped in 839fd5d today' })])
+    expect(links.get(sha)).toEqual([{ handoffId: 'h1', confidence: 'mentioned' }])
+  })
+
+  it('heuristic: same project + same calendar date; labeled explicitly', () => {
+    const links = computeLinks([change], [note({ date: '2026-07-09' })])
+    expect(links.get(sha)).toEqual([{ handoffId: 'h1', confidence: 'heuristic' }])
+  })
+
+  it('heuristic matrix: project mismatch or date mismatch → no link', () => {
+    expect(
+      computeLinks([change], [note({ date: '2026-07-09', projects: ['mobile'] })]).get(sha),
+    ).toEqual([])
+    expect(computeLinks([change], [note({ date: '2026-07-08' })]).get(sha)).toEqual([])
+    expect(computeLinks([change], [note({ date: '' })]).get(sha)).toEqual([])
+  })
+
+  it('a note qualifying for both tiers gets mentioned ONLY; mentioned sorts first', () => {
+    const both = note({ date: '2026-07-09', text: `did it in ${sha}` })
+    expect(computeLinks([change], [both]).get(sha)).toEqual([
+      { handoffId: 'h1', confidence: 'mentioned' },
+    ])
+    const links = computeLinks(
+      [change],
+      [note({ id: 'h-day', date: '2026-07-09' }), note({ id: 'h-named', text: sha })],
+    ).get(sha)
+    expect(links?.map((l) => l.handoffId)).toEqual(['h-named', 'h-day'])
+  })
+
+  it('a short mention never links a DIFFERENT sha (prefix rule)', () => {
+    const other = { sha: 'f3a398e' + 'b'.repeat(33), project: 'backend', date: '2026-01-01T00:00:00Z' }
+    const links = computeLinks([change, other], [note({ text: 'about 839fd5d only' })])
+    expect(links.get(other.sha)).toEqual([])
+  })
+})
+
+describe('mentionedOnly (AC4 guardrail — notify/suggest gate)', () => {
+  it('heuristic links cannot pass, by construction', () => {
+    const filtered = mentionedOnly([
+      { handoffId: 'a', confidence: 'heuristic' },
+      { handoffId: 'b', confidence: 'mentioned' },
+    ])
+    expect(filtered).toEqual([{ handoffId: 'b', confidence: 'mentioned' }])
+    // the returned type only admits 'mentioned' — this line type-checks only
+    // because the tier is narrowed:
+    const tier: 'mentioned' = filtered[0]!.confidence
+    expect(tier).toBe('mentioned')
+  })
+})
+
+describe('timelineWithLinks + handoffNoteViews', () => {
+  it('populates links from cached rows + note content, derived only', () => {
+    const db = openAppDb(tmp('loredex-contracts-db-'))
+    const sha = '1234abc' + 'c'.repeat(33)
+    insertScanRows(db, '/repos/backend', 'openapi.yaml', [
+      {
+        sha,
+        committedAt: '2026-07-09T10:00:00+02:00',
+        summary: { adds: 5, dels: 1, subject: 'feat', author: 'Dana' },
+      },
+    ])
+    const cards = [
+      {
+        id: '2026-07-09-handoff-backend',
+        from: 'backend',
+        to: 'frontend',
+        objective: `API v2 landed in 1234abc`,
+        date: '2026-07-01',
+        path: '/vault/projects/frontend/handoffs/2026-07-09-handoff-backend.md',
+      } as unknown as import('../shared/types').HandoffCard,
+    ]
+    const notes = handoffNoteViews(cards, () => null) // body unreadable → objective still scans
+    const timeline = timelineWithLinks(db, { '/repos/backend': { name: 'backend' } }, notes)
+    expect(timeline[0]?.links).toEqual([
+      { handoffId: '2026-07-09-handoff-backend', confidence: 'mentioned' },
+    ])
+    db.close()
   })
 })
 

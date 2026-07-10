@@ -76,13 +76,14 @@ export const useContracts = create<ContractsState>((set, get) => ({
     set({ project })
   },
 
-  /** Click-through diff (AC2): one open at a time; clicking again closes. */
+  /** Click-through diff (AC2): one open at a time; clicking again closes.
+   *  Interacting with a card also clears a chip-navigation focus ring. */
   async toggleDiff(change) {
     if (get().openDiff?.sha === change.sha && get().openDiff?.file === change.file) {
-      set({ openDiff: null, diffError: null })
+      set({ openDiff: null, diffError: null, focusSha: null })
       return
     }
-    set({ diffFor: change.sha, diffError: null })
+    set({ diffFor: change.sha, diffError: null, focusSha: null })
     try {
       const diff = await invoke('contracts.diff', {
         repoRoot: change.repoRoot,

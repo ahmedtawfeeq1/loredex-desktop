@@ -11,8 +11,12 @@ import { describe, expect, it } from 'vitest'
 import { openAppDb } from './db/index'
 import { readScanRows } from './db/contract-scan'
 import {
+  capDiff,
+  DIFF_CAP_BYTES,
+  diffArgs,
   discoverContractFiles,
   globToRegExp,
+  isCommitSha,
   loadContractGlobs,
   loadProjectRoots,
   matchesContractFile,
@@ -181,6 +185,34 @@ describe('project roots + globs settings', () => {
   })
 })
 
+// ── diff extraction (story 11.2: pinned to commits, capped, flagged) ────────
+
+describe('capDiff + diffArgs', () => {
+  it('small diffs pass through untouched', () => {
+    expect(capDiff('+a\n-b\n')).toEqual({ unified: '+a\n-b\n', truncated: false })
+  })
+
+  it('>200 KB is cut at a line boundary and FLAGGED — never a silent cut', () => {
+    const line = `+${'x'.repeat(99)}\n` // 100 bytes per line
+    const big = line.repeat(2200) // 220 KB
+    const { unified, truncated } = capDiff(big)
+    expect(truncated).toBe(true)
+    expect(Buffer.byteLength(unified, 'utf8')).toBeLessThanOrEqual(DIFF_CAP_BYTES)
+    expect(unified.endsWith('\n')).toBe(true) // whole lines only
+  })
+
+  it('pins to the commit: git show <sha> -- <file>, never worktree diff', () => {
+    expect(diffArgs('abc1234', 'openapi.yaml')).toEqual(['show', 'abc1234', '--', 'openapi.yaml'])
+  })
+
+  it('sha guard accepts 7–40 hex, rejects everything else', () => {
+    expect(isCommitSha('abc1234')).toBe(true)
+    expect(isCommitSha('A'.repeat(40))).toBe(true)
+    expect(isCommitSha('abc123')).toBe(false) // 6 — too short
+    expect(isCommitSha('--exec=evil')).toBe(false)
+  })
+})
+
 // ── integration: fixture repo, scanned twice (AC3/AC5 material) ─────────────
 
 /** Distinct committer dates so the date-sorted timeline is deterministic. */
@@ -236,6 +268,30 @@ describe('scanContracts against a fixture repo', () => {
     expect(timeline[3]?.subject).toBe('chore: scaffold contract')
     expect(timeline.every((c) => c.links.length === 0)).toBe(true) // 11.3 fills these
     expect(readTimeline(db, roots, 'other-project')).toHaveLength(0)
+    db.close()
+  }, 30_000)
+
+  it('diff round-trip: git show pinned to a cached commit; a huge change truncates', async () => {
+    const root = tmp('loredex-contracts-repo-')
+    initRepo(root)
+    const db = openAppDb(tmp('loredex-contracts-db-'))
+    const roots = { [root]: { name: 'backend' } }
+    const rows = await scanContracts({ db, roots, userGlobs: [], git: gitAsync })
+    const usersCommit = rows.find((r) => r.sha && r.date.startsWith('2026-07-02'))
+    expect(usersCommit).toBeDefined()
+    const diff = capDiff(await gitAsync(root, diffArgs(usersCommit!.sha, 'openapi.yaml')))
+    expect(diff.truncated).toBe(false)
+    expect(diff.unified).toContain('+  /users: {}')
+
+    // a >200 KB change comes back truncated + flagged
+    const bigBody = `openapi: 3.1.0\npaths:\n${Array.from({ length: 30_000 }, (_, i) => `  /path-${i}: {}`).join('\n')}\n`
+    writeFileSync(join(root, 'openapi.yaml'), bigBody)
+    commitAt(root, 'feat(api): the mega change', '2026-07-05T10:00:00+02:00')
+    const fresh = await scanContracts({ db, roots, userGlobs: [], git: gitAsync })
+    expect(fresh).toHaveLength(1)
+    const big = capDiff(await gitAsync(root, diffArgs(fresh[0]!.sha, 'openapi.yaml')))
+    expect(big.truncated).toBe(true)
+    expect(Buffer.byteLength(big.unified, 'utf8')).toBeLessThanOrEqual(DIFF_CAP_BYTES)
     db.close()
   }, 30_000)
 

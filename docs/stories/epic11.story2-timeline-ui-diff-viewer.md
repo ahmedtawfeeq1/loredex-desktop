@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,13 +20,13 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Timeline view (AC: 1, 4)
-  - [ ] `views/contracts/ContractTimeline.tsx`: vertical rail + change cards from `contracts.timeline`; project filter; `contract.changed` subscription; empty states
-- [ ] Diff viewer (AC: 2, 3)
-  - [ ] `contracts.diff` channel registration (core: `git show <sha> -- <file>`, 200 KB cap → truncated flag); `DiffView.tsx` unified renderer (line-class by prefix, no diff lib needed) in an `overflow-x: auto` card
-- [ ] Chip slot (AC: 5)
-  - [ ] `links: {handoffId, confidence}[]` slot on the change card; renders nothing when empty
-- [ ] Tests
+- [x] Timeline view (AC: 1, 4)
+  - [x] `views/contracts/ContractTimeline.tsx`: vertical rail + change cards from `contracts.timeline`; project filter; `contract.changed` subscription; empty states
+- [x] Diff viewer (AC: 2, 3)
+  - [x] `contracts.diff` channel registration (core: `git show <sha> -- <file>`, 200 KB cap → truncated flag); `DiffView.tsx` unified renderer (line-class by prefix, no diff lib needed) in an `overflow-x: auto` card
+- [x] Chip slot (AC: 5)
+  - [x] `links: {handoffId, confidence}[]` slot on the change card; renders nothing when empty
+- [x] Tests
 
 ## Dev Notes
 
@@ -51,10 +51,31 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5)
+
 ### Debug Log References
+
+- `npx vitest run src/core/contracts.test.ts src/renderer/src/views/contracts/diff-logic.test.ts` — 27/27 (line classification incl. `+++`/`---` as meta, empty-state matrix, filter, cap/truncation on a >200 KB fixture change, sha guard)
+- Live-fixture driver (temp vitest file, removed after): nimbus-backend timeline shows the real openapi.yaml series (cfde836 → f3a398e → 839fd5d → 97d4b73, +8/+25/+58/+73 adds) plus postman_collection.json rows; `git show 97d4b73 -- openapi.yaml` diff renders untruncated
+- `npm test` — 389/389; `npm run build` — typecheck + electron-vite clean
 
 ### Completion Notes List
 
+- Diff pinning is enforced twice: `diffArgs` is exactly `show <sha> -- <file>`, and the handler rejects any repoRoot not in the registered roots plus any non-hex "sha" (`isCommitSha`, 7–40 word-bounded) — git only runs where the user pointed the app, with commit args only.
+- 200 KB cap cuts at a whole-line boundary (also drops split multi-byte chars); the renderer shows a rust "Diff truncated" notice with the hash — AC3's never-silent rule.
+- Project filter is client-side over the full timeline so tabs never vanish while filtered; switcher reuses the board-tab pattern.
+- Commit hashes render plain mono for now — story 12.1's helper makes them links (dev note honored).
+- Empty-state matrix: no roots → serif sentence + "Choose project folders…" into Settings; roots without matches → plain statement; per-project empty → honest sentence.
+- Chip slot (`LinkChips`) renders nothing on empty `links`; tier styling (solid gold mentioned / dashed `--text-2` + explicit HEURISTIC label) shipped now so 11.3 only feeds data.
+- Nav: sidebar "Contracts" entry + ⌘K "Contract timeline" action; store resets on vault change like every view store.
+
 ### File List
+
+- `src/renderer/src/views/contracts/ContractTimeline.tsx`, `DiffView.tsx`, `diff-logic.ts`, `diff-logic.test.ts` (new)
+- `src/renderer/src/stores/contracts.ts` (new)
+- `src/core/contracts.ts` (capDiff, diffArgs, isCommitSha), `src/core/contracts.test.ts`
+- `src/core/handlers.ts` (contracts.diff), `src/shared/ipc-contract.ts` (channel)
+- `src/renderer/src/App.tsx`, `src/renderer/src/stores/app.ts`, `src/renderer/src/views/search/Palette.tsx` (nav + ⌘K)
+- `src/renderer/src/styles.css` (timeline rail, change cards, chips, diff viewer)
 
 ## QA Results

@@ -10,6 +10,9 @@ import type { Identity, ProjectRootsMap, SyncReport } from '../shared/types'
 import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import {
+  capDiff,
+  diffArgs,
+  isCommitSha,
   loadContractGlobs,
   loadProjectRoots,
   readTimeline,
@@ -149,6 +152,20 @@ export function registerCoreHandlers(
     // then the merged cache — links stay [] until story 11.3
     await scanContracts({ db, roots, userGlobs: globs, git: gitAsync })
     return readTimeline(db, roots, project)
+  })
+  // Story 11.2: one commit's unified diff — `git show <sha> -- <file>` pinned
+  // to the commit (never the worktree), 200 KB cap with a visible flag. The
+  // repoRoot must be a registered root: git only ever runs where the user
+  // (or their config) pointed the app.
+  ipc.register('contracts.diff', async ({ repoRoot, file, sha }) => {
+    const { roots } = contractRoots()
+    if (!(repoRoot in roots)) {
+      throw ipcError('INTERNAL', 'that folder is not a registered project root — add it in Settings')
+    }
+    if (!isCommitSha(sha)) {
+      throw ipcError('INTERNAL', `not a commit hash: ${sha}`)
+    }
+    return capDiff(await gitAsync(repoRoot, diffArgs(sha, file)))
   })
   const requireDb = (): { db: NonNullable<ReturnType<typeof getAppDb>>; vid: string } => {
     const db = getAppDb()

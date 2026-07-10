@@ -12,6 +12,7 @@ export type AppView =
   | 'reader'
   | 'handoffs'
   | 'atlas'
+  | 'contracts'
   | 'search'
   | 'feed'
   | 'sync'

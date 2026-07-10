@@ -131,6 +131,14 @@ export interface CoreApi {
    *  from the app-db contract_scan cache (incremental git-log scan on demand).
    *  Read-only against the repos — no vault writes, no worktree diffs. */
   'contracts.timeline': { in: { project?: string }; out: ContractChange[] }
+  /** M2 (story 11.2): one commit's unified diff for one contract file —
+   *  `git show <sha> -- <file>`, pinned to commits, NEVER the worktree.
+   *  200 KB cap; larger diffs return truncated: true (visible notice, no
+   *  silent cut). */
+  'contracts.diff': {
+    in: { repoRoot: string; file: string; sha: string }
+    out: { unified: string; truncated: boolean }
+  }
   /** Project roots for the contract scan (m2 §5 precedence). fromConfig=true →
    *  loredex config.projects won; the set channel writes app-db only and never
    *  touches config.json. */

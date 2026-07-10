@@ -254,6 +254,29 @@ export function readTimeline(
   return changes
 }
 
+// ── diff extraction (story 11.2 — pinned to commits, capped, never silent) ──
+
+/** The decided size cap (m2 §5): larger diffs are cut at a line boundary and
+ *  flagged — the notice renders visibly, never a silent truncation. */
+export const DIFF_CAP_BYTES = 200 * 1024
+
+export function capDiff(unified: string): { unified: string; truncated: boolean } {
+  if (Buffer.byteLength(unified, 'utf8') <= DIFF_CAP_BYTES) return { unified, truncated: false }
+  const sliced = Buffer.from(unified, 'utf8').subarray(0, DIFF_CAP_BYTES).toString('utf8')
+  // cut at the last whole line (also drops any split multi-byte char)
+  return { unified: sliced.slice(0, sliced.lastIndexOf('\n') + 1), truncated: true }
+}
+
+/** `git show <sha> -- <file>` args — a commit's diff, never `git diff` against
+ *  the worktree (m2 §5). */
+export function diffArgs(sha: string, file: string): string[] {
+  return ['show', sha, '--', file]
+}
+
+export function isCommitSha(sha: string): boolean {
+  return /^[0-9a-f]{7,40}$/i.test(sha)
+}
+
 // ── app-db settings (project_roots / contract_globs, per vault — m2 §3) ─────
 
 const ROOTS_KEY = 'project_roots'

@@ -49,6 +49,12 @@ function actionItems(q: string): PaletteItem[] {
       title: 'Vault Atlas',
       run: () => useApp.getState().setView('atlas'),
     },
+    // story 11.2: the contract timeline is ⌘K-reachable (quality floor)
+    {
+      key: 'action:contracts',
+      title: 'Contract timeline',
+      run: () => useApp.getState().setView('contracts'),
+    },
   ]
   // story 10.3: every atlas navigation action is ⌘K-listed while it's open
   if (useApp.getState().view === 'atlas') {

@@ -108,7 +108,7 @@ development_status:
 
   epic-11: in-progress     # Contract Intelligence (read-only)
   11-1-contract-discovery-timeline-core: done
-  11-2-timeline-ui-diff-viewer: ready-for-dev
+  11-2-timeline-ui-diff-viewer: done
   11-3-handoff-link-heuristics-chips: ready-for-dev
   epic-11-retrospective: optional
 

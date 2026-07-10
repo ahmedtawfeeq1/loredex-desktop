@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,13 +20,13 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Root discovery + settings (AC: 1, 4)
-  - [ ] `src/core/contracts.ts`: precedence resolver; `settings.projectRoots` / `settings.contractGlobs` channels backed by `app_settings`; Settings UI rows (folder picker via native panel — no cold scans)
-- [ ] Matching + scan (AC: 2, 3)
-  - [ ] Glob matcher with the fixed pattern set + user globs; incremental `git log --follow --numstat` per file; parse into `contract_scan` rows (adds/dels, subject, author in `summary_json`)
-- [ ] Timeline channel + event (AC: 4, 5)
-  - [ ] `contracts.timeline` merges cached rows date-sorted; wire the post-integrate scan hook (poller) → `contract.changed`
-- [ ] Tests
+- [x] Root discovery + settings (AC: 1, 4)
+  - [x] `src/core/contracts.ts`: precedence resolver; `settings.projectRoots` / `settings.contractGlobs` channels backed by `app_settings`; Settings UI rows (folder picker via native panel — no cold scans)
+- [x] Matching + scan (AC: 2, 3)
+  - [x] Glob matcher with the fixed pattern set + user globs; incremental `git log --follow --numstat` per file; parse into `contract_scan` rows (adds/dels, subject, author in `summary_json`)
+- [x] Timeline channel + event (AC: 4, 5)
+  - [x] `contracts.timeline` merges cached rows date-sorted; wire the post-integrate scan hook (poller) → `contract.changed`
+- [x] Tests
 
 ## Dev Notes
 
@@ -51,10 +51,34 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5)
+
 ### Debug Log References
+
+- `npx vitest run src/core/contracts.test.ts` — 16/16 (precedence matrix, glob matrix incl. exclusions + user globs + `?(a)` extglob, numstat parsing incl. binary/merge, incremental cutoff args, settings round-trip, fixture repo scanned twice: 3 rows → 0 new → 1 new after a 4th commit)
+- `npm test` — 378/378; `npm run build` — typecheck + electron-vite clean
 
 ### Completion Notes List
 
+- Precedence needs the config FILE's own vaultPath (the picker override rewrites `config.vaultPath`), so `engine.initEngine` now captures the pre-override config and exposes `configFileProjects()` — config wins only when non-empty AND its vaultPath equals the open vault; the app map is never written back.
+- Channel naming: the m2 §8 table lists `settings.projectRoots` / `settings.contractGlobs` as "get/set"; implemented as `.get`/`.set` channel pairs matching the app's existing settings convention (`settings.identity.get/set`). App-local contract evolution, same payloads.
+- `ContractChange` carries `repoRoot` + `project` beyond the §8 sketch so the diff channel (11.2) and project filter need no second lookup — additive, recorded here.
+- Incremental scan discipline: `git log <newest_cached_sha>..HEAD --follow --numstat` per file; a failing range (rewritten history) falls back to ONE full re-log, kept idempotent by `INSERT OR IGNORE`. Timeline sort compares epochs, not ISO strings (`%cI` carries tz offsets; string order lies across repos).
+- Post-integrate hook rides the poller's `pullAndReconcile` fire-and-forget (read-only against the repos, never blocks the tick); only genuinely NEW cache rows emit `contract.changed`.
+- `contract.changed` is view-refresh material only — never a notification (m2 §5 honesty rule; heuristics gate lands in 11.3).
+- New native folder picker (`loredex:pick-project-root`) for the Settings roots rows — same TCC rule as the vault picker, no cold scans.
+
 ### File List
+
+- `src/core/contracts.ts` (new — precedence, globs, walk, log parse, incremental scan, timeline, settings persistence)
+- `src/core/contracts.test.ts` (new)
+- `src/core/db/contract-scan.ts` (new — contract_scan cache read/write)
+- `src/core/engine.ts` (configFileProjects)
+- `src/core/handlers.ts` (contracts.timeline + settings.projectRoots/contractGlobs channels)
+- `src/core/index.ts` (post-integrate scan → contract.changed)
+- `src/shared/types.ts` (ContractChange, ContractLink, ProjectRootsMap)
+- `src/shared/ipc-contract.ts` (channels + contract.changed event)
+- `src/main/dialogs.ts`, `src/main/index.ts`, `src/preload/index.ts`, `src/renderer/src/api.ts` (pickProjectRoot bridge)
+- `src/renderer/src/views/settings/ContractsSection.tsx` (new), `SettingsView.tsx`, `src/renderer/src/styles.css` (roots rows + textarea)
 
 ## QA Results

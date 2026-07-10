@@ -5,6 +5,7 @@
  */
 import { join } from 'node:path'
 import type { CoreControlMessage, PortLike } from '../shared/ipc-contract'
+import { loadContractGlobs, loadProjectRoots, resolveRoots, scanContracts } from './contracts'
 import { getPollCursor, initAppDb, setPollCursor, vaultId } from './db/index'
 import { reconcileSnoozeTimers, sweepExpiredSnoozes } from './db/snooze'
 import { invalidateAtlas } from './atlas'
@@ -81,6 +82,29 @@ if (appDb && vid) {
   setInterval(sweepSnoozes, 60_000).unref?.()
 }
 
+// Contract intelligence post-integrate scan (story 11.1 AC5): after a pull
+// lands, rescan the registered repos (incremental — only since the newest
+// cached sha per file) and announce genuinely NEW rows as contract.changed.
+// Read-only against the repos; fire-and-forget, never blocks the tick.
+function scanContractsAfterIntegrate(): void {
+  if (!appDb || !vid || !config) return
+  const db = appDb
+  const { roots } = resolveRoots({
+    openVaultPath: config.vaultPath,
+    fileConfig: engine.configFileProjects(),
+    appRoots: loadProjectRoots(db, vid),
+  })
+  scanContracts({ db, roots, userGlobs: loadContractGlobs(db, vid), git: gitAsync })
+    .then((fresh) => {
+      for (const row of fresh) {
+        ipc.emit({ kind: 'contract.changed', project: row.project, file: row.file, sha: row.sha })
+      }
+    })
+    .catch(() => {
+      // a repo being mid-rewrite is not this app's problem — next scan catches up
+    })
+}
+
 // Vault watcher (story 9.3): CLI/agent/local edits surface live. Debounced
 // batches refresh the changed paths; storms (pull bursts) reconcile from disk
 // instead of trusting per-file events (F4). Refresh buttons become fallbacks.
@@ -145,6 +169,7 @@ if (config && appDb && vid) {
         engine.rebuildVaultIndexes()
         reconcileState()
         sweepSnoozes()
+        scanContractsAfterIntegrate() // story 11.1 AC5 — async, off the tick path
       },
       syncHealth: () => engine.syncHealth(),
     })

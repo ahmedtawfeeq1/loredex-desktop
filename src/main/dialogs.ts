@@ -36,6 +36,20 @@ export async function pickVaultDialog(win: BrowserWindow | null): Promise<string
 }
 
 /**
+ * Native folder picker for contract project roots (story 11.1). Same TCC rule
+ * as the vault picker: folder access ONLY via the panel — no cold scans.
+ */
+export async function pickProjectRootDialog(win: BrowserWindow | null): Promise<string | null> {
+  const opts = {
+    title: 'Add project folder',
+    buttonLabel: 'Add project',
+    properties: ['openDirectory' as const],
+  }
+  const result = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+  return result.canceled ? null : (result.filePaths[0] ?? null)
+}
+
+/**
  * Native save panel for atlas exports (story 10.7). Display-only main-process
  * work: the renderer hands finished bytes; main only picks where they land.
  * Returns the written path, or null when the user cancels.

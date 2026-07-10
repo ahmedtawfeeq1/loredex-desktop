@@ -8,6 +8,7 @@ import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, Menu, MessageChannelMain, utilityProcess } from 'electron'
 import {
   loadVaultPath,
+  pickProjectRootDialog,
   pickRouteFileDialog,
   pickVaultDialog,
   saveExportDialog,
@@ -118,6 +119,10 @@ app.whenReady().then(() => {
   // story 7.4: native markdown picker for route-a-note (no business logic here)
   ipcMain.handle('loredex:pick-route-file', (event) =>
     pickRouteFileDialog(BrowserWindow.fromWebContents(event.sender)),
+  )
+  // story 11.1: native folder picker for contract project roots (TCC rule)
+  ipcMain.handle('loredex:pick-project-root', (event) =>
+    pickProjectRootDialog(BrowserWindow.fromWebContents(event.sender)),
   )
   // story 10.7: atlas export — renderer sends finished bytes, main saves them
   ipcMain.handle(

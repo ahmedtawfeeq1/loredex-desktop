@@ -13,6 +13,7 @@ declare global {
       onVaultChanged(cb: (vaultPath: string) => void): Unsubscribe
       onOpenHandoff(cb: (relPath: string) => void): Unsubscribe
       pickRouteFile(): Promise<string | null>
+      pickProjectRoot(): Promise<string | null>
       pathForFile(file: File): string
       saveExport(defaultName: string, data: string | ArrayBuffer): Promise<string | null>
     }
@@ -47,6 +48,11 @@ export function onOpenHandoff(cb: (relPath: string) => void): Unsubscribe {
 /** Native markdown picker for route-a-note (story 7.4, main-owned — NFR12). */
 export function pickRouteFile(): Promise<string | null> {
   return window.loredex.pickRouteFile()
+}
+
+/** Native folder picker for contract project roots (story 11.1, main-owned). */
+export function pickProjectRoot(): Promise<string | null> {
+  return window.loredex.pickProjectRoot()
 }
 
 /** Real filesystem path of a dropped File (preload webUtils, story 7.4). */

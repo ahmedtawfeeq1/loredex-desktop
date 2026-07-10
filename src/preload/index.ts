@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld('loredex', {
   // story 7.4: native markdown picker + drop-path extraction (webUtils is
   // preload-only; the sandboxed page never sees a Node API)
   pickRouteFile: (): Promise<string | null> => ipcRenderer.invoke('loredex:pick-route-file'),
+  // story 11.1: native folder picker for contract project roots (TCC rule)
+  pickProjectRoot: (): Promise<string | null> => ipcRenderer.invoke('loredex:pick-project-root'),
   // story 10.7: atlas export — bytes rendered in the page, saved via a native panel
   saveExport: (defaultName: string, data: string | ArrayBuffer): Promise<string | null> =>
     ipcRenderer.invoke('loredex:save-export', defaultName, data),

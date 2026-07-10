@@ -371,6 +371,49 @@ export interface TourDef {
   steps: TourStep[]
 }
 
+// ── Contract intelligence (epic 11 — architecture-m2.md §5, read-only) ──────
+
+/** Registered project roots: absolute repo path → display name. Precedence is
+ *  decided (m2 §5): loredex config.projects wins when its vaultPath matches the
+ *  open vault; else the app-db `project_roots` setting; config is never
+ *  written back. */
+export type ProjectRootsMap = Record<string, { name: string }>
+
+/** A contract↔handoff link with its confidence tier ALWAYS labeled (m2 §5).
+ *  `mentioned` = commit sha appears in a handoff body/objective (solid chip);
+ *  `heuristic` = same project + same calendar date (labeled, display-only —
+ *  NEVER notifications or suggestions). */
+export interface ContractLink {
+  handoffId: string
+  confidence: 'mentioned' | 'heuristic'
+}
+
+/**
+ * One contract change on the timeline (story 11.1): a commit that touched a
+ * matched contract file, from the app-db `contract_scan` cache. repoRoot +
+ * project ride along (app-local contract evolution) so the diff channel and
+ * the project filter need no second lookup.
+ */
+export interface ContractChange {
+  /** absolute repo root the file lives in */
+  repoRoot: string
+  /** registered project name for that root */
+  project: string
+  /** repo-relative file path */
+  file: string
+  /** full 40-hex commit sha */
+  sha: string
+  /** committer date, ISO */
+  date: string
+  author: string
+  subject: string
+  /** numstat counts; null = git reported '-' (binary) or none */
+  adds: number | null
+  dels: number | null
+  /** [] until story 11.3 computes the tiers */
+  links: ContractLink[]
+}
+
 /** One contract-scan change row (story 11.1's provider shape). The Atlas
  *  consumes it verbatim; until 11.1 ships the production provider is empty and
  *  contract nodes are simply absent (story 10.1 AC5 degradation). */

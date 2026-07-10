@@ -12,6 +12,7 @@ import type {
   AtlasPathResult,
   AtlasScope,
   ConsumeReceipt,
+  ContractChange,
   CreateHandoffInput,
   Facets,
   FacetValues,
@@ -25,6 +26,7 @@ import type {
   IdentitySettings,
   LinkResolution,
   McpStatus,
+  ProjectRootsMap,
   ReplyHandoffInput,
   RoutePreview,
   StatusReceipt,
@@ -125,6 +127,18 @@ export interface CoreApi {
   /** Path tracing (story 10.6): BFS shortest path over the core-side model's
    *  bidirectional adjacency; null = disconnected (one honest sentence). */
   'atlas.path': { in: { from: string; to: string }; out: AtlasPathResult | null }
+  /** M2 contract intelligence (story 11.1): merged, date-sorted change rows
+   *  from the app-db contract_scan cache (incremental git-log scan on demand).
+   *  Read-only against the repos — no vault writes, no worktree diffs. */
+  'contracts.timeline': { in: { project?: string }; out: ContractChange[] }
+  /** Project roots for the contract scan (m2 §5 precedence). fromConfig=true →
+   *  loredex config.projects won; the set channel writes app-db only and never
+   *  touches config.json. */
+  'settings.projectRoots.get': { in: void; out: { roots: ProjectRootsMap; fromConfig: boolean } }
+  'settings.projectRoots.set': { in: { roots: ProjectRootsMap }; out: void }
+  /** User contract globs, added to the fixed pattern set (app-db, per vault). */
+  'settings.contractGlobs.get': { in: void; out: { globs: string[] } }
+  'settings.contractGlobs.set': { in: { globs: string[] }; out: void }
   'vault.createOrJoin': { in: WizardInput; out: WizardResult }
   /** app-local contract evolution (story 6.2): optional window size for paging */
   'activity.feed': { in: { since?: string; limit?: number }; out: ActivityEvent[] } // (lib PR-6)
@@ -151,6 +165,9 @@ export type CoreEvent =
   /** M2 (story 9.2): a snooze's `snoozed_until` passed — fired ONCE per machine
    *  (app-db notified flag). A toast + board resort; NEVER an auto status write. */
   | { kind: 'snooze.expired'; handoffId: string }
+  /** M2 (story 11.1): the post-integrate scan found a new contract change —
+   *  the Contracts view refreshes; never a notification (m2 §5 honesty rule). */
+  | { kind: 'contract.changed'; project: string; file: string; sha: string }
   | { kind: 'route.completed'; receipt: RoutePreview }
   | { kind: 'vault.changed'; paths: string[] }
   | { kind: 'sync.changed'; health: SyncHealth }

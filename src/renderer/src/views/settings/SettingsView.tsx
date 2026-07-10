@@ -1,8 +1,10 @@
 /**
  * Settings view (story 3.4): identity profile; MCP host section (story 1.6);
- * appearance (story 14.1). One gold primary per view: Save identity — the MCP
- * save is a navy-outline secondary.
+ * appearance (story 14.1); contract roots + globs (story 11.1). One gold
+ * primary per view: Save identity — every other save is a navy-outline
+ * secondary.
  */
+import { ContractsSection } from './ContractsSection'
 import { IdentityForm } from './IdentityForm'
 import { McpSection } from './McpSection'
 import { ThemeSection } from './ThemeSection'
@@ -15,6 +17,7 @@ export function SettingsView(): React.JSX.Element {
       </div>
       <ThemeSection />
       <IdentityForm />
+      <ContractsSection />
       <McpSection />
     </div>
   )

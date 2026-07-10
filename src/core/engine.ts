@@ -59,12 +59,16 @@ import type { HomeBrief, ReplyHandoffInput, VaultIdentity } from '../shared/type
 /** undefined = not yet initialized; null = initialized, no config on disk. */
 let config: Config | null | undefined
 let configSource: VaultIdentity['configSource'] = 'loredex-config'
+/** The config file as loaded, BEFORE any picker override — the contract-root
+ *  precedence check (m2 §5) needs the file's own vaultPath to compare. */
+let fileConfig: Config | null = null
 
 export function initEngine(vaultOverride?: string): Config | null {
   if (config !== undefined) {
     throw new Error('initEngine called twice — config resolves exactly once per core-host lifetime')
   }
   config = loadConfig()
+  fileConfig = config
   if (vaultOverride) {
     config = { ...(config ?? { sync: 'none' as const, projects: {} }), vaultPath: vaultOverride }
     configSource = 'vault-picker'
@@ -78,6 +82,15 @@ export function getConfig(): Config {
     throw ipcError('NO_CONFIG', 'no loredex config resolved — pick a vault first (story 1.4)')
   }
   return config
+}
+
+/**
+ * The loredex config file's own vaultPath + projects map, pre-override (story
+ * 11.1): contract-root precedence — config.projects wins only when non-empty
+ * AND its vaultPath matches the open vault; it is never written back.
+ */
+export function configFileProjects(): { vaultPath: string; projects: Config['projects'] } | null {
+  return fileConfig ? { vaultPath: fileConfig.vaultPath, projects: fileConfig.projects } : null
 }
 
 export function readNote(path: string): Doc {

@@ -6,14 +6,23 @@ import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting } from '../shared/theme'
 import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
-import type { Identity, SyncReport } from '../shared/types'
+import type { Identity, ProjectRootsMap, SyncReport } from '../shared/types'
 import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
+import {
+  loadContractGlobs,
+  loadProjectRoots,
+  readTimeline,
+  resolveRoots,
+  saveContractGlobs,
+  saveProjectRoots,
+  scanContracts,
+} from './contracts'
 import { getAppDb, vaultId } from './db/index'
 import { getReadState, markRead } from './db/read-state'
 import { reconcileSnoozeTimers } from './db/snooze'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
-import { withGitIdentity } from './git'
+import { gitAsync, withGitIdentity } from './git'
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { getMcpStatus } from './mcp-server'
@@ -113,6 +122,54 @@ export function registerCoreHandlers(
     const db = getAppDb()
     const vid = currentVaultId()
     if (db && vid && paths.length > 0) markRead(db, vid, paths)
+  })
+  // M2 contract intelligence (story 11.1): read-only, app-side, derived +
+  // app-db cache — no vault writes, so core-host code, never lib (m2 §5).
+  const contractRoots = (): {
+    roots: ProjectRootsMap
+    fromConfig: boolean
+    globs: string[]
+  } => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return {
+      ...resolveRoots({
+        openVaultPath: engine.getConfig().vaultPath,
+        fileConfig: engine.configFileProjects(),
+        appRoots: db && vid ? loadProjectRoots(db, vid) : null,
+      }),
+      globs: db && vid ? loadContractGlobs(db, vid) : [],
+    }
+  }
+  ipc.register('contracts.timeline', async ({ project }) => {
+    const db = getAppDb()
+    if (!db) return [] // bare test host — no cache, honest empty timeline
+    const { roots, globs } = contractRoots()
+    // on-demand incremental scan (only since the newest cached sha per file),
+    // then the merged cache — links stay [] until story 11.3
+    await scanContracts({ db, roots, userGlobs: globs, git: gitAsync })
+    return readTimeline(db, roots, project)
+  })
+  const requireDb = (): { db: NonNullable<ReturnType<typeof getAppDb>>; vid: string } => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (!db || !vid) {
+      throw ipcError('INTERNAL', 'no app database — restart the app, then set this again')
+    }
+    return { db, vid }
+  }
+  ipc.register('settings.projectRoots.get', () => {
+    const { roots, fromConfig } = contractRoots()
+    return { roots, fromConfig }
+  })
+  ipc.register('settings.projectRoots.set', ({ roots }) => {
+    const { db, vid } = requireDb()
+    saveProjectRoots(db, vid, roots) // app-db only — config.json is never written
+  })
+  ipc.register('settings.contractGlobs.get', () => ({ globs: contractRoots().globs }))
+  ipc.register('settings.contractGlobs.set', ({ globs }) => {
+    const { db, vid } = requireDb()
+    saveContractGlobs(db, vid, globs)
   })
   // Consume is a lib write op: write lock (3.5 shim) + per-command git identity.
   ipc.register('handoffs.consume', ({ id, identity }) =>

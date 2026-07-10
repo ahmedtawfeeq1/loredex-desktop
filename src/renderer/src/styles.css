@@ -1204,6 +1204,52 @@ a:hover {
   color: var(--rust);
 }
 
+/* contract project roots (story 11.1): dense rows, mono paths */
+.settings-roots {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-root-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.settings-root-row:last-child {
+  border-bottom: none;
+}
+
+.settings-root-name {
+  font-weight: 600;
+  flex: none;
+}
+
+.settings-root-path {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-field textarea {
+  flex: 1;
+  max-width: 320px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  padding: 4px 8px;
+  resize: vertical;
+}
+
 /* ── activity feed (story 6.2): dense 38px rows, mono metadata ─────────── */
 
 .feed {

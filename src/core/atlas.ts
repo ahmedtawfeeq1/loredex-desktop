@@ -52,6 +52,8 @@ import {
   NODE_W,
   NOTE_ROW_PITCH,
   PANEL_PAD,
+  panelWrapRows,
+  PILL_GUTTER,
   PILL_H,
   PILL_W,
   TOPIC_COL_PITCH,
@@ -688,38 +690,49 @@ const byDateThenLabel = (a: AtlasNode, b: AtlasNode): number =>
     ? a.label.localeCompare(b.label)
     : (a.date ?? '').localeCompare(b.date ?? '')
 
-/** Panel columns left→right: topic folders alpha with `handoffs` forced last
+/** One flowable panel block: a topic's members (date-sorted) or a deep
+ *  context type. `ownLane` blocks (handoffs, source/commit/contract) always
+ *  start a fresh column and nothing packs after them mid-column — wrapped
+ *  handoff lanes stay contiguous, never interleaved with topic notes. */
+interface PanelBlock {
+  nodes: AtlasNode[]
+  ownLane: boolean
+}
+
+/** Panel blocks left→right: topic folders alpha with `handoffs` forced last
  *  (its own lane, thread rails ride it), then source/commit/contract context
- *  columns at deep. Members stack top→bottom, date-sorted. */
-function panelColumns(
+ *  lanes at deep. Members stay date-sorted top→bottom in flow order. */
+function panelBlocks(
   cluster: AtlasCluster,
   nodeById: Map<string, AtlasNode>,
   extras: AtlasNode[],
-): AtlasNode[][] {
+): PanelBlock[] {
   const topics = [...cluster.topics].sort((a, b) =>
     a.name === 'handoffs' ? 1 : b.name === 'handoffs' ? -1 : a.name.localeCompare(b.name),
   )
-  const columns: AtlasNode[][] = []
+  const blocks: PanelBlock[] = []
   for (const topic of topics) {
     const members = topic.nodeIds
       .map((id) => nodeById.get(id))
       .filter((n): n is AtlasNode => n !== undefined)
       .sort(byDateThenLabel)
-    if (members.length > 0) columns.push(members)
+    if (members.length > 0) blocks.push({ nodes: members, ownLane: topic.name === 'handoffs' })
   }
   for (const type of ['source', 'commit', 'contract'] as const) {
     const column = extras.filter((n) => n.type === type).sort((a, b) => a.id.localeCompare(b.id))
-    if (column.length > 0) columns.push(column)
+    if (column.length > 0) blocks.push({ nodes: column, ownLane: true })
   }
-  return columns
+  return blocks
 }
 
-/** Lay one focused-cluster panel: header bar top-left, columns on the GRID
- *  pitch. Returns the panel's outer box (the renderer draws the big white
- *  card exactly around what was positioned here). */
+/** Lay one focused-cluster panel: header bar top-left, blocks flow-packed
+ *  into GRID-pitch columns of panelWrapRows(total) rows so the content FILLS
+ *  the panel toward PANEL_ASPECT (story 16.5) — never one unbounded column
+ *  per topic (the tiny-top-strip defect). Returns the panel's outer box (the
+ *  renderer draws the big white card around what is visible of this). */
 function positionPanel(
   header: AtlasNode | undefined,
-  columns: AtlasNode[][],
+  blocks: PanelBlock[],
   x0: number,
   y0: number,
 ): { w: number; h: number } {
@@ -728,17 +741,42 @@ function positionPanel(
     header.y = y0 + PANEL_PAD
   }
   const contentTop = y0 + PANEL_PAD + PILL_H + GRID
-  let maxRows = 0
-  columns.forEach((column, t) => {
-    column.forEach((node, i) => {
-      node.x = x0 + PANEL_PAD + t * TOPIC_COL_PITCH
-      node.y = contentTop + i * NOTE_ROW_PITCH
-    })
-    maxRows = Math.max(maxRows, column.length)
-  })
-  const contentW =
-    columns.length > 0 ? (columns.length - 1) * TOPIC_COL_PITCH + NODE_W : PILL_W
-  const contentH = maxRows > 0 ? (maxRows - 1) * NOTE_ROW_PITCH + NODE_H : 0
+  // flow runs mirror the placement rule below: consecutive topic blocks pack
+  // as one run; each own-lane block (handoffs, deep context types) is its own
+  const runs: number[] = []
+  let prevRunOwnLane = true
+  for (const block of blocks) {
+    if (block.ownLane || prevRunOwnLane || runs.length === 0) runs.push(block.nodes.length)
+    else runs[runs.length - 1] = (runs[runs.length - 1] as number) + block.nodes.length
+    prevRunOwnLane = block.ownLane
+  }
+  const wrapRows = panelWrapRows(runs)
+  let col = 0
+  let row = 0
+  let colsUsed = 0
+  let rowsUsed = 0
+  let prevOwnLane = false
+  for (const block of blocks) {
+    // own-lane blocks start fresh, and the block AFTER one starts fresh too
+    if ((block.ownLane || prevOwnLane) && row > 0) {
+      col++
+      row = 0
+    }
+    for (const node of block.nodes) {
+      if (row >= wrapRows) {
+        col++
+        row = 0
+      }
+      node.x = x0 + PANEL_PAD + col * TOPIC_COL_PITCH
+      node.y = contentTop + row * NOTE_ROW_PITCH
+      colsUsed = Math.max(colsUsed, col + 1)
+      rowsUsed = Math.max(rowsUsed, row + 1)
+      row++
+    }
+    prevOwnLane = block.ownLane
+  }
+  const contentW = colsUsed > 0 ? (colsUsed - 1) * TOPIC_COL_PITCH + NODE_W : PILL_W
+  const contentH = rowsUsed > 0 ? (rowsUsed - 1) * NOTE_ROW_PITCH + NODE_H : 0
   return {
     w: PANEL_PAD * 2 + Math.max(contentW, PILL_W),
     h: contentTop - y0 + contentH + PANEL_PAD,
@@ -870,8 +908,10 @@ export function projectAtlas(
   })
 
   // panels stacked vertically, all sharing one left edge (aligned columns
-  // keep the inter-column bands card-free for orthogonal edge channels)
-  const panelX = MARGIN + (leftPills.length > 0 ? PILL_W + GUTTER : 0)
+  // keep the inter-column bands card-free for orthogonal edge channels);
+  // PILL_GUTTER (not GUTTER) keeps the pill→panel chip channel clear of both
+  // the pills and the panel card (story 16.5 clipped-label fix)
+  const panelX = MARGIN + (leftPills.length > 0 ? PILL_W + PILL_GUTTER : 0)
   let panelY = MARGIN
   let panelsRight = panelX
   for (const cluster of scopedClusters) {
@@ -879,7 +919,7 @@ export function projectAtlas(
     const header = nodeById.get(projectIdOf(cluster.project))
     const box = positionPanel(
       header,
-      panelColumns(scopedTopicsOf(cluster), nodeById, extras),
+      panelBlocks(scopedTopicsOf(cluster), nodeById, extras),
       panelX,
       panelY,
     )

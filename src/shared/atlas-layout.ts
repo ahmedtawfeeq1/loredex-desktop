@@ -8,9 +8,12 @@
  * - overview: columns by route-dependency depth, cluster cards CLUSTER_W wide,
  *   vertical gaps ≥ V_GAP, horizontal gutters ≥ GUTTER reserved as edge
  *   channels — cards NEVER overlap (asserted in unit tests);
- * - learn/deep: the focused cluster expands into one large panel — topic
- *   column groups on a GRID-aligned pitch, handoffs in their own lane;
- *   neighboring clusters collapse to compact side pills.
+ * - learn/deep (story 16.5 density rework): the focused cluster expands into
+ *   one large panel whose content FILLS it — topic blocks flow-pack into
+ *   columns of panelWrapRows(total) rows on the GRID-aligned pitch (the grid
+ *   tends toward PANEL_ASPECT so fit-to-content lands near 1:1), handoffs and
+ *   deep context types keep their own wrapped lanes; neighboring clusters
+ *   collapse to compact side pills behind a PILL_GUTTER chip channel.
  */
 
 /** mini routing-slip card box (DESIGN.md data-visualizations spec) */
@@ -40,6 +43,42 @@ export const CHIP_W = 112
 export const CHIP_H = 18
 /** fit-to-content padding (viewport spec) */
 export const FIT_PAD = 48
+/** target width/height ratio the focused panel's grid wraps toward — near the
+ *  pane aspect, so fitViewBox (which never zooms past 1:1) stays readable */
+export const PANEL_ASPECT = 1.6
+/** side-pill column → panel gutter (GRID-aligned, 24 × 9): fits a CHIP_W
+ *  route chip mid-channel with real clearance to the pill AND the panel card
+ *  (GUTTER left it exactly chip-tight — the clipped-label defect, story 16.5) */
+export const PILL_GUTTER = 216
+
+/** How many rows a focused panel wraps its lanes at (story 16.5). `runs` are
+ *  the panel's flow runs: consecutive topic blocks pack as one run; handoffs
+ *  and each deep context type are their own lane run. Scans every candidate
+ *  row count and keeps the grid whose aspect lands closest to PANEL_ASPECT,
+ *  skipping fragmented grids (fill ≤ 0.55 with > 6 members) — so the drilled
+ *  panel FILLS instead of rendering one unbounded column per topic (the
+ *  18-member user case becomes 4×5, not a 13-row strip). Deterministic:
+ *  ties keep the smaller row count. */
+export function panelWrapRows(runs: number[]): number {
+  const total = runs.reduce((n, r) => n + r, 0)
+  if (total <= 0 || runs.length === 0) return 1
+  const longest = Math.max(...runs)
+  let best = 1
+  let bestScore = Number.POSITIVE_INFINITY
+  for (let rows = 1; rows <= total; rows++) {
+    const cols = runs.reduce((n, r) => n + Math.ceil(r / rows), 0)
+    const rowsUsed = Math.min(rows, longest)
+    if (total > 6 && total / (cols * rowsUsed) <= 0.55) continue // fragmented
+    const w = (cols - 1) * TOPIC_COL_PITCH + NODE_W
+    const h = (rowsUsed - 1) * NOTE_ROW_PITCH + NODE_H
+    const score = Math.abs(Math.log(w / h / PANEL_ASPECT))
+    if (score < bestScore - 1e-9) {
+      best = rows
+      bestScore = score
+    }
+  }
+  return best
+}
 
 export interface AtlasBox {
   w: number
@@ -69,6 +108,29 @@ export interface Rect {
 /** Axis-aligned intersection — THE no-overlap test the layout is held to. */
 export function rectsOverlap(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+}
+
+/** The focused-cluster panel: bounding box of its members plus padding —
+ *  drawn as one large white card (radius 16) behind them. Shared so the
+ *  drilled-level invariant tests can hold chips clear of the panel card too. */
+export function panelRect(members: Rect[]): Rect | null {
+  if (members.length === 0) return null
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const m of members) {
+    minX = Math.min(minX, m.x)
+    minY = Math.min(minY, m.y)
+    maxX = Math.max(maxX, m.x + m.w)
+    maxY = Math.max(maxY, m.y + m.h)
+  }
+  return {
+    x: minX - PANEL_PAD,
+    y: minY - PANEL_PAD,
+    w: maxX - minX + PANEL_PAD * 2,
+    h: maxY - minY + PANEL_PAD * 2,
+  }
 }
 
 /** The box a node draws with (the shared contract, as a positioned rect). */

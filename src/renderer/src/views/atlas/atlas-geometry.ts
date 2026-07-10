@@ -6,17 +6,19 @@
  * can never clip under a card, and keyboard traversal order.
  * No DOM, fully unit-tested; the canvas component just applies the numbers.
  */
-import { FIT_PAD, PANEL_PAD, type Rect } from '../../../../shared/atlas-layout'
+import { FIT_PAD, type Rect } from '../../../../shared/atlas-layout'
 
 // the geometry both sides of the seam must agree on (card boxes, overlap
-// test, orthogonal routing, chips, lanes) lives in shared/atlas-layout —
-// re-exported here so the canvas keeps one geometry import
+// test, orthogonal routing, chips, lanes, the panel card box) lives in
+// shared/atlas-layout — re-exported here so the canvas keeps one geometry
+// import (panelRect moved shared in story 16.5 for the drilled invariants)
 export {
   chipRect,
   laneOffsets,
   nodeRect,
   type OrthoRoute,
   orthoRoute,
+  panelRect,
   type Rect,
   rectsOverlap,
 } from '../../../../shared/atlas-layout'
@@ -26,28 +28,6 @@ export interface ViewBox {
   y: number
   w: number
   h: number
-}
-
-/** The focused-cluster panel: bounding box of its members plus padding —
- *  drawn as one large white card (radius 16) behind them. */
-export function panelRect(members: Rect[]): Rect | null {
-  if (members.length === 0) return null
-  let minX = Number.POSITIVE_INFINITY
-  let minY = Number.POSITIVE_INFINITY
-  let maxX = Number.NEGATIVE_INFINITY
-  let maxY = Number.NEGATIVE_INFINITY
-  for (const m of members) {
-    minX = Math.min(minX, m.x)
-    minY = Math.min(minY, m.y)
-    maxX = Math.max(maxX, m.x + m.w)
-    maxY = Math.max(maxY, m.y + m.h)
-  }
-  return {
-    x: minX - PANEL_PAD,
-    y: minY - PANEL_PAD,
-    w: maxX - minX + PANEL_PAD * 2,
-    h: maxY - minY + PANEL_PAD * 2,
-  }
 }
 
 /** ViewBox fitted to the content bounding box: FIT_PAD padding, content

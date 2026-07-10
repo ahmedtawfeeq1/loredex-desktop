@@ -12,8 +12,12 @@ import {
   GUTTER,
   NODE_H,
   NODE_W,
+  NOTE_ROW_PITCH,
+  PANEL_ASPECT,
+  panelWrapRows,
   PILL_H,
   PILL_W,
+  TOPIC_COL_PITCH,
   V_GAP,
 } from '../../../../shared/atlas-layout'
 import type { AtlasNode } from '../../../../shared/types'
@@ -172,6 +176,47 @@ describe('panelRect', () => {
     const p = panelRect([rect(100, 100), rect(340, 244)])
     expect(p).toEqual({ x: 76, y: 76, w: 24 * 2 + 240 + NODE_W, h: 24 * 2 + 144 + NODE_H })
     expect(panelRect([])).toBeNull()
+  })
+})
+
+describe('panelWrapRows (story 16.5 drilled density)', () => {
+  it('wraps the panel grid toward PANEL_ASPECT — never one unbounded column', () => {
+    expect(panelWrapRows([])).toBe(1)
+    expect(panelWrapRows([1])).toBe(1)
+    // the user's 18-member nimbus-backend case (5 topic notes + 13 handoffs):
+    // 5 rows → a 4×5 grid, not a 13-row strip
+    expect(panelWrapRows([5, 13])).toBe(5)
+    // single-run panels wrap: rows always shallower than the strip layout
+    for (const n of [6, 12, 18, 30, 60]) {
+      const rows = panelWrapRows([n])
+      expect(rows, `${n} members`).toBeLessThan(n)
+      const cols = Math.ceil(n / rows)
+      const aspect = (cols * TOPIC_COL_PITCH) / (rows * NOTE_ROW_PITCH)
+      expect(aspect, `${n} members`).toBeGreaterThan(0.5)
+      expect(aspect, `${n} members`).toBeLessThan(PANEL_ASPECT * 2)
+    }
+  })
+
+  it('avoids fragmented grids: > 6 members always fill > 0.55 of the grid', () => {
+    const cases: number[][] = [
+      [5, 13],
+      [2, 5, 1, 2], // nimbus-frontend deep: lane singletons fragment naive wraps
+      [1, 1, 1, 1, 1, 1, 1],
+      [3, 9, 2],
+      [18],
+    ]
+    for (const runs of cases) {
+      const total = runs.reduce((a, b) => a + b, 0)
+      const rows = panelWrapRows(runs)
+      const cols = runs.reduce((n, r) => n + Math.ceil(r / rows), 0)
+      const rowsUsed = Math.min(rows, Math.max(...runs))
+      expect(total / (cols * rowsUsed), `runs ${runs.join(',')}`).toBeGreaterThan(0.55)
+    }
+  })
+
+  it('is deterministic for identical runs', () => {
+    expect(panelWrapRows([5, 13])).toBe(panelWrapRows([5, 13]))
+    expect(panelWrapRows([2, 5, 1, 2])).toBe(panelWrapRows([2, 5, 1, 2]))
   })
 })
 

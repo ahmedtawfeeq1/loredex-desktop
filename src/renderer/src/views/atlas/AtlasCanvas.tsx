@@ -14,7 +14,7 @@ import { GUTTER, NODE_H, NODE_W } from '../../../../shared/atlas-layout'
 import type { AtlasEdge, AtlasGraph, AtlasNode } from '../../../../shared/types'
 import { AtlasNodeCard, type AtlasNodeVariant } from './AtlasNodeCard'
 import { focusNeighborhood } from './atlas-filters'
-import type { TopicAtom } from './atlas-visibility'
+import { type TopicAtom, visiblePanels } from './atlas-visibility'
 import { type AtlasDecor, edgeDecorClass, nodeDecorClass } from './decor'
 import { TopicGroup } from './TopicGroup'
 import {
@@ -25,7 +25,6 @@ import {
   nextFocus,
   nodeRect,
   orthoRoute,
-  panelRect,
   panViewBox,
   type Rect,
   routeBadge,
@@ -190,54 +189,44 @@ export function AtlasCanvas({
 
   const level = graph.level
   const byId = useMemo(() => new Map(visibleNodes.map((n) => [n.id, n])), [visibleNodes])
-  const allById = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes])
 
   // focused-cluster panels (learn/deep): one large white card per cluster,
-  // drawn around everything the core layout placed inside it
+  // sized by what is VISIBLE (cards + atoms) — hidden collapsed members must
+  // never inflate the panel (the story 16.5 tiny-top-strip defect)
   const panelOwners = useMemo(
     () => (level === 'overview' ? new Set<string>() : new Set(graph.clusters.map((c) => c.project))),
     [graph.clusters, level],
   )
-  const panels = useMemo(() => {
-    if (level === 'overview') return []
-    const out: Array<{ project: string; rect: Rect }> = []
-    for (const cluster of graph.clusters) {
-      // exactly what the core layout placed inside: the (topic-scoped)
-      // cluster members, deep-level extras, and the header bar
-      const memberIds = new Set(cluster.topics.flatMap((t) => t.nodeIds))
-      const members = graph.nodes
-        .filter(
-          (n) =>
-            memberIds.has(n.id) ||
-            (n.type === 'project' && n.label === cluster.project) ||
-            (level === 'deep' &&
-              (n.type === 'source' || n.type === 'commit' || n.type === 'contract') &&
-              n.project === cluster.project),
-        )
-        .map((n) => nodeRect(n, level))
-      const rect = panelRect(members)
-      if (rect) out.push({ project: cluster.project, rect })
-    }
-    return out
-  }, [graph, level])
+  const panels = useMemo(
+    () =>
+      level === 'overview' ? [] : visiblePanels(graph.clusters, visibleNodes, atoms, level),
+    [graph.clusters, visibleNodes, atoms, level],
+  )
 
-  // topic column labels inside panels (mono 10px caps at each column head)
+  // topic column labels inside panels (mono 10px caps): only topics with
+  // VISIBLE members (collapsed atoms carry their own name), anchored above
+  // the flow-first member — wrapped topics get one label, at their head
   const topicLabels = useMemo(() => {
     if (level === 'overview') return []
     const out: Array<{ key: string; text: string; x: number; y: number }> = []
     for (const cluster of graph.clusters) {
       for (const topic of cluster.topics) {
         const members = topic.nodeIds
-          .map((id) => allById.get(id))
+          .map((id) => byId.get(id))
           .filter((n): n is AtlasNode => n !== undefined)
-        if (members.length === 0) continue
-        const x = Math.min(...members.map((m) => m.x))
-        const y = Math.min(...members.map((m) => m.y))
-        out.push({ key: `${cluster.project}/${topic.name}`, text: topic.name, x, y: y - 8 })
+          .sort((a, b) => a.x - b.x || a.y - b.y)
+        const first = members[0]
+        if (!first) continue
+        out.push({
+          key: `${cluster.project}/${topic.name}`,
+          text: topic.name,
+          x: first.x,
+          y: first.y - 8,
+        })
       }
     }
     return out
-  }, [graph.clusters, allById, level])
+  }, [graph.clusters, byId, level])
 
   const variantOf = (node: AtlasNode): AtlasNodeVariant => {
     if (node.type !== 'project') return 'card'

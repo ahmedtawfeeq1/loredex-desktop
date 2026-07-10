@@ -1,11 +1,14 @@
 /**
  * Story 10.3: collapsed-atom visibility (lazy expand, single-child
  * suppression), breadcrumb model, and the bounded history stack.
+ * Story 16.5: visibility-derived panel rects — hidden collapsed members must
+ * never inflate the focused panel (the tiny-top-strip defect).
  */
 import { describe, expect, it } from 'vitest'
+import { NODE_H, PANEL_PAD } from '../../../../shared/atlas-layout'
 import type { AtlasGraph, AtlasNode } from '../../../../shared/types'
 import { type AtlasHistoryEntry, MAX_HISTORY, pushHistory } from '../../stores/atlas'
-import { breadcrumbsFor, visibleAtlas } from './atlas-visibility'
+import { breadcrumbsFor, visibleAtlas, visiblePanels } from './atlas-visibility'
 
 const node = (id: string, type: AtlasNode['type'], x = 0, y = 0): AtlasNode => ({
   id,
@@ -64,6 +67,63 @@ describe('visibleAtlas', () => {
     const v = visibleAtlas(graph({ ...learnGraph, level: 'deep' }), null)
     expect(v.atoms).toHaveLength(0)
     expect(v.nodes).toHaveLength(4)
+  })
+
+  it('anchors an atom at the flow-first member cell — an occupied slot, never a free corner', () => {
+    // wrapped topic: first member sits mid-column (240, 300), the wrap
+    // continues atop the NEXT column (480, 40) — min-x/min-y independently
+    // would be (240, 40), a cell owned by another topic's card
+    const g = graph({
+      nodes: [
+        node('note:alpha/t/a', 'note', 240, 300),
+        node('note:alpha/t/b', 'note', 480, 40),
+      ],
+      clusters: [
+        {
+          project: 'alpha',
+          topics: [
+            { name: 't', nodeIds: ['note:alpha/t/a', 'note:alpha/t/b'], singleChild: false },
+          ],
+        },
+      ],
+    })
+    const v = visibleAtlas(g, null)
+    expect(v.atoms[0]).toMatchObject({ x: 240, y: 300 })
+  })
+})
+
+describe('visiblePanels (story 16.5)', () => {
+  // header + one dissolved note + one collapsed 2-note topic whose hidden
+  // members sit FAR below — the defect had them inflating the panel
+  const header: AtlasNode = { id: 'project:alpha', type: 'project', label: 'alpha', x: 64, y: 64 }
+  const near = node('note:alpha/notes/only', 'note', 64, 160)
+  const hiddenA = node('note:alpha/design/a', 'note', 304, 160)
+  const hiddenB = node('note:alpha/design/b', 'note', 304, 1800)
+  const clusters = [
+    {
+      project: 'alpha',
+      topics: [
+        { name: 'design', nodeIds: ['note:alpha/design/a', 'note:alpha/design/b'], singleChild: false },
+        { name: 'notes', nodeIds: ['note:alpha/notes/only'], singleChild: true },
+      ],
+    },
+  ]
+  const g = graph({ nodes: [header, near, hiddenA, hiddenB], clusters })
+
+  it('bounds the panel by VISIBLE content — hidden members never inflate it', () => {
+    const v = visibleAtlas(g, null) // design collapsed → atom at (304, 160)
+    const panels = visiblePanels(clusters, v.nodes, v.atoms, 'learn')
+    expect(panels).toHaveLength(1)
+    const rect = (panels[0] as { rect: { y: number; h: number } }).rect
+    // bottom hugs the visible row (atom + note at y 160), not the member at 1800
+    expect(rect.y + rect.h).toBe(160 + NODE_H + PANEL_PAD)
+  })
+
+  it('grows to the expanded members when the topic opens', () => {
+    const v = visibleAtlas(g, 'alpha/design')
+    const panels = visiblePanels(clusters, v.nodes, v.atoms, 'learn')
+    const rect = (panels[0] as { rect: { y: number; h: number } }).rect
+    expect(rect.y + rect.h).toBe(1800 + NODE_H + PANEL_PAD)
   })
 })
 

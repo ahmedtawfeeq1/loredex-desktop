@@ -4,7 +4,14 @@
  * single-child groups are dissolved (their one note renders directly).
  * Deep Dive renders everything. Pure — the canvas just draws the result.
  */
-import type { AtlasGraph, AtlasNode } from '../../../../shared/types'
+import {
+  NODE_H,
+  NODE_W,
+  nodeRect,
+  panelRect,
+  type Rect,
+} from '../../../../shared/atlas-layout'
+import type { AtlasCluster, AtlasGraph, AtlasNode } from '../../../../shared/types'
 
 export interface TopicAtom {
   /** stable key `<project>/<topic>` (the store's expandedTopic key) */
@@ -12,7 +19,8 @@ export interface TopicAtom {
   project: string
   topic: string
   count: number
-  /** the row position of its (hidden) members */
+  /** the flow-first hidden member's cell (an occupied slot in the panel grid —
+   *  never a free min-corner that could sit under another topic's card) */
   x: number
   y: number
 }
@@ -36,17 +44,51 @@ export function visibleAtlas(graph: AtlasGraph, expandedTopic: string | null): A
         .filter((n): n is AtlasNode => n !== undefined)
       if (members.length === 0) continue
       for (const m of members) hidden.add(m.id)
+      const first = [...members].sort((a, b) => a.x - b.x || a.y - b.y)[0] as AtlasNode
       atoms.push({
         key,
         project: cluster.project,
         topic: topic.name,
         count: members.length,
-        x: Math.min(...members.map((m) => m.x)),
-        y: Math.min(...members.map((m) => m.y)),
+        x: first.x,
+        y: first.y,
       })
     }
   }
   return { nodes: graph.nodes.filter((n) => !hidden.has(n.id)), atoms }
+}
+
+/** Focused-cluster panel rects derived from what is VISIBLE — expanded cards,
+ *  collapsed atoms, the header bar, deep extras. Hidden members must never
+ *  inflate the panel: sizing it from ALL members left the visible content in
+ *  a tiny top strip of a mostly-empty card (the story 16.5 defect). */
+export function visiblePanels(
+  clusters: AtlasCluster[],
+  visibleNodes: AtlasNode[],
+  atoms: TopicAtom[],
+  level: 'learn' | 'deep',
+): Array<{ project: string; rect: Rect }> {
+  const out: Array<{ project: string; rect: Rect }> = []
+  for (const cluster of clusters) {
+    const memberIds = new Set(cluster.topics.flatMap((t) => t.nodeIds))
+    const members: Rect[] = visibleNodes
+      .filter(
+        (n) =>
+          memberIds.has(n.id) ||
+          (n.type === 'project' && n.label === cluster.project) ||
+          (level === 'deep' &&
+            (n.type === 'source' || n.type === 'commit' || n.type === 'contract') &&
+            n.project === cluster.project),
+      )
+      .map((n) => nodeRect(n, level))
+    for (const atom of atoms) {
+      if (atom.project === cluster.project)
+        members.push({ x: atom.x, y: atom.y, w: NODE_W, h: NODE_H })
+    }
+    const rect = panelRect(members)
+    if (rect) out.push({ project: cluster.project, rect })
+  }
+  return out
 }
 
 /** Breadcrumb trail: vault › project › topic (story 10.3 AC3). */

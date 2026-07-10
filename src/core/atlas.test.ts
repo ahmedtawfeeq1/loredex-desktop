@@ -10,14 +10,17 @@ import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   chipRect,
+  FIT_PAD,
   laneOffsets,
+  NODE_H,
+  NODE_W,
   nodeRect,
   orthoRoute,
   rectsOverlap,
 } from '../shared/atlas-layout'
 import { createIpcClient } from '../shared/ipc-client'
 import type { PortLike } from '../shared/ipc-contract'
-import type { AtlasEdge, AtlasGraph, AtlasNode, HandoffCard } from '../shared/types'
+import type { AtlasCluster, AtlasEdge, AtlasGraph, AtlasNode, HandoffCard } from '../shared/types'
 import {
   type AtlasSource,
   buildAtlasModel,
@@ -151,6 +154,86 @@ function assertLayoutInvariants(g: AtlasGraph): void {
       expect(rectsOverlap(chip, r), `${g.level}: chip of ${e.id} clips under ${id}`).toBe(false)
     }
   }
+}
+
+/** Per-panel column-grid fill: members ÷ (columns × deepest column). The old
+ *  one-unbounded-column-per-topic layout scored 18/(4×13) ≈ 0.35 on the
+ *  user's vault — the tiny-top-strip defect this story fixes (16.5 AC5). */
+function panelFill(g: AtlasGraph, cluster: AtlasCluster): { members: number; ratio: number } {
+  const ids = new Set(cluster.topics.flatMap((t) => t.nodeIds))
+  const members = g.nodes.filter(
+    (n) =>
+      ids.has(n.id) ||
+      ((n.type === 'source' || n.type === 'commit' || n.type === 'contract') &&
+        n.project === cluster.project),
+  )
+  const columns = new Map<number, number>()
+  for (const m of members) columns.set(m.x, (columns.get(m.x) ?? 0) + 1)
+  const deepest = Math.max(1, ...columns.values())
+  return {
+    members: members.length,
+    ratio: members.length / Math.max(1, columns.size * deepest),
+  }
+}
+
+/** The story 16.5 drilled-level density invariants: min card size, aggregated
+ *  label chips clear of every pill with an 8px margin ("never clipped", not
+ *  merely non-overlapping), and panels > 6 members fill > half their grid. */
+function assertDrilledInvariants(g: AtlasGraph): void {
+  // min card size: drilled content never renders below the mini routing slip
+  for (const n of g.nodes) {
+    if (n.type === 'project') continue
+    const r = nodeRect(n, g.level)
+    expect(r.w, `${g.level}: ${n.id} card width`).toBeGreaterThanOrEqual(NODE_W)
+    expect(r.h, `${g.level}: ${n.id} card height`).toBeGreaterThanOrEqual(NODE_H)
+  }
+
+  // no label/pill intersection with clearance: inflate every project rect
+  // (side pills AND the panel header bar) by 8px before the overlap test
+  const byId = new Map(g.nodes.map((n) => [n.id, n]))
+  const lanes = laneOffsets(g.edges)
+  const pills = g.nodes
+    .filter((n) => n.type === 'project')
+    .map((n) => ({ id: n.id, r: nodeRect(n, g.level) }))
+  for (const e of g.edges) {
+    if (e.totalCount === undefined) continue
+    const a = byId.get(e.source)
+    const b = byId.get(e.target)
+    if (!a || !b) continue
+    const route = orthoRoute(nodeRect(a, g.level), nodeRect(b, g.level), lanes.get(e.id) ?? 0)
+    const chip = chipRect(route.label)
+    for (const { id, r } of pills) {
+      const inflated = { x: r.x - 8, y: r.y - 8, w: r.w + 16, h: r.h + 16 }
+      expect(
+        rectsOverlap(chip, inflated),
+        `${g.level}: chip of ${e.id} crowds pill ${id}`,
+      ).toBe(false)
+    }
+  }
+
+  // panel-content fill ratio > 0.5 whenever a panel holds more than 6 members
+  for (const cluster of g.clusters) {
+    const { members, ratio } = panelFill(g, cluster)
+    if (members > 6) {
+      expect(ratio, `${g.level}: panel ${cluster.project} fill (${members} members)`)
+        .toBeGreaterThan(0.5)
+    }
+  }
+}
+
+/** The fit scale a paneW×paneH pane would apply (mirrors fitViewBox: pane
+ *  aspect preserved, FIT_PAD padding, never zoomed past 1:1). */
+function fitScaleFor(g: AtlasGraph, paneW: number, paneH: number): number {
+  const rects = g.nodes.map((n) => nodeRect(n, g.level))
+  const minX = Math.min(...rects.map((r) => r.x))
+  const maxX = Math.max(...rects.map((r) => r.x + r.w))
+  const minY = Math.min(...rects.map((r) => r.y))
+  const maxY = Math.max(...rects.map((r) => r.y + r.h))
+  return Math.max(
+    (maxX - minX + FIT_PAD * 2) / paneW,
+    (maxY - minY + FIT_PAD * 2) / paneH,
+    1,
+  )
 }
 
 // ── pure helpers ─────────────────────────────────────────────────────────────
@@ -550,6 +633,35 @@ describe('projectAtlas levels', () => {
     assertLayoutInvariants(projectAtlas(model, 'deep', { project: 'alpha', topic: 'streaming' }))
   })
 
+  it('drilled density invariants (16.5) hold on the fixture', () => {
+    const model = buildAtlasModel(src)
+    assertDrilledInvariants(projectAtlas(model, 'learn', { project: 'alpha' }))
+    assertDrilledInvariants(projectAtlas(model, 'deep', { project: 'alpha' }))
+    assertDrilledInvariants(projectAtlas(model, 'deep', {}))
+  })
+
+  it('a many-note topic wraps into panel rows instead of one unbounded column', () => {
+    // 12 same-topic notes: the pre-16.5 layout stacked them 12 rows deep
+    const files: Record<string, { meta: Record<string, unknown>; body: string }> = {}
+    for (let i = 0; i < 12; i++) {
+      files[`projects/alpha/research/note-${String(i).padStart(2, '0')}.md`] = {
+        meta: { date: `2026-06-${String(i + 1).padStart(2, '0')}` },
+        body: '',
+      }
+    }
+    const g = projectAtlas(buildAtlasModel(vaultSource(files)), 'learn', { project: 'alpha' })
+    const notes = g.nodes.filter((n) => n.type === 'note')
+    expect(notes).toHaveLength(12)
+    const columns = new Set(notes.map((n) => n.x))
+    const rowsDeep = Math.max(
+      ...[...columns].map((x) => notes.filter((n) => n.x === x).length),
+    )
+    expect(columns.size).toBeGreaterThan(1) // distributed across the panel width
+    expect(rowsDeep).toBeLessThan(12) // never the single strip column
+    assertLayoutInvariants(g)
+    assertDrilledInvariants(g)
+  })
+
   it('deep boundary nodes are always positioned — nothing piles at the origin', () => {
     // the (0,0) pile-up of cross-project boundary cards was the visual
     // "duplicate floating cards under a cluster" defect
@@ -771,6 +883,44 @@ describe.skipIf(!existsSync(NIMBUS_VAULT))('atlas model (nimbus simulation vault
     expect(handoffNodes.length).toBe(cardCount)
     expect(model.nodes.has('handoff:nimbus-frontend/2026-07-10-handoff-nimbus-backend')).toBe(true)
     expect(model.nodes.has('handoff:nimbus-mobile/2026-07-10-handoff-nimbus-backend')).toBe(true)
+  })
+
+  // ── story 16.5: drilled Learn/Deep density on the USER'S exact case ───────
+  // (nimbus-backend holds 18 panel members — the screenshot-verified defect)
+
+  it('drilled density invariants (16.5) hold for every project at learn and deep', () => {
+    for (const project of [
+      'nimbus-ai-engine',
+      'nimbus-backend',
+      'nimbus-frontend',
+      'nimbus-mobile',
+    ]) {
+      assertDrilledInvariants(projectAtlas(model, 'learn', { project }))
+      assertDrilledInvariants(projectAtlas(model, 'deep', { project }))
+    }
+    assertDrilledInvariants(graphDeep)
+  })
+
+  it('nimbus-backend at learn: 18 members fill the panel (> 0.5), never a strip', () => {
+    const g = projectAtlas(model, 'learn', { project: 'nimbus-backend' })
+    const cluster = g.clusters.find((c) => c.project === 'nimbus-backend') as AtlasCluster
+    const { members, ratio } = panelFill(g, cluster)
+    expect(members).toBe(18) // the user's exact case
+    expect(ratio).toBeGreaterThan(0.5)
+    // and the panel spreads: more than one column, no column deeper than 6
+    const memberNodes = g.nodes.filter((n) => n.type === 'note' || n.type === 'handoff')
+    const columns = new Set(memberNodes.map((n) => n.x))
+    expect(columns.size).toBeGreaterThanOrEqual(3)
+    for (const x of columns) {
+      expect(memberNodes.filter((n) => n.x === x).length).toBeLessThanOrEqual(6)
+    }
+  })
+
+  it('nimbus-backend at learn fits READABLE: full-size cards stay ≥ 140px in a 1280×800 pane', () => {
+    const g = projectAtlas(model, 'learn', { project: 'nimbus-backend' })
+    const scale = fitScaleFor(g, 1280, 800)
+    // pre-16.5 the 1264×1900 strip forced scale ≈ 2.6 → ~76px cards, ~5px type
+    expect(NODE_W / scale).toBeGreaterThanOrEqual(140)
   })
 
   it('deep-scoped boundary cards land in context columns, never at the origin pile', () => {

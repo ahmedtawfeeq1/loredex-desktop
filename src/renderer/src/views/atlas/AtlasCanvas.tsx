@@ -1,15 +1,19 @@
 /**
- * The Atlas SVG canvas (story 10.2): hand-rolled SVG — pan (drag), zoom
- * (wheel), edges with navy arrowheads (gold when a blocking request rides the
- * route), aggregated `N open / M total` badges, keyboard-traversable node
- * cards. Positions arrive precomputed from atlas.graph; this renders only.
+ * The Atlas SVG canvas (stories 10.2/10.3): hand-rolled SVG — pan (drag),
+ * zoom (wheel), edges with navy arrowheads (gold when a blocking request
+ * rides the route), aggregated `N open / M total` badges, collapsed topic
+ * atoms, keyboard-traversable cards (arrows move, Enter drills/expands,
+ * Esc/Backspace goes up). Positions arrive precomputed from atlas.graph.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AtlasEdge, AtlasGraph, AtlasNode } from '../../../../shared/types'
 import { AtlasNodeCard } from './AtlasNodeCard'
+import type { TopicAtom } from './atlas-visibility'
+import { TopicGroup } from './TopicGroup'
 import {
   edgeAnchors,
   fitViewBox,
+  type FocusTarget,
   nextFocus,
   panViewBox,
   routeBadge,
@@ -21,8 +25,9 @@ import {
 function describeNode(node: AtlasNode): string {
   if (node.type === 'project') {
     const open = node.openCount ?? 0
-    return `project ${node.label}, ${open} open handoff${open === 1 ? '' : 's'}`
+    return `project ${node.label}, ${open} open handoff${open === 1 ? '' : 's'} — Enter opens it`
   }
+  if (node.type === 'handoff') return `handoff ${node.label}, ${node.status || 'open'}`
   return `${node.type} ${node.label}`
 }
 
@@ -35,10 +40,12 @@ function EdgeLine({
 }): React.JSX.Element | null {
   const a = byId.get(edge.source)
   const b = byId.get(edge.target)
-  if (!a || !b) return null
+  if (!a || !b) return null // an endpoint is collapsed into an atom — edge waits
   const { x1, y1, x2, y2, midX, midY } = edgeAnchors(a, b)
   const gold = edge.category === 'route' && edge.blocking
-  const dashed = edge.category === 'contract-link' && edge.confidence === 'heuristic'
+  const dashed =
+    edge.category === 'affinity' ||
+    (edge.category === 'contract-link' && edge.confidence === 'heuristic')
   const aggregated = edge.totalCount !== undefined
   return (
     <g className={`atlas-edge atlas-edge-${edge.category}`}>
@@ -64,14 +71,24 @@ function EdgeLine({
 
 export function AtlasCanvas({
   graph,
+  visibleNodes,
+  atoms,
   selectedId,
   onSelect,
   onActivate,
+  onExpandTopic,
+  onEscape,
 }: {
   graph: AtlasGraph
+  /** nodes after collapsed-atom filtering (atlas-visibility) */
+  visibleNodes: AtlasNode[]
+  atoms: TopicAtom[]
   selectedId: string | null
   onSelect: (node: AtlasNode | null) => void
   onActivate: (node: AtlasNode) => void
+  onExpandTopic: (key: string) => void
+  /** Esc/Backspace: one level up (story 10.3 keyboard map) */
+  onEscape: () => void
 }): React.JSX.Element {
   const paneRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -79,18 +96,25 @@ export function AtlasCanvas({
   const [viewBox, setViewBox] = useState<ViewBox | null>(null)
   const drag = useRef<{ x: number; y: number } | null>(null)
 
-  const byId = useMemo(() => new Map(graph.nodes.map((n) => [n.id, n])), [graph.nodes])
-  const ordered = useMemo(() => traversalOrder(graph.nodes), [graph.nodes])
+  const byId = useMemo(() => new Map(visibleNodes.map((n) => [n.id, n])), [visibleNodes])
+  const ordered = useMemo<FocusTarget[]>(
+    () =>
+      traversalOrder<FocusTarget>([
+        ...visibleNodes,
+        ...atoms.map((a) => ({ id: `topic:${a.key}`, x: a.x, y: a.y })),
+      ]),
+    [visibleNodes, atoms],
+  )
 
-  // fit on graph change (level/scope moves are discrete — refit is expected)
-  const fitKey = `${graph.level}|${graph.scope.project ?? ''}|${graph.scope.topic ?? ''}|${graph.nodes.length}`
+  // fit on discrete state change (level/scope/expansion are navigation, not zoom)
+  const fitKey = `${graph.level}|${graph.scope.project ?? ''}|${graph.scope.topic ?? ''}|${visibleNodes.length}|${atoms.length}`
   // biome-ignore lint/correctness/useExhaustiveDependencies: refit exactly on the discrete-state key
   useEffect(() => {
     const pane = paneRef.current
-    setViewBox(fitViewBox(graph.nodes, pane?.clientWidth ?? 1200, pane?.clientHeight ?? 800))
+    setViewBox(fitViewBox(ordered, pane?.clientWidth ?? 1200, pane?.clientHeight ?? 800))
   }, [fitKey])
 
-  const vb = viewBox ?? fitViewBox(graph.nodes, 1200, 800)
+  const vb = viewBox ?? fitViewBox(ordered, 1200, 800)
   const scale = (): number => {
     const pane = paneRef.current
     return vb.w / Math.max(pane?.clientWidth ?? 1200, 1)
@@ -106,9 +130,16 @@ export function AtlasCanvas({
   }
 
   function onKeyDown(e: React.KeyboardEvent<SVGSVGElement>): void {
+    if (e.key === 'Escape' || e.key === 'Backspace') {
+      e.preventDefault()
+      onEscape()
+      return
+    }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault()
-      const next = nextFocus(ordered, selectedId, e.key)
+      const focusedId =
+        (document.activeElement as SVGGElement | null)?.dataset?.nodeId ?? selectedId
+      const next = nextFocus(ordered, focusedId, e.key)
       if (next) {
         const node = byId.get(next)
         if (node) onSelect(node)
@@ -117,15 +148,22 @@ export function AtlasCanvas({
     }
   }
 
+  const refFor =
+    (id: string) =>
+    (el: SVGGElement | null): void => {
+      if (el) nodeEls.current.set(id, el)
+      else nodeEls.current.delete(id)
+    }
+
   return (
     <div ref={paneRef} className="atlas-pane">
-      {/* biome-ignore lint: the canvas itself pans on drag; nodes carry the button semantics */}
+      {/* biome-ignore lint: the canvas itself pans on drag; cards carry button semantics */}
       <svg
         ref={svgRef}
         className="atlas-canvas"
         viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
         role="application"
-        aria-label={`Vault atlas, ${graph.level} level, ${graph.nodes.length} nodes`}
+        aria-label={`Vault atlas, ${graph.level} level, ${visibleNodes.length} nodes`}
         onWheel={onWheel}
         onKeyDown={onKeyDown}
         onPointerDown={(e) => {
@@ -179,7 +217,15 @@ export function AtlasCanvas({
           ))}
         </g>
         <g className="atlas-nodes">
-          {graph.nodes.map((node) => (
+          {atoms.map((atom) => (
+            <TopicGroup
+              key={atom.key}
+              atom={atom}
+              onExpand={onExpandTopic}
+              nodeRef={refFor(`topic:${atom.key}`)}
+            />
+          ))}
+          {visibleNodes.map((node) => (
             <AtlasNodeCard
               key={node.id}
               node={node}
@@ -187,10 +233,7 @@ export function AtlasCanvas({
               describe={describeNode(node)}
               onSelect={(n) => onSelect(n)}
               onActivate={onActivate}
-              nodeRef={(el) => {
-                if (el) nodeEls.current.set(node.id, el)
-                else nodeEls.current.delete(node.id)
-              }}
+              nodeRef={refFor(node.id)}
             />
           ))}
         </g>

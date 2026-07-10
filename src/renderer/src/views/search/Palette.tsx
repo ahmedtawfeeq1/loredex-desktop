@@ -6,6 +6,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../stores/app'
+import { useAtlas } from '../../stores/atlas'
 import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import { useRoute } from '../../stores/route'
@@ -47,6 +48,43 @@ function actionItems(q: string): PaletteItem[] {
       run: () => useApp.getState().setView('atlas'),
     },
   ]
+  // story 10.3: every atlas navigation action is ⌘K-listed while it's open
+  if (useApp.getState().view === 'atlas') {
+    const atlas = useAtlas.getState()
+    actions.push({
+      key: 'action:atlas-overview',
+      title: 'Atlas: Overview',
+      run: () => void atlas.navigate('overview', {}),
+    })
+    if (atlas.scope.project) {
+      actions.push(
+        {
+          key: 'action:atlas-learn',
+          title: `Atlas: Learn — ${atlas.scope.project}`,
+          run: () => void atlas.navigate('learn', { project: atlas.scope.project as string }),
+        },
+        {
+          key: 'action:atlas-deep',
+          title: 'Atlas: Deep Dive (current scope)',
+          run: () => void atlas.navigate('deep', atlas.scope),
+        },
+      )
+    }
+    if (atlas.historyIndex > 0) {
+      actions.push({
+        key: 'action:atlas-back',
+        title: 'Atlas: Back (⌘[)',
+        run: () => void atlas.back(),
+      })
+    }
+    if (atlas.historyIndex < atlas.history.length - 1) {
+      actions.push({
+        key: 'action:atlas-forward',
+        title: 'Atlas: Forward (⌘])',
+        run: () => void atlas.forward(),
+      })
+    }
+  }
   // reply/comment target the open reader note when it is a handoff (story 7.3)
   const { selected, doc } = useReader.getState()
   const ref = selected && doc ? handoffRefFromNote(selected, doc.meta as Record<string, unknown>) : null

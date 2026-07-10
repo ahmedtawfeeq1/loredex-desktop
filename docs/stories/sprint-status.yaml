@@ -95,7 +95,7 @@ development_status:
   epic-10: in-progress     # Vault Atlas — supersedes Dependency Graph; binding concept: docs/plan/ATLAS-CONCEPT.md (§5 slices)
   10-1-atlas-model: done                               # ATLAS-1 — atlas.graph channel; blocks 10-2..10-7
   10-2-cluster-layout-svg-canvas: done                 # ATLAS-2 — Overview canvas
-  10-3-zoom-drill-navigation: ready-for-dev            # ATLAS-3
+  10-3-zoom-drill-navigation: done                     # ATLAS-3
   10-4-node-cards-hyperlink-resolution: ready-for-dev  # ATLAS-4 — full §3 resolution table
   10-5-tours-from-reading-orders: ready-for-dev        # ATLAS-5 — independent once 10-1..10-4 land
   10-6-path-tracing-filters-search: ready-for-dev      # ATLAS-6 — may start after 10-2; absorbs old blocked-on view

@@ -24,8 +24,9 @@ interface AtlasState {
   level: AtlasLevel
   scope: AtlasScope
   selectedId: string | null
-  /** expanded collapsed-atom topic groups (Learn/Deep Dive, story 10.3) */
-  expandedTopics: string[]
+  /** the one expanded collapsed-atom topic group at Learn — lazy expand shows
+   *  one topic's notes at a time (story 10.3 AC2); key `<project>/<topic>` */
+  expandedTopic: string | null
   /** visited levels/nodes — bounded back/forward stack (story 10.3) */
   history: AtlasHistoryEntry[]
   historyIndex: number
@@ -39,7 +40,7 @@ interface AtlasState {
   back(): Promise<void>
   forward(): Promise<void>
   select(id: string | null): void
-  toggleTopic(topic: string): void
+  toggleTopic(key: string): void
   reset(): void
 }
 
@@ -64,7 +65,7 @@ export const useAtlas = create<AtlasState>((set, get) => ({
   level: 'overview',
   scope: {},
   selectedId: null,
-  expandedTopics: [],
+  expandedTopic: null,
   history: [{ level: 'overview', scope: {}, selectedId: null }],
   historyIndex: 0,
 
@@ -84,12 +85,7 @@ export const useAtlas = create<AtlasState>((set, get) => ({
   async navigate(level, scope) {
     const s = get()
     const entry: AtlasHistoryEntry = { level, scope, selectedId: s.selectedId }
-    set({
-      level,
-      scope,
-      ...pushHistory(s.history, s.historyIndex, entry),
-      ...(level === 'overview' ? { expandedTopics: [] } : {}),
-    })
+    set({ level, scope, expandedTopic: null, ...pushHistory(s.history, s.historyIndex, entry) })
     await get().load()
   },
 
@@ -143,13 +139,8 @@ export const useAtlas = create<AtlasState>((set, get) => ({
     set({ selectedId: id })
   },
 
-  toggleTopic(topic) {
-    const { expandedTopics } = get()
-    set({
-      expandedTopics: expandedTopics.includes(topic)
-        ? expandedTopics.filter((t) => t !== topic)
-        : [...expandedTopics, topic],
-    })
+  toggleTopic(key) {
+    set({ expandedTopic: get().expandedTopic === key ? null : key })
   },
 
   reset() {
@@ -160,7 +151,7 @@ export const useAtlas = create<AtlasState>((set, get) => ({
       level: 'overview',
       scope: {},
       selectedId: null,
-      expandedTopics: [],
+      expandedTopic: null,
       history: [{ level: 'overview', scope: {}, selectedId: null }],
       historyIndex: 0,
     })

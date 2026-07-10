@@ -4,7 +4,6 @@
  * No DOM, fully unit-tested; the canvas component just applies the numbers.
  */
 import { MARGIN, NODE_H, NODE_W } from '../../../../shared/atlas-layout'
-import type { AtlasNode } from '../../../../shared/types'
 
 export interface ViewBox {
   x: number
@@ -17,7 +16,7 @@ export const MIN_ZOOM_W = 320
 export const MAX_ZOOM_W = 6000
 
 /** ViewBox that contains every node card plus a margin; a sane default when empty. */
-export function fitViewBox(nodes: AtlasNode[], paneW: number, paneH: number): ViewBox {
+export function fitViewBox(nodes: FocusTarget[], paneW: number, paneH: number): ViewBox {
   if (nodes.length === 0) return { x: 0, y: 0, w: Math.max(paneW, 1), h: Math.max(paneH, 1) }
   let maxX = 0
   let maxY = 0
@@ -47,8 +46,8 @@ export function panViewBox(vb: ViewBox, dx: number, dy: number): ViewBox {
 /** Edge endpoints clipped to the card borders: leaves the source's right or
  *  left edge center toward the target (layout is left→right by depth). */
 export function edgeAnchors(
-  a: Pick<AtlasNode, 'x' | 'y'>,
-  b: Pick<AtlasNode, 'x' | 'y'>,
+  a: Pick<FocusTarget, 'x' | 'y'>,
+  b: Pick<FocusTarget, 'x' | 'y'>,
 ): { x1: number; y1: number; x2: number; y2: number; midX: number; midY: number } {
   const leftToRight = a.x + NODE_W / 2 <= b.x + NODE_W / 2
   const x1 = leftToRight ? a.x + NODE_W : a.x
@@ -58,26 +57,33 @@ export function edgeAnchors(
   return { x1, y1, x2, y2, midX: (x1 + x2) / 2, midY: (y1 + y2) / 2 }
 }
 
+/** Anything focusable on the canvas: node cards and topic atoms alike. */
+export interface FocusTarget {
+  id: string
+  x: number
+  y: number
+}
+
 /** Stable reading order for roving focus: top→bottom rows, left→right. */
-export function traversalOrder(nodes: AtlasNode[]): AtlasNode[] {
+export function traversalOrder<T extends FocusTarget>(nodes: T[]): T[] {
   return [...nodes].sort((a, b) => a.y - b.y || a.x - b.x || a.id.localeCompare(b.id))
 }
 
 /** Arrow-key traversal over the ordered nodes: Left/Right walk the reading
  *  order; Up/Down jump to the nearest node in the adjacent row direction. */
 export function nextFocus(
-  ordered: AtlasNode[],
+  ordered: FocusTarget[],
   currentId: string | null,
   key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown',
 ): string | null {
   if (ordered.length === 0) return null
   const index = currentId ? ordered.findIndex((n) => n.id === currentId) : -1
-  if (index === -1) return (ordered[0] as AtlasNode).id
-  const current = ordered[index] as AtlasNode
+  if (index === -1) return (ordered[0] as FocusTarget).id
+  const current = ordered[index] as FocusTarget
   if (key === 'ArrowRight') return ordered[Math.min(index + 1, ordered.length - 1)]?.id ?? null
   if (key === 'ArrowLeft') return ordered[Math.max(index - 1, 0)]?.id ?? null
   const dir = key === 'ArrowDown' ? 1 : -1
-  let best: AtlasNode | null = null
+  let best: FocusTarget | null = null
   let bestDist = Number.POSITIVE_INFINITY
   for (const n of ordered) {
     if (dir === 1 ? n.y <= current.y : n.y >= current.y) continue

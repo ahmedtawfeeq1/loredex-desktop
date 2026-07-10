@@ -2251,3 +2251,62 @@ a:hover {
   background: var(--bg-inset);
   border: 1px solid var(--hairline);
 }
+
+/* ── Atlas navigation chrome (story 10.3): breadcrumbs, history, topic atoms ── */
+
+.atlas-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.atlas-history-button {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  color: var(--navy);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.atlas-history-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.atlas-crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.atlas-crumb-sep {
+  color: var(--text-2);
+}
+
+.atlas-crumb {
+  color: var(--navy);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+button.atlas-crumb:hover {
+  background: var(--bg-inset);
+  text-decoration: underline;
+}
+
+.atlas-crumb-current {
+  color: var(--text-2);
+}
+
+/* collapsed topic atom: inset ground — a container, not a resolvable card */
+.atlas-topic-card {
+  fill: var(--bg-inset);
+  stroke-dasharray: 3 3;
+}

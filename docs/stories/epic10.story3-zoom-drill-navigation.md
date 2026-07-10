@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,15 +20,15 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Navigation state (AC: 1, 4)
-  - [ ] Atlas store slice: `level`, `scope`, selection; re-fetch `atlas.graph` on level/scope change; selection carry-over
-- [ ] Drill + collapsed atoms (AC: 2)
-  - [ ] Cluster click → Learn; topic group component with lazy expand + single-child suppression; Deep Dive renders full node/edge set for scope
-- [ ] Breadcrumbs + history (AC: 3)
-  - [ ] Breadcrumb bar; bounded history stack (50) with back/forward
-- [ ] Quality floor (AC: 5)
-  - [ ] Keyboard map, ⌘K entries, themes, reduced-motion
-- [ ] Tests
+- [x] Navigation state (AC: 1, 4)
+  - [x] Atlas store slice: `level`, `scope`, selection; re-fetch `atlas.graph` on level/scope change; selection carry-over
+- [x] Drill + collapsed atoms (AC: 2)
+  - [x] Cluster click → Learn; topic group component with lazy expand + single-child suppression; Deep Dive renders full node/edge set for scope
+- [x] Breadcrumbs + history (AC: 3)
+  - [x] Breadcrumb bar; bounded history stack (50) with back/forward
+- [x] Quality floor (AC: 5)
+  - [x] Keyboard map, ⌘K entries, themes, reduced-motion
+- [x] Tests
 
 ## Dev Notes
 
@@ -53,10 +53,31 @@ Approved
 
 ### Agent Model Used
 
+Fable 5 (claude-fable-5)
+
 ### Debug Log References
+
+- `npx vitest run src/renderer/src/views/atlas` — 17/17 (visibility, breadcrumbs, bounded history)
+- `npm run typecheck && npx vitest run` — 293 tests green; `npm run build` green
 
 ### Completion Notes List
 
+- Zoom = discrete states: each level/scope change is one `atlas.graph` call; the store pushes a history entry (bounded 50, forward-tail truncated — UA's MAX_HISTORY verbatim) and `load()` carries selection over when the node still exists in the new scope (AC4).
+- Collapsed atoms are a **Learn** behavior (Deep Dive renders everything per AC1); expansion is accordion-style — one topic's notes at a time, per AC2's wording — and single-child groups dissolve renderer-side off the model's `singleChild` flag. Visibility is a pure function (`atlas-visibility.ts`); edges wait until both endpoints are visible.
+- Keyboard map: arrows traverse cards+atoms (shared roving focus), Enter drills (project) / expands (atom), Esc/Backspace goes up (topic → project → vault), ⌘[ / ⌘] walk history; all navigation actions ⌘K-listed while the atlas is open.
+- Level segmented control uses the DESIGN seg-control pattern; Learn is honestly disabled (with a title) until a project is scoped or selected; Deep Dive keeps the current scope (AC4).
+- Topic atoms render on `--bg-inset` with a dashed hairline — visually a container, not a resolvable routing-slip card (they navigate, never resolve).
+
 ### File List
+
+- `src/renderer/src/stores/atlas.ts` — navigate/drill/up/back/forward, accordion `expandedTopic`, bounded `pushHistory`
+- `src/renderer/src/views/atlas/atlas-visibility.ts` + `.test.ts` — NEW: visibility + breadcrumb model + history tests
+- `src/renderer/src/views/atlas/TopicGroup.tsx` — NEW: collapsed topic atom
+- `src/renderer/src/views/atlas/AtlasBreadcrumbs.tsx` — NEW: crumb bar + history buttons
+- `src/renderer/src/views/atlas/AtlasCanvas.tsx` — atoms, Esc/Backspace, shared focus targets
+- `src/renderer/src/views/atlas/AtlasView.tsx` — level seg-control, drill wiring, ⌘[/⌘]
+- `src/renderer/src/views/atlas/atlas-geometry.ts` — `FocusTarget` generalization
+- `src/renderer/src/views/search/Palette.tsx` — atlas navigation ⌘K entries
+- `src/renderer/src/styles.css` — breadcrumbs/history/topic-atom classes
 
 ## QA Results

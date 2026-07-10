@@ -17,6 +17,7 @@ export function RouteConfirmCard(): React.JSX.Element | null {
   const mode = useRoute((s) => s.mode)
   const projectName = useRoute((s) => s.projectName)
   const busy = useRoute((s) => s.busy)
+  const duplicate = useRoute((s) => s.duplicate)
   const error = useRoute((s) => s.error)
   const setMode = useRoute((s) => s.setMode)
   const setProjectName = useRoute((s) => s.setProjectName)
@@ -73,6 +74,12 @@ export function RouteConfirmCard(): React.JSX.Element | null {
               </option>
             ))}
           </select>
+        </div>
+      )}
+      {duplicate && (
+        <div className="modal-notice modal-notice-warn" role="alert">
+          This exact content was already routed on {duplicate.appliedAt.slice(0, 10)}. Routing again
+          creates a duplicate — undo the earlier route instead if this replaces it.
         </div>
       )}
       <div className="modal-row modal-row-block">

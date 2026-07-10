@@ -19,6 +19,7 @@ export type {
   HandoffCreateResult,
   HandoffTransition,
   Identity,
+  RouteReceipt,
   StatusReceipt,
   SyncHealth,
 } from 'loredex'

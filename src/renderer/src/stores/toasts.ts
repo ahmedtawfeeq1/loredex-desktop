@@ -4,16 +4,24 @@
  */
 import { create } from 'zustand'
 
+/** An optional inline action on a toast — e.g. Undo on a route receipt (epic4). */
+export interface ToastAction {
+  label: string
+  run(): void | Promise<void>
+}
+
 export interface Toast {
   id: number
   title: string
   /** mono details line — path + pushed state for write receipts */
   detail?: string
+  /** inline action button (epic4: route-receipt Undo); actioned toasts linger longer */
+  action?: ToastAction
 }
 
 interface ToastsState {
   toasts: Toast[]
-  push(title: string, detail?: string): void
+  push(title: string, detail?: string, action?: ToastAction): void
   dismiss(id: number): void
 }
 
@@ -22,12 +30,18 @@ let nextId = 1
 export const useToasts = create<ToastsState>((set) => ({
   toasts: [],
 
-  push(title, detail) {
+  push(title, detail, action) {
     const id = nextId++
-    set((s) => ({ toasts: [...s.toasts, { id, title, ...(detail ? { detail } : {}) }] }))
-    setTimeout(() => {
-      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
-    }, 5000)
+    set((s) => ({
+      toasts: [...s.toasts, { id, title, ...(detail ? { detail } : {}), ...(action ? { action } : {}) }],
+    }))
+    // actioned receipts (Undo) linger long enough to act on; plain receipts 5 s
+    setTimeout(
+      () => {
+        set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }))
+      },
+      action ? 10000 : 5000,
+    )
   },
 
   dismiss(id) {

@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -53,10 +53,22 @@ Approved
 
 ### Agent Model Used
 
+Opus 4.8 (1M) — BMAD dev agent, epic4 sequential.
+
 ### Debug Log References
+
+- Git-heavy lib tests flake under vitest file parallelism; run `npx vitest run --no-file-parallelism` (157 green).
 
 ### Completion Notes List
 
+- **Approach:** Additive over the existing `executePlan` seam rather than a plan/apply rewrite — the single write chokepoint captures every source's pre-route bytes, persists a `RouteReceipt` JSON under `<vault>/.loredex/receipts/<id>.json` (rides the route's own git commit — `.loredex/` is tracked), and returns `receiptId` on `ExecuteResult`. `routeFile` widened to `{ written; receiptId? }`.
+- **Undo (`undoRoute`)** deletes the created vault copies and restores each source to its exact captured bytes, then `rebuildIndexes` + `gitAutoCommit` — byte-identical vault, clean tree. Receipts are append-only: undo marks `undone: true` (a second undo throws `RouteUndoError('ALREADY_UNDONE')`; missing → `RECEIPT_NOT_FOUND`), so the audit trail survives (the one intended tree delta vs pre-route is the receipt JSON itself).
+- **Content hash** on the receipt equals the note's stamped `source_hash` (same `hashBody`) — the dedup key story 4.2 reads.
+- **Scope (spec §E / story 4.3 lib half):** `Config.neverRoute?: string[]` + a dependency-free `matchNeverRoute` (minimatch-ish, `scope.ts`); `executePlan` refuses a matched source with `RouteScopeError` at the one chokepoint, so app + CLI + store all honor the policy with no bypass.
+- **Deviation:** pinned as `loredex-2.3.0.tgz` (release-please had bumped package.json to 2.2.0 but never packed it); no plan/apply *rename* (previewRoute/routeFile kept). CLI rewire (AC3) is satisfied for free — CLI routes go through `executePlan`, so they now write shared receipts + honor globs.
+
 ### File List
+
+loredex repo (commit 5eb22e1): `src/core/receipts.ts` (new), `src/core/scope.ts` (new), `src/core/router.ts`, `src/core/config.ts`, `src/core/handoff.ts`, `src/lib.ts`, `tests/receipts.test.ts` (new), `package.json`, `CHANGELOG.md`.
 
 ## QA Results

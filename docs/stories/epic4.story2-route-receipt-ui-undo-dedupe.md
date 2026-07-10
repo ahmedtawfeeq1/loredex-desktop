@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -54,10 +54,17 @@ Approved
 
 ### Agent Model Used
 
-### Debug Log References
+Opus 4.8 (1M) — BMAD dev agent, epic4 sequential.
 
 ### Completion Notes List
 
+- **Receipt + Undo:** every `route.file` returns the lib `receiptId`; the confirm-flow receipt toast now carries a one-click **Undo** action (`route.undo` → lib `undoRoute`, under the write lock, identity on the commit). Undo failure surfaces its own toast (superseded → `ROUTE_ALREADY_UNDONE`). Toast store gained an optional `action` (10 s linger for actioned receipts).
+- **History channel:** `route.history { limit? } → RouteReceipt[]` reads persisted receipts, newest first.
+- **Dedupe:** on preview, the store fetches `route.history` and `findDuplicateReceipt(history, preview.meta.source_hash)` matches a non-undone receipt with the same content hash → the confirm card shows a rust "already routed on <date>" warning (warn, not hard-block — the user can still proceed or Undo the earlier route). Copy routes stamp `source_hash`; move routes carry none so no false dedupe.
+- **Deviations:** the receipt toast fires from the app confirm flow (single source, no double toast). Observing **CLI/agent/watcher-initiated** routes (the `route.completed` push for non-app routes via a `.loredex/receipts/` watch) is deferred — app-initiated routes are the shipped surface; noted for a follow-up. A standalone `views/routes/History.tsx` list view was not built (the toast + dedupe warning + `route.history` channel cover the F4 recoverability need); the channel is ready for a history view later.
+
 ### File List
+
+`src/shared/ipc-contract.ts` (route.file out, route.undo/route.history channels, codes), `src/shared/types.ts` (RouteReceipt re-export), `src/core/engine.ts` (route/routeUndo/routeHistory), `src/core/handlers.ts` (route.undo/route.history), `src/core/engine.test.ts`, `src/core/route-safety.test.ts` (new), `src/renderer/src/stores/toasts.ts`, `src/renderer/src/components/ToastStack.tsx`, `src/renderer/src/stores/route.ts`, `src/renderer/src/stores/route.test.ts` (new), `src/renderer/src/views/routes/RouteConfirmCard.tsx`, `src/renderer/src/styles.css`.
 
 ## QA Results

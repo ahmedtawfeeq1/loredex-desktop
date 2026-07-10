@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Doc } from '../../../../shared/ipc-contract'
 import type { NoteComment } from '../../../../shared/types'
 import { BrandMark } from '../../components/BrandMark'
+import { DriftBadge } from '../../components/DriftBadge'
 import { humanizeTitle, noteDate } from '../../humanize'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useComments } from '../../stores/comments'
@@ -287,6 +288,8 @@ export function NoteArticle({
           {humanizeTitle(title)}
         </h1>
         {filedDate && <p className="note-date">{filedDate}</p>}
+        {/* epic4.story4: stale-vs-source badge + one-click re-route */}
+        <DriftBadge path={selected} />
         {handoffRef &&
           attributionLines(doc.meta as Record<string, unknown>).map((line) => (
             <p key={line} className="handoff-history">

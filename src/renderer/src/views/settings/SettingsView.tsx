@@ -8,6 +8,7 @@ import { ContractsSection } from './ContractsSection'
 import { GitHubSection } from './GitHubSection'
 import { IdentityForm } from './IdentityForm'
 import { McpSection } from './McpSection'
+import { ScopeSettings } from './ScopeSettings'
 import { ThemeSection } from './ThemeSection'
 
 export function SettingsView(): React.JSX.Element {
@@ -19,6 +20,7 @@ export function SettingsView(): React.JSX.Element {
       <ThemeSection />
       <IdentityForm />
       <ContractsSection />
+      <ScopeSettings />
       <GitHubSection />
       <McpSection />
     </div>

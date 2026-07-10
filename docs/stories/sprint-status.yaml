@@ -40,11 +40,11 @@ development_status:
   3-7-native-notifications-badge: done
   epic-3-retrospective: optional
 
-  epic-4: backlog          # Routing Safety
-  4-1-loredex-pr3-route-receipts-undo: ready-for-dev
-  4-2-route-receipt-ui-undo-dedupe: ready-for-dev
-  4-3-filing-scope-control: ready-for-dev
-  4-4-drift-badges-reroute: ready-for-dev
+  epic-4: done             # Routing Safety (D1 amendment 7 §E) — lib PR-3 landed (loredex 2.3.0)
+  4-1-loredex-pr3-route-receipts-undo: done   # loredex 5eb22e1: receipts + undoRoute + never-route globs; pin = file:../loredex/loredex-2.3.0.tgz
+  4-2-route-receipt-ui-undo-dedupe: done       # receipt toast + one-click Undo (route.undo), route.history, content-hash dedupe warning
+  4-3-filing-scope-control: done               # never-route globs via saveConfig (settings.neverRoute), blocked-preview explanation, ScopeSettings
+  4-4-drift-badges-reroute: done               # vault.drift (source_hash compare) + DriftBadge + one-click re-route in the reader
   epic-4-retrospective: optional
 
   epic-5: in-progress      # Onboarding, Registry & Sync Health

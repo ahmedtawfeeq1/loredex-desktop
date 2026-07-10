@@ -95,10 +95,10 @@ describe('core host answers over the typed IPC contract shape', () => {
     await expect(client.invoke('vault.readNote', { path: '/etc/passwd' })).rejects.toMatchObject({
       code: 'VAULT_OUTSIDE_PATH',
     })
-    // channel not implemented until its lib-PR story lands
-    // (route.preview/route.file graduated to implemented in story 7.4)
+    // route.undo is implemented (epic4 / lib PR-3); a bogus receipt id fails
+    // loudly with a typed error rather than a silent no-op
     await expect(client.invoke('route.undo', { receiptId: 'x' })).rejects.toMatchObject({
-      code: 'NOT_IMPLEMENTED',
+      code: 'ROUTE_RECEIPT_NOT_FOUND',
     })
   })
 })

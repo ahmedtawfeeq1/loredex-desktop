@@ -492,6 +492,12 @@ export function registerCoreHandlers(
   }
   ipc.register('route.preview', ({ file, mode, projectName }) => {
     guardRouteSource(file)
+    // epic4.story3: a never-route match short-circuits with a named-glob
+    // explanation BEFORE the confirm card ever opens — never a silent skip.
+    const blocked = engine.scopeBlock(file)
+    if (blocked) {
+      throw ipcError('ROUTE_BLOCKED', `routing blocked — this file matches never-route "${blocked}"`)
+    }
     const plan = engine.routePlan(file, { mode, ...(projectName ? { projectName } : {}) })
     return {
       file,
@@ -519,6 +525,7 @@ export function registerCoreHandlers(
             project: String(engine.noteMeta(written).project ?? ''),
             meta: engine.noteMeta(written),
           },
+          ...(result.receiptId ? { receiptId: result.receiptId } : {}),
         })
       }
       ipc.emit({
@@ -528,6 +535,22 @@ export function registerCoreHandlers(
       return result
     }),
   )
+  // epic4.story2: reverse a route by its receipt (lib PR-3 undoRoute) under the
+  // write lock; identity rides the undo commit exactly like the route did.
+  ipc.register('route.undo', ({ receiptId }) =>
+    withWriteLock(() => {
+      const profile = loadIdentityProfile()
+      if (profile) withGitIdentity(profile, () => engine.routeUndo(receiptId))
+      else engine.routeUndo(receiptId)
+      ipc.emit({ kind: 'vault.changed', paths: [] })
+    }),
+  )
+  ipc.register('route.history', ({ limit }) => engine.routeHistory(limit))
+  ipc.register('settings.neverRoute.get', () => ({ globs: engine.neverRouteGlobs() }))
+  ipc.register('settings.neverRoute.set', ({ globs }) => {
+    engine.setNeverRoute(globs)
+  })
+  ipc.register('vault.drift', ({ path }) => engine.noteDrift(path))
   // Product home (story 2.5). dashboard.build is the re-curate seam — it runs
   // in the core host so a long build never blocks a window; story 2.6 hooks
   // its post-build snapshot here (callback point, not implemented in v0.1).

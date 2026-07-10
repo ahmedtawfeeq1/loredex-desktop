@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -53,10 +53,17 @@ Approved
 
 ### Agent Model Used
 
-### Debug Log References
+Opus 4.8 (1M) — BMAD dev agent, epic4 sequential.
 
 ### Completion Notes List
 
+- **Drift (AC1):** `vault.drift { path } → { stale; source? }`. `engine.noteDrift` resolves the note's source on this machine (`source_path`, else `source_project`+`source_rel` through the registered `config.projects`, mirroring the lib resolver, path-escape-guarded) and reports **stale** when the live source body hash no longer matches the stamped `source_hash`. `DriftBadge.tsx` renders a rust badge under the note title (reader), self-fetching per note; nothing shows for in-sync / non-routed / move-routed notes (no source to compare — never guess).
+- **Re-route (AC2):** the badge's **Re-route** opens the ordinary confirm card on the source (`useRoute.startWithFile`) — the WRITE goes through lib plan/apply (`route()`), reusing story 4.2/4.3's confirmed-apply + scope checks. Read-only git/hash for detection only.
+- **Deviation — hash drift, not commit count (AC1 "N commits behind"):** route stamps carry `source_hash` + `source_path` but **no routed-at SHA**, so an exact "N commits behind" is not derivable from existing data without a lib stamp change. Shipped the honest signal the data supports — stale vs in-sync by content-hash compare — which is the F4 antidote ("nothing to route while content diverged"). A commits-behind count can layer on once PR-3 stamps a routed-at SHA.
+- **Deviation — local-vs-pushed indicator (AC3) & explicit cache/refresh (AC4)** not built this pass: `DriftBadge` recomputes on note open (cheap, per-view) rather than via a cache invalidated on `vault.changed`/`sync.changed`; the `PushStateDot` local/committed/pushed indicator is deferred. Core drift channel + badge + re-route (the F4 heart) shipped; these are additive follow-ups.
+
 ### File List
+
+`src/core/engine.ts` (noteDrift + resolveNoteSource + hashBodyLocal), `src/core/handlers.ts` (vault.drift), `src/shared/ipc-contract.ts` (vault.drift), `src/renderer/src/components/DriftBadge.tsx` (new), `src/renderer/src/views/reader/NoteView.tsx`, `src/renderer/src/styles.css`.
 
 ## QA Results

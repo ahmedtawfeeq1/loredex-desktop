@@ -35,6 +35,7 @@ import type {
   RemoteCheck,
   ReplyHandoffInput,
   RoutePreview,
+  RouteReceipt,
   StatusReceipt,
   SyncHealth,
   SyncReport,
@@ -159,12 +160,28 @@ export interface CoreApi {
     in: { file: string; mode: 'move' | 'copy'; projectName?: string }
     out: RoutePreview
   }
-  /** Story 7.4: plan+execute in one call (lib routeFile) under the write lock. */
+  /** Story 7.4: plan+execute in one call (lib routeFile) under the write lock.
+   *  epic4: returns the PR-3 receiptId so the host can offer one-click Undo. */
   'route.file': {
     in: { path: string; mode: 'move' | 'copy'; projectName?: string }
-    out: { written: string[] }
+    out: { written: string[]; receiptId?: string }
   }
+  /** epic4.story2: reverse a route by its receipt (lib PR-3 undoRoute), under the
+   *  write lock — restores byte-identical state + indexes; a superseded receipt
+   *  rejects with ROUTE_ALREADY_UNDONE, a missing one ROUTE_RECEIPT_NOT_FOUND. */
   'route.undo': { in: { receiptId: string }; out: void } // (lib PR-3)
+  /** epic4.story2: persisted route receipts, newest first — powers the receipt
+   *  history view AND content-hash dedupe (the confirm card warns when the same
+   *  source body was already routed). Read from <vault>/.loredex/receipts/. */
+  'route.history': { in: { limit?: number }; out: RouteReceipt[] } // (lib PR-3)
+  /** epic4.story3: never-route globs — shared lib config (saveConfig), so the CLI
+   *  honors the same list. set persists through the engine facade. */
+  'settings.neverRoute.get': { in: void; out: { globs: string[] } }
+  'settings.neverRoute.set': { in: { globs: string[] }; out: void }
+  /** epic4.story4: drift for one routed note — read-only source-vs-stamp hash
+   *  compare; stale=true means the vault copy is behind its source. Re-route is
+   *  the ordinary route() write, not a channel. */
+  'vault.drift': { in: { path: string }; out: { stale: boolean; source?: string } }
   'sync.status': { in: void; out: SyncHealth } // (lib PR-4)
   'sync.run': { in: void; out: SyncReport } // (lib PR-5)
   /** app-local contract evolution (story 5.2): engine/schema handshake (NFR8) */
@@ -273,7 +290,7 @@ export type CoreEvent =
       status: WizardStepStatus
       detail?: string
     }
-  | { kind: 'route.completed'; receipt: RoutePreview }
+  | { kind: 'route.completed'; receipt: RoutePreview; receiptId?: string }
   | { kind: 'vault.changed'; paths: string[] }
   | { kind: 'sync.changed'; health: SyncHealth }
   | { kind: 'git.warning'; text: string } // F8: surface stderr, never swallow
@@ -329,6 +346,10 @@ export type IpcCode =
   | 'IDENTITY_MISSING'
   | 'CLONE_AUTH_FAILED'
   | 'NOT_A_VAULT'
+  // epic4 routing-safety codes (lib PR-3 RouteScopeError / RouteUndoError)
+  | 'ROUTE_BLOCKED'
+  | 'ROUTE_ALREADY_UNDONE'
+  | 'ROUTE_RECEIPT_NOT_FOUND'
 
 export interface ErrEnvelope {
   code: IpcCode

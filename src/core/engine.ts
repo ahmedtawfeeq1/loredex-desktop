@@ -3,10 +3,11 @@
  * architecture.md#coding-standards #3). Config resolves exactly once per
  * core-host lifetime (F6 split-brain defense); a respawned host re-resolves.
  */
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { basename, dirname, isAbsolute, join, normalize } from 'node:path'
 import {
   ACTIVITY_LOG_ARGS,
   type ActivityEvent,
@@ -31,8 +32,10 @@ import {
   type HandoffScope,
   type Identity,
   listHandoffs,
+  listReceipts,
   loadConfig,
   LOREDEX_SCHEMA,
+  matchNeverRoute,
   type Meta,
   parseDoc,
   previewRoute,
@@ -45,6 +48,9 @@ import {
   routeFile,
   type RouteOptions,
   type RoutePlanPreview,
+  type RouteReceipt,
+  RouteScopeError,
+  RouteUndoError,
   saveConfig,
   scaffoldVault,
   type SearchHit,
@@ -57,6 +63,7 @@ import {
   type StatusReceipt,
   type SyncHealth,
   syncStatus,
+  undoRoute,
   type VaultSchemaStatus,
   vaultSchemaStatus,
 } from 'loredex'
@@ -244,10 +251,106 @@ export function routePlan(file: string, opts: RouteOptions): RoutePlanPreview {
   return previewRoute(getConfig().vaultPath, file, opts)
 }
 
-/** Route one file into the vault (story 7.4) — lib routeFile, plan+execute in one call. */
-export function route(file: string, opts: RouteOptions): { written: string[] } {
+/**
+ * Route one file into the vault (story 7.4) — lib routeFile, plan+execute in one
+ * call. Now returns the PR-3 receiptId (epic4) so the host can offer Undo. A
+ * never-route glob match throws RouteScopeError → mapped to ROUTE_BLOCKED.
+ */
+export function route(file: string, opts: RouteOptions): { written: string[]; receiptId?: string } {
   const config = getConfig()
-  return routeFile(config.vaultPath, config, file, opts)
+  try {
+    return routeFile(config.vaultPath, config, file, opts)
+  } catch (e) {
+    if (e instanceof RouteScopeError) {
+      throw ipcError('ROUTE_BLOCKED', `routing blocked — ${file} matches never-route "${e.glob}"`)
+    }
+    throw e
+  }
+}
+
+/**
+ * Reverse a route by its receipt (epic4.story1/4.2, lib PR-3 undoRoute). Restores
+ * byte-identical state and regenerates indexes; a superseded/missing receipt fails
+ * loudly (never a silent no-op). Callers hold the write lock.
+ */
+export function routeUndo(receiptId: string): void {
+  const config = getConfig()
+  try {
+    undoRoute(config.vaultPath, config, receiptId)
+  } catch (e) {
+    if (e instanceof RouteUndoError) {
+      const code = e.code === 'ALREADY_UNDONE' ? 'ROUTE_ALREADY_UNDONE' : 'ROUTE_RECEIPT_NOT_FOUND'
+      throw ipcError(code, e.message)
+    }
+    throw e
+  }
+}
+
+/** Persisted route receipts, newest first (epic4.story2 history + dedup source). */
+export function routeHistory(limit?: number): RouteReceipt[] {
+  return listReceipts(getConfig().vaultPath, limit)
+}
+
+/** The matching never-route glob for `file`, or null (epic4.story3 blocked preview). */
+export function scopeBlock(file: string): string | null {
+  return matchNeverRoute(getConfig().neverRoute ?? [], file)
+}
+
+/** The configured never-route globs (epic4.story3). */
+export function neverRouteGlobs(): string[] {
+  return getConfig().neverRoute ?? []
+}
+
+/**
+ * Persist never-route globs through the shared lib config (saveConfig) so the CLI
+ * honors the same list (epic4.story3 — team-visible routing policy, never app-db).
+ */
+export function setNeverRoute(globs: string[]): void {
+  const next: Config = { ...getConfig(), neverRoute: globs }
+  saveConfig(next)
+  config = next
+}
+
+/**
+ * Drift check for a routed note (epic4.story4): resolve its source on THIS machine
+ * (source_path, else source_project+source_rel through the registered projects) and
+ * report stale when the live source body no longer matches the stamped source_hash.
+ * Read-only — the one-click re-route WRITE goes through the lib plan/apply (route()).
+ * A note with no resolvable source (move-routed, or source absent) is never stale.
+ */
+export function noteDrift(path: string): { stale: boolean; source?: string } {
+  const abs = resolveInVault(path)
+  const meta = parseDoc(readFileSync(abs, 'utf8')).meta as Record<string, unknown>
+  const source = resolveNoteSource(meta, getConfig().projects)
+  if (!source) return { stale: false }
+  const stamped = meta.source_hash
+  if (typeof stamped !== 'string') return { stale: false, source }
+  const srcBody = parseDoc(readFileSync(source, 'utf8')).body
+  return { stale: hashBodyLocal(srcBody) !== stamped, source }
+}
+
+/** Same identity the lib's router stamps (sha256 of the trimmed body). */
+function hashBodyLocal(body: string): string {
+  return createHash('sha256').update(body.trim()).digest('hex')
+}
+
+/** Where a routed note's source lives on this machine — mirrors the lib resolver. */
+function resolveNoteSource(
+  meta: Record<string, unknown>,
+  projects: Config['projects'],
+): string | null {
+  const sp = meta.source_path
+  if (typeof sp === 'string' && isAbsolute(sp) && existsSync(sp)) return sp
+  const proj = meta.source_project
+  const rel = meta.source_rel
+  if (typeof proj === 'string' && typeof rel === 'string') {
+    for (const [root, entry] of Object.entries(projects)) {
+      if (slugify(entry.name) !== proj) continue
+      const candidate = normalize(join(root, rel))
+      if (candidate.startsWith(normalize(root)) && existsSync(candidate)) return candidate
+    }
+  }
+  return null
 }
 
 /** Resolve a note path (rel or abs) strictly inside the vault, or throw. */

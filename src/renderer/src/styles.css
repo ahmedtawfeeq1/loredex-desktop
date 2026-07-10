@@ -2386,6 +2386,41 @@ a:hover {
   border-radius: 12px;
   box-shadow: var(--shadow-card);
   padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* the clickable body region (dismiss on click) — transparent, text left */
+.toast-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* epic4: inline route-receipt Undo — navy outline pill, never gold */
+.toast-action {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--navy);
+  background: none;
+  border: 1px solid var(--navy);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.toast-action:hover {
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
 }
 
 .toast-detail {
@@ -2393,6 +2428,69 @@ a:hover {
   font-size: 11px;
   color: var(--text-2);
   margin-top: 4px;
+}
+
+/* epic4.story4: drift badge — rust, sits under the note title */
+.drift-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--rust);
+  background: color-mix(in srgb, var(--rust) 8%, transparent);
+  border: 1px solid var(--rust);
+  border-radius: 8px;
+}
+
+.drift-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--rust);
+}
+
+.drift-reroute {
+  height: 22px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rust);
+  background: none;
+  border: 1px solid var(--rust);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* epic4.story2: dedupe / blocked notice inside a modal */
+.modal-notice {
+  margin: 4px 0 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--hairline);
+  background: var(--bg-inset);
+  color: var(--text-1);
+}
+
+.modal-notice-warn {
+  color: var(--rust);
+  border-color: var(--rust);
+  background: color-mix(in srgb, var(--rust) 8%, transparent);
+}
+
+/* epic4.story3: never-route glob add field */
+.settings-inline-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-inset);
+  color: var(--text-1);
 }
 
 /* suggestion toasts (story 12.2): same receipt-style card, but PERSISTENT —

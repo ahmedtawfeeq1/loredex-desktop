@@ -91,6 +91,9 @@ export function registerCoreHandlers(
     }
   }
   const announceCreated = (result: { id: string; path: string }): void => {
+    // a new note exists — the link index must see it NOW (thread edges, story
+    // 8.2, resolve through it before any renderer tree refresh lands)
+    invalidateLinkIndex(engine.getConfig().vaultPath)
     const rel = toVaultRelative(result.path, engine.getConfig().vaultPath)
     ipc.emit({ kind: 'handoff.created', card: engine.handoffCard(result.id), relPath: rel })
     ipc.emit({ kind: 'vault.changed', paths: [rel] })

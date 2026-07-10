@@ -42,6 +42,8 @@ export interface ComposeState {
   /** textarea raw: one next action per line */
   nextActions: string
   body: string
+  /** story 8.3: note name of the OPEN request this delivery fulfills ('' = none) */
+  fulfills: string
 }
 
 export const emptyCompose = (fromProject = ''): ComposeState => ({
@@ -52,6 +54,7 @@ export const emptyCompose = (fromProject = ''): ComposeState => ({
   notes: [],
   nextActions: '',
   body: '',
+  fulfills: '',
 })
 
 /**
@@ -89,7 +92,24 @@ export function buildCreateInput(s: ComposeState): CreateHandoffInput {
     notes: [...s.notes],
     ...(nextActions.length > 0 ? { nextActions } : {}),
     ...(body ? { body } : {}),
+    // deliveries only — the picker is hidden (and the field dropped) for requests
+    ...(s.fulfills && s.kind === 'delivery' ? { fulfills: s.fulfills } : {}),
   }
+}
+
+/**
+ * Fulfillable requests for the picker (story 8.3 AC1/AC5): OPEN (or accepted)
+ * `kind: request` handoffs addressed TO the sending project — never consumed,
+ * declined, or snoozed ones. Card ids are note names, unique per vault (lib
+ * uniquePath), so the id IS the `fulfills` value.
+ */
+export function fulfillsCandidates(cards: HandoffCard[], fromProject: string): HandoffCard[] {
+  return cards.filter(
+    (c) =>
+      c.kind === 'request' &&
+      (c.status === 'open' || c.status === 'accepted') &&
+      c.to === fromProject,
+  )
 }
 
 /** Reply payload: same fields minus the route (the lib derives it from the parent). */

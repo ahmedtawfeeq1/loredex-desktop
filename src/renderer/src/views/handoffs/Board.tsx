@@ -15,6 +15,7 @@ import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
 import {
   actionsFor,
+  fulfilledByMap,
   groupByProject,
   type Lanes,
   lanesFor,
@@ -127,6 +128,9 @@ function Lane({
   const pressedId = useHandoffs((s) => s.pressedId)
   const openCompose = useHandoffs((s) => s.openCompose)
   const openAnnotate = useHandoffs((s) => s.openAnnotate)
+  const openLinkRequest = useHandoffs((s) => s.openLinkRequest)
+  // story 8.3 AC3: derived reverse fulfills edges — recomputed per render
+  const fulfilled = fulfilledByMap(useHandoffs((s) => s.cards) ?? [])
   return (
     <section className="board-lane" aria-label={title}>
       <h2 className="board-lane-title">{title}</h2>
@@ -141,6 +145,10 @@ function Lane({
             pressed={pressedId === card.id}
             onReply={(c) => openCompose(c)}
             onComment={(c) => openAnnotate(c)}
+            {...(fulfilled.has(card.id) ? { fulfilledBy: fulfilled.get(card.id) } : {})}
+            {...(!inbound && card.kind === 'delivery' && !card.fulfills
+              ? { onLinkRequest: (c: HandoffCard) => openLinkRequest(c) }
+              : {})}
             {...(inbound && actionsFor(card, true).length > 0
               ? {
                   actionsSlot: <LifecycleActions card={card} />,

@@ -15,6 +15,13 @@ import { useToasts } from './toasts'
  *  one from note frontmatter, board actions pass full cards (story 7.3). */
 export type HandoffRef = Pick<HandoffCard, 'id' | 'from' | 'to' | 'objective' | 'kind'>
 
+/** Compose-form field prefill (story 8.3 retro-link path). */
+export interface ComposePrefill {
+  fulfills?: string
+  objective?: string
+  body?: string
+}
+
 interface HandoffsState {
   /** null until first load (skeleton); company-wide, lanes derived per project */
   cards: HandoffCard[] | null
@@ -35,6 +42,10 @@ interface HandoffsState {
   /** compose modal (story 7.2); replyTo set = reply variant (story 7.3) */
   composeOpen: boolean
   composeReplyTo: HandoffRef | null
+  /** story 8.3 retro-link: field prefill for the compose form (fulfills etc.) */
+  composePrefill: ComposePrefill | null
+  /** story 8.3: delivery card looking for its request ("Link to request…") */
+  linkRequestFor: HandoffCard | null
   /** comment modal target (story 7.3) */
   annotateFor: HandoffRef | null
   load(): Promise<void>
@@ -47,8 +58,10 @@ interface HandoffsState {
   closeSnooze(): void
   dismissReceipt(): void
   setProject(project: string | 'all'): void
-  openCompose(replyTo?: HandoffRef): void
+  openCompose(replyTo?: HandoffRef, prefill?: ComposePrefill): void
   closeCompose(): void
+  openLinkRequest(card: HandoffCard): void
+  closeLinkRequest(): void
   openAnnotate(card: HandoffRef): void
   closeAnnotate(): void
   /** optimistic insert from the handoff.created event — no full refetch */
@@ -68,6 +81,8 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
   snoozeFor: null,
   composeOpen: false,
   composeReplyTo: null,
+  composePrefill: null,
+  linkRequestFor: null,
   annotateFor: null,
 
   async load() {
@@ -185,12 +200,20 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
     set({ project })
   },
 
-  openCompose(replyTo) {
-    set({ composeOpen: true, composeReplyTo: replyTo ?? null })
+  openCompose(replyTo, prefill) {
+    set({ composeOpen: true, composeReplyTo: replyTo ?? null, composePrefill: prefill ?? null })
   },
 
   closeCompose() {
-    set({ composeOpen: false, composeReplyTo: null })
+    set({ composeOpen: false, composeReplyTo: null, composePrefill: null })
+  },
+
+  openLinkRequest(card) {
+    set({ linkRequestFor: card })
+  },
+
+  closeLinkRequest() {
+    set({ linkRequestFor: null })
   },
 
   openAnnotate(card) {
@@ -220,6 +243,8 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
       snoozeFor: null,
       composeOpen: false,
       composeReplyTo: null,
+      composePrefill: null,
+      linkRequestFor: null,
       annotateFor: null,
     })
   },

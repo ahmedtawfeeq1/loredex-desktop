@@ -266,6 +266,40 @@ describe('handoffs.thread over the seam (request → delivery → comment)', () 
     expect(t.ancestors).toEqual([])
   })
 
+  it('a delivery composed with fulfills closes the loop both ways (story 8.3)', async () => {
+    const request = await client.invoke('handoffs.create', {
+      input: {
+        fromProject: 'nimbus-web',
+        toProject: 'nimbus-api',
+        objective: 'Need burst-limit numbers',
+        kind: 'request',
+        notes: [],
+      },
+      identity: dana,
+    })
+    const delivery = await client.invoke('handoffs.create', {
+      input: {
+        fromProject: 'nimbus-api',
+        toProject: 'nimbus-web',
+        objective: 'Burst-limit numbers attached',
+        kind: 'delivery',
+        notes: [API_NOTE],
+        fulfills: request.id,
+      },
+      identity: dana,
+    })
+
+    // request side: FULFILLED badge material (derived — status stays open)
+    const onRequest = await client.invoke('handoffs.thread', { id: `nimbus-api/${request.id}` })
+    expect(onRequest.fulfilledBy.map((n) => n.id)).toEqual([delivery.id])
+    const cards = await client.invoke('handoffs.list', { scope: 'all' })
+    expect(cards.find((c) => c.id === request.id)?.status).toBe('open') // never auto-written
+
+    // delivery side: the labeled fulfills edge resolves to the request
+    const onDelivery = await client.invoke('handoffs.thread', { id: `nimbus-web/${delivery.id}` })
+    expect(onDelivery.fulfills?.id).toBe(request.id)
+  })
+
   it('unknown focus maps to UNKNOWN_HANDOFF, never a crash', async () => {
     await expect(
       client.invoke('handoffs.thread', { id: 'nimbus-web/never-existed' }),

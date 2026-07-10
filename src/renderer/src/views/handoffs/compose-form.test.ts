@@ -71,6 +71,7 @@ describe('payload assembly', () => {
       fromProject: 'web',
       toProject: 'api',
       objective: ' Ship it ',
+      fulfills: '',
       notes: ['z-last-selected-first', 'a-note'],
       nextActions: ' read this \n\n then that \n',
       body: '  Context paragraph.  ',
@@ -113,5 +114,86 @@ describe('qualified ids (story 7.3 AC4)', () => {
   it('qualifies by the owning project (cards live in projects/<to>/handoffs)', () => {
     expect(qualifiedId({ id: 'n', to: 'web' })).toBe('web/n')
     expect(qualifiedId({ id: 'n', to: '' })).toBe('n')
+  })
+})
+
+// ── story 8.3: fulfills picker + payload ─────────────────────────────────────
+
+import type { HandoffCard } from '../../../../shared/types'
+import { fulfilledByMap } from '../../../../shared/handoff-lanes'
+import { fulfillsCandidates } from './compose-form'
+
+const handoff = (id: string, extra: Partial<HandoffCard>): HandoffCard => ({
+  id,
+  name: id,
+  from: 'api',
+  to: 'web',
+  objective: `do ${id}`,
+  date: '2026-07-10',
+  ageDays: 1,
+  status: 'open',
+  path: `/v/projects/web/handoffs/${id}.md`,
+  readingOrder: [],
+  kind: 'delivery',
+  expired: false,
+  ...extra,
+})
+
+describe('fulfills picker filter (story 8.3 AC1/AC5: kind × status × direction)', () => {
+  const cards = [
+    handoff('open-req', { kind: 'request', status: 'open' }),
+    handoff('accepted-req', { kind: 'request', status: 'accepted' }),
+    handoff('consumed-req', { kind: 'request', status: 'consumed' }),
+    handoff('declined-req', { kind: 'request', status: 'declined' }),
+    handoff('snoozed-req', { kind: 'request', status: 'snoozed' }),
+    handoff('open-delivery', { kind: 'delivery', status: 'open' }),
+    handoff('elsewhere-req', { kind: 'request', status: 'open', to: 'mobile' }),
+  ]
+
+  it('lists only open/accepted requests addressed to the sending project', () => {
+    expect(fulfillsCandidates(cards, 'web').map((c) => c.id)).toEqual([
+      'open-req',
+      'accepted-req',
+    ])
+  })
+
+  it('never lists consumed or declined requests (AC5), nor other directions', () => {
+    const ids = fulfillsCandidates(cards, 'web').map((c) => c.id)
+    for (const out of ['consumed-req', 'declined-req', 'open-delivery', 'elsewhere-req']) {
+      expect(ids).not.toContain(out)
+    }
+    expect(fulfillsCandidates(cards, 'mobile').map((c) => c.id)).toEqual(['elsewhere-req'])
+  })
+})
+
+describe('fulfills payload (story 8.3 AC1)', () => {
+  it('rides CreateHandoffInput for deliveries and is dropped for requests', () => {
+    const state = {
+      ...emptyCompose('web'),
+      toProject: 'api',
+      objective: 'ship it',
+      fulfills: 'open-req',
+    }
+    expect(buildCreateInput(state).fulfills).toBe('open-req')
+    expect(buildCreateInput({ ...state, kind: 'request' }).fulfills).toBeUndefined()
+    expect(buildCreateInput({ ...state, fulfills: '' }).fulfills).toBeUndefined()
+    // reply variant carries it too (retro-link path composes a reply)
+    expect(buildReplyInput(state).fulfills).toBe('open-req')
+  })
+})
+
+describe('fulfilledByMap (story 8.3 AC3: one/many deliveries, dangling names)', () => {
+  it('reverses fulfills edges by request id', () => {
+    const map = fulfilledByMap([
+      handoff('req', { kind: 'request' }),
+      handoff('d1', { fulfills: 'req' }),
+      handoff('d2', { fulfills: 'req' }),
+      handoff('d3', { fulfills: 'gone-request' }),
+      handoff('plain', {}),
+    ])
+    expect(map.get('req')).toEqual(['d1', 'd2'])
+    // a dangling name maps to nothing rendered — no request card carries it
+    expect(map.get('gone-request')).toEqual(['d3'])
+    expect(map.has('plain')).toBe(false)
   })
 })

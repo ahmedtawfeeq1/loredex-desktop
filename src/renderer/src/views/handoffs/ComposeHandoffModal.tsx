@@ -20,10 +20,12 @@ import {
   type ComposeState,
   composeProblem,
   emptyCompose,
+  fulfillsCandidates,
   projectNotes,
   replyCompose,
   vaultProjects,
 } from './compose-form'
+import { FulfillsPicker } from './FulfillsPicker'
 
 function NoteScopePicker({
   candidates,
@@ -97,17 +99,27 @@ function ComposeForm({
   const tree = useReader((s) => s.tree)
   const loadTree = useReader((s) => s.loadTree)
   const boardProject = useHandoffs((s) => s.project)
+  const cards = useHandoffs((s) => s.cards)
+  const loadCards = useHandoffs((s) => s.load)
   const identity = useIdentity((s) => effectiveIdentity(s))
   const setView = useApp((s) => s.setView)
-  const [state, setState] = useState<ComposeState>(() =>
-    replyTo ? replyCompose(replyTo) : emptyCompose(boardProject === 'all' ? '' : boardProject),
-  )
+  const [state, setState] = useState<ComposeState>(() => {
+    const base = replyTo
+      ? replyCompose(replyTo)
+      : emptyCompose(boardProject === 'all' ? '' : boardProject)
+    // story 8.3 retro-link path: field prefill rides the store, one open only
+    return { ...base, ...(useHandoffs.getState().composePrefill ?? {}) }
+  })
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (tree === null) void loadTree()
   }, [tree, loadTree])
+
+  useEffect(() => {
+    if (cards === null) void loadCards() // fulfills picker material (story 8.3)
+  }, [cards, loadCards])
 
   const projects = vaultProjects(tree ?? [])
   const notes = state.fromProject ? projectNotes(tree ?? [], state.fromProject) : []
@@ -208,6 +220,16 @@ function ComposeForm({
             </select>
           </div>
         </>
+      )}
+      {state.kind === 'delivery' && state.fromProject && (
+        <div className="modal-row">
+          <span className="modal-label">Fulfills</span>
+          <FulfillsPicker
+            candidates={fulfillsCandidates(cards ?? [], state.fromProject)}
+            value={state.fulfills}
+            onChange={(fulfills) => patch({ fulfills })}
+          />
+        </div>
       )}
       <div className="modal-row">
         <span className="modal-label">Objective</span>

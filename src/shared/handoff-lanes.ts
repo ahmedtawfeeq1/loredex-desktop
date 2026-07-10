@@ -40,6 +40,23 @@ export function openCount(cards: HandoffCard[], project: string | 'all'): number
     .length
 }
 
+/**
+ * Reverse fulfills edges for board cards (story 8.3 AC3): request id → ids of
+ * deliveries naming it. `fulfills` stores the note NAME and card ids are note
+ * names (unique per vault — lib uniquePath), so the id match IS the edge; the
+ * detail view's rail uses the full resolver. Derived, never a status write.
+ */
+export function fulfilledByMap(cards: HandoffCard[]): Map<string, string[]> {
+  const map = new Map<string, string[]>()
+  for (const card of cards) {
+    if (!card.fulfills) continue
+    const list = map.get(card.fulfills) ?? []
+    list.push(card.id)
+    map.set(card.fulfills, list)
+  }
+  return map
+}
+
 /** Relative age line: today / 1d / Nd. */
 export function formatAge(ageDays: number): string {
   if (ageDays <= 0) return 'today'

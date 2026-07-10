@@ -82,12 +82,25 @@ export function ThreadRail({ id }: { id: string }): React.JSX.Element | null {
     thread.ancestors.length === 0 &&
     thread.replies.length === 0 &&
     !thread.fulfills &&
+    thread.fulfilledBy.length === 0 &&
     thread.broken.length === 0
   if (empty) return null
 
   return (
     <section className="thread" aria-label="Thread">
       <h2 className="thread-title">Thread</h2>
+      {/* story 8.3 AC3/AC4: derived FULFILLED badge + labeled connector —
+          the request's own status is never auto-written */}
+      {thread.fulfilledBy.length > 0 && (
+        <div className="thread-fulfills">
+          <span className="thread-edge-label">
+            <span className="status-chip chip-fulfilled">fulfilled</span> ⟵ by
+          </span>
+          {thread.fulfilledBy.map((node) => (
+            <ThreadCardRow key={node.path} node={node} />
+          ))}
+        </div>
+      )}
       {thread.fulfills && (
         <div className="thread-fulfills">
           <span className="thread-edge-label">fulfills ⟶</span>

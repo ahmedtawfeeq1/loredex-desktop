@@ -2065,3 +2065,17 @@ a:hover {
   display: inline-block;
   margin-top: 4px;
 }
+
+/* ── fulfills loop (story 8.3): derived FULFILLED badge — ok is status-only
+   in v2, exactly right here; gold stays with actions ──────────────────────── */
+
+.chip-fulfilled {
+  color: var(--ok);
+}
+
+/* picker empty state: one serif sentence, no action noise (AC5) */
+.fulfills-empty {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  color: var(--text-2);
+}

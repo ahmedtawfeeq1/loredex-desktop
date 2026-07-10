@@ -21,6 +21,7 @@ import { AnnotateModal } from './views/handoffs/AnnotateModal'
 import { Board } from './views/handoffs/Board'
 import { ComposeHandoffModal } from './views/handoffs/ComposeHandoffModal'
 import { DeclineReasonModal } from './views/handoffs/DeclineReasonModal'
+import { LinkRequestModal } from './views/handoffs/FulfillsPicker'
 import { SnoozeUntilPicker } from './views/handoffs/SnoozeUntilPicker'
 import { HomeView } from './views/home/HomeView'
 import { RouteConfirmCard } from './views/routes/RouteConfirmCard'
@@ -229,6 +230,7 @@ export default function App(): React.JSX.Element {
       <AnnotateModal />
       <DeclineReasonModal />
       <SnoozeUntilPicker />
+      <LinkRequestModal />
       <RouteConfirmCard />
       <ToastStack />
     </div>

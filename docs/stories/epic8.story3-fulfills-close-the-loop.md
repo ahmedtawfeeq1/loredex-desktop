@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,13 +20,13 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Compose integration (AC: 1, 5)
-  - [ ] `FulfillsPicker.tsx`: searchable list from `handoffs.list` filtered `kind=request`, `status=open|accepted`, to-project = my project; wires `fulfills` into `CreateHandoffInput`
-- [ ] Retro-link path (AC: 2)
-  - [ ] Card action per the shipped PR-11 surface; if compose-time only, the action deep-links into a prefilled reply-with-fulfills compose
-- [ ] Fulfilled badge (AC: 3, 4)
-  - [ ] Derive `fulfilledBy` in the thread/edge builder (Story 8.2 `threads.ts`); render the badge chip on request cards + the labeled connector in the rail
-- [ ] Tests
+- [x] Compose integration (AC: 1, 5)
+  - [x] `FulfillsPicker.tsx`: searchable list from `handoffs.list` filtered `kind=request`, `status=open|accepted`, to-project = my project; wires `fulfills` into `CreateHandoffInput`
+- [x] Retro-link path (AC: 2)
+  - [x] Card action per the shipped PR-11 surface; if compose-time only, the action deep-links into a prefilled reply-with-fulfills compose
+- [x] Fulfilled badge (AC: 3, 4)
+  - [x] Derive `fulfilledBy` in the thread/edge builder (Story 8.2 `threads.ts`); render the badge chip on request cards + the labeled connector in the rail
+- [x] Tests
 
 ## Dev Notes
 
@@ -51,10 +51,35 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5)
+
 ### Debug Log References
+
+- `npx vitest run src/core/threads.test.ts` — 11/11 incl. fulfills-both-ways integration
+- `npm run typecheck && npm test && npm run build` — 34 files / 208 tests green
 
 ### Completion Notes List
 
+- **Retro-link path chosen (AC2):** PR-11 ships NO "set fulfills on existing note" export, so per the story's own fallback the "Link request" action on a fulfills-less outbound delivery opens a picker modal, then deep-links into a prefilled reply-with-fulfills compose targeting the picked request (`replies_to` from the reply seam + `fulfills` prefilled; body references the earlier delivery as a wikilink). The existing delivery's frontmatter is never rewritten — anti-second-engine holds.
+- Picker filter: `kind=request`, `status ∈ {open, accepted}`, `to === fromProject` (task list wording); snoozed requests are therefore excluded along with consumed/declined (AC5 names only the latter two — recorded as the stricter reading). Empty state is one serif sentence, zero buttons.
+- `fulfilledBy` was derived in threads.ts in story 8.2 (it IS the edge model); this story renders it: `--ok` FULFILLED chip on request board cards (`fulfilledByMap`, id-match — note names are vault-unique via lib uniquePath) and the labeled `fulfilled ⟵ by` connector block in the rail. The request's `status` is never auto-written (integration test asserts it stays `open`).
+- Bug fixed en route: `announceCreated` now invalidates the core link index — thread edges resolve new notes immediately instead of waiting for a renderer tree refresh.
+- `fulfills` is dropped from the payload when kind = request (field is delivery-semantics only).
+
 ### File List
+
+- src/renderer/src/views/handoffs/FulfillsPicker.tsx — NEW: picker + LinkRequestModal (retro-link)
+- src/renderer/src/views/handoffs/compose-form.ts — `fulfills` state/payload, `fulfillsCandidates`
+- src/renderer/src/views/handoffs/compose-form.test.ts — filter matrix, payload, fulfilledByMap
+- src/renderer/src/views/handoffs/ComposeHandoffModal.tsx — Fulfills row (delivery kind), prefill merge
+- src/renderer/src/stores/handoffs.ts — composePrefill, linkRequestFor open/close
+- src/shared/handoff-lanes.ts — `fulfilledByMap`
+- src/renderer/src/components/HandoffCardView.tsx — FULFILLED chip + Link request action
+- src/renderer/src/views/handoffs/Board.tsx — wiring (outbound deliveries, badge map)
+- src/renderer/src/views/handoffs/ThreadRail.tsx — `fulfilled ⟵ by` labeled connector
+- src/renderer/src/App.tsx — mount LinkRequestModal
+- src/renderer/src/styles.css — `.chip-fulfilled`, `.fulfills-empty`
+- src/core/handlers.ts — link-index invalidation on create
+- src/core/threads.test.ts — fulfills both-ways integration
 
 ## QA Results

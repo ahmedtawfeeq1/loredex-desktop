@@ -15,6 +15,8 @@ export function HandoffCardView({
   pressed,
   onReply,
   onComment,
+  fulfilledBy,
+  onLinkRequest,
 }: {
   card: HandoffCard
   onOpen: (card: HandoffCard) => void
@@ -27,6 +29,10 @@ export function HandoffCardView({
   /** story 7.3: thread actions — secondary pills, the gold primary stays with accept */
   onReply?: (card: HandoffCard) => void
   onComment?: (card: HandoffCard) => void
+  /** story 8.3 AC3: deliveries that fulfill this request (derived, never a status write) */
+  fulfilledBy?: string[]
+  /** story 8.3 AC2: retro-link a delivery without `fulfills` to its request */
+  onLinkRequest?: (card: HandoffCard) => void
 }): React.JSX.Element {
   const notes = card.readingOrder.length
   const snoozed = card.status === 'snoozed'
@@ -47,6 +53,14 @@ export function HandoffCardView({
         {/* story 8.2 AC1: request cards carry a navy REQUEST chip beside the
             stamp; kind absent in v1 notes defaults to delivery (lib) */}
         {card.kind === 'request' && <span className="status-chip chip-request">request</span>}
+        {/* story 8.3 AC3: derived FULFILLED badge — the request's own status
+            is never auto-written; closing it for real stays a recipient act */}
+        {fulfilledBy && fulfilledBy.length > 0 && (
+          <span className="status-chip chip-fulfilled" title={`by ${fulfilledBy.join(', ')}`}>
+            fulfilled by {fulfilledBy[0]}
+            {fulfilledBy.length > 1 ? ` +${fulfilledBy.length - 1}` : ''}
+          </span>
+        )}
         {/* AC4 (story 8.1): expired snooze is a DERIVED treatment — the vault
             status stays snoozed until a human reopens it */}
         {snoozed && card.expired && <span className="snooze-expired">expired</span>}
@@ -61,8 +75,21 @@ export function HandoffCardView({
           {notes === 1 ? '1 note' : `${notes} notes`} · {formatAge(card.ageDays)}
           {snoozed && card.snoozedUntil ? ` · until ${card.snoozedUntil}` : ''}
         </span>
-        {(onReply || onComment) && (
+        {(onReply || onComment || onLinkRequest) && (
           <span className="handoff-actions">
+            {onLinkRequest && (
+              <button
+                type="button"
+                className="button-secondary button-small"
+                title="Link this delivery to the request it fulfills"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onLinkRequest(card)
+                }}
+              >
+                Link request
+              </button>
+            )}
             {onReply && (
               <button
                 type="button"

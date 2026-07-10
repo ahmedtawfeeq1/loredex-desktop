@@ -44,6 +44,13 @@ contextBridge.exposeInMainWorld('loredex', {
     ipcRenderer.invoke('loredex:pick-wizard-folder', kind),
   setVault: (vaultPath: string): Promise<string> =>
     ipcRenderer.invoke('loredex:set-vault', vaultPath),
+  // story 23.1 (D1 amendment 7 §D): vault switcher menu + multi-window
+  pickVaultFolder: (): Promise<string | null> =>
+    ipcRenderer.invoke('loredex:pick-vault-folder'),
+  listRecentVaults: (): Promise<import('../shared/recent-vaults').RecentVault[]> =>
+    ipcRenderer.invoke('loredex:list-recent-vaults'),
+  openInNewWindow: (vaultPath?: string): Promise<null> =>
+    ipcRenderer.invoke('loredex:open-in-new-window', vaultPath),
   // story 10.7: atlas export — bytes rendered in the page, saved via a native panel
   saveExport: (defaultName: string, data: string | ArrayBuffer): Promise<string | null> =>
     ipcRenderer.invoke('loredex:save-export', defaultName, data),

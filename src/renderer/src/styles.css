@@ -395,6 +395,137 @@ a:hover {
   text-align: left;
 }
 
+/* ── vault switcher menu (story 23.1, D1 amendment 7 §D) ───────────────────
+   The identity chip becomes a menu trigger; a popover card rises above it with
+   recent vaults + open/create/join. DESIGN v2: --bg-card, hairline, radius 10,
+   shadow-sm; gold reserved for the current-vault dot only. */
+.vault-switcher {
+  position: relative;
+  flex: none;
+}
+
+.vault-chip-button {
+  width: calc(100% - 16px);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.vault-chip-button:hover {
+  border-color: var(--text-2);
+}
+
+.vault-chip-caret {
+  margin-left: auto;
+  align-self: center;
+  color: var(--text-2);
+  font-size: 11px;
+}
+
+.vault-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 8px;
+  right: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+}
+
+.vault-menu-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding: 6px 8px 2px;
+}
+
+.vault-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.vault-menu-item:hover {
+  background: var(--bg-inset);
+}
+.vault-menu-item[aria-current='true'],
+.vault-menu-item:disabled {
+  cursor: default;
+  color: var(--text-2);
+}
+.vault-menu-item:disabled:hover {
+  background: transparent;
+}
+
+.vault-menu-recent {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+.vault-menu-recent-main {
+  flex: 1;
+  min-width: 0;
+}
+.vault-menu-recent-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.vault-menu-recent-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+.vault-menu-recent-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+.vault-menu-newwin {
+  flex: none;
+  width: 30px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 13px;
+}
+.vault-menu-newwin:hover {
+  background: var(--bg-inset);
+  color: var(--text-1);
+}
+
+.vault-menu-sep {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--hairline);
+}
+
 /* ── collapsible rails (story 16.2, DESIGN.md Addendum D1) ──────────────────
    Sidebar ⌘\ → 56px icon rail (badges become dots, vault chip → dot+tooltip);
    file list ⌘⇧\ → 0 (reader full-bleed). 160ms ease-out on the widths — the

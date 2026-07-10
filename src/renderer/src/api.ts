@@ -3,6 +3,7 @@
  * All payload types come from the shared contract — never redefine them here.
  */
 import type { CoreApi, CoreEvent, Unsubscribe } from '../../shared/ipc-contract'
+import type { RecentVault } from '../../shared/recent-vaults'
 
 declare global {
   interface Window {
@@ -16,6 +17,9 @@ declare global {
       pickProjectRoot(): Promise<string | null>
       pickWizardFolder(kind: 'create' | 'join'): Promise<string | null>
       setVault(vaultPath: string): Promise<string>
+      pickVaultFolder(): Promise<string | null>
+      listRecentVaults(): Promise<RecentVault[]>
+      openInNewWindow(vaultPath?: string): Promise<null>
       onJoinLink(cb: (url: string) => void): Unsubscribe
       pathForFile(file: File): string
       saveExport(defaultName: string, data: string | ArrayBuffer): Promise<string | null>
@@ -67,6 +71,21 @@ export function pickWizardFolder(kind: 'create' | 'join'): Promise<string | null
  *  core host on it; resolves after the fresh port is brokered. */
 export function setVault(vaultPath: string): Promise<string> {
   return window.loredex.setVault(vaultPath)
+}
+
+/** story 23.1: pick a vault folder with NO side effect (the menu chooses the action). */
+export function pickVaultFolder(): Promise<string | null> {
+  return window.loredex.pickVaultFolder()
+}
+
+/** story 23.1: the app-wide recently-opened vaults list (main-owned JSON). */
+export function listRecentVaults(): Promise<RecentVault[]> {
+  return window.loredex.listRecentVaults()
+}
+
+/** story 23.1: open a brand-new window bound to `vaultPath` (its own core host). */
+export function openInNewWindow(vaultPath?: string): Promise<null> {
+  return window.loredex.openInNewWindow(vaultPath)
 }
 
 /** loredex://join deep link (story 13.2): raw URL, parsed by shared/join-link. */

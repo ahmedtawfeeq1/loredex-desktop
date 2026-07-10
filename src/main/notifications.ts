@@ -3,21 +3,26 @@
  * the core host filtered, deduped and batched already — main just shows what
  * it is told and routes the click back into the renderer.
  */
-import { app, BrowserWindow, Notification } from 'electron'
+import { app, type BrowserWindow, Notification } from 'electron'
 import { isMainControlMessage } from '../shared/ipc-contract'
 
-function focusMainWindow(): BrowserWindow | undefined {
-  const win = BrowserWindow.getAllWindows()[0]
-  if (win) {
+function focusWindow(win: BrowserWindow | undefined): BrowserWindow | undefined {
+  if (win && !win.isDestroyed()) {
     if (win.isMinimized()) win.restore()
     win.show()
     win.focus()
+    return win
   }
-  return win
+  return undefined
 }
 
-/** Handle a core-host control message; ignores anything that isn't one. */
-export function handleCoreMessage(msg: unknown): void {
+/**
+ * Handle a core-host control message; ignores anything that isn't one.
+ * Multi-window (story 23.1): each core host serves ONE window, so its
+ * notification click focuses and deep-navigates THAT window (its vault), not
+ * an arbitrary first window.
+ */
+export function handleCoreMessage(msg: unknown, win?: BrowserWindow): void {
   if (!isMainControlMessage(msg)) return
   if (msg.t === 'badge') {
     app.setBadgeCount(msg.count)
@@ -27,7 +32,7 @@ export function handleCoreMessage(msg: unknown): void {
   const notification = new Notification({ title: msg.title, body: msg.body })
   notification.on('click', () => {
     // focus + deep-navigate: '' (batched summary) opens the board
-    focusMainWindow()?.webContents.send('open-handoff', msg.relPath)
+    focusWindow(win)?.webContents.send('open-handoff', msg.relPath)
   })
   notification.show()
 }

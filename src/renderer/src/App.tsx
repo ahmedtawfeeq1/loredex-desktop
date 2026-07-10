@@ -9,7 +9,7 @@ import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
 import { BrandMark } from './components/BrandMark'
-import { IdentityBadge } from './components/IdentityBadge'
+import { VaultMenu } from './components/VaultMenu'
 import { NavIcon, RailChevron } from './components/NavIcon'
 import { ShortcutCheatsheet } from './components/ShortcutCheatsheet'
 import { SuggestToastStack } from './components/SuggestToast'
@@ -211,7 +211,7 @@ export default function App(): React.JSX.Element {
             Route a note…
           </button>
         )}
-        <IdentityBadge collapsed={sidebarCollapsed} />
+        <VaultMenu collapsed={sidebarCollapsed} />
       </aside>
       {status === 'ready' ? (
         view === 'home' ? (

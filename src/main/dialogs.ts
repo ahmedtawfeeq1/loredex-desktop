@@ -5,10 +5,12 @@
  * choice in main-owned JSON is bootstrap config, not business logic.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { app, type BrowserWindow, dialog } from 'electron'
+import { pushRecent, type RecentVault } from '../shared/recent-vaults'
 
 const vaultFile = (): string => join(app.getPath('userData'), 'vault.json')
+const recentVaultsFile = (): string => join(app.getPath('userData'), 'recent-vaults.json')
 
 export function loadVaultPath(): string | null {
   try {
@@ -22,6 +24,41 @@ export function loadVaultPath(): string | null {
 export function saveVaultPath(vaultPath: string): void {
   mkdirSync(app.getPath('userData'), { recursive: true })
   writeFileSync(vaultFile(), JSON.stringify({ vaultPath }))
+}
+
+/**
+ * Recently-opened vaults (story 23.1, D1 amendment 7 §D) — the app-wide list
+ * behind the vault switcher menu. Same bootstrap-config category as vault.json
+ * (main-owned JSON, not business logic); list logic is the pure shared module.
+ */
+export function loadRecentVaults(): RecentVault[] {
+  try {
+    const raw = JSON.parse(readFileSync(recentVaultsFile(), 'utf8')) as unknown
+    if (!Array.isArray(raw)) return []
+    return raw.filter(
+      (r): r is RecentVault =>
+        typeof r === 'object' &&
+        r !== null &&
+        typeof (r as RecentVault).path === 'string' &&
+        typeof (r as RecentVault).name === 'string' &&
+        typeof (r as RecentVault).openedAt === 'string',
+    )
+  } catch {
+    return []
+  }
+}
+
+/** Record an opened/switched-to vault at the top of the recents list. */
+export function recordRecentVault(vaultPath: string): RecentVault[] {
+  const entry: RecentVault = {
+    path: vaultPath,
+    name: basename(vaultPath) || vaultPath,
+    openedAt: new Date().toISOString(),
+  }
+  const next = pushRecent(loadRecentVaults(), entry)
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  writeFileSync(recentVaultsFile(), JSON.stringify(next))
+  return next
 }
 
 /** Show the native folder picker; null when the user cancels. */

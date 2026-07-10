@@ -20,6 +20,7 @@ import {
   searchRingTiers,
 } from '../views/atlas/atlas-filters'
 import { changedNodeIds, withLiveChanges } from '../views/atlas/changed-since'
+import { shouldAutoOpenLegend } from '../views/atlas/atlas-legend'
 import { clampStep, playbackActionFor } from '../views/atlas/tour-playback'
 import { invoke, onEvent } from '../api'
 import { useApp } from './app'
@@ -102,6 +103,12 @@ interface AtlasState {
   forward(): Promise<void>
   select(id: string | null): void
   toggleTopic(key: string): void
+  /** "How to read this map" legend popover (story epic17.2, D1 amendment 3) */
+  legendOpen: boolean
+  openLegend(): void
+  closeLegend(): void
+  /** first-ever Atlas visit auto-opens the legend once (app.db flag) */
+  maybeAutoOpenLegend(): Promise<void>
   reset(): void
 }
 
@@ -368,6 +375,27 @@ export const useAtlas = create<AtlasState>((set, get) => ({
     set({ expandedTopic: get().expandedTopic === key ? null : key })
   },
 
+  legendOpen: false,
+
+  openLegend() {
+    set({ legendOpen: true })
+    // opening it (auto or via ?) satisfies the once-per-app auto-open flag
+    void invoke('settings.atlasLegendSeen.set', undefined).catch(() => {})
+  },
+
+  closeLegend() {
+    set({ legendOpen: false })
+  },
+
+  async maybeAutoOpenLegend() {
+    try {
+      const { seen } = await invoke('settings.atlasLegendSeen.get', undefined)
+      if (shouldAutoOpenLegend(seen)) get().openLegend()
+    } catch {
+      // flag unreadable (no db yet) → leave the legend closed, no crash
+    }
+  },
+
   reset() {
     set({
       graph: null,
@@ -394,6 +422,7 @@ export const useAtlas = create<AtlasState>((set, get) => ({
       overlaySince: null,
       overlayChanged: new Set(),
       overlayNodes: [],
+      legendOpen: false,
     })
   },
 }))

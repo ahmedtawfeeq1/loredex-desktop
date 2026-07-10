@@ -10,7 +10,15 @@
  * Positions arrive precomputed from atlas.graph.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { GUTTER, NODE_H, NODE_W } from '../../../../shared/atlas-layout'
+import {
+  GUTTER,
+  newestDate,
+  NODE_H,
+  NODE_W,
+  orderChips,
+  SUBCARD_PAD,
+  subCardRect,
+} from '../../../../shared/atlas-layout'
 import type { AtlasEdge, AtlasGraph, AtlasNode } from '../../../../shared/types'
 import { AtlasNodeCard, type AtlasNodeVariant } from './AtlasNodeCard'
 import { focusNeighborhood } from './atlas-filters'
@@ -79,6 +87,7 @@ function OrthoEdge({
   onActivateEdge,
   decorClass = '',
   hot,
+  openThread,
 }: {
   edge: AtlasEdge
   a: Rect
@@ -90,6 +99,8 @@ function OrthoEdge({
   decorClass?: string
   /** hover emphasis: this edge touches the hovered node */
   hot?: boolean
+  /** thread edge whose thread is still open — draws gold (D1 amendment 3) */
+  openThread?: boolean
 }): React.JSX.Element {
   // aggregated route chips need the full gutter channel; quiet in-panel
   // edges (thread rails, wikilinks) stay inside the 40px column gaps
@@ -102,9 +113,15 @@ function OrthoEdge({
     edge.category === 'affinity' ||
     (edge.category === 'contract-link' && edge.confidence === 'heuristic')
   const aggregated = edge.totalCount !== undefined
+  // in-panel relationship connectors (everything but the aggregated project
+  // routes) draw as thin, soft-cornered curves; open threads glow gold
+  const inPanel = edge.category !== 'route'
+  const threadGold = openThread === true
   const d = pathOf(points)
   return (
-    <g className={`atlas-edge atlas-edge-${edge.category}${decorClass}${hot ? ' atlas-edge-hot' : ''}`}>
+    <g
+      className={`atlas-edge atlas-edge-${edge.category}${inPanel ? ' atlas-edge-inpanel' : ''}${threadGold ? ' atlas-edge-open-thread' : ''}${decorClass}${hot ? ' atlas-edge-hot' : ''}`}
+    >
       <path
         className={`atlas-edge-line${gold ? ' atlas-edge-blocking' : ''}${dashed ? ' atlas-edge-heuristic' : ''}`}
         d={d}
@@ -203,30 +220,68 @@ export function AtlasCanvas({
     [graph.clusters, visibleNodes, atoms, level],
   )
 
-  // topic column labels inside panels (mono 10px caps): only topics with
-  // VISIBLE members (collapsed atoms carry their own name), anchored above
-  // the flow-first member — wrapped topics get one label, at their head
-  const topicLabels = useMemo(() => {
+  // topic SUB-CARDS (D1 amendment 3): each topic with VISIBLE note members
+  // draws a bordered card (radius 10) around them — label + count + newest date
+  // in a top row. Collapsed atoms carry their own border, so they're skipped.
+  const topicCards = useMemo(() => {
     if (level === 'overview') return []
-    const out: Array<{ key: string; text: string; x: number; y: number }> = []
+    const out: Array<{
+      key: string
+      text: string
+      count: number
+      newest: string
+      rect: { x: number; y: number; w: number; h: number }
+    }> = []
     for (const cluster of graph.clusters) {
       for (const topic of cluster.topics) {
         const members = topic.nodeIds
           .map((id) => byId.get(id))
           .filter((n): n is AtlasNode => n !== undefined)
-          .sort((a, b) => a.x - b.x || a.y - b.y)
-        const first = members[0]
-        if (!first) continue
+        if (members.length === 0) continue // collapsed → the atom draws its own card
+        const rect = subCardRect(members.map((n) => nodeRect(n, level)))
+        if (!rect) continue
         out.push({
           key: `${cluster.project}/${topic.name}`,
           text: topic.name,
-          x: first.x,
-          y: first.y - 8,
+          count: topic.nodeIds.length,
+          newest: newestDate(members.map((m) => m.date)),
+          rect,
         })
       }
     }
     return out
   }, [graph.clusters, byId, level])
+
+  // 01/02/03… order chips: newest-first within each topic that shows ≥2 notes
+  // (a lone note needs no ordering). chip order IS recency order (shared util).
+  const orderChipById = useMemo(() => {
+    const map = new Map<string, string>()
+    if (level === 'overview') return map
+    for (const cluster of graph.clusters) {
+      for (const topic of cluster.topics) {
+        const members = topic.nodeIds
+          .map((id) => byId.get(id))
+          .filter((n): n is AtlasNode => n !== undefined)
+        if (members.length < 2) continue
+        for (const [id, chip] of orderChips(members)) map.set(id, chip)
+      }
+    }
+    return map
+  }, [graph.clusters, byId, level])
+
+  // in-panel thread edges glow gold while their thread is still open (an
+  // endpoint handoff is open/accepted/expired) — D1a3 "gold for open threads"
+  const openThreadEdges = useMemo(() => {
+    const openish = (n: AtlasNode | undefined): boolean =>
+      n?.type === 'handoff' &&
+      (n.status === 'open' || n.status === 'accepted' || n.expired === true)
+    const set = new Set<string>()
+    for (const e of graph.edges) {
+      if (e.category !== 'thread') continue
+      if (openish(byId.get(e.source)) || openish(byId.get(e.target))) set.add(e.id)
+    }
+    return set
+  }, [graph.edges, byId])
 
   const variantOf = (node: AtlasNode): AtlasNodeVariant => {
     if (node.type !== 'project') return 'card'
@@ -442,10 +497,29 @@ export function AtlasCanvas({
               rx={16}
             />
           ))}
-          {topicLabels.map((t) => (
-            <text key={t.key} className="atlas-topic-label" x={t.x} y={t.y}>
-              {t.text.toUpperCase()}
-            </text>
+          {topicCards.map((t) => (
+            <g key={t.key} className="atlas-subcard-group">
+              <rect
+                className="atlas-subcard"
+                x={t.rect.x}
+                y={t.rect.y}
+                width={t.rect.w}
+                height={t.rect.h}
+                rx={10}
+              />
+              <text className="atlas-topic-label" x={t.rect.x + SUBCARD_PAD} y={t.rect.y + 15}>
+                {t.text.toUpperCase()}
+              </text>
+              <text
+                className="atlas-subcard-meta"
+                x={t.rect.x + t.rect.w - SUBCARD_PAD}
+                y={t.rect.y + 15}
+                textAnchor="end"
+              >
+                {t.count === 1 ? '1 note' : `${t.count} notes`}
+                {t.newest ? ` · ${t.newest}` : ''}
+              </text>
+            </g>
           ))}
         </g>
         <g className="atlas-edges" aria-hidden>
@@ -461,6 +535,7 @@ export function AtlasCanvas({
                 b={nodeRect(b, level)}
                 off={lanes.get(edge.id) ?? 0}
                 onActivateEdge={onActivateEdge}
+                openThread={openThreadEdges.has(edge.id)}
                 decorClass={`${edgeDecorClass(edge, decor)}${
                   hoverHood && !(hoverHood.has(edge.source) && hoverHood.has(edge.target))
                     ? ' atlas-dim'
@@ -497,6 +572,7 @@ export function AtlasCanvas({
               changedCount={
                 node.type === 'project' ? (changedCounts?.get(node.label) ?? 0) : 0
               }
+              orderChip={orderChipById.get(node.id)}
             />
           ))}
         </g>

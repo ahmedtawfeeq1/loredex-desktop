@@ -4,7 +4,7 @@
  * Deep Dive (everything in scope) — with breadcrumbs and a bounded history.
  * Exploring feels like browsing, never panning a physics diagram.
  */
-import { useEffect, useMemo } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { AtlasLevel, AtlasNode } from '../../../../shared/types'
 import './atlas.css'
 import { useAtlas } from '../../stores/atlas'
@@ -13,6 +13,8 @@ import { AtlasBreadcrumbs } from './AtlasBreadcrumbs'
 import { AtlasCanvas } from './AtlasCanvas'
 import { activeFilterCount, applyAtlasFilters, focusNeighborhood } from './atlas-filters'
 import { AtlasFilterPanel } from './AtlasFilterPanel'
+import { AtlasLegend } from './AtlasLegend'
+import { type ToolbarAction, TOOLBAR_GROUPS, toolbarLabel } from './atlas-toolbar'
 import { visibleAtlas } from './atlas-visibility'
 import { BlockedList } from './BlockedList'
 import { affectedNodeIds, clusterChangedCounts } from './changed-since'
@@ -56,11 +58,20 @@ export function AtlasView(): React.JSX.Element {
   const overlayOn = useAtlas((s) => s.overlayOn)
   const overlayChanged = useAtlas((s) => s.overlayChanged)
   const toggleOverlay = useAtlas((s) => s.toggleOverlay)
+  const legendOpen = useAtlas((s) => s.legendOpen)
+  const openLegend = useAtlas((s) => s.openLegend)
+  const maybeAutoOpenLegend = useAtlas((s) => s.maybeAutoOpenLegend)
+  const [exportOpen, setExportOpen] = useState(false)
 
   useEffect(() => {
     // live data (watcher/poller) keeps it fresh after this first fetch
     if (graph === null && !loading) void load()
   }, [graph, loading, load])
+
+  useEffect(() => {
+    // first-ever Atlas visit opens the legend once (app.db flag)
+    void maybeAutoOpenLegend()
+  }, [maybeAutoOpenLegend])
 
   useEffect(() => {
     // ⌘[ / ⌘] — history back/forward while the atlas is on screen
@@ -124,102 +135,142 @@ export function AtlasView(): React.JSX.Element {
     else void activateNode(node)
   }
 
+  // D1 amendment 3 header: each toolbar pill's pressed state + click, mapped
+  // from the model id to the same handlers the old naked buttons carried
+  function pillState(id: ToolbarAction['id']): { pressed: boolean; onClick: () => void } {
+    switch (id) {
+      case 'tours':
+        return { pressed: panel === 'tour', onClick: () => setPanel(panel === 'tour' ? null : 'tour') }
+      case 'filters':
+        return { pressed: panel === 'filters', onClick: () => setPanel(panel === 'filters' ? null : 'filters') }
+      case 'path':
+        return { pressed: panel === 'path', onClick: () => setPanel(panel === 'path' ? null : 'path') }
+      case 'blocked':
+        return { pressed: filters.blocked, onClick: toggleBlocked }
+      case 'changed':
+        return {
+          pressed: overlayOn,
+          onClick: () => {
+            if (overlayOn && panel !== 'changed') setPanel('changed')
+            else toggleOverlay()
+          },
+        }
+      case 'export':
+        return { pressed: exportOpen, onClick: () => setExportOpen((o) => !o) }
+      case 'help':
+        return { pressed: legendOpen, onClick: openLegend }
+    }
+  }
+
+  function pillLabel(action: ToolbarAction): string {
+    if (action.id === 'tours') return `${action.label}${activeTour ? ' ●' : ''}`
+    return toolbarLabel(action, activeFilterCount(filters))
+  }
+
   return (
     <div className="atlas">
       <div className="atlas-header">
-        <span className="pane-list-title">Vault Atlas</span>
-        <div className="seg-control" role="tablist" aria-label="Zoom level">
-          {(['overview', 'learn', 'deep'] as const).map((l) => (
-            <button
-              key={l}
-              type="button"
-              className="seg-option"
-              role="tab"
-              aria-selected={level === l}
-              disabled={l === 'learn' && !learnTarget}
-              title={
-                l === 'learn' && !learnTarget
-                  ? 'Select or open a project first'
-                  : `${LEVEL_LABEL[l]} level`
-              }
-              onClick={() => {
-                if (l === 'overview') void navigate('overview', {})
-                else if (l === 'learn' && learnTarget) void navigate('learn', { project: learnTarget })
-                else if (l === 'deep') void navigate('deep', scope)
-              }}
-            >
-              {LEVEL_LABEL[l]}
-            </button>
+        <div className="atlas-header-left">
+          <span className="atlas-eyebrow">VAULT ATLAS</span>
+          <div className="seg-control" role="tablist" aria-label="Zoom level">
+            {(['overview', 'learn', 'deep'] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                className="seg-option"
+                role="tab"
+                aria-selected={level === l}
+                disabled={l === 'learn' && !learnTarget}
+                title={
+                  l === 'learn' && !learnTarget
+                    ? 'Select or open a project first'
+                    : `${LEVEL_LABEL[l]} level`
+                }
+                onClick={() => {
+                  if (l === 'overview') void navigate('overview', {})
+                  else if (l === 'learn' && learnTarget) void navigate('learn', { project: learnTarget })
+                  else if (l === 'deep') void navigate('deep', scope)
+                }}
+              >
+                {LEVEL_LABEL[l]}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="atlas-header-center">
+          <AtlasBreadcrumbs />
+        </div>
+        <div className="atlas-toolbar">
+          {TOOLBAR_GROUPS.map((group, gi) => (
+            // biome-ignore lint: group index is a stable structural key here
+            <Fragment key={gi}>
+              {gi > 0 && <span className="atlas-tool-divider" aria-hidden />}
+              <div className="atlas-tool-group">
+                {group.map((action) => {
+                  const state = pillState(action.id)
+                  if (action.id === 'export') {
+                    return (
+                      <div key={action.id} className="atlas-export-wrap">
+                        <button
+                          type="button"
+                          className="atlas-tool"
+                          aria-pressed={state.pressed}
+                          aria-haspopup="menu"
+                          aria-expanded={exportOpen}
+                          title={action.tooltip}
+                          onClick={state.onClick}
+                        >
+                          <span className="atlas-tool-icon" aria-hidden>
+                            {action.icon}
+                          </span>
+                          {action.label} ▾
+                        </button>
+                        {exportOpen && (
+                          <div className="atlas-export-menu" role="menu">
+                            {(action.submenu ?? []).map((fmt) => (
+                              <button
+                                key={fmt}
+                                type="button"
+                                role="menuitem"
+                                className="atlas-export-item"
+                                title={`Export the current view as ${fmt.toUpperCase()}`}
+                                onClick={() => {
+                                  setExportOpen(false)
+                                  void exportAtlasView(fmt)
+                                }}
+                              >
+                                {fmt.toUpperCase()}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+                  const helpPill = action.id === 'help'
+                  return (
+                    <button
+                      key={action.id}
+                      type="button"
+                      className={`atlas-tool${helpPill ? ' atlas-tool-icon-only' : ''}`}
+                      aria-pressed={state.pressed}
+                      aria-label={helpPill ? action.label : undefined}
+                      title={action.tooltip}
+                      onClick={state.onClick}
+                    >
+                      <span className="atlas-tool-icon" aria-hidden>
+                        {action.icon}
+                      </span>
+                      {!helpPill && pillLabel(action)}
+                    </button>
+                  )
+                })}
+              </div>
+            </Fragment>
           ))}
         </div>
-        <AtlasBreadcrumbs />
-        <div className="atlas-toolbar">
-          <button
-            type="button"
-            className="atlas-tool"
-            aria-pressed={panel === 'tour'}
-            title="Guided tours from reading orders"
-            onClick={() => setPanel(panel === 'tour' ? null : 'tour')}
-          >
-            Tours{activeTour ? ' ●' : ''}
-          </button>
-          <button
-            type="button"
-            className="atlas-tool"
-            aria-pressed={panel === 'filters'}
-            title="Narrow the canvas by type, status, topic, edge, tier"
-            onClick={() => setPanel(panel === 'filters' ? null : 'filters')}
-          >
-            Filters{activeFilterCount(filters) > 0 ? ` (${activeFilterCount(filters)})` : ''}
-          </button>
-          <button
-            type="button"
-            className="atlas-tool"
-            aria-pressed={panel === 'path'}
-            title="Trace how one node reaches another"
-            onClick={() => setPanel(panel === 'path' ? null : 'path')}
-          >
-            Path
-          </button>
-          <button
-            type="button"
-            className="atlas-tool"
-            aria-pressed={filters.blocked}
-            title="Isolate blocking chains — who is blocked on whom"
-            onClick={toggleBlocked}
-          >
-            Blocked
-          </button>
-          <button
-            type="button"
-            className="atlas-tool"
-            aria-pressed={overlayOn}
-            title="Glow what changed since a date or your last visit"
-            onClick={() => {
-              if (overlayOn && panel !== 'changed') setPanel('changed')
-              else toggleOverlay()
-            }}
-          >
-            Changed
-          </button>
-          <button
-            type="button"
-            className="atlas-tool"
-            title="Export the current view as a standalone SVG"
-            onClick={() => void exportAtlasView('svg')}
-          >
-            Export SVG
-          </button>
-          <button
-            type="button"
-            className="atlas-tool"
-            title="Export the current view as a PNG"
-            onClick={() => void exportAtlasView('png')}
-          >
-            PNG
-          </button>
-        </div>
       </div>
+      {legendOpen && <AtlasLegend />}
       {error && <div className="note-error">{error}</div>}
       {graph === null ? (
         <div className="atlas-loading" aria-label="Loading the atlas">

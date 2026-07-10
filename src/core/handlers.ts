@@ -49,10 +49,12 @@ import { commentView } from './notes'
 import { getMcpStatus } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
+  loadAtlasLegendSeen,
   loadIdentityProfile,
   loadRailsCollapsed,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
+  saveAtlasLegendSeen,
   saveIdentityProfile,
   saveMcpPortOverride,
   saveRailsCollapsed,
@@ -604,6 +606,13 @@ export function registerCoreHandlers(
   ipc.register('settings.treeSections.set', (state) => {
     const { db, vid } = requireDb()
     saveTreeSectionsCollapsed(db, vid, state)
+  })
+  // Atlas legend seen (story epic17.2, D1 amendment 3): app-global meta flag —
+  // no vault/db needed to READ (defaults to unseen so the popover shows once);
+  // the set persists only when a db is open (first run before a vault is fine).
+  ipc.register('settings.atlasLegendSeen.get', () => ({ seen: loadAtlasLegendSeen() }))
+  ipc.register('settings.atlasLegendSeen.set', () => {
+    saveAtlasLegendSeen()
   })
   ipc.register('settings.mcpPort.set', ({ port }) => {
     if (port !== null && (!Number.isInteger(port) || port < 1024 || port > 65535)) {

@@ -52,12 +52,53 @@
   font-weight: 600;
 }
 
-/* topic column heads inside a panel */
+/* topic SUB-CARD (D1 amendment 3): a bordered card around one topic's notes —
+   radius 10, hairline, faint inset ground so it reads as a group container */
+.atlas-subcard {
+  fill: color-mix(in srgb, var(--bg-inset) 45%, transparent);
+  stroke: var(--hairline);
+  stroke-width: 1;
+}
+
+/* topic label (left) + count · newest-date meta (right) in the sub-card head */
 .atlas-topic-label {
   fill: var(--text-2);
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
+}
+
+.atlas-subcard-meta {
+  fill: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+
+/* 01/02/03… recency order chip on a note card's top-left corner */
+.atlas-order-chip rect {
+  fill: var(--gold);
+}
+
+.atlas-order-chip text {
+  fill: var(--gold-ink);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+/* in-panel relationship connectors (D1 amendment 3): thin, soft-cornered
+   hairlines between visible notes — quieter than the project route lines */
+.atlas-edge-inpanel .atlas-edge-line {
+  stroke-width: 1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+/* …and gold while the thread they belong to is still open */
+.atlas-edge-open-thread .atlas-edge-line {
+  stroke: var(--gold);
+  opacity: 1;
 }
 
 /* aggregated-route label chips: WHITE pill (--bg-card + hairline, mono 10px)

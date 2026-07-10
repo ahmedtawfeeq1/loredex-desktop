@@ -139,6 +139,19 @@ export function saveTreeSectionsCollapsed(
   appSettingSet(db, vaultId, 'treeSections', JSON.stringify({ collapsed }))
 }
 
+// ── Atlas legend seen (story epic17.2, D1 amendment 3) ──────────────────────
+// APP-GLOBAL, not per-vault: the "How to read this map" popover auto-opens on
+// the first-EVER Atlas visit across any vault, exactly once. Rides `meta` like
+// the theme, not app_settings.
+
+export function loadAtlasLegendSeen(): boolean {
+  return readJsonKey('atlasLegendSeen') === true
+}
+
+export function saveAtlasLegendSeen(): void {
+  writeKey('atlasLegendSeen', JSON.stringify(true))
+}
+
 // ── MCP host settings (story 1.6) ───────────────────────────────────────────
 
 /** Per-install bearer token: generated once, persisted. */

@@ -6,10 +6,12 @@ import { describe, expect, it } from 'vitest'
 import { appSettingSet, initAppDb, type AppDb } from './db/index'
 import {
   initSettings,
+  loadAtlasLegendSeen,
   loadIdentityProfile,
   loadRailsCollapsed,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
+  saveAtlasLegendSeen,
   saveIdentityProfile,
   saveRailsCollapsed,
   saveThemeSetting,
@@ -121,6 +123,27 @@ describe('vault tree sections collapsed-state persistence — PER VAULT (story 1
     expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: [] })
     appSettingSet(db, 'vault-a', 'treeSections', JSON.stringify({ collapsed: [1, '_index', null] }))
     expect(loadTreeSectionsCollapsed(db, 'vault-a')).toEqual({ collapsed: ['_index'] })
+  })
+})
+
+describe('atlas legend seen — APP-GLOBAL once-per-app flag (story epic17.2)', () => {
+  it('defaults to unseen (so the popover auto-opens on the first visit)', () => {
+    freshDir()
+    expect(loadAtlasLegendSeen()).toBe(false)
+  })
+
+  it('sticks once set — never auto-opens again', () => {
+    freshDir()
+    saveAtlasLegendSeen()
+    expect(loadAtlasLegendSeen()).toBe(true)
+  })
+
+  it('does not disturb sibling settings', () => {
+    freshDir()
+    saveThemeSetting('dark')
+    saveAtlasLegendSeen()
+    expect(loadThemeSetting()).toBe('dark')
+    expect(loadAtlasLegendSeen()).toBe(true)
   })
 })
 

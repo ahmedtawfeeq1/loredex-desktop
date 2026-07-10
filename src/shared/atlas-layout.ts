@@ -51,6 +51,62 @@ export const PANEL_ASPECT = 1.6
  *  (GUTTER left it exactly chip-tight — the clipped-label defect, story 16.5) */
 export const PILL_GUTTER = 216
 
+// ── topic sub-cards + recency reading flow (story epic17.2, D1 amendment 3) ──
+/** topic sub-card inset around its member notes (tighter than PANEL_PAD) */
+export const SUBCARD_PAD = 12
+/** label row reserved at the top of a topic sub-card (label + count + date);
+ *  the panel's content top drops by this so a col-0 sub-card never rides its
+ *  header bar */
+export const SUBCARD_LABEL_H = 22
+/** the `01 02 03…` order chip box on a note card's top-left corner */
+export const ORDER_CHIP_W = 20
+export const ORDER_CHIP_H = 14
+
+/** Newest ISO date among dated members ('' when none carry a date). */
+export function newestDate(dates: ReadonlyArray<string | undefined>): string {
+  let max = ''
+  for (const d of dates) if (d && d > max) max = d
+  return max
+}
+
+/** Recency-DESCENDING comparator (newest first; label breaks ties) — the
+ *  reading direction D1 amendment 3 gives every drilled panel. The inverse of
+ *  the ascending byDateThenLabel the layout stacked notes with before. */
+export function byRecencyDesc(
+  a: { date?: string; label: string },
+  b: { date?: string; label: string },
+): number {
+  const ad = a.date ?? ''
+  const bd = b.date ?? ''
+  return ad === bd ? a.label.localeCompare(b.label) : bd.localeCompare(ad)
+}
+
+/** The bordered topic sub-card (radius 10): the bounding box of its member
+ *  rects grown by SUBCARD_PAD, with SUBCARD_LABEL_H reserved above for the
+ *  label row. Shared so the containment + no-overlap invariants can hold the
+ *  renderer to exactly this box. Null for an empty topic (nothing to border). */
+export function subCardRect(members: Rect[]): Rect | null {
+  const box = boundingRect(members)
+  if (!box) return null
+  return {
+    x: box.x - SUBCARD_PAD,
+    y: box.y - SUBCARD_PAD - SUBCARD_LABEL_H,
+    w: box.w + SUBCARD_PAD * 2,
+    h: box.h + SUBCARD_PAD * 2 + SUBCARD_LABEL_H,
+  }
+}
+
+/** 1-based, zero-padded order chips assigned NEWEST-FIRST over a topic's
+ *  members: chip `01` names the newest note, `02` the next, and so on. The
+ *  invariant the renderer is held to — chip order IS recency order. */
+export function orderChips<T extends { id: string; date?: string; label: string }>(
+  members: readonly T[],
+): Map<string, string> {
+  const out = new Map<string, string>()
+  ;[...members].sort(byRecencyDesc).forEach((m, i) => out.set(m.id, String(i + 1).padStart(2, '0')))
+  return out
+}
+
 /** How many rows a focused panel wraps its lanes at (story 16.5). `runs` are
  *  the panel's flow runs: consecutive topic blocks pack as one run; handoffs
  *  and each deep context type are their own lane run. Scans every candidate
@@ -110,10 +166,8 @@ export function rectsOverlap(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 }
 
-/** The focused-cluster panel: bounding box of its members plus padding —
- *  drawn as one large white card (radius 16) behind them. Shared so the
- *  drilled-level invariant tests can hold chips clear of the panel card too. */
-export function panelRect(members: Rect[]): Rect | null {
+/** Tight bounding box of a set of rects (null when empty). */
+export function boundingRect(members: Rect[]): Rect | null {
   if (members.length === 0) return null
   let minX = Number.POSITIVE_INFINITY
   let minY = Number.POSITIVE_INFINITY
@@ -125,11 +179,20 @@ export function panelRect(members: Rect[]): Rect | null {
     maxX = Math.max(maxX, m.x + m.w)
     maxY = Math.max(maxY, m.y + m.h)
   }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
+
+/** The focused-cluster panel: bounding box of its members plus padding —
+ *  drawn as one large white card (radius 16) behind them. Shared so the
+ *  drilled-level invariant tests can hold chips clear of the panel card too. */
+export function panelRect(members: Rect[]): Rect | null {
+  const box = boundingRect(members)
+  if (!box) return null
   return {
-    x: minX - PANEL_PAD,
-    y: minY - PANEL_PAD,
-    w: maxX - minX + PANEL_PAD * 2,
-    h: maxY - minY + PANEL_PAD * 2,
+    x: box.x - PANEL_PAD,
+    y: box.y - PANEL_PAD,
+    w: box.w + PANEL_PAD * 2,
+    h: box.h + PANEL_PAD * 2,
   }
 }
 

@@ -606,15 +606,16 @@ describe('projectAtlas levels', () => {
     expect(g.edges.some((e) => e.category === 'provenance')).toBe(true)
   })
 
-  it('positions are deterministic across runs and date-sort notes within a topic', () => {
+  it('positions are deterministic across runs and stack notes NEWEST-FIRST within a topic', () => {
     const a = projectAtlas(buildAtlasModel(src), 'learn', { project: 'alpha' })
     const b = projectAtlas(buildAtlasModel(src), 'learn', { project: 'alpha' })
     expect(a).toEqual(b)
-    // layout-v2: topics are panel COLUMN groups — same x, date-sorted top→bottom
+    // D1 amendment 3: a topic is a sub-card COLUMN — same x, newest note on top
     const design = a.nodes.find((n) => n.id === 'note:alpha/streaming/design') as AtlasNode
     const later = a.nodes.find((n) => n.id === 'note:alpha/streaming/later') as AtlasNode
-    expect(design.x).toBe(later.x) // same topic column
-    expect(design.y).toBeLessThan(later.y) // date-sorted top→bottom
+    expect(design.x).toBe(later.x) // same topic sub-card column
+    expect(later.date).toBe('2026-07-05')
+    expect(design.y).toBeGreaterThan(later.y) // newer 'later' sits above older 'design'
   })
 
   it('overview columns order projects left→right by route-dependency depth', () => {
@@ -916,11 +917,14 @@ describe.skipIf(!existsSync(NIMBUS_VAULT))('atlas model (nimbus simulation vault
     }
   })
 
-  it('nimbus-backend at learn fits READABLE: full-size cards stay ≥ 140px in a 1280×800 pane', () => {
+  it('nimbus-backend at learn fits READABLE: full-size cards stay ≥ 130px in a 1280×800 pane', () => {
     const g = projectAtlas(model, 'learn', { project: 'nimbus-backend' })
     const scale = fitScaleFor(g, 1280, 800)
-    // pre-16.5 the 1264×1900 strip forced scale ≈ 2.6 → ~76px cards, ~5px type
-    expect(NODE_W / scale).toBeGreaterThanOrEqual(140)
+    // pre-16.5 the 1264×1900 strip forced scale ≈ 2.6 → ~76px cards, ~5px type.
+    // 16.5 hit ≥140px by cross-topic note packing; D1 amendment 3 gives each
+    // topic its own bordered sub-card lane (no shared columns) — a deliberate
+    // ~5px width trade for legible grouping. 130px stays clearly readable.
+    expect(NODE_W / scale).toBeGreaterThanOrEqual(130)
   })
 
   it('deep-scoped boundary cards land in context columns, never at the origin pile', () => {

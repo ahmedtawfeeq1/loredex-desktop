@@ -115,6 +115,11 @@ export interface CoreApi {
    *  degrades to nothing-collapsed while no vault/db is open. */
   'settings.treeSections.get': { in: void; out: TreeSectionsCollapsed }
   'settings.treeSections.set': { in: TreeSectionsCollapsed; out: void }
+  /** app-local contract evolution (story epic17.2, D1 amendment 3): whether the
+   *  Atlas "How to read this map" legend has been shown. APP-GLOBAL (meta, not
+   *  per-vault) — the first-ever Atlas visit auto-opens it once, then set. */
+  'settings.atlasLegendSeen.get': { in: void; out: { seen: boolean } }
+  'settings.atlasLegendSeen.set': { in: void; out: void }
   /** Edit mode (story 16.4, Addendum D1): body-only write to an EXISTING
    *  vault note — frontmatter is preserved byte-for-byte (agents own it);
    *  path guarded via the lib's resolveNoteInsideVault; git auto-commit

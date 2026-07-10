@@ -7,7 +7,15 @@
  * (outbound affordance), project (open-count gold badge). Atlas cards never
  * stamp-press — that animation stays exclusive to the board card.
  */
-import { CLUSTER_W, NODE_H, NODE_W, PILL_H, PILL_W } from '../../../../shared/atlas-layout'
+import {
+  CLUSTER_W,
+  NODE_H,
+  NODE_W,
+  ORDER_CHIP_H,
+  ORDER_CHIP_W,
+  PILL_H,
+  PILL_W,
+} from '../../../../shared/atlas-layout'
 import type { AtlasNode } from '../../../../shared/types'
 import { humanizeTitle, noteDate } from '../../humanize'
 
@@ -234,6 +242,7 @@ export function AtlasNodeCard({
   describe,
   decorClass = '',
   changedCount = 0,
+  orderChip,
 }: {
   node: AtlasNode
   /** layout-v2 render mode — sizes MUST match shared atlasNodeBox */
@@ -251,6 +260,8 @@ export function AtlasNodeCard({
   decorClass?: string
   /** project clusters at Overview: changed-since count (story 10.7 AC1) */
   changedCount?: number
+  /** `01`/`02`… recency order chip for a note inside a topic sub-card (D1a3) */
+  orderChip?: string
 }): React.JSX.Element {
   const disabledSource = node.type === 'source' && node.localPath == null
   const w = variant === 'cluster' ? CLUSTER_W : variant === 'card' ? NODE_W : PILL_W
@@ -288,6 +299,14 @@ export function AtlasNodeCard({
         rx={variant === 'pill' || variant === 'header' ? PILL_H / 2 : 12}
       />
       <Body node={node} variant={variant} />
+      {orderChip && node.type === 'note' && (
+        <g className="atlas-order-chip" aria-hidden>
+          <rect x={-8} y={-7} width={ORDER_CHIP_W} height={ORDER_CHIP_H} rx={4} />
+          <text x={-8 + ORDER_CHIP_W / 2} y={-7 + ORDER_CHIP_H - 3.5} textAnchor="middle">
+            {orderChip}
+          </text>
+        </g>
+      )}
       {node.type === 'project' && variant === 'cluster' && changedCount > 0 && (
         <text className="atlas-node-changed-count" x={14} y={NODE_H - 32} aria-hidden>
           {changedCount} changed

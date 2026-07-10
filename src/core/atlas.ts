@@ -43,11 +43,13 @@ import { listMarkdownFiles } from './tree'
 
 // layout constants live in shared/atlas-layout.ts (renderer draws with them)
 import {
+  byRecencyDesc,
   CLUSTER_H,
   CLUSTER_W,
   GRID,
   GUTTER,
   MARGIN,
+  newestDate,
   NODE_H,
   NODE_W,
   NOTE_ROW_PITCH,
@@ -56,6 +58,7 @@ import {
   PILL_GUTTER,
   PILL_H,
   PILL_W,
+  SUBCARD_LABEL_H,
   TOPIC_COL_PITCH,
   V_GAP,
 } from '../shared/atlas-layout'
@@ -690,34 +693,42 @@ const byDateThenLabel = (a: AtlasNode, b: AtlasNode): number =>
     ? a.label.localeCompare(b.label)
     : (a.date ?? '').localeCompare(b.date ?? '')
 
-/** One flowable panel block: a topic's members (date-sorted) or a deep
- *  context type. `ownLane` blocks (handoffs, source/commit/contract) always
- *  start a fresh column and nothing packs after them mid-column — wrapped
- *  handoff lanes stay contiguous, never interleaved with topic notes. */
+/** One flowable panel block: a topic's members or a deep context type. Every
+ *  block is now its OWN lane — a topic is a bordered sub-card (D1 amendment 3),
+ *  so no two topics ever share a column and each sub-card contains only its own
+ *  notes. `ownLane` therefore stays true for all blocks; it drives the fresh
+ *  column start and the per-run wrap accounting positionPanel already does. */
 interface PanelBlock {
   nodes: AtlasNode[]
   ownLane: boolean
 }
 
-/** Panel blocks left→right: topic folders alpha with `handoffs` forced last
- *  (its own lane, thread rails ride it), then source/commit/contract context
- *  lanes at deep. Members stay date-sorted top→bottom in flow order. */
+/** Panel blocks left→right in RECENCY order (D1 amendment 3): topic sub-cards
+ *  newest-activity first, `handoffs` forced last (its own lane, thread rails
+ *  ride it), then source/commit/contract context lanes at deep. Members inside
+ *  a topic stack NEWEST-FIRST top→bottom (with 01/02/03 order chips). */
 function panelBlocks(
   cluster: AtlasCluster,
   nodeById: Map<string, AtlasNode>,
   extras: AtlasNode[],
 ): PanelBlock[] {
-  const topics = [...cluster.topics].sort((a, b) =>
-    a.name === 'handoffs' ? 1 : b.name === 'handoffs' ? -1 : a.name.localeCompare(b.name),
-  )
-  const blocks: PanelBlock[] = []
-  for (const topic of topics) {
-    const members = topic.nodeIds
-      .map((id) => nodeById.get(id))
-      .filter((n): n is AtlasNode => n !== undefined)
-      .sort(byDateThenLabel)
-    if (members.length > 0) blocks.push({ nodes: members, ownLane: topic.name === 'handoffs' })
-  }
+  const withMembers = cluster.topics
+    .map((topic) => ({
+      topic,
+      members: topic.nodeIds
+        .map((id) => nodeById.get(id))
+        .filter((n): n is AtlasNode => n !== undefined)
+        .sort(byRecencyDesc),
+    }))
+    .filter((t) => t.members.length > 0)
+    .map((t) => ({ ...t, newest: newestDate(t.members.map((m) => m.date)) }))
+  // newest topic first; handoffs always trails the real topics; label breaks ties
+  withMembers.sort((a, b) => {
+    if (a.topic.name === 'handoffs') return 1
+    if (b.topic.name === 'handoffs') return -1
+    return a.newest === b.newest ? a.topic.name.localeCompare(b.topic.name) : b.newest.localeCompare(a.newest)
+  })
+  const blocks: PanelBlock[] = withMembers.map((t) => ({ nodes: t.members, ownLane: true }))
   for (const type of ['source', 'commit', 'contract'] as const) {
     const column = extras.filter((n) => n.type === type).sort((a, b) => a.id.localeCompare(b.id))
     if (column.length > 0) blocks.push({ nodes: column, ownLane: true })
@@ -740,7 +751,9 @@ function positionPanel(
     header.x = x0 + PANEL_PAD
     header.y = y0 + PANEL_PAD
   }
-  const contentTop = y0 + PANEL_PAD + PILL_H + GRID
+  // extra SUBCARD_LABEL_H below the header so a col-0 topic sub-card's label
+  // row (D1 amendment 3) never rides the header bar
+  const contentTop = y0 + PANEL_PAD + PILL_H + GRID + SUBCARD_LABEL_H
   // flow runs mirror the placement rule below: consecutive topic blocks pack
   // as one run; each own-lane block (handoffs, deep context types) is its own
   const runs: number[] = []

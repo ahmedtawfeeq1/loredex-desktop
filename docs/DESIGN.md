@@ -134,3 +134,14 @@ Board filtering: the Handoffs board and its counts list ONLY `type: handoff` not
 In-place edit (nice-to-have this cycle if cheap): a handoff YOU authored that no one has consumed yet is editable in place (fix objective/typo) via the editor — no new note, no reply. Skip if it needs new plumbing.
 
 Migration: existing `type: handoff` notes that were really conversational replies stay as-is (never rewrite the vault); the model applies going forward. Thread rail already renders `replies_to` chains regardless of type, so past replies still thread correctly.
+
+### D1 amendment 5 — atlas navigation + header breathing room (user feedback, 2026-07-10)
+
+**Trackpad-native navigation.** The atlas canvas responds to standard macOS gestures:
+- Pinch-to-zoom (trackpad pinch → wheel+ctrlKey events): zoom toward the cursor, clamped 0.4–2.5, smooth.
+- Two-finger scroll pans the canvas (wheel dx/dy → translate); shift+scroll pans horizontally. No accidental page scroll.
+- Drag-pan (mouse/one-finger drag on empty canvas) unchanged.
+- **On-canvas zoom controls** (bottom-right, floating `--bg-card` pill stack, hairline, shadow-sm): `+` / `−` / `⌖` fit-to-content / `1:1` reset, each with tooltip + keyboard (⌘= zoom in, ⌘− zoom out, ⌘0 fit). 28px buttons, mono glyphs.
+- Momentum/inertia not required; smoothness via CSS transform transitions ≤120ms, disabled under reduced-motion.
+
+**Header breathing room.** The atlas toolbar content currently touches the container edges. Fix: the atlas view container gets the standard card treatment (inset from the window ground with 16px gap like every other view), and the 44px toolbar row gets 16px horizontal padding + 12px vertical so the VAULT ATLAS eyebrow, segmented zoom control, breadcrumb, and action pills never kiss the border. Toolbar actions keep 8px inter-group gaps; a hairline divider sits below the toolbar, not at the very top edge. Same inset applies to the canvas region below.

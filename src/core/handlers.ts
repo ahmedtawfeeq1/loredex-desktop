@@ -27,6 +27,7 @@ import { getReadState, markRead } from './db/read-state'
 import { reconcileSnoozeTimers } from './db/snooze'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
 import { gitAsync, withGitIdentity } from './git'
+import { remoteWebBase } from './github'
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { getMcpStatus } from './mcp-server'
@@ -160,7 +161,9 @@ export function registerCoreHandlers(
         return null
       }
     })
-    return timelineWithLinks(db, roots, notes, project)
+    // story 12.1: each row carries its repo's real-origin GitHub base (one
+    // derivation — core/github.ts — session-cached per repo)
+    return timelineWithLinks(db, roots, notes, project, remoteWebBase)
   })
   // Story 11.2: one commit's unified diff — `git show <sha> -- <file>` pinned
   // to the commit (never the worktree), 200 KB cap with a visible flag. The

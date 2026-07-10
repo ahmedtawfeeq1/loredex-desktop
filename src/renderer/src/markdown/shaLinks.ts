@@ -1,20 +1,12 @@
 /**
- * Commit-SHA hyperlinks in the product brief (story 2.5, AC2). Plain link
- * construction only — commit verification (chips, existence checks) is M2.
- * Unresolvable remote → nothing is linkified (no dead links).
+ * Commit-SHA hyperlinks in rendered markdown (story 2.5, AC2). Plain link
+ * construction only. Story 12.1 superseded the local remote→base helper with
+ * the app's ONE derivation (shared/github.ts githubWebBase) — GitHub only,
+ * so a non-GitHub remote linkifies nothing (never a broken URL).
  */
 import type { Root } from 'mdast'
 import { visit } from 'unist-util-visit'
-
-/** git remote url → https commit-page base, or null when not constructible. */
-export function remoteCommitBase(remote: string | null): string | null {
-  if (!remote) return null
-  let m = /^https?:\/\/([^/]+)\/(.+?)(?:\.git)?\/?$/.exec(remote)
-  if (m) return `https://${m[1]}/${m[2]}`
-  m = /^(?:ssh:\/\/)?git@([^:/]+)[:/](.+?)(?:\.git)?\/?$/.exec(remote)
-  if (m) return `https://${m[1]}/${m[2]}`
-  return null
-}
+import { commitUrl } from '../../../shared/github'
 
 /**
  * A token that plausibly IS a commit SHA: 7–40 hex chars with at least one
@@ -43,7 +35,7 @@ export function remarkShaLinks(options: { commitBase: string | null }) {
       if (!isLikelySha(value)) return
       parent.children?.splice(index, 1, {
         type: 'link',
-        url: `${base}/commit/${value}`,
+        url: commitUrl(base, value),
         children: [node],
       })
       return index + 1
@@ -60,7 +52,7 @@ export function remarkShaLinks(options: { commitBase: string | null }) {
         if (m.index > at) parts.push({ type: 'text', value: value.slice(at, m.index) })
         parts.push({
           type: 'link',
-          url: `${base}/commit/${m[0]}`,
+          url: commitUrl(base, m[0]),
           children: [{ type: 'text', value: m[0] }],
         })
         at = m.index + m[0].length

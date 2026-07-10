@@ -4,8 +4,10 @@
  * avatars, click-through to note / board / sync panel.
  */
 import { useEffect } from 'react'
+import { githubWebBase } from '../../../../shared/github'
 import { toVaultRelative } from '../../../../shared/handoff-lanes'
 import type { ActivityEvent } from '../../../../shared/types'
+import { CommitChip } from '../../components/CommitChip'
 import { useApp } from '../../stores/app'
 import { useFeed } from '../../stores/feed'
 import { useReader } from '../../stores/reader'
@@ -25,16 +27,31 @@ function open(event: ActivityEvent): void {
   }
 }
 
-function EventRow({ event }: { event: ActivityEvent }): React.JSX.Element {
+function EventRow({
+  event,
+  commitBase,
+}: {
+  event: ActivityEvent
+  /** vault repo's GitHub base (story 12.1) — activity SHAs are vault commits */
+  commitBase: string | null
+}): React.JSX.Element {
   const path = event.subject.path
   return (
     // dense row shows the basename; the hover title carries the full vault
-    // path (defect 14.2-2)
-    <button
-      type="button"
+    // path (defect 14.2-2). div role=button (story 12.1): the commit chip is
+    // an anchor — interactive content may not nest inside a <button>.
+    <div
+      role="button"
+      tabIndex={0}
       className="feed-row"
       title={path ?? undefined}
       onClick={() => open(event)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          open(event)
+        }
+      }}
     >
       <span className="feed-avatar" aria-hidden>
         {initials(event.actor.name)}
@@ -44,10 +61,11 @@ function EventRow({ event }: { event: ActivityEvent }): React.JSX.Element {
         <span className="feed-meta">
           <span className={`feed-kind feed-kind-${event.kind}`}>{event.kind}</span>{' '}
           {event.actor.name} · {event.at.slice(11, 16)}
-          {path ? ` · ${noteBasename(path)}` : ''}
+          {path ? ` · ${noteBasename(path)}` : ''} ·{' '}
+          <CommitChip sha={event.sha} base={commitBase} />
         </span>
       </span>
-    </button>
+    </div>
   )
 }
 
@@ -57,6 +75,8 @@ export function FeedView(): React.JSX.Element {
   const error = useFeed((s) => s.error)
   const load = useFeed((s) => s.load)
   const loadMore = useFeed((s) => s.loadMore)
+  // story 12.1: vault-repo SHAs link through the one GitHub derivation
+  const commitBase = githubWebBase(useApp((s) => s.identity?.remote ?? null))
 
   useEffect(() => {
     if (events === null) void load()
@@ -95,7 +115,7 @@ export function FeedView(): React.JSX.Element {
             <section key={group.day} aria-label={group.day}>
               <h2 className="feed-day">{dayLabel(group.day, today)}</h2>
               {group.events.map((event) => (
-                <EventRow key={event.sha} event={event} />
+                <EventRow key={event.sha} event={event} commitBase={commitBase} />
               ))}
             </section>
           ))}

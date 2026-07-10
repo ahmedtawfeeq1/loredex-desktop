@@ -52,6 +52,7 @@ const change = (project: string, sha: string): ContractChange => ({
   adds: 1,
   dels: 0,
   links: [],
+  commitBase: null,
 })
 
 describe('project filter', () => {

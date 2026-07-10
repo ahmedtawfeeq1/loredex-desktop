@@ -1,27 +1,10 @@
-/** Story 2.5: SHA detection boundaries, remote→commit-URL construction, plugin output. */
+/** Story 2.5: SHA detection boundaries + plugin output. The remote→base
+ *  derivation moved to shared/github.ts (story 12.1 supersession) and is
+ *  tested there — this file covers only what still lives here. */
 import remarkParse from 'remark-parse'
 import { unified } from 'unified'
 import { describe, expect, it } from 'vitest'
-import { isLikelySha, remarkShaLinks, remoteCommitBase } from './shaLinks'
-
-describe('remoteCommitBase', () => {
-  it('handles https remotes with and without .git', () => {
-    expect(remoteCommitBase('https://github.com/acme/vault.git')).toBe(
-      'https://github.com/acme/vault',
-    )
-    expect(remoteCommitBase('https://github.com/acme/vault')).toBe('https://github.com/acme/vault')
-  })
-  it('converts ssh remotes', () => {
-    expect(remoteCommitBase('git@github.com:acme/vault.git')).toBe('https://github.com/acme/vault')
-    expect(remoteCommitBase('ssh://git@gitlab.com/team/vault.git')).toBe(
-      'https://gitlab.com/team/vault',
-    )
-  })
-  it('returns null for missing or unparsable remotes (→ no dead links)', () => {
-    expect(remoteCommitBase(null)).toBeNull()
-    expect(remoteCommitBase('/local/bare/repo.git')).toBeNull()
-  })
-})
+import { isLikelySha, remarkShaLinks } from './shaLinks'
 
 describe('isLikelySha', () => {
   it('accepts 7–40 hex with a digit', () => {

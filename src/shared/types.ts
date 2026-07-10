@@ -412,6 +412,10 @@ export interface ContractChange {
   dels: number | null
   /** [] until story 11.3 computes the tiers */
   links: ContractLink[]
+  /** story 12.1: this repo's normalized GitHub web base (from its real origin
+   *  remote, core-derived + session-cached); null = non-GitHub/no remote —
+   *  the commit chip renders plain mono text, never a broken URL */
+  commitBase: string | null
 }
 
 /** One contract-scan change row (story 11.1's provider shape). The Atlas

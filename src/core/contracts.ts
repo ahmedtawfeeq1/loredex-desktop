@@ -231,10 +231,14 @@ export function readTimeline(
   db: AppDb,
   roots: ProjectRootsMap,
   project?: string,
+  /** story 12.1: repoRoot → normalized GitHub web base (core/github.ts,
+   *  session-cached); defaults to none — chips render plain, never broken */
+  webBase: (repoRoot: string) => string | null = () => null,
 ): ContractChange[] {
   const changes: ContractChange[] = []
   for (const [root, { name }] of Object.entries(roots)) {
     if (project && name !== project) continue
+    const commitBase = webBase(root)
     for (const row of readScanRows(db, root)) {
       changes.push({
         repoRoot: root,
@@ -247,6 +251,7 @@ export function readTimeline(
         adds: row.summary.adds,
         dels: row.summary.dels,
         links: [], // story 11.3 computes the tiers
+        commitBase,
       })
     }
   }
@@ -355,8 +360,9 @@ export function timelineWithLinks(
   roots: ProjectRootsMap,
   notes: readonly HandoffNoteView[],
   project?: string,
+  webBase?: (repoRoot: string) => string | null,
 ): ContractChange[] {
-  const changes = readTimeline(db, roots, project)
+  const changes = readTimeline(db, roots, project, webBase)
   const links = computeLinks(changes, notes)
   return changes.map((c) => ({ ...c, links: links.get(c.sha) ?? [] }))
 }

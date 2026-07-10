@@ -10,9 +10,10 @@
  * type emitted here has a resolution target (hyperlink-everything rule);
  * story 10.4 wires the targets.
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { isBlockingCard } from '../shared/blocked'
+import { githubWebBase } from '../shared/github'
 import { toVaultRelative } from '../shared/handoff-lanes'
 import type {
   AtlasCluster,
@@ -35,6 +36,7 @@ import {
 } from './contracts'
 import { getAppDb, vaultId } from './db/index'
 import * as engine from './engine'
+import { originRemote } from './github'
 import { resolveLink } from './links'
 import { buildTours, filterTours } from './tours'
 import { listMarkdownFiles } from './tree'
@@ -104,16 +106,6 @@ export function firstSentence(body: string): string {
     return sentence.length > 140 ? `${sentence.slice(0, 139)}…` : sentence
   }
   return ''
-}
-
-/** git remote url → https commit-page base; GitHub only (m2 §6: non-GitHub
- *  remotes render commit chips as plain mono text + copy-sha, no link). */
-export function commitBaseOf(remote: string | null): string | null {
-  if (!remote) return null
-  let m = /^https?:\/\/([^/]+)\/(.+?)(?:\.git)?\/?$/.exec(remote)
-  if (!m) m = /^(?:ssh:\/\/)?git@([^:/]+)[:/](.+?)(?:\.git)?\/?$/.exec(remote)
-  if (!m) return null
-  return m[1] === 'github.com' ? `https://github.com/${m[2]}` : null
 }
 
 /** A token that plausibly IS a commit sha (mirrors the story 2.5 rule):
@@ -380,7 +372,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
       const remote = root ? source.readRepoRemote(root) : null
       remoteOfProject.set(project, remote ?? source.vaultRemote)
     }
-    return commitBaseOf(remoteOfProject.get(project) ?? null)
+    return githubWebBase(remoteOfProject.get(project) ?? null)
   }
   for (const { ownerId, project, body } of parsedBodies) {
     SHA_TOKEN.lastIndex = 0
@@ -443,7 +435,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
         y: 0,
         date: change.date,
         sha: change.sha,
-        commitBase: commitBaseOf(source.readRepoRemote(change.repoRoot)),
+        commitBase: githubWebBase(source.readRepoRemote(change.repoRoot)),
       })
     }
     pushEdge({
@@ -813,16 +805,6 @@ export function projectAtlas(
 
 // ── production wiring: engine-backed source + memoized cache ────────────────
 
-/** Read-only peek at a repo's .git/config for the origin url (no shell-out). */
-function readOriginRemote(rootAbs: string): string | null {
-  try {
-    const raw = readFileSync(join(rootAbs, '.git', 'config'), 'utf8')
-    return /\[remote "origin"\][^[]*?url\s*=\s*(\S+)/.exec(raw)?.[1] ?? null
-  } catch {
-    return null
-  }
-}
-
 /** Story 11.3: contract nodes come from the cached scan + link tiers — sync
  *  reads only (cache + notes), no git; absent db degrades to no contract
  *  nodes (story 10.1 AC5). */
@@ -874,7 +856,8 @@ function productionSource(): AtlasSource {
     contracts: productionContracts(cards), // story 11.3: cached scan + tiers
     today: new Date().toISOString().slice(0, 10),
     fileExists: (abs) => existsSync(abs),
-    readRepoRemote: readOriginRemote,
+    // story 12.1: one derivation — the cached real-origin lookup (github.ts)
+    readRepoRemote: originRemote,
     vaultRemote: engine.identity().remote,
   }
 }

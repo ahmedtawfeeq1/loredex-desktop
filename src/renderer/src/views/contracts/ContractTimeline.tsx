@@ -6,6 +6,7 @@
  */
 import { useEffect } from 'react'
 import type { ContractChange, ContractLink } from '../../../../shared/types'
+import { CommitChip } from '../../components/CommitChip'
 import { useApp } from '../../stores/app'
 import { useContracts } from '../../stores/contracts'
 import { DiffView } from './DiffView'
@@ -54,8 +55,11 @@ function ChangeCard({
     <li className="timeline-entry">
       <span className="timeline-date">{railDate(change.date)}</span>
       <div className="timeline-body">
-        <button
-          type="button"
+        {/* div role=button (story 12.1): the commit chip is an anchor —
+            interactive content may not nest inside a <button> */}
+        <div
+          role="button"
+          tabIndex={0}
           ref={(node) => {
             if (focused && node) node.scrollIntoView({ block: 'center' })
           }}
@@ -63,6 +67,12 @@ function ChangeCard({
           aria-expanded={open}
           title={open ? 'Hide the diff' : 'Show what changed in this commit'}
           onClick={() => void toggleDiff(change)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              void toggleDiff(change)
+            }
+          }}
         >
           <span className="contract-card-top">
             <span className="mono contract-file">{change.file}</span>
@@ -76,11 +86,12 @@ function ChangeCard({
           </span>
           <span className="contract-subject">{change.subject}</span>
           <span className="contract-meta">
-            <span className="mono">{change.sha.slice(0, 7)}</span> · {change.author} ·{' '}
+            {/* story 12.1: linked when this repo's real origin is GitHub */}
+            <CommitChip sha={change.sha} base={change.commitBase} /> · {change.author} ·{' '}
             {change.project}
             <LinkChips links={change.links} />
           </span>
-        </button>
+        </div>
         {diffFor === change.sha && <p className="settings-hint">Reading the diff…</p>}
         {open && openDiff && <DiffView diff={openDiff} />}
       </div>

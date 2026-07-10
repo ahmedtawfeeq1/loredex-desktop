@@ -14,6 +14,7 @@ const change = (over: Partial<ContractChange>): ContractChange => ({
   adds: 1,
   dels: 0,
   links: [],
+  commitBase: null,
   ...over,
 })
 

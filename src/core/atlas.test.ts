@@ -14,7 +14,6 @@ import type { AtlasEdge, AtlasGraph, AtlasNode, HandoffCard } from '../shared/ty
 import {
   type AtlasSource,
   buildAtlasModel,
-  commitBaseOf,
   firstSentence,
   isBlocking,
   projectAtlas,
@@ -104,12 +103,8 @@ describe('atlas helpers', () => {
     expect(firstSentence('# only headings\n## here')).toBe('')
   })
 
-  it('commitBaseOf normalizes GitHub remotes only (m2 §6 degradation)', () => {
-    expect(commitBaseOf('git@github.com:acme/nimbus.git')).toBe('https://github.com/acme/nimbus')
-    expect(commitBaseOf('https://github.com/acme/nimbus')).toBe('https://github.com/acme/nimbus')
-    expect(commitBaseOf('git@gitlab.com:acme/nimbus.git')).toBeNull()
-    expect(commitBaseOf(null)).toBeNull()
-  })
+  // commitBaseOf moved to shared/github.ts githubWebBase (story 12.1
+  // supersession — one derivation, everywhere); tested in shared/github.test.ts
 
   it('blocking matrix: open/accepted requests block; expired snooze counts as open', () => {
     const matrix: Array<[string, string, boolean, boolean]> = [

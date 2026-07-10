@@ -7,8 +7,8 @@
 import { useEffect } from 'react'
 import { useApp } from '../../stores/app'
 import { useHome } from '../../stores/home'
+import { githubWebBase } from '../../../../shared/github'
 import { renderMarkdown } from '../../markdown/pipeline'
-import { remoteCommitBase } from '../../markdown/shaLinks'
 import { DEFAULT_BRIEF_TITLE, splitLeadingH1 } from './brief-title'
 import { formatFreshness } from './freshness'
 
@@ -58,7 +58,8 @@ export function HomeView(): React.JSX.Element {
             </p>
           )}
           <div className="note-body">
-            {renderMarkdown(split?.body ?? brief.markdown, remoteCommitBase(remote))}
+            {/* story 12.1: SHAs link through the one GitHub derivation */}
+            {renderMarkdown(split?.body ?? brief.markdown, githubWebBase(remote))}
           </div>
         </article>
       )}

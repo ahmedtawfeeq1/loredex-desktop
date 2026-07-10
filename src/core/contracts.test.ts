@@ -386,6 +386,10 @@ describe('scanContracts against a fixture repo', () => {
     expect(timeline[0]?.subject).toBe('revert(api): drop /orders')
     expect(timeline[3]?.subject).toBe('chore: scaffold contract')
     expect(timeline.every((c) => c.links.length === 0)).toBe(true) // 11.3 fills these
+    expect(timeline.every((c) => c.commitBase === null)).toBe(true) // 12.1: default = no base
+    // story 12.1: rows carry the per-repo base from the injected derivation
+    const linked = readTimeline(db, roots, undefined, () => 'https://github.com/acme/backend')
+    expect(linked.every((c) => c.commitBase === 'https://github.com/acme/backend')).toBe(true)
     expect(readTimeline(db, roots, 'other-project')).toHaveLength(0)
     db.close()
   }, 30_000)

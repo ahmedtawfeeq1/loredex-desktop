@@ -3377,3 +3377,100 @@ a.commit-chip-sha:hover {
   color: var(--text-2);
   overflow-wrap: anywhere;
 }
+
+/* join wizard extras (story 13.2) */
+
+.wizard-schema-banner {
+  padding: 10px 12px;
+  border: 1px solid var(--rust);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rust) 8%, transparent);
+  color: var(--rust);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wizard-roots {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wizard-roots li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ── first-run screen (story 13.2): replaces the bare picker — logo, one
+     serif sentence, three cards on --bg-app. No gold primary here: the cards
+     ARE the decision; hover ring uses the one gold vocabulary. ───────────── */
+
+.firstrun {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px;
+}
+
+.firstrun-mark {
+  width: 72px;
+  height: 72px;
+}
+
+.firstrun-title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.firstrun-line {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  color: var(--text-2);
+  margin-bottom: 16px;
+}
+
+.firstrun-cards {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  max-width: 720px;
+}
+
+.firstrun-card {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: border-color 100ms ease-out;
+}
+
+.firstrun-card:hover {
+  border-color: var(--gold);
+}
+
+.firstrun-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.firstrun-card-body {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-2);
+}

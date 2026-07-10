@@ -4,7 +4,8 @@
  * (open-count badge), Settings.
  */
 import { useEffect } from 'react'
-import { onEvent, onOpenHandoff, onVaultChanged } from './api'
+import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
+import { parseJoinLink } from '../../shared/join-link'
 import { IdentityBadge } from './components/IdentityBadge'
 import { SuggestToastStack } from './components/SuggestToast'
 import { ToastStack } from './components/ToastStack'
@@ -41,22 +42,8 @@ import { Palette } from './views/search/Palette'
 import { SearchView } from './views/search/SearchView'
 import { SettingsView } from './views/settings/SettingsView'
 import { CreateVaultWizard } from './views/wizard/CreateVaultWizard'
-
-function EmptyVault(): React.JSX.Element {
-  const openVaultPicker = useApp((s) => s.openVaultPicker)
-  const openCreate = useWizard((s) => s.openCreate)
-  return (
-    <div className="empty-state">
-      <p>No vault open.</p>
-      <button type="button" className="button-primary" onClick={openCreate}>
-        Create a vault
-      </button>
-      <button type="button" className="button-secondary" onClick={() => void openVaultPicker()}>
-        Open an existing folder
-      </button>
-    </div>
-  )
-}
+import { FirstRun } from './views/wizard/FirstRun'
+import { JoinVaultWizard } from './views/wizard/JoinVaultWizard'
 
 export default function App(): React.JSX.Element {
   const status = useApp((s) => s.status)
@@ -108,6 +95,17 @@ export default function App(): React.JSX.Element {
         if (e.kind === 'wizard.progress') {
           useWizard.getState().applyProgress(e)
         }
+      }),
+    [],
+  )
+
+  useEffect(
+    // story 13.2: loredex://join deep link opens the join wizard pre-filled
+    // (the paste path stays available — prefill only)
+    () =>
+      onJoinLink((raw) => {
+        const link = parseJoinLink(raw)
+        if (link) useWizard.getState().openJoin(link)
       }),
     [],
   )
@@ -266,12 +264,13 @@ export default function App(): React.JSX.Element {
           </>
         )
       ) : status === 'no-vault' ? (
-        <EmptyVault />
+        <FirstRun />
       ) : (
         <div className="empty-state" />
       )}
       <Palette />
       <CreateVaultWizard />
+      <JoinVaultWizard />
       <ComposeHandoffModal />
       <AnnotateModal />
       <DeclineReasonModal />

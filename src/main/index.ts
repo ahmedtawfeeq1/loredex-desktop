@@ -21,6 +21,27 @@ import { createMainWindow } from './windows'
 let core: Electron.UtilityProcess | null = null
 let quitting = false
 
+// ── loredex:// deep links (story 13.2): main only REGISTERS and FORWARDS the
+//    raw URL — parsing lives renderer-side (shared/join-link.ts). open-url can
+//    fire before any window exists; buffer the last link until one loads. ────
+let pendingDeepLink: string | null = null
+
+function forwardDeepLink(url: string): void {
+  const wins = BrowserWindow.getAllWindows()
+  if (wins.length === 0) {
+    pendingDeepLink = url
+    return
+  }
+  for (const win of wins) win.webContents.send('join-link', url)
+  pendingDeepLink = null
+}
+
+app.setAsDefaultProtocolClient('loredex')
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  forwardDeepLink(url)
+})
+
 function forkCoreHost(): void {
   // The persisted vault crosses to the core host at fork time — config
   // resolves exactly once per core-host lifetime (F6).
@@ -152,7 +173,11 @@ app.whenReady().then(() => {
   forkCoreHost()
   const win = createMainWindow()
   // did-finish-load also covers renderer reloads — each load gets a fresh port pair
-  win.webContents.on('did-finish-load', () => brokerPorts(win))
+  win.webContents.on('did-finish-load', () => {
+    brokerPorts(win)
+    // a deep link that arrived before the window loaded lands now (story 13.2)
+    if (pendingDeepLink) forwardDeepLink(pendingDeepLink)
+  })
 })
 
 app.on('before-quit', () => {

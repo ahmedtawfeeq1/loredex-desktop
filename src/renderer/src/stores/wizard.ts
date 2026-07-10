@@ -5,8 +5,9 @@
  */
 import { create } from 'zustand'
 import type { CoreEvent } from '../../../shared/ipc-contract'
+import type { JoinLink } from '../../../shared/join-link'
 import type { RemoteCheck, WizardFlow, WizardStepStatus } from '../../../shared/types'
-import { invoke, pickWizardFolder, setVault } from '../api'
+import { invoke, pickProjectRoot, pickWizardFolder, setVault } from '../api'
 import { describeWizardFailure, type WizardFailure } from '../views/wizard/wizard-errors'
 
 export interface WizardStepRow {
@@ -25,6 +26,14 @@ interface WizardState {
   remoteUrl: string
   remoteCheck: RemoteCheck | null
   checkingRemote: boolean
+  // join form (story 13.2)
+  joinUrl: string
+  joinBranch: string | null
+  dest: string | null
+  /** join result: false = SCHEMA_AHEAD, loud banner, read-mostly */
+  schemaOk: boolean | null
+  /** skippable post-join prompt: where this team's repos live on this machine */
+  roots: string[]
   // progress + terminal state
   steps: WizardStepRow[]
   failure: WizardFailure | null
@@ -32,11 +41,16 @@ interface WizardState {
   pivoting: boolean
 
   openCreate(): void
+  openJoin(prefill?: JoinLink): void
   close(): void
   setRemoteUrl(url: string): void
+  setJoinUrl(url: string): void
   pickDir(kind: WizardFlow): Promise<void>
   checkRemote(): Promise<void>
   runCreate(): Promise<void>
+  runJoin(): Promise<void>
+  addRoot(): Promise<void>
+  removeRoot(path: string): void
   backToForm(): void
   /** success pivot: persist + core restart; App's vault-changed listener re-inits */
   openVault(vaultPath: string): Promise<void>
@@ -58,9 +72,26 @@ export const useWizard = create<WizardState>((set, get) => ({
   remoteUrl: '',
   remoteCheck: null,
   checkingRemote: false,
+  joinUrl: '',
+  joinBranch: null,
+  dest: null,
+  schemaOk: null,
+  roots: [],
 
   openCreate() {
     set({ flow: 'create', ...formReset, dir: null, remoteUrl: '', remoteCheck: null })
+  },
+
+  openJoin(prefill) {
+    set({
+      flow: 'join',
+      ...formReset,
+      joinUrl: prefill?.remote ?? '',
+      joinBranch: prefill?.branch ?? null,
+      dest: null,
+      schemaOk: null,
+      roots: [],
+    })
   },
 
   close() {
@@ -73,9 +104,13 @@ export const useWizard = create<WizardState>((set, get) => ({
     set({ remoteUrl: url, remoteCheck: null })
   },
 
+  setJoinUrl(url) {
+    set({ joinUrl: url })
+  },
+
   async pickDir(kind) {
     const picked = await pickWizardFolder(kind)
-    if (picked) set({ dir: picked })
+    if (picked) set(kind === 'create' ? { dir: picked } : { dest: picked })
   },
 
   async checkRemote() {
@@ -114,13 +149,50 @@ export const useWizard = create<WizardState>((set, get) => ({
     }
   },
 
+  async runJoin() {
+    const { joinUrl, joinBranch, dest } = get()
+    const url = joinUrl.trim()
+    if (!url || !dest) return
+    set({ phase: 'running', steps: [], failure: null, result: null, schemaOk: null })
+    try {
+      const result = await invoke('wizard.joinVault', {
+        url,
+        dest,
+        ...(joinBranch ? { branch: joinBranch } : {}),
+      })
+      set({ phase: 'done', result: { vaultPath: result.vaultPath }, schemaOk: result.schemaOk })
+    } catch (e) {
+      set({ phase: 'failed', failure: describeWizardFailure(e, 'join') })
+    }
+  },
+
+  async addRoot() {
+    const picked = await pickProjectRoot()
+    if (picked) set((s) => ({ roots: s.roots.includes(picked) ? s.roots : [...s.roots, picked] }))
+  },
+
+  removeRoot(path) {
+    set((s) => ({ roots: s.roots.filter((p) => p !== path) }))
+  },
+
   backToForm() {
     set({ phase: 'form', steps: [], failure: null })
   },
 
   async openVault(vaultPath) {
     set({ pivoting: true })
+    const roots = get().roots
     await setVault(vaultPath) // resolves after the core host restarted on it
+    // join wizard's skippable project-roots seed (m2 §7.5) — lands in the NEW
+    // vault's app-db scope, so it runs after the pivot; feeds contract discovery
+    if (roots.length > 0) {
+      const map = Object.fromEntries(
+        roots.map((p) => [p, { name: p.split('/').filter(Boolean).pop() ?? p }]),
+      )
+      await invoke('settings.projectRoots.set', { roots: map }).catch(() => {
+        // seeding is a convenience — Settings offers the same map any time
+      })
+    }
     set({ flow: null, ...formReset })
   },
 

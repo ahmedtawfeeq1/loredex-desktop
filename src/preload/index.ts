@@ -59,4 +59,10 @@ contextBridge.exposeInMainWorld('loredex', {
     ipcRenderer.on('open-handoff', listener)
     return () => ipcRenderer.removeListener('open-handoff', listener)
   },
+  // story 13.2: loredex://join deep link — main forwards the raw URL
+  onJoinLink: (cb: (url: string) => void): (() => void) => {
+    const listener = (_e: unknown, url: string): void => cb(url)
+    ipcRenderer.on('join-link', listener)
+    return () => ipcRenderer.removeListener('join-link', listener)
+  },
 })

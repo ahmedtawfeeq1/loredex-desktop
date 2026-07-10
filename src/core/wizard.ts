@@ -8,11 +8,13 @@
  */
 import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { type CoreEvent, type ErrEnvelope, type IpcCode, ipcError } from '../shared/ipc-contract'
 import type {
   Config,
   CreateVaultResult,
   Identity,
+  JoinVaultResult,
   RemoteCheck,
   SyncHealth,
   WizardFlow,
@@ -28,12 +30,21 @@ export interface WizardDeps {
   emit(event: CoreEvent): void
   /** async git runner — MUST be non-interactive (NON_INTERACTIVE_GIT_ENV) */
   git(cwd: string, args: readonly string[]): Promise<string>
+  /** streaming `git clone --progress` (story 13.2); rejects with stderr tail */
+  clone(
+    url: string,
+    dest: string,
+    branch: string | undefined,
+    onProgress: (line: string) => void,
+  ): Promise<void>
   identity(): Identity | null
   scaffold(path: string): void
   readConfig(): Config | null
   writeConfig(config: Config): void
   ensureMergeDriver(vaultPath: string): void
   syncHealth(vaultPath: string): SyncHealth
+  /** lib vaultSchemaStatus at an explicit path (join handshake, story 13.2) */
+  schemaStatus(vaultPath: string): { declared: number | null; supported: number; ok: boolean }
   /** seed poll_cursor so the first poll emits nothing (m2 §4 no-storm rule) */
   seedCursor(
     vaultPath: string,
@@ -245,5 +256,102 @@ export async function createVault(
     })
 
     return { vaultPath: dir, remoteWired: Boolean(remoteUrl) }
+  })
+}
+
+// ── join-vault sequence (story 13.2, m2 §7 steps verbatim) ───────────────────
+
+/** Shape rule: `projects/` exists or `.loredex/engine.json` present (m2 §7.3). */
+export function looksLikeVault(dest: string): boolean {
+  return existsSync(join(dest, 'projects')) || existsSync(join(dest, '.loredex', 'engine.json'))
+}
+
+export async function joinVault(
+  deps: WizardDeps,
+  input: { url: string; dest: string; branch?: string },
+): Promise<JoinVaultResult> {
+  const { url, dest, branch } = input
+  const steps = new StepRunner('join', deps.emit)
+  return deps.lock(async () => {
+    // 2 — destination pick happened renderer-side; enforce empty-or-new here
+    await steps.run('destination', () => ensureEmptyDir(dest))
+
+    // 2b — clone with streamed progress
+    await steps.run('clone', async (post) => {
+      try {
+        await deps.clone(url, dest, branch, (line) => post('running', line))
+      } catch (e) {
+        fail('CLONE_AUTH_FAILED', `could not clone that repository — ${NO_OAUTH_MESSAGE}`, {
+          localVaultCreated: false,
+          gitOutput: e instanceof Error ? e.message : String(e),
+        })
+      }
+    })
+
+    // 3 — shape validation; the clone is KEPT either way (never delete a download)
+    await steps.run('validate', () => {
+      if (!looksLikeVault(dest)) {
+        fail(
+          'NOT_A_VAULT',
+          `cloned, but that repository does not look like a loredex vault (no projects/ folder and no .loredex/engine.json) — the clone was kept at ${dest}`,
+          { localVaultCreated: false },
+        )
+      }
+    })
+
+    // 4 — schema handshake: newer-than-supported warns LOUDLY, join continues read-mostly
+    const schemaOk = await steps.run('handshake', (post) => {
+      const status = deps.schemaStatus(dest)
+      if (!status.ok) {
+        post(
+          'warn',
+          `this vault declares loredex schema ${status.declared} but this app supports ${status.supported} — a newer engine wrote here; reading is safe, update Loredex Desktop before writing`,
+        )
+        return false
+      }
+      post(
+        'done',
+        status.declared === null
+          ? 'vault predates schema stamping — compatible'
+          : `vault schema ${status.declared}, app supports ${status.supported}`,
+      )
+      return true
+    })
+
+    // 5 — register: the loredex config file points every engine on this
+    // machine at the joined vault (projects-map merge rides PR-7a when it ships)
+    await steps.run('register', () => {
+      deps.writeConfig({
+        ...(deps.readConfig() ?? { projects: {} }),
+        vaultPath: dest,
+        sync: 'git',
+      })
+    })
+
+    // 6 — identity check: blocks WRITES, never reading — warn, don't fail
+    await steps.run('identity', (post) => {
+      const id = deps.identity()
+      if (!id) {
+        post(
+          'warn',
+          'no identity yet — reading works now; set your name and email in Settings before accepting or writing',
+        )
+      } else {
+        post('done', `${id.name} <${id.email}>`)
+      }
+    })
+
+    // 7 — merge driver + first fetch + fresh-cursor seed (no notification storm)
+    await steps.run('finish', async (post) => {
+      deps.ensureMergeDriver(dest)
+      const head = (await deps.git(dest, ['symbolic-ref', '--short', 'HEAD'])).trim()
+      const onBranch = head || branch || 'main'
+      await deps.git(dest, ['fetch', 'origin', onBranch])
+      const sha = (await deps.git(dest, ['rev-parse', `origin/${onBranch}`])).trim()
+      deps.seedCursor(dest, url, { branch: onBranch, sha })
+      post('done', `cursor seeded at origin/${onBranch} ${sha.slice(0, 7)} — no notification storm`)
+    })
+
+    return { vaultPath: dest, schemaOk }
   })
 }

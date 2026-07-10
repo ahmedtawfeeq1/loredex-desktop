@@ -11,7 +11,7 @@
  *   effect is identical per-command injection. Recorded deviation; a lib PR
  *   revision threading `-c` args replaces this.
  */
-import { execFile, execFileSync } from 'node:child_process'
+import { execFile, execFileSync, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import type { Identity } from '../shared/types'
 
@@ -64,6 +64,48 @@ export async function gitAsync(
 export const NON_INTERACTIVE_GIT_ENV: Record<string, string> = {
   GIT_TERMINAL_PROMPT: '0',
   GIT_SSH_COMMAND: 'ssh -oBatchMode=yes',
+}
+
+/**
+ * `git clone --progress` with streamed progress lines (story 13.2 AC1). Git
+ * writes progress to stderr with \r rewrites; lines are split on both, phase
+ * lines pass through and percent rewrites are throttled to ~3/s. On failure
+ * the promise rejects with the stderr tail — git's own words (F8).
+ */
+export function gitCloneStreaming(
+  url: string,
+  dest: string,
+  branch: string | undefined,
+  onProgress: (line: string) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const args = ['clone', '--progress', ...(branch ? ['--branch', branch] : []), url, dest]
+    const child = spawn('git', args, { env: { ...process.env, ...NON_INTERACTIVE_GIT_ENV } })
+    const tail: string[] = []
+    let pending = ''
+    let lastEmit = 0
+    child.stderr.on('data', (chunk: Buffer) => {
+      pending += chunk.toString('utf8')
+      const lines = pending.split(/\r\n|\r|\n/)
+      pending = lines.pop() ?? ''
+      for (const raw of lines) {
+        const line = raw.trim()
+        if (!line) continue
+        tail.push(line)
+        if (tail.length > 20) tail.shift()
+        const now = Date.now()
+        if (!line.includes('%') || now - lastEmit > 300) {
+          lastEmit = now
+          onProgress(line)
+        }
+      }
+    })
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(tail.join('\n') || `git clone exited with code ${code}`))
+    })
+  })
 }
 
 export function gitIdentityArgs(identity: Identity): string[] {

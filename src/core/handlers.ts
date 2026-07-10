@@ -28,7 +28,7 @@ import { appSettingGet, appSettingSet, getAppDb, setPollCursor, vaultId } from '
 import { getReadState, markRead } from './db/read-state'
 import { reconcileSnoozeTimers } from './db/snooze'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
-import { gitAsync, NON_INTERACTIVE_GIT_ENV, withGitIdentity } from './git'
+import { gitAsync, gitCloneStreaming, NON_INTERACTIVE_GIT_ENV, withGitIdentity } from './git'
 import {
   dismissKey,
   ghCapability,
@@ -50,7 +50,7 @@ import {
 } from './settings'
 import { buildThread, collectComments } from './threads'
 import { listMarkdownFiles, walkVault } from './tree'
-import { createVault, validateRemote, type WizardDeps } from './wizard'
+import { createVault, joinVault, validateRemote, type WizardDeps } from './wizard'
 import { withWriteLock } from './write-lock'
 
 /**
@@ -536,12 +536,14 @@ export function registerCoreHandlers(
   const wizardDeps: WizardDeps = {
     emit: (event) => ipc.emit(event),
     git: (cwd, args) => gitAsync(cwd, args, { env: NON_INTERACTIVE_GIT_ENV }),
+    clone: gitCloneStreaming,
     identity: () => loadIdentityProfile(),
     scaffold: (path) => engine.scaffoldNewVault(path),
     readConfig: () => engine.readConfigFile(),
     writeConfig: (config) => engine.writeConfigFile(config),
     ensureMergeDriver: (path) => engine.ensureMergeDriverAt(path),
     syncHealth: (path) => engine.syncHealthAt(path),
+    schemaStatus: (path) => engine.schemaStatusAt(path),
     seedCursor: (vaultPath, remoteUrl, cursor) => {
       const db = getAppDb()
       if (!db) return // bare test host — the poller needs the db anyway
@@ -556,6 +558,9 @@ export function registerCoreHandlers(
   ipc.register('wizard.validateRemote', ({ url }) => validateRemote(wizardDeps, url))
   ipc.register('wizard.createVault', ({ dir, remoteUrl }) =>
     createVault(wizardDeps, { dir, ...(remoteUrl ? { remoteUrl } : {}) }),
+  )
+  ipc.register('wizard.joinVault', ({ url, dest, branch }) =>
+    joinVault(wizardDeps, { url, dest, ...(branch ? { branch } : {}) }),
   )
 
   return notifier

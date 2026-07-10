@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,15 +20,15 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Core sequence (AC: 1, 5)
-  - [ ] `src/core/wizard.ts joinVault`: clone with progress streaming, shape validation, `vaultSchemaStatus` handshake, register + project_roots seed, merge driver + first fetch + fresh-cursor seed; delete `vault.createOrJoin`
-- [ ] Deep link (AC: 1)
-  - [ ] Main registers the `loredex://` protocol; `join?remote&branch` opens the wizard pre-filled (paste path always available)
-- [ ] First-run screen (AC: 2)
-  - [ ] `views/wizard/FirstRun.tsx`: three-card chooser on `--bg-app`, serif empty-state line, routes to CreateVaultWizard / JoinVaultWizard / native picker
-- [ ] Wizard UI + failures (AC: 3, 4)
-  - [ ] `JoinVaultWizard.tsx` stepped modal; code→message map; SCHEMA_AHEAD renders as a loud warning banner, join continues; post-join pivot (core host on the new vault, board live)
-- [ ] Tests
+- [x] Core sequence (AC: 1, 5)
+  - [x] `src/core/wizard.ts joinVault`: clone with progress streaming, shape validation, `vaultSchemaStatus` handshake, register + project_roots seed, merge driver + first fetch + fresh-cursor seed; delete `vault.createOrJoin`
+- [x] Deep link (AC: 1)
+  - [x] Main registers the `loredex://` protocol; `join?remote&branch` opens the wizard pre-filled (paste path always available)
+- [x] First-run screen (AC: 2)
+  - [x] `views/wizard/FirstRun.tsx`: three-card chooser on `--bg-app`, serif empty-state line, routes to CreateVaultWizard / JoinVaultWizard / native picker
+- [x] Wizard UI + failures (AC: 3, 4)
+  - [x] `JoinVaultWizard.tsx` stepped modal; code→message map; SCHEMA_AHEAD renders as a loud warning banner, join continues; post-join pivot (core host on the new vault, board live)
+- [x] Tests
 
 ## Dev Notes
 
@@ -53,10 +53,39 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (Claude Code)
+
 ### Debug Log References
+
+- `npm run typecheck` clean; `npx vitest run` 62 files / 480 tests green; `npm run build` clean.
+- M2 DoD walk (driver run, scratch bare repo in the OS temp dir): create on machine1 → pushed `refs/heads/main` (`.loredex/engine.json`, `_index/Home.md`), config.json → machine1 vault; join on machine2 → clone streamed (`Cloning into…`/`done.` as running details), handshake "vault predates schema stamping — compatible", config.json → machine2 vault, origin wired, cursor seeded at `origin/main b3fe957 — no notification storm`. Both flows returned their contract results (`remoteWired: true` / `schemaOk: true`).
 
 ### Completion Notes List
 
+- Join sequence verbatim (m2 §7): destination → clone (streamed `git clone --progress`, stderr lines throttled ~3/s as running details) → shape validation (`projects/` OR `.loredex/engine.json`; the clone is KEPT on NOT_A_VAULT and the message names where) → `vaultSchemaStatus` handshake (SCHEMA_AHEAD = loud `warn` step + rust banner on the done page, join continues read-mostly, `schemaOk:false` in the result) → register (lib `saveConfig`, existing editor/projects preserved) → identity check (warn, never fail — blocks writes not reading, per the existing writer-channel identity gates) → merge driver + first fetch + fresh-cursor seed at `origin/<branch>`.
+- Deep link: main registers `loredex://` (`setAsDefaultProtocolClient` + `open-url`, buffered until a window loads) and forwards the RAW url; parsing lives in `shared/join-link.ts` (renderer), so main stays logic-free. `branch` param rides into `git clone --branch` and the checked-out branch (symbolic-ref) wins the cursor.
+- First-run screen replaces the bare picker (`status === 'no-vault'`): inline SVG mark (icon.svg identity, token-colored), serif line, three cards (Create / Join / Open existing folder — old picker kept). No gold primary on the view: the cards are the decision; hover ring is the gold vocabulary.
+- Post-join skippable prompt "where do this team's repos live on this machine?" collects folders via the existing native project-root picker; the seed runs AFTER the pivot (`settings.projectRoots.set`) so rows land in the NEW vault's app-db scope — feeds contract discovery (11.1).
+- `vault.createOrJoin` + `WizardInput`/`WizardResult` fully REMOVED (it never had a registered handler); the three wizard channels replace it (AC5).
+- Integration test joins the vault the create-flow test just pushed (the literal DoD: a second "machine" joins machine1's remote); NOT_A_VAULT integration case proves the clone is kept and config untouched. Note learned there: a fresh scaffold's empty `projects/` is untracked by git, so joins of pristine vaults validate via `engine.json` — exactly why the shape rule is an OR.
+- Deviation (recorded): identity prompt inside the join modal is the warn step + Settings pointer rather than an embedded form — the create wizard's `IdentityConfirm` remains the one identity-entry surface; join must not block on it (AC1 "block writes, not reading").
+
 ### File List
+
+- `src/shared/ipc-contract.ts` — `wizard.joinVault`; `vault.createOrJoin` removed
+- `src/shared/types.ts` — `JoinVaultResult`; `WizardInput`/`WizardResult` removed
+- `src/shared/join-link.ts` + `join-link.test.ts` (new) — deep-link parsing
+- `src/core/wizard.ts` — `joinVault`, `looksLikeVault`; deps gain `clone`/`schemaStatus`
+- `src/core/git.ts` — `gitCloneStreaming`
+- `src/core/engine.ts` — `schemaStatusAt`
+- `src/core/handlers.ts` — join registration + real clone/schema deps
+- `src/core/wizard.test.ts` — join failure matrix, shape matrix, SCHEMA_AHEAD/identity warn, deep-link branch, progress streaming
+- `src/core/wizard.integration.test.ts` — machine2 join + NOT_A_VAULT clone-kept cases
+- `src/main/index.ts` — `loredex://` registration, open-url buffering/forwarding
+- `src/preload/index.ts`, `src/renderer/src/api.ts` — `onJoinLink`
+- `src/renderer/src/stores/wizard.ts` — join form/run state, roots prompt, post-pivot seed
+- `src/renderer/src/views/wizard/JoinVaultWizard.tsx`, `FirstRun.tsx` (new)
+- `src/renderer/src/App.tsx` — FirstRun replaces EmptyVault; JoinVaultWizard mount; deep-link wiring
+- `src/renderer/src/styles.css` — schema banner, roots list, first-run cards
 
 ## QA Results

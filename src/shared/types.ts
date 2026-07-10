@@ -444,19 +444,9 @@ export interface PrInfo {
   mergedAt: string | null
 }
 
-export interface WizardInput {
-  mode: 'create' | 'join'
-  vaultPath: string
-  remoteUrl?: string
-}
-
-export interface WizardResult {
-  ok: boolean
-  vaultPath: string
-  message?: string
-}
-
 // ── Wizards (epic 13 — architecture-m2.md §7, paste-URL only, NO OAuth) ─────
+// (v0.1 WizardInput/WizardResult + vault.createOrJoin removed by story 13.2 —
+//  the three wizard channels below replace them, per m2 §7.)
 
 export type WizardFlow = 'create' | 'join'
 
@@ -482,6 +472,13 @@ export interface RemoteCheck {
 export interface CreateVaultResult {
   vaultPath: string
   remoteWired: boolean
+}
+
+export interface JoinVaultResult {
+  vaultPath: string
+  /** false = SCHEMA_AHEAD: the vault declares a newer loredex schema than this
+   *  app supports — the join continued read-mostly with a loud warning */
+  schemaOk: boolean
 }
 
 /**

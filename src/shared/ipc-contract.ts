@@ -25,6 +25,7 @@ import type {
   HomeBrief,
   Identity,
   IdentitySettings,
+  JoinVaultResult,
   LinkResolution,
   McpStatus,
   PrInfo,
@@ -39,8 +40,6 @@ import type {
   TreeNode,
   VaultIdentity,
   WizardFlow,
-  WizardInput,
-  WizardResult,
   WizardStepStatus,
 } from './types'
 
@@ -171,7 +170,11 @@ export interface CoreApi {
    *  optional remote wiring + cursor seed. Steps stream as wizard.progress;
    *  every failure after scaffold leaves a valid LOCAL vault (AC4). */
   'wizard.createVault': { in: { dir: string; remoteUrl?: string }; out: CreateVaultResult }
-  'vault.createOrJoin': { in: WizardInput; out: WizardResult }
+  /** Join-vault sequence (story 13.2): clone (streamed) → shape validation →
+   *  schema handshake → register → merge driver + first fetch + cursor seed.
+   *  `branch` rides the loredex://join deep link (app-local evolution). The
+   *  v0.1 `vault.createOrJoin` channel is REMOVED in favor of these three. */
+  'wizard.joinVault': { in: { url: string; dest: string; branch?: string }; out: JoinVaultResult }
   /** app-local contract evolution (story 6.2): optional window size for paging */
   'activity.feed': { in: { since?: string; limit?: number }; out: ActivityEvent[] } // (lib PR-6)
 }

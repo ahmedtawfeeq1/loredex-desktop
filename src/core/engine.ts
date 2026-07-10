@@ -303,6 +303,11 @@ export function syncHealthAt(vaultPath: string): SyncHealth {
   return syncStatus(vaultPath)
 }
 
+/** Schema handshake at an explicit path (join step 4 — the clone, pre-pivot). */
+export function schemaStatusAt(vaultPath: string): VaultSchemaStatus {
+  return vaultSchemaStatus(vaultPath)
+}
+
 /**
  * Rebuild generated indexes from filesystem truth (story 9.1 post-integrate
  * reconcile, F4 rule). A vault write — callers hold the write lock.

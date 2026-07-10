@@ -16,6 +16,7 @@ declare global {
       pickProjectRoot(): Promise<string | null>
       pickWizardFolder(kind: 'create' | 'join'): Promise<string | null>
       setVault(vaultPath: string): Promise<string>
+      onJoinLink(cb: (url: string) => void): Unsubscribe
       pathForFile(file: File): string
       saveExport(defaultName: string, data: string | ArrayBuffer): Promise<string | null>
     }
@@ -66,6 +67,11 @@ export function pickWizardFolder(kind: 'create' | 'join'): Promise<string | null
  *  core host on it; resolves after the fresh port is brokered. */
 export function setVault(vaultPath: string): Promise<string> {
   return window.loredex.setVault(vaultPath)
+}
+
+/** loredex://join deep link (story 13.2): raw URL, parsed by shared/join-link. */
+export function onJoinLink(cb: (url: string) => void): Unsubscribe {
+  return window.loredex.onJoinLink(cb)
 }
 
 /** Real filesystem path of a dropped File (preload webUtils, story 7.4). */

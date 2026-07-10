@@ -7,17 +7,35 @@
 
 // ── loredex payload types (landed lib PRs re-exported; rest still stubbed) ──
 
-/** (lib PR-1, PR-2, PR-4, PR-6 — landed, local file: dep) */
-import type { Identity } from 'loredex'
+/** (lib PR-1, PR-2, PR-4, PR-6, PR-11 — landed, local file: dep) */
+import type { CreateHandoffInput, Identity } from 'loredex'
 
-export type { ActivityEvent, ConsumeReceipt, HandoffCard, Identity, SyncHealth } from 'loredex'
+export type {
+  ActivityEvent,
+  ConsumeReceipt,
+  CreateHandoffInput,
+  HandoffCard,
+  HandoffCreateResult,
+  Identity,
+  SyncHealth,
+} from 'loredex'
 
-/** (lib PR-3) */
+/** Reply payload (lib PR-11): route + replies_to are derived from the parent. */
+export type ReplyHandoffInput = Omit<CreateHandoffInput, 'fromProject' | 'toProject' | 'repliesTo'>
+
+/**
+ * Route plan for the confirm card (story 7.4, built on lib previewRoute).
+ * Lib PR-3 (plan/apply split + persisted receipts + undo) supersedes this shape.
+ */
 export interface RoutePreview {
+  /** absolute source path (outside the vault) */
   file: string
+  /** absolute destination path, collision-suffixed exactly like the executor */
   destination: string
+  /** planned owning project; '' = ambiguous — the confirm card requires a select */
   project: string
-  receiptId?: string
+  /** the exact frontmatter the route would stamp (lib plannedMeta) */
+  meta: Record<string, unknown>
 }
 
 /** (lib PR-5) */

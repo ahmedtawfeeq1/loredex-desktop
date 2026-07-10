@@ -8,15 +8,18 @@ import type { ThemeSetting } from './theme'
 import type {
   ActivityEvent,
   ConsumeReceipt,
+  CreateHandoffInput,
   Facets,
   FacetValues,
   HandoffCard,
+  HandoffCreateResult,
   HandshakeStatus,
   HomeBrief,
   Identity,
   IdentitySettings,
   LinkResolution,
   McpStatus,
+  ReplyHandoffInput,
   RoutePreview,
   SyncHealth,
   SyncReport,
@@ -48,6 +51,17 @@ export interface CoreApi {
    *  the scope is company-wide and direction is ignored. */
   'handoffs.list': { in: { scope: 'inbox' | 'outbox' | 'all'; project?: string }; out: HandoffCard[] } // (lib PR-1)
   'handoffs.consume': { in: { id: string; identity: Identity }; out: ConsumeReceipt } // (lib PR-2)
+  /** M2 handoff writers (lib PR-11, stories 7.2/7.3). Identity rides the payload
+   *  from the renderer's profile store — same pattern as consume. */
+  'handoffs.create': { in: { input: CreateHandoffInput; identity: Identity }; out: HandoffCreateResult }
+  'handoffs.reply': {
+    in: { parentId: string; input: ReplyHandoffInput; identity: Identity }
+    out: HandoffCreateResult
+  }
+  'handoffs.annotate': {
+    in: { id: string; title: string; body: string; identity: Identity }
+    out: HandoffCreateResult
+  }
   /** app-local contract evolution (story 3.4): identity profile, app-side only —
    *  persisted in the core host's settings JSON (app.db seam, story 3.6) */
   'settings.identity.get': { in: void; out: IdentitySettings }
@@ -60,7 +74,17 @@ export interface CoreApi {
    *  state, persisted core-side (settings JSON → app.db seam, story 9.2) */
   'settings.theme.get': { in: void; out: ThemeSetting }
   'settings.theme.set': { in: { theme: ThemeSetting }; out: void }
-  'route.preview': { in: { file: string }; out: RoutePreview } // (lib PR-3)
+  /** Story 7.4: read-only plan (lib previewRoute) for the confirm card; the
+   *  in-shape gained mode/projectName over the v1 sketch (app-local evolution). */
+  'route.preview': {
+    in: { file: string; mode: 'move' | 'copy'; projectName?: string }
+    out: RoutePreview
+  }
+  /** Story 7.4: plan+execute in one call (lib routeFile) under the write lock. */
+  'route.file': {
+    in: { path: string; mode: 'move' | 'copy'; projectName?: string }
+    out: { written: string[] }
+  }
   'route.undo': { in: { receiptId: string }; out: void } // (lib PR-3)
   'sync.status': { in: void; out: SyncHealth } // (lib PR-4)
   'sync.run': { in: void; out: SyncReport } // (lib PR-5)
@@ -78,6 +102,9 @@ export interface CoreApi {
 
 export type CoreEvent =
   | { kind: 'handoff.new'; handoff: HandoffCard }
+  /** M2 (stories 7.2/7.3): a write landed a new note. `card` carries the board
+   *  card for optimistic insert; null for comments (thread data, never a card). */
+  | { kind: 'handoff.created'; card: HandoffCard | null; relPath: string }
   | { kind: 'handoff.stateChanged'; id: string; from: string; to: string; by: Identity }
   | { kind: 'route.completed'; receipt: RoutePreview }
   | { kind: 'vault.changed'; paths: string[] }
@@ -120,6 +147,10 @@ export type IpcCode =
   | 'TIMEOUT'
   | 'PORT_SWAPPED'
   | 'NO_CONFIG'
+  // M2 handoff-writer codes (lib HandoffError, architecture-m2.md#2)
+  | 'ILLEGAL_TRANSITION'
+  | 'AMBIGUOUS_HANDOFF'
+  | 'UNKNOWN_HANDOFF'
 
 export interface ErrEnvelope {
   code: IpcCode

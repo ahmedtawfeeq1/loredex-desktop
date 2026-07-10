@@ -6,7 +6,7 @@ import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting } from '../shared/theme'
 import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
-import type { SyncReport } from '../shared/types'
+import type { Identity, SyncReport } from '../shared/types'
 import * as engine from './engine'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
 import { withGitIdentity } from './git'
@@ -79,6 +79,98 @@ export function registerCoreHandlers(
       ipc.emit({ kind: 'vault.changed', paths: [rel] })
       notifier.refresh() // badge drops immediately (story 3.7 AC3)
       return receipt
+    }),
+  )
+  // M2 handoff writers (stories 7.2/7.3): every one is a lib write op — write
+  // lock + per-command identity; the new note is announced as handoff.created
+  // (card for board optimistic insert; null for comments) + vault.changed.
+  const requireIdentity = (identity: Identity, verb: string): void => {
+    if (!isValidIdentity(identity)) {
+      throw ipcError('INTERNAL', `${verb} needs an identity — set name and email in Settings`)
+    }
+  }
+  const announceCreated = (result: { id: string; path: string }): void => {
+    const rel = toVaultRelative(result.path, engine.getConfig().vaultPath)
+    ipc.emit({ kind: 'handoff.created', card: engine.handoffCard(result.id), relPath: rel })
+    ipc.emit({ kind: 'vault.changed', paths: [rel] })
+    notifier.refresh()
+  }
+  ipc.register('handoffs.create', ({ input, identity }) =>
+    withWriteLock(() => {
+      requireIdentity(identity, 'publishing a handoff')
+      const result = engine.composeHandoff(input, identity)
+      announceCreated(result)
+      return result
+    }),
+  )
+  ipc.register('handoffs.reply', ({ parentId, input, identity }) =>
+    withWriteLock(() => {
+      requireIdentity(identity, 'replying')
+      const result = engine.reply(parentId, input, identity)
+      announceCreated(result)
+      return result
+    }),
+  )
+  ipc.register('handoffs.annotate', ({ id, title, body, identity }) =>
+    withWriteLock(() => {
+      requireIdentity(identity, 'commenting')
+      if (!title.trim() || !body.trim()) {
+        throw ipcError('INTERNAL', 'a comment needs a title and a body')
+      }
+      const result = engine.annotate(id, { title, body }, identity)
+      announceCreated(result)
+      return result
+    }),
+  )
+  // Route-a-note (story 7.4). Preview is read-only (no lock); route is a lib
+  // write op. The picker/drop is the user's consent for that ONE file (NFR12).
+  const guardRouteSource = (file: string): void => {
+    if (!file.endsWith('.md')) {
+      throw ipcError('INTERNAL', 'only markdown files can be routed — pick a .md file')
+    }
+    if (toVaultRelative(file, engine.getConfig().vaultPath) !== file) {
+      throw ipcError(
+        'VAULT_OUTSIDE_PATH',
+        'this file already lives inside the vault — routing is for working files outside it',
+      )
+    }
+  }
+  ipc.register('route.preview', ({ file, mode, projectName }) => {
+    guardRouteSource(file)
+    const plan = engine.routePlan(file, { mode, ...(projectName ? { projectName } : {}) })
+    return {
+      file,
+      destination: plan.destination,
+      project: String((plan.meta as Record<string, unknown>).project ?? ''),
+      meta: plan.meta as Record<string, unknown>,
+    }
+  })
+  ipc.register('route.file', ({ path, mode, projectName }) =>
+    withWriteLock(() => {
+      guardRouteSource(path)
+      const opts = { mode, ...(projectName ? { projectName } : {}) }
+      const profile = loadIdentityProfile()
+      const result = profile
+        ? withGitIdentity(profile, () => engine.route(path, opts))
+        : engine.route(path, opts)
+      const vaultPath = engine.getConfig().vaultPath
+      const written = result.written[0]
+      if (written) {
+        ipc.emit({
+          kind: 'route.completed',
+          receipt: {
+            file: path,
+            destination: written,
+            project: String(engine.noteMeta(written).project ?? ''),
+            meta: engine.noteMeta(written),
+          },
+        })
+      }
+      ipc.emit({
+        kind: 'vault.changed',
+        paths: result.written.map((w) => toVaultRelative(w, vaultPath)),
+      })
+      return result
     }),
   )
   // Product home (story 2.5). dashboard.build is the re-curate seam — it runs

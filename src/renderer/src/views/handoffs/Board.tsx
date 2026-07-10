@@ -62,6 +62,8 @@ function Lane({
 }): React.JSX.Element {
   const consume = useHandoffs((s) => s.consume)
   const pressedId = useHandoffs((s) => s.pressedId)
+  const openCompose = useHandoffs((s) => s.openCompose)
+  const openAnnotate = useHandoffs((s) => s.openAnnotate)
   return (
     <section className="board-lane" aria-label={title}>
       <h2 className="board-lane-title">{title}</h2>
@@ -74,6 +76,8 @@ function Lane({
             card={card}
             onOpen={openBrief}
             pressed={pressedId === card.id}
+            onReply={(c) => openCompose(c)}
+            onComment={(c) => openAnnotate(c)}
             {...(inbound && card.status === 'open'
               ? {
                   onConsume: (c: HandoffCard) => void consume(c),
@@ -185,6 +189,14 @@ export function Board(): React.JSX.Element {
         >
           Refresh
         </button>
+        <button
+          type="button"
+          className="button-primary"
+          title="Compose a handoff (story 7.2)"
+          onClick={() => useHandoffs.getState().openCompose()}
+        >
+          New handoff
+        </button>
       </div>
       {error && <div className="note-error">{error}</div>}
       {receipt && <ConsumeReceiptView receipt={receipt} onDismiss={dismissReceipt} />}
@@ -193,7 +205,8 @@ export function Board(): React.JSX.Element {
       ) : cards.length === 0 ? (
         <div className="empty-state" style={{ border: 'none' }}>
           <p>No handoffs in this vault yet.</p>
-          <button type="button" className="button-primary" onClick={() => void load()}>
+          {/* secondary — the view's one gold primary is New handoff above */}
+          <button type="button" className="button-secondary" onClick={() => void load()}>
             Check again
           </button>
         </div>

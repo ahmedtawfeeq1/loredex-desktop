@@ -11,25 +11,35 @@ import {
   ACTIVITY_LOG_ARGS,
   type ActivityEvent,
   ambientGitIdentity,
+  annotateHandoff,
   buildDashboard,
   parseActivity,
   type Config,
   type ConsumeReceipt,
   consumeHandoff,
+  createHandoff,
+  type CreateHandoffInput,
   createLoredexMcpServer,
   type Doc,
   gitPullPush,
   type HandoffCard,
+  type HandoffCreateResult,
+  HandoffError,
   type HandoffScope,
   type Identity,
   listHandoffs,
   loadConfig,
   LOREDEX_SCHEMA,
   parseDoc,
+  previewRoute,
   PRODUCT_BRIEF_NAME,
   type ProductDashboard,
   renderDashboardMarkdown,
+  replyToHandoff,
   resolveNoteInsideVault,
+  routeFile,
+  type RouteOptions,
+  type RoutePlanPreview,
   type SearchHit,
   searchVault,
   type SyncHealth,
@@ -40,7 +50,7 @@ import {
 import { abbreviatePath } from '../shared/identity'
 import { gitLog, withGitIdentity } from './git'
 import { ipcError } from '../shared/ipc-contract'
-import type { HomeBrief, VaultIdentity } from '../shared/types'
+import type { HomeBrief, ReplyHandoffInput, VaultIdentity } from '../shared/types'
 
 /** undefined = not yet initialized; null = initialized, no config on disk. */
 let config: Config | null | undefined
@@ -135,6 +145,70 @@ export function registeredProjects(): string[] {
 export function consume(id: string, identity: Identity): ConsumeReceipt {
   const config = getConfig()
   return withGitIdentity(identity, () => consumeHandoff(config.vaultPath, config, id, identity))
+}
+
+/**
+ * Lib HandoffError → typed envelope (AMBIGUOUS_HANDOFF / UNKNOWN_HANDOFF /
+ * ILLEGAL_TRANSITION). Lives here because engine.ts is the only module allowed
+ * to know loredex classes; other errors pass through (dispatcher → INTERNAL).
+ */
+function mapHandoffError<T>(fn: () => T): T {
+  try {
+    return fn()
+  } catch (e) {
+    if (e instanceof HandoffError) throw ipcError(e.code, e.message)
+    throw e
+  }
+}
+
+/** Compose a handoff (story 7.2) — the lib's one create writer, verbatim brief, NO LLM. */
+export function composeHandoff(input: CreateHandoffInput, identity: Identity): HandoffCreateResult {
+  const config = getConfig()
+  return mapHandoffError(() =>
+    withGitIdentity(identity, () => createHandoff(config.vaultPath, config, input, identity)),
+  )
+}
+
+/** Reply to a handoff (story 7.3) — lib sugar inverts the route + sets replies_to. */
+export function reply(
+  parentId: string,
+  input: ReplyHandoffInput,
+  identity: Identity,
+): HandoffCreateResult {
+  const config = getConfig()
+  return mapHandoffError(() =>
+    withGitIdentity(identity, () =>
+      replyToHandoff(config.vaultPath, config, parentId, input, identity),
+    ),
+  )
+}
+
+/** Comment on a handoff (story 7.3) — a NEW type:'comment' note; parent never mutated. */
+export function annotate(
+  id: string,
+  comment: { title: string; body: string },
+  identity: Identity,
+): HandoffCreateResult {
+  const config = getConfig()
+  return mapHandoffError(() =>
+    withGitIdentity(identity, () => annotateHandoff(config.vaultPath, config, id, comment, identity)),
+  )
+}
+
+/** The board card a create landed as; null for comments (never board cards). */
+export function handoffCard(id: string): HandoffCard | null {
+  return listHandoffs(getConfig().vaultPath, { direction: 'all' }).find((c) => c.id === id) ?? null
+}
+
+/** Read-only route plan for the confirm card (story 7.4) — lib previewRoute, no writes. */
+export function routePlan(file: string, opts: RouteOptions): RoutePlanPreview {
+  return previewRoute(getConfig().vaultPath, file, opts)
+}
+
+/** Route one file into the vault (story 7.4) — lib routeFile, plan+execute in one call. */
+export function route(file: string, opts: RouteOptions): { written: string[] } {
+  const config = getConfig()
+  return routeFile(config.vaultPath, config, file, opts)
 }
 
 /** Read-only sync health snapshot (story 5.2) — lib syncStatus, never fetches. */

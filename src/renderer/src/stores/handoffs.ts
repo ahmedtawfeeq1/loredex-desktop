@@ -8,6 +8,10 @@ import type { ConsumeReceipt, HandoffCard } from '../../../shared/types'
 import { invoke } from '../api'
 import { effectiveIdentity, useIdentity } from './identity'
 
+/** The slice of a card the write modals need — reader-detail actions build
+ *  one from note frontmatter, board actions pass full cards (story 7.3). */
+export type HandoffRef = Pick<HandoffCard, 'id' | 'from' | 'to' | 'objective' | 'kind'>
+
 interface HandoffsState {
   /** null until first load (skeleton); company-wide, lanes derived per project */
   cards: HandoffCard[] | null
@@ -20,10 +24,21 @@ interface HandoffsState {
   consumingId: string | null
   /** stamp-press animation trigger for the just-consumed card */
   pressedId: string | null
+  /** compose modal (story 7.2); replyTo set = reply variant (story 7.3) */
+  composeOpen: boolean
+  composeReplyTo: HandoffRef | null
+  /** comment modal target (story 7.3) */
+  annotateFor: HandoffRef | null
   load(): Promise<void>
   consume(card: HandoffCard): Promise<void>
   dismissReceipt(): void
   setProject(project: string | 'all'): void
+  openCompose(replyTo?: HandoffRef): void
+  closeCompose(): void
+  openAnnotate(card: HandoffRef): void
+  closeAnnotate(): void
+  /** optimistic insert from the handoff.created event — no full refetch */
+  applyCreated(card: HandoffCard): void
   reset(): void
 }
 
@@ -34,6 +49,9 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
   receipt: null,
   consumingId: null,
   pressedId: null,
+  composeOpen: false,
+  composeReplyTo: null,
+  annotateFor: null,
 
   async load() {
     try {
@@ -77,6 +95,28 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
     set({ project })
   },
 
+  openCompose(replyTo) {
+    set({ composeOpen: true, composeReplyTo: replyTo ?? null })
+  },
+
+  closeCompose() {
+    set({ composeOpen: false, composeReplyTo: null })
+  },
+
+  openAnnotate(card) {
+    set({ annotateFor: card })
+  },
+
+  closeAnnotate() {
+    set({ annotateFor: null })
+  },
+
+  applyCreated(card) {
+    const cards = get().cards
+    if (cards === null || cards.some((c) => c.id === card.id)) return
+    set({ cards: [card, ...cards] })
+  },
+
   reset() {
     set({
       cards: null,
@@ -85,6 +125,9 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
       receipt: null,
       consumingId: null,
       pressedId: null,
+      composeOpen: false,
+      composeReplyTo: null,
+      annotateFor: null,
     })
   },
 }))

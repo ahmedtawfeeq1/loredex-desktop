@@ -50,3 +50,13 @@ export function formatAge(ageDays: number): string {
 export function toVaultRelative(absPath: string, vaultPath: string): string {
   return absPath.startsWith(`${vaultPath}/`) ? absPath.slice(vaultPath.length + 1) : absPath
 }
+
+/**
+ * Qualified handoff id `<project>/<name>` (stories 7.3/8.x): handoff notes live
+ * in projects/<to>/handoffs/, so the owning project is the card's `to`. Bare
+ * ids are a CLI-human affordance — the app always sends qualified ones so
+ * cross-project basename collisions never mis-target.
+ */
+export function qualifiedId(card: Pick<HandoffCard, 'id' | 'to'>): string {
+  return card.to ? `${card.to}/${card.id}` : card.id
+}

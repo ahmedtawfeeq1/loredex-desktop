@@ -2310,3 +2310,105 @@ button.atlas-crumb:hover {
   fill: var(--bg-inset);
   stroke-dasharray: 3 3;
 }
+
+/* ── Atlas node card variants (story 10.4): all 6 types to spec ───────────── */
+
+.atlas-note-title {
+  fill: var(--text-1);
+  font-family: var(--font-serif);
+  font-size: 12.5px;
+}
+
+.atlas-node-summary {
+  fill: var(--text-2);
+  font-family: var(--font-ui);
+  font-size: 10px;
+}
+
+.atlas-node-date {
+  fill: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+
+/* mono route line `from ⟶ to` — the routing-slip signature */
+.atlas-route-line {
+  fill: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.atlas-node-mono {
+  fill: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* freshness: stale = rust, per token rules */
+.atlas-meta-stale {
+  fill: var(--rust);
+}
+
+/* type/topic chips: quiet inset pills, 9px mono uppercase */
+.atlas-chip rect {
+  fill: var(--bg-inset);
+  stroke: var(--hairline);
+  stroke-width: 1;
+}
+
+.atlas-chip text {
+  fill: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+
+.atlas-chip-request rect {
+  fill: transparent;
+  stroke: var(--navy);
+}
+
+.atlas-chip-request text {
+  fill: var(--navy);
+}
+
+/* stamp chip: 1px border + transparent fill, mono uppercase (DESIGN spec) */
+.atlas-stamp rect {
+  fill: transparent;
+  stroke-width: 1;
+}
+
+.atlas-stamp text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.atlas-stamp-open rect { stroke: var(--gold); }
+.atlas-stamp-open text { fill: var(--gold); }
+.atlas-stamp-accepted rect { stroke: var(--navy); }
+.atlas-stamp-accepted text { fill: var(--navy); }
+.atlas-stamp-declined rect { stroke: var(--rust); }
+.atlas-stamp-declined text { fill: var(--rust); }
+.atlas-stamp-consumed rect { stroke: var(--text-2); }
+.atlas-stamp-consumed text { fill: var(--text-2); }
+.atlas-stamp-snoozed rect { stroke: var(--text-2); stroke-dasharray: 3 2; }
+.atlas-stamp-snoozed text { fill: var(--text-2); }
+
+/* source card with no local repo: honestly disabled, copy affordance stays */
+.atlas-node-disabled {
+  opacity: 0.55;
+}
+
+.atlas-node-disabled .atlas-card {
+  stroke-dasharray: 3 3;
+}
+
+/* wide invisible hit target: edge click = the handoff/diff it stands for */
+.atlas-edge-hit {
+  stroke: transparent;
+  stroke-width: 12;
+  fill: none;
+  cursor: pointer;
+  pointer-events: stroke;
+}

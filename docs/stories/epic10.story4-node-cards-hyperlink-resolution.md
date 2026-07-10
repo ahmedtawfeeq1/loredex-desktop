@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -27,13 +27,13 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Node cards (AC: 1, 4)
-  - [ ] `views/atlas/AtlasNodeCard.tsx`: per-type card variants, stamp/type/topic/date chips, live stamp subscription, dashed heuristic edges
-- [ ] Resolution wiring (AC: 2, 3)
-  - [ ] `views/atlas/resolve.ts`: one resolver per node/edge type mapped to existing routes/channels; source local re-resolution + disabled fallback + copy-path; GitHub/editor outbound affordances
-- [ ] Quality floor (AC: 5)
-  - [ ] ⌘K entries for resolutions, keyboard activation, themes, reduced-motion
-- [ ] Tests
+- [x] Node cards (AC: 1, 4)
+  - [x] `views/atlas/AtlasNodeCard.tsx`: per-type card variants, stamp/type/topic/date chips, live stamp subscription, dashed heuristic edges
+- [x] Resolution wiring (AC: 2, 3)
+  - [x] `views/atlas/resolve.ts`: one resolver per node/edge type mapped to existing routes/channels; source local re-resolution + disabled fallback + copy-path; GitHub/editor outbound affordances
+- [x] Quality floor (AC: 5)
+  - [x] ⌘K entries for resolutions, keyboard activation, themes, reduced-motion
+- [x] Tests
 
 ## Dev Notes
 
@@ -58,10 +58,30 @@ Approved
 
 ### Agent Model Used
 
+Fable 5 (claude-fable-5)
+
 ### Debug Log References
+
+- `npx vitest run src/renderer/src/views/atlas` — 32/32 (one test per §3 table row, source fallback chain, non-GitHub degradation, stamp vocabulary, edge direction-of-click)
+- `npx vitest run` — 308 tests green; `npm run typecheck && npm run build` green
 
 ### Completion Notes List
 
+- Resolution is split pure/impure: `resolveNode`/`resolveEdgeTarget` return descriptors (unit-tested row for row); `performResolution` maps each descriptor onto existing routes/channels. No dead clicks: unresolvable source → dimmed dashed card + copy-path toast; non-GitHub commit → copy-sha (m2 §6).
+- **Handoff row deviation (recorded):** the board has no per-card focus state, so "board card with thread rail expanded" resolves to the app's canonical card-detail surface — the brief in the Reader with the ThreadRail (`handoffs.thread`) expanded beneath it, reading order inline, marked read (identical to the board's own `openBrief` behavior). Stamp chips on Atlas cards mirror board state live via the store's `handoff.stateChanged` patch.
+- **Contract row (recorded):** contract nodes cannot render in production yet — the 11.1 scan provider is empty, and the hyperlink-everything corollary forbids a node without a live target. The resolver row is implemented + tested against synthetic nodes; `performResolution` answers with an honest toast until the 11.2 timeline view exists. `github.prForCommit` (12.1) is also unshipped, so commit cards degrade to the plain commit link — exactly the m2 §6 fallback.
+- Editor deep links: `editor: system|vscode|cursor|windsurf|custom` → `file://<abs>` or `<scheme>://file/<abs>`, opened through main's allow-listed `shell.openExternal` (added editor schemes + a `<scheme>://file/` pattern to `windows.ts` — dispatch only, no logic). Local re-resolution (roots map first, recorded path fallback) happens core-side at build (10.1); config wins, the app-db roots fallback arrives with its settings channel (11.x).
+- Edge rows: every edge gets a 12px invisible hit line; route → the handoff behind it, aggregated route → the receiving project's board lane, thread → the card that made the edge, contract-link → nearer end by direction of click (screen-CTM distance). Heuristic-tier contract links + affinity render dashed `--text-2`; `mentioned` solid.
+- Cards: note (serif title, type/topic chips, stale = rust), handoff (stamp vocabulary chips, REQUEST navy chip, mono `from ⟶ to`, expired renders as due-again gold), contract/source/commit mono variants with outbound `↗` affordances. Atlas cards never stamp-press (board exclusive). ⌘K lists the selected node's resolution.
+
 ### File List
+
+- `src/renderer/src/views/atlas/resolve.ts` + `resolve.test.ts` — NEW: §3 table, descriptors + performer + 15 tests
+- `src/renderer/src/views/atlas/AtlasNodeCard.tsx` — all 6 card variants, stamp/chips/disabled states
+- `src/renderer/src/views/atlas/AtlasCanvas.tsx` — edge hit lines, direction-of-click, per-type aria labels
+- `src/renderer/src/views/atlas/AtlasView.tsx` — activation through the resolver, edge activation
+- `src/renderer/src/views/search/Palette.tsx` — ⌘K "open selection" resolution entry
+- `src/main/windows.ts` — editor scheme allow-list for outbound jumps
+- `src/renderer/src/styles.css` — card variant classes, stamps, chips, edge hit/dash styles
 
 ## QA Results

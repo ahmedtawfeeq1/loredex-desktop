@@ -11,6 +11,7 @@ import { useHandoffs } from '../../stores/handoffs'
 import { AtlasBreadcrumbs } from './AtlasBreadcrumbs'
 import { AtlasCanvas } from './AtlasCanvas'
 import { visibleAtlas } from './atlas-visibility'
+import { activateNode, performResolution, resolveEdgeTarget } from './resolve'
 
 const LEVEL_LABEL: Record<AtlasLevel, string> = {
   overview: 'Overview',
@@ -63,9 +64,10 @@ export function AtlasView(): React.JSX.Element {
   const learnTarget = scope.project ?? selectedProject
 
   function onActivate(node: AtlasNode): void {
-    // §3 resolution: project cluster click drills into Learn (story 10.3's row);
-    // the remaining node types resolve via story 10.4
+    // §3 resolution table, one click per row (story 10.4): project drills
+    // (10.3's row), everything else resolves through views/atlas/resolve.ts
     if (node.type === 'project') void drillProject(node.label)
+    else void activateNode(node)
   }
 
   return (
@@ -124,6 +126,13 @@ export function AtlasView(): React.JSX.Element {
           selectedId={selectedId}
           onSelect={(n) => select(n?.id ?? null)}
           onActivate={onActivate}
+          onActivateEdge={(edge, nearerEnd) => {
+            const byId = new Map(graph.nodes.map((n) => [n.id, n]))
+            const target = resolveEdgeTarget(edge, byId, nearerEnd)
+            if (!target) return
+            if ('board' in target) performResolution({ kind: 'board', project: target.board })
+            else onActivate(target.node)
+          }}
           onExpandTopic={toggleTopic}
           onEscape={() => void up()}
         />

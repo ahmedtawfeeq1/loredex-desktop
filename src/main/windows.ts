@@ -23,15 +23,21 @@ export function createMainWindow(): BrowserWindow {
   win.on('ready-to-show', () => win.show())
 
   // Rendered notes may contain external links: never navigate the app window;
-  // http(s) targets open in the default browser.
+  // http(s) targets open in the default browser. Story 10.4 adds the Atlas
+  // editor deep links (loredex config editor scheme) — an allow-list, no logic.
+  const EXTERNAL = ['https://', 'http://', 'file://', 'vscode://', 'cursor://', 'windsurf://']
+  // `<custom-scheme>://file/<abs>` — the loredex editor deep-link shape
+  const EDITOR_LINK = /^[a-z][a-z0-9+.-]*:\/\/file\//
+  const isExternal = (url: string): boolean =>
+    EXTERNAL.some((p) => url.startsWith(p)) || EDITOR_LINK.test(url)
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://') || url.startsWith('http://')) void shell.openExternal(url)
+    if (isExternal(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event, url) => {
     if (url.startsWith(process.env.ELECTRON_RENDERER_URL ?? 'file://')) return
     event.preventDefault()
-    if (url.startsWith('https://') || url.startsWith('http://')) void shell.openExternal(url)
+    if (isExternal(url)) void shell.openExternal(url)
   })
 
   const devUrl = process.env.ELECTRON_RENDERER_URL

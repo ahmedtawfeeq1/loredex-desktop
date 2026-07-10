@@ -27,16 +27,45 @@ function describeNode(node: AtlasNode): string {
     const open = node.openCount ?? 0
     return `project ${node.label}, ${open} open handoff${open === 1 ? '' : 's'} — Enter opens it`
   }
-  if (node.type === 'handoff') return `handoff ${node.label}, ${node.status || 'open'}`
-  return `${node.type} ${node.label}`
+  if (node.type === 'handoff') return `handoff ${node.label}, ${node.status || 'open'} — Enter opens the card`
+  if (node.type === 'note') return `note ${node.label}${node.stale ? ', stale' : ''} — Enter opens the reader`
+  if (node.type === 'source') {
+    return node.localPath
+      ? `source file ${node.label} — Enter opens it in your editor`
+      : `source file ${node.label}, repo not on this machine — Enter copies the path`
+  }
+  if (node.type === 'commit') {
+    return node.commitBase
+      ? `commit ${node.label} — Enter opens it on GitHub`
+      : `commit ${node.label}, non-GitHub remote — Enter copies the sha`
+  }
+  return `contract ${node.label} — Enter opens its timeline`
+}
+
+/** Which endpoint the click landed nearer to — §3 "by direction of click". */
+function nearerEndOf(
+  e: React.MouseEvent<SVGLineElement>,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): 'source' | 'target' {
+  const ctm = e.currentTarget.getScreenCTM()
+  if (!ctm) return 'target'
+  const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse())
+  return (pt.x - x1) ** 2 + (pt.y - y1) ** 2 <= (pt.x - x2) ** 2 + (pt.y - y2) ** 2
+    ? 'source'
+    : 'target'
 }
 
 function EdgeLine({
   edge,
   byId,
+  onActivateEdge,
 }: {
   edge: AtlasEdge
   byId: Map<string, AtlasNode>
+  onActivateEdge: (edge: AtlasEdge, nearerEnd: 'source' | 'target') => void
 }): React.JSX.Element | null {
   const a = byId.get(edge.source)
   const b = byId.get(edge.target)
@@ -57,6 +86,29 @@ function EdgeLine({
         y2={y2}
         markerEnd={gold ? 'url(#atlas-arrow-gold)' : 'url(#atlas-arrow)'}
       />
+      {/* wide invisible hit line: edge click = the handoff/diff it stands for */}
+      {/* biome-ignore lint: pointer affordance for edges; nodes carry keyboard access */}
+      <line
+        className="atlas-edge-hit"
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        onClick={(e) => {
+          e.stopPropagation()
+          onActivateEdge(edge, nearerEndOf(e, x1, y1, x2, y2))
+        }}
+      >
+        <title>
+          {edge.category === 'route'
+            ? 'route — open the handoff behind it'
+            : edge.category === 'thread'
+              ? `thread (${edge.field ?? ''})`
+              : edge.category === 'contract-link'
+                ? `contract link${edge.confidence ? ` — ${edge.confidence}` : ''}`
+                : edge.category}
+        </title>
+      </line>
       {aggregated && (
         <g className={`atlas-edge-badge${(edge.openCount ?? 0) > 0 ? ' atlas-edge-badge-open' : ''}`}>
           <rect x={midX - 56} y={midY - 21} width={112} height={18} rx={9} />
@@ -76,6 +128,7 @@ export function AtlasCanvas({
   selectedId,
   onSelect,
   onActivate,
+  onActivateEdge,
   onExpandTopic,
   onEscape,
 }: {
@@ -87,6 +140,8 @@ export function AtlasCanvas({
   onSelect: (node: AtlasNode | null) => void
   onActivate: (node: AtlasNode) => void
   onExpandTopic: (key: string) => void
+  /** edge click → the handoff/diff it stands for (story 10.4 §3 rows) */
+  onActivateEdge: (edge: AtlasEdge, nearerEnd: 'source' | 'target') => void
   /** Esc/Backspace: one level up (story 10.3 keyboard map) */
   onEscape: () => void
 }): React.JSX.Element {
@@ -213,7 +268,7 @@ export function AtlasCanvas({
         </defs>
         <g className="atlas-edges" aria-hidden>
           {graph.edges.map((edge) => (
-            <EdgeLine key={edge.id} edge={edge} byId={byId} />
+            <EdgeLine key={edge.id} edge={edge} byId={byId} onActivateEdge={onActivateEdge} />
           ))}
         </g>
         <g className="atlas-nodes">

@@ -11,6 +11,7 @@ import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import { useRoute } from '../../stores/route'
 import { openSearchResult, useSearch } from '../../stores/search'
+import { activateNode } from '../atlas/resolve'
 import { handoffRefFromNote } from '../handoffs/compose-form'
 import { clampSelection, moveSelection } from './palette-nav'
 
@@ -51,6 +52,15 @@ function actionItems(q: string): PaletteItem[] {
   // story 10.3: every atlas navigation action is ⌘K-listed while it's open
   if (useApp.getState().view === 'atlas') {
     const atlas = useAtlas.getState()
+    // story 10.4 AC5: the selected node's resolution is keyboard-reachable here
+    const selected = atlas.graph?.nodes.find((n) => n.id === atlas.selectedId)
+    if (selected) {
+      actions.push({
+        key: 'action:atlas-open-selection',
+        title: `Atlas: open ${selected.type} “${selected.label}”`,
+        run: () => void activateNode(selected),
+      })
+    }
     actions.push({
       key: 'action:atlas-overview',
       title: 'Atlas: Overview',

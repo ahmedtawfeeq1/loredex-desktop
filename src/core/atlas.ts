@@ -53,12 +53,14 @@ import {
   NODE_H,
   NODE_W,
   NOTE_ROW_PITCH,
+  PANEL_ASPECT,
   PANEL_PAD,
   panelWrapRows,
   PILL_GUTTER,
   PILL_H,
   PILL_W,
   SUBCARD_LABEL_H,
+  SUBCARD_PAD,
   TOPIC_COL_PITCH,
   V_GAP,
 } from '../shared/atlas-layout'
@@ -693,19 +695,17 @@ const byDateThenLabel = (a: AtlasNode, b: AtlasNode): number =>
     ? a.label.localeCompare(b.label)
     : (a.date ?? '').localeCompare(b.date ?? '')
 
-/** One flowable panel block: a topic's members or a deep context type. Every
- *  block is now its OWN lane — a topic is a bordered sub-card (D1 amendment 3),
- *  so no two topics ever share a column and each sub-card contains only its own
- *  notes. `ownLane` therefore stays true for all blocks; it drives the fresh
- *  column start and the per-run wrap accounting positionPanel already does. */
+/** One flowable panel block: a topic's members or a deep context type. Each
+ *  block becomes a shelf-packed CELL — a topic is a bordered sub-card (D1
+ *  amendment 3), so no two blocks ever share a column and each sub-card contains
+ *  only its own notes. */
 interface PanelBlock {
   nodes: AtlasNode[]
-  ownLane: boolean
 }
 
 /** Panel blocks left→right in RECENCY order (D1 amendment 3): topic sub-cards
- *  newest-activity first, `handoffs` forced last (its own lane, thread rails
- *  ride it), then source/commit/contract context lanes at deep. Members inside
+ *  newest-activity first, `handoffs` forced last (its own cell, thread rails
+ *  ride it), then source/commit/contract context cells at deep. Members inside
  *  a topic stack NEWEST-FIRST top→bottom (with 01/02/03 order chips). */
 function panelBlocks(
   cluster: AtlasCluster,
@@ -728,19 +728,59 @@ function panelBlocks(
     if (b.topic.name === 'handoffs') return -1
     return a.newest === b.newest ? a.topic.name.localeCompare(b.topic.name) : b.newest.localeCompare(a.newest)
   })
-  const blocks: PanelBlock[] = withMembers.map((t) => ({ nodes: t.members, ownLane: true }))
+  const blocks: PanelBlock[] = withMembers.map((t) => ({ nodes: t.members }))
   for (const type of ['source', 'commit', 'contract'] as const) {
     const column = extras.filter((n) => n.type === type).sort((a, b) => a.id.localeCompare(b.id))
-    if (column.length > 0) blocks.push({ nodes: column, ownLane: true })
+    if (column.length > 0) blocks.push({ nodes: column })
   }
   return blocks
 }
 
-/** Lay one focused-cluster panel: header bar top-left, blocks flow-packed
- *  into GRID-pitch columns of panelWrapRows(total) rows so the content FILLS
- *  the panel toward PANEL_ASPECT (story 16.5) — never one unbounded column
- *  per topic (the tiny-top-strip defect). Returns the panel's outer box (the
- *  renderer draws the big white card around what is visible of this). */
+/** A shelf-packing cell: a block's notes column-packed `wrapRows` deep, so it
+ *  spans `cols` GRID columns of a shared, uniform column grid. */
+interface PanelCell {
+  nodes: AtlasNode[]
+  cols: number
+}
+
+/** Uniform shelf pitch: every shelf is `wrapRows` note-rows tall, so cells on
+ *  different shelves land on one shared column grid (the fill invariant stays
+ *  as dense as the pre-wrap single row). A shelf's sub-cards clear the shelf
+ *  above by V_GAP — a sub-card reaches SUBCARD_PAD below its deepest note and
+ *  SUBCARD_PAD + SUBCARD_LABEL_H above its top note. */
+const shelfStep = (wrapRows: number): number =>
+  (wrapRows - 1) * NOTE_ROW_PITCH +
+  NODE_H +
+  SUBCARD_PAD +
+  V_GAP +
+  SUBCARD_PAD +
+  SUBCARD_LABEL_H
+
+/** Fold `cells` (each `cols` wide) into shelves of width `targetCols`, never
+ *  splitting a cell → (columns used, shelves used). Deterministic. */
+function foldShelves(cells: PanelCell[], targetCols: number): { cols: number; shelves: number } {
+  let gridCol = 0
+  let maxCols = 0
+  let shelves = 1
+  for (const cell of cells) {
+    if (gridCol > 0 && gridCol + cell.cols > targetCols) {
+      shelves++
+      gridCol = 0
+    }
+    gridCol += cell.cols
+    maxCols = Math.max(maxCols, gridCol)
+  }
+  return { cols: maxCols, shelves }
+}
+
+/** Lay one focused-cluster panel: header bar top-left, then topic sub-cards
+ *  packed `wrapRows` deep and SHELF-WRAPPED left→right, row-down onto a shared
+ *  column grid. The shelf width is chosen so the packed bounding box lands
+ *  nearest PANEL_ASPECT — a many-topic project reads as browsable rows, never
+ *  the canvas-wide strip (the regression this fixes). Folding a uniform-depth
+ *  single row into aligned shelves conserves grid area, so the epic16 fill
+ *  ratio holds. Reading order preserved: recency-sorted cells fill row-major.
+ *  Returns the panel's outer box (the renderer draws the white card around it). */
 function positionPanel(
   header: AtlasNode | undefined,
   blocks: PanelBlock[],
@@ -751,48 +791,65 @@ function positionPanel(
     header.x = x0 + PANEL_PAD
     header.y = y0 + PANEL_PAD
   }
-  // extra SUBCARD_LABEL_H below the header so a col-0 topic sub-card's label
+  // extra SUBCARD_LABEL_H below the header so a row-0 topic sub-card's label
   // row (D1 amendment 3) never rides the header bar
   const contentTop = y0 + PANEL_PAD + PILL_H + GRID + SUBCARD_LABEL_H
-  // flow runs mirror the placement rule below: consecutive topic blocks pack
-  // as one run; each own-lane block (handoffs, deep context types) is its own
-  const runs: number[] = []
-  let prevRunOwnLane = true
-  for (const block of blocks) {
-    if (block.ownLane || prevRunOwnLane || runs.length === 0) runs.push(block.nodes.length)
-    else runs[runs.length - 1] = (runs[runs.length - 1] as number) + block.nodes.length
-    prevRunOwnLane = block.ownLane
+  const contentX = x0 + PANEL_PAD
+  if (blocks.length === 0) {
+    return { w: PANEL_PAD * 2 + PILL_W, h: contentTop - y0 + PANEL_PAD }
   }
-  const wrapRows = panelWrapRows(runs)
-  let col = 0
-  let row = 0
-  let colsUsed = 0
-  let rowsUsed = 0
-  let prevOwnLane = false
-  for (const block of blocks) {
-    // own-lane blocks start fresh, and the block AFTER one starts fresh too
-    if ((block.ownLane || prevOwnLane) && row > 0) {
-      col++
-      row = 0
+
+  // uniform column depth (the tested 16.5 wrap) → every column is wrapRows deep
+  // save its partial tail, keeping the folded grid dense
+  const wrapRows = Math.max(1, panelWrapRows(blocks.map((b) => b.nodes.length)))
+  const cells: PanelCell[] = blocks.map((b) => ({
+    nodes: b.nodes,
+    cols: Math.max(1, Math.ceil(b.nodes.length / wrapRows)),
+  }))
+
+  // choose the shelf width (GRID columns) whose folded box is nearest
+  // PANEL_ASPECT — deterministic: the first (narrowest) width that ties wins
+  const totalCols = cells.reduce((n, c) => n + c.cols, 0)
+  const maxCellCols = Math.max(...cells.map((c) => c.cols))
+  const step = shelfStep(wrapRows)
+  let targetCols = totalCols
+  let bestScore = Number.POSITIVE_INFINITY
+  for (let k = maxCellCols; k <= totalCols; k++) {
+    const { cols, shelves } = foldShelves(cells, k)
+    const w = (cols - 1) * TOPIC_COL_PITCH + NODE_W
+    const h = (shelves - 1) * step + (wrapRows - 1) * NOTE_ROW_PITCH + NODE_H
+    const score = Math.abs(Math.log(w / Math.max(h, 1) / PANEL_ASPECT))
+    if (score < bestScore - 1e-9) {
+      bestScore = score
+      targetCols = k
     }
-    for (const node of block.nodes) {
-      if (row >= wrapRows) {
-        col++
-        row = 0
-      }
-      node.x = x0 + PANEL_PAD + col * TOPIC_COL_PITCH
-      node.y = contentTop + row * NOTE_ROW_PITCH
-      colsUsed = Math.max(colsUsed, col + 1)
-      rowsUsed = Math.max(rowsUsed, row + 1)
-      row++
-    }
-    prevOwnLane = block.ownLane
   }
-  const contentW = colsUsed > 0 ? (colsUsed - 1) * TOPIC_COL_PITCH + NODE_W : PILL_W
-  const contentH = rowsUsed > 0 ? (rowsUsed - 1) * NOTE_ROW_PITCH + NODE_H : 0
+
+  // place the cells shelf by shelf; each cell's notes fill column-major so the
+  // newest (index 0) lands at the sub-card's top-left cell
+  let gridCol = 0
+  let shelfIndex = 0
+  let maxRight = contentX + NODE_W
+  let maxBottom = contentTop + NODE_H
+  for (const cell of cells) {
+    if (gridCol > 0 && gridCol + cell.cols > targetCols) {
+      shelfIndex++
+      gridCol = 0
+    }
+    const cx = contentX + gridCol * TOPIC_COL_PITCH
+    const cyTop = contentTop + shelfIndex * step
+    cell.nodes.forEach((node, i) => {
+      node.x = cx + Math.floor(i / wrapRows) * TOPIC_COL_PITCH
+      node.y = cyTop + (i % wrapRows) * NOTE_ROW_PITCH
+      maxRight = Math.max(maxRight, node.x + NODE_W)
+      maxBottom = Math.max(maxBottom, node.y + NODE_H)
+    })
+    gridCol += cell.cols
+  }
+
   return {
-    w: PANEL_PAD * 2 + Math.max(contentW, PILL_W),
-    h: contentTop - y0 + contentH + PANEL_PAD,
+    w: PANEL_PAD * 2 + Math.max(maxRight - contentX, PILL_W),
+    h: maxBottom - y0 + PANEL_PAD,
   }
 }
 

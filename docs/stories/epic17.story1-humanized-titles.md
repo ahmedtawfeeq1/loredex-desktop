@@ -42,3 +42,12 @@ Done
 ## Dev Agent Record
 
 - 2026-07-10: implemented as specced, no scope growth beyond one rider: `treeFilter` matches humanized titles too (users search what they see — one guard clause, tested by the existing filter suite plus the drift guard). Gate: typecheck clean, vitest 84 files / 756 tests green (was 735 — +21 here), production build clean. Deviations recorded in Dev Notes (unresolved reading-order names stay verbatim; non-note atlas cards stay machine-labeled).
+
+## QA Results
+
+**Verdict: PASS** — fresh-eyes QA 2026-07-10 (M5 comprehension cycle).
+
+- `humanizeTitle`/`noteDate` (`src/renderer/src/humanize.ts`) match D1a3 verbatim: small-word set `a,an,the,of,to,for,and,or,in,on` (lowercased mid-title, first word always capitalized), leading `YYYY-MM-DD-` strip, bare-date stays literal, consecutive dashes collapse (`split(/[-\s]+/).filter(Boolean)`), path + `.md` stripped defensively, existing casing survives (`OAuth`→`OAuth`).
+- ALL title surfaces wired to the one util (grep-confirmed, no per-view drift): reader header (`NoteView.tsx`, serif title + mono `.note-date`), tree rows (`VaultTree.tsx`), search view (`SearchView.tsx`), ⌘K palette (`Palette.tsx`), atlas note cards (`AtlasNodeCard.tsx`), reading orders (`ReadingOrderInline.tsx`), home attention rows (`HomeView.tsx`), plus the `treeFilter.ts` rider (filter matches humanized titles).
+- AC3 real filename reachable: `FrontmatterPanel` renders a `file` row from `path={selected}` and every humanized element keeps a `title=` tooltip.
+- `humanize.test.ts` drift guard + per-surface import/usage assertions green. No defects in this story.

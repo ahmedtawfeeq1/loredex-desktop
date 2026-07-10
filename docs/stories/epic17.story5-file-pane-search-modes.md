@@ -43,3 +43,11 @@ Done
 ## Dev Agent Record
 
 - 2026-07-10: implemented as specced. Gate: typecheck (node+web) clean, full vitest 828/828 sequential (`--no-file-parallelism`), production build clean, e2e release gate 18/18. Same concurrent-atlas-batch caveat as story 17.4 (foreign uncommitted `atlas*`/`_diag*` files failed 2 atlas tests + the build typecheck; confirmed not mine — baseline atlas + my changes are 828/828 green and build clean — restored untouched, only my files committed).
+
+## QA Results
+
+**Verdict: PASS** — fresh-eyes QA 2026-07-10 (M5 comprehension cycle).
+
+- **Content search verified END-TO-END on the real nimbus vault.** Probed `searchVault` (what `vault.search` → `engine.search` calls) for **body-only** terms: `websocket` → 4 hits / **0 filename matches**, `webhook` → 4/0, `latency` → 3/0 — i.e. full-text hits on note bodies whose filenames don't contain the term. Hit shape `{name, project, topic, date, status, kind, excerpt, path, score}` maps 1:1 to the row.
+- `ContentRow` (`VaultTree.tsx`): project tint dot `sectionTint(hit.project)`, `Highlight` over `humanizeTitle(hit.name)`, `hit.date`, `Highlight` over `hit.excerpt` (snippet), `title={hit.path}` (real filename), click → `openSearchResult(hit.path)`. Enter → `openTop(openSearchResult)` (top hit); Esc → `escape` (back to Name/empty/tree). 150ms debounce, seq-guarded.
+- Isolation (AC5): dedicated `fileSearch` store, separate from the Search-view/⌘K `search` store; reset on vault change. Reuses Highlight/openSearchResult/sectionTint/humanizeTitle — no re-impl. `fileSearch.test.ts` green. No defects.

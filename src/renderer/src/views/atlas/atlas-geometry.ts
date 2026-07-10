@@ -6,7 +6,7 @@
  * can never clip under a card, and keyboard traversal order.
  * No DOM, fully unit-tested; the canvas component just applies the numbers.
  */
-import { FIT_PAD, type Rect } from '../../../../shared/atlas-layout'
+import { FIT_PAD, NODE_W, READABLE_CARD_MIN, type Rect } from '../../../../shared/atlas-layout'
 
 // the geometry both sides of the seam must agree on (card boxes, overlap
 // test, orthogonal routing, chips, lanes, the panel card box) lives in
@@ -30,9 +30,13 @@ export interface ViewBox {
   h: number
 }
 
-/** ViewBox fitted to the content bounding box: FIT_PAD padding, content
- *  CENTERED (never bunched top-left), pane aspect preserved, and never
- *  zoomed past 1:1 — small graphs sit centered at natural size. */
+/** ViewBox fitted to the content bounding box: FIT_PAD padding, pane aspect
+ *  preserved, never zoomed past 1:1. When the whole graph fits at a readable
+ *  card size it sits CENTERED at natural size (small/medium graphs). When it
+ *  does NOT — a large graph would need cards below READABLE_CARD_MIN to fit —
+ *  the fit stops at that readable floor and frames the TOP-LEFT starting region
+ *  (newest-activity topic), leaving the rest to pan/scroll rather than shrinking
+ *  the whole map to an unreadable line. */
 export function fitViewBox(rects: Rect[], paneW: number, paneH: number): ViewBox {
   const w0 = Math.max(paneW, 1)
   const h0 = Math.max(paneH, 1)
@@ -49,10 +53,18 @@ export function fitViewBox(rects: Rect[], paneW: number, paneH: number): ViewBox
   }
   const needW = maxX - minX + FIT_PAD * 2
   const needH = maxY - minY + FIT_PAD * 2
-  const scale = Math.max(needW / w0, needH / h0, 1) // never above 100%
+  const fitScale = Math.max(needW / w0, needH / h0, 1) // never above 100%
+  // the widest zoom-out that still renders a card ≥ READABLE_CARD_MIN
+  const floorScale = Math.max(NODE_W / READABLE_CARD_MIN, 1)
+  const scale = Math.min(fitScale, floorScale)
   const w = w0 * scale
   const h = h0 * scale
-  return { x: (minX + maxX) / 2 - w / 2, y: (minY + maxY) / 2 - h / 2, w, h }
+  if (fitScale <= floorScale + 1e-9) {
+    // fits at a readable size → center (no dead top-left corner)
+    return { x: (minX + maxX) / 2 - w / 2, y: (minY + maxY) / 2 - h / 2, w, h }
+  }
+  // clamped at the readable floor → frame the top-left starting region and pan
+  return { x: minX - FIT_PAD, y: minY - FIT_PAD, w, h }
 }
 
 /** Wheel/pinch zoom about a pointer position (SVG coords), clamped to

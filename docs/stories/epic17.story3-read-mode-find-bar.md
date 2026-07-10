@@ -44,3 +44,12 @@ Done
 ## Dev Agent Record
 
 - 2026-07-10: implemented as specced. Gate: typecheck (node+web) clean, full vitest 800/800 sequential (89 files; +30 here — findEngine, find store, registry ⌘F guard), production build clean. `npx vitest run` flakes 6 git-heavy sync/poller tests under default file-parallelism (the documented concurrency flake); `npx vitest run --no-file-parallelism` is 800/800 green. No new dependencies; find rides the existing Custom Highlight seam under new names.
+
+## QA Results
+
+**Verdict: PASS** — fresh-eyes QA 2026-07-10 (M5 comprehension cycle).
+
+- `FindBar.tsx`: floating top-right bar — query input, `N/M` counter (`counterLabel`), ↑↓ prev/next + Enter/⇧Enter, `Aa` case toggle, Esc close; 150ms debounced scan over the rendered note DOM (`bodyRef`+`renderKey`), immediate navigation repaint off cached positions, current match scrolls into view.
+- Highlight colors (`styles.css`): `::highlight(loredex-find)` = `--bg-inset` + hairline underline (all matches); `::highlight(loredex-find-current)` = `--gold`/`--gold-ink` (current). `.find-case[aria-pressed='true']` gold.
+- **Coexistence** (AC3): find rides `FIND_HIGHLIGHT_NAME='loredex-find'` + `FIND_CURRENT_HIGHLIGHT_NAME='loredex-find-current'`, injectable registry, **never touches `loredex-anchor`** — an anchored comment and a find hit on the same text never clobber each other (`findEngine.test.ts` proves it via a Map-backed fake registry holding `ANCHOR_HIGHLIGHT_NAME`).
+- **Mode split** (AC4): `action:find-in-note` (⌘F) `run()` returns early when `editor.editing && editor.path === selected` → Edit keeps CodeMirror's own ⌘F; registered → ⌘K palette + cheatsheet (`registry.test.ts` guard green). No defects.

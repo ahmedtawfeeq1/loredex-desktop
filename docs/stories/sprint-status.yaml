@@ -153,7 +153,35 @@ development_status:
   17-5-file-pane-search-modes: done           # File-pane Name|Content search modes (D1a3): segmented toggle on the "Search files…" box (DESIGN --bg-inset track / --bg-card active). Name = existing filterTree (machine+humanized). Content = vault.search full-text (150ms debounce), tree REPLACED by a flat result list (project tint dot via sectionTint(hit.project), humanized title, Highlight'd snippet+title, date; filename in tooltip); Enter opens the TOP hit, Esc clears back to the tree. Dedicated fileSearch store (mode/query/results/searching/error; setMode/setQuery/runContentSearch seq-guarded/topHit/openTop(open)/escape/reset) SEPARATE from the search-view/⌘K store so file-pane typing never contaminates Search; reset on vault change. Reuses Highlight/openSearchResult/sectionTint/humanizeTitle — no re-impl. Deviation: content rows reuse .search-row recipe + tint-dot head. Gate: typecheck clean, vitest 828/828 sequential, build clean, e2e 18/18
 
 qa:
-  pass_date: 2026-07-10   # M4 UI-polish pass (epic16 stories 1-6, fresh-eyes QA agent); supersedes the M3 pass below for the epic16 surface
+  pass_date: 2026-07-10   # M5 comprehension pass (epic17 stories 1-5, fresh-eyes QA agent); M4/M3 passes below stay valid for their surfaces
+  m5_verdicts: >
+    All five epic17 comprehension-pass stories (17.1-17.5) verified PASS against
+    DESIGN.md "D1 amendment 3" verbatim (per-story evidence in each QA Results).
+    Test matrix, re-run solo by QA: typecheck (node+web) clean, app vitest 829/829
+    (91 files, --no-file-parallelism), e2e release gate 18/18, production build clean,
+    dev-launch smoke alive at 32 s ([natives] OK dual-ABI + app.db open + core host
+    started + vault watcher armed; node-test ABI intact after). ONE delivery defect
+    found and FIXED in place: the cycle shipped an INCOMPLETE, UNCOMMITTED
+    `epic17.2 layout-fix` (atlas.ts/atlas-geometry.ts/atlas-layout.ts READABLE_CARD_MIN
+    pan-instead-of-shrink so a 25-topic project reads as browsable rows, not an
+    unreadable line) plus two untracked _diag*.test.ts scratch files — as delivered the
+    working tree FAILED its own gate (scratch files broke typecheck; the stale
+    atlas-geometry fitViewBox test still pinned the pre-fix cover+center contract). Root
+    cause is documented in the 17.4/17.5 Dev Agent Records ("concurrent atlas batch …
+    confirmed NOT mine … left untouched") — the batch was never finished or reverted.
+    The layout-fix is real, spec-aligned story-2 work (D1a3 "the eye always knows where
+    to start" → newest-activity top-left framed at the ≥140px readable floor), so QA
+    COMPLETED it: removed the scratch files, updated the fitViewBox test to the new
+    contract (readable-floor clamp + top-left start-region framing for oversize graphs;
+    centered coverage when it fits readably). Suite then 829/829, all pre-existing atlas
+    layout-v2/density invariants green. Content search proven END-TO-END on the real
+    nimbus vault (body-only terms websocket 4/0, webhook 4/0, latency 3/0
+    hits/filename-matches through searchVault). Regression all green: atlas layout-v2 +
+    density, v0.1 five, home dashboard, editor v2, comment popover. The layout-fix +
+    test update sit UNCOMMITTED in the tree (QA does not commit unless asked) — commit
+    them together as fix(epic17.2) before release. D1 amendment 4 (handoff reply model)
+    is spec'd but NOT built this cycle — out of scope. Full status:
+    V3-STATUS.md "Comprehension pass (epic17)".
   m4_verdicts: >
     All six epic16 UI-polish stories (16.1-16.6) verified PASS (per-story evidence in
     each QA Results). Test matrix, all re-run solo by QA sequentially: typecheck

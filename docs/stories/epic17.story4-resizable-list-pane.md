@@ -45,3 +45,12 @@ Done
 ## Dev Agent Record
 
 - 2026-07-10: implemented as specced. Gate: typecheck (node+web) clean, full vitest 828/828 sequential (`--no-file-parallelism`; +this story's cases), production build clean, e2e release gate 18/18. Concurrency note: a concurrent atlas batch had uncommitted edits to `atlas.ts`/`atlas-geometry.ts`/`atlas-layout.ts` + two `_diag*.test.ts` scratch files in the working tree that failed 2 atlas tests and the build typecheck; confirmed NOT mine (baseline atlas + my changes = 828/828 green, build clean), those files left untouched and restored, only my files committed.
+
+## QA Results
+
+**Verdict: PASS** — fresh-eyes QA 2026-07-10 (M5 comprehension cycle).
+
+- `clampListWidth` (`listPaneWidth.ts`): `MIN=200`/`MAX=480`/`DEFAULT=300`, `Math.round`, non-finite → default. ONE definition shared by store, handle, and core (`settings.ts` keeps a defensive copy so a hand-edited app.db row can't widen past 480).
+- Persistence per vault in its OWN `settings.listWidth` app_settings row (sibling to the rails row — `RailsCollapsed` contract untouched); malformed/new vault degrades to 300; out-of-band stored value reads back clamped (`settings.test.ts`, `rails.test.ts`).
+- Two-speed writes: `dragListWidth` (clamp, no persist — live), `commitListWidth` (one app.db write on pointerup); `list-resizing` class kills the 160ms width transition mid-drag. Double-click → `resetListWidth` (300 + persist). Collapse (⌘⇧\) untouched — handle rendered only while expanded, `.rail-collapsed{width:0}` still wins. No defects.
+- Note: this story's Dev Agent Record already flagged the foreign uncommitted `atlas*`/`_diag*` files in the tree; QA confirmed the same and resolved them under story 17.2 (see its QA Results).

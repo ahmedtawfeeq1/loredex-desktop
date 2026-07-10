@@ -14,6 +14,7 @@ import {
   NODE_W,
   NOTE_ROW_PITCH,
   PANEL_ASPECT,
+  READABLE_CARD_MIN,
   panelWrapRows,
   PILL_H,
   PILL_W,
@@ -56,17 +57,37 @@ describe('nodeRect', () => {
 })
 
 describe('fitViewBox', () => {
-  it('fits the content bounding box with FIT_PAD padding, centered', () => {
-    const vb = fitViewBox([rect(0, 0), rect(2000, 1200)], 800, 600)
+  it('a graph that fits at a readable size is centered and fully covered', () => {
+    // content needs a modest zoom-out (< the readable floor) → fit covers all,
+    // centered, no dead top-left corner (epic17.2 layout-fix, centered branch)
+    const vb = fitViewBox([rect(0, 0), rect(700, 400)], 800, 600)
     // contains everything plus the pad
     expect(vb.x).toBeLessThanOrEqual(-FIT_PAD)
     expect(vb.y).toBeLessThanOrEqual(-FIT_PAD)
-    expect(vb.x + vb.w).toBeGreaterThanOrEqual(2000 + NODE_W + FIT_PAD)
-    expect(vb.y + vb.h).toBeGreaterThanOrEqual(1200 + NODE_H + FIT_PAD)
-    // aspect preserved, content centered — no dead top-left corner
+    expect(vb.x + vb.w).toBeGreaterThanOrEqual(700 + NODE_W + FIT_PAD)
+    expect(vb.y + vb.h).toBeGreaterThanOrEqual(400 + NODE_H + FIT_PAD)
+    // aspect preserved, content centered
     expect(vb.w / vb.h).toBeCloseTo(800 / 600, 5)
-    expect(vb.x + vb.w / 2).toBeCloseTo((2000 + NODE_W) / 2, 5)
-    expect(vb.y + vb.h / 2).toBeCloseTo((1200 + NODE_H) / 2, 5)
+    expect(vb.x + vb.w / 2).toBeCloseTo((700 + NODE_W) / 2, 5)
+    expect(vb.y + vb.h / 2).toBeCloseTo((400 + NODE_H) / 2, 5)
+    // a card renders at least the readable floor
+    expect((NODE_W * 800) / vb.w).toBeGreaterThanOrEqual(READABLE_CARD_MIN - 1e-6)
+  })
+
+  it('a graph too big to fit readably clamps at the floor and frames top-left', () => {
+    // content that would need cards below READABLE_CARD_MIN to fit → the fit
+    // stops at the readable floor and frames the top-left start region, leaving
+    // the rest to pan (epic17.2 layout-fix, D1a3 "eye knows where to start")
+    const vb = fitViewBox([rect(0, 0), rect(2000, 1200)], 800, 600)
+    // framed at the top-left start region, not centered
+    expect(vb.x).toBeCloseTo(-FIT_PAD, 5)
+    expect(vb.y).toBeCloseTo(-FIT_PAD, 5)
+    // aspect preserved
+    expect(vb.w / vb.h).toBeCloseTo(800 / 600, 5)
+    // clamped at the readable floor — a card renders at exactly READABLE_CARD_MIN
+    expect((NODE_W * 800) / vb.w).toBeCloseTo(READABLE_CARD_MIN, 5)
+    // it does NOT cover everything — the far content pans off-view
+    expect(vb.x + vb.w).toBeLessThan(2000)
   })
 
   it('never zooms past 1:1 — small graphs sit centered at natural size', () => {

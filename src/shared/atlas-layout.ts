@@ -8,12 +8,16 @@
  * - overview: columns by route-dependency depth, cluster cards CLUSTER_W wide,
  *   vertical gaps ≥ V_GAP, horizontal gutters ≥ GUTTER reserved as edge
  *   channels — cards NEVER overlap (asserted in unit tests);
- * - learn/deep (story 16.5 density rework): the focused cluster expands into
- *   one large panel whose content FILLS it — topic blocks flow-pack into
- *   columns of panelWrapRows(total) rows on the GRID-aligned pitch (the grid
- *   tends toward PANEL_ASPECT so fit-to-content lands near 1:1), handoffs and
- *   deep context types keep their own wrapped lanes; neighboring clusters
- *   collapse to compact side pills behind a PILL_GUTTER chip channel.
+ * - learn/deep (story 16.5 density rework, epic17.2 reading flow, epic17.2
+ *   layout-fix): the focused cluster expands into one large panel whose content
+ *   FILLS it — each topic is a bordered sub-card (its notes column-packed
+ *   panelWrapRows deep) and the sub-cards SHELF-WRAP left→right then row-down
+ *   onto a shared column grid, the shelf width chosen so the packed bounding box
+ *   lands near PANEL_ASPECT (a 25-topic project reads as browsable rows, never
+ *   one canvas-wide strip); handoffs and deep context types are trailing cells
+ *   in the same flow;
+ *   neighboring clusters collapse to compact side pills behind a PILL_GUTTER
+ *   chip channel.
  */
 
 /** mini routing-slip card box (DESIGN.md data-visualizations spec) */
@@ -44,8 +48,15 @@ export const CHIP_H = 18
 /** fit-to-content padding (viewport spec) */
 export const FIT_PAD = 48
 /** target width/height ratio the focused panel's grid wraps toward — near the
- *  pane aspect, so fitViewBox (which never zooms past 1:1) stays readable */
+ *  pane aspect (roughly 16:10), so the packed content is a browsable rectangle
+ *  rather than a canvas-wide line the fit then shrinks to nothing */
 export const PANEL_ASPECT = 1.6
+/** post-fit readable floor: the fit never zooms a card narrower than this, so a
+ *  topic label + note count stays legible on a large graph. When content at
+ *  this floor exceeds the viewport the canvas PANS instead of scaling to a line
+ *  (fitViewBox frames the top-left starting region). Matches the ≥140px density
+ *  floor. (epic17.2 layout-fix) */
+export const READABLE_CARD_MIN = 140
 /** side-pill column → panel gutter (GRID-aligned, 24 × 9): fits a CHIP_W
  *  route chip mid-channel with real clearance to the pill AND the panel card
  *  (GUTTER left it exactly chip-tight — the clipped-label defect, story 16.5) */

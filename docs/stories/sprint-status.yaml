@@ -141,6 +141,7 @@ development_status:
   16-3-vault-tree-sections: done                # D1 Notability-style tinted section rows (groups + projects); deterministic 8-tint FNV-1a; 12%/20% alpha both themes; 2px project rail, selection stays gold; per-vault collapsed persistence
   16-4-edit-mode-inline-comments: done          # D1 writing surface: note.save channel (frontmatter byte-preserved), Read ⇄ Edit ⌘E/⌘S + formatter bar, anchored inline comments (margin rail, gold ::highlight, rust orphans); live nimbus drive incl. cat-readable comment note
   16-5-atlas-learn-deep-density: done         # drilled panel density: flow-packed wrapped lanes toward PANEL_ASPECT (18 notes -> 4x5, was a 13-row strip), visibility-derived panel rects, PILL_GUTTER chip channel; invariants proven on nimbus-backend
+  16-6-activity-cards: done                   # D1 activity cards: card recipe + kind chips + relative time + middle-truncated paths + sha chips; status-churn ×5 collapse proven on the real nimbus git-log fixture; per-kind outline-pill actions (max 2) wired to reader/board/consume/sync/diff
   16-7-editor-v2: done                        # D1 amendment 2: CodeMirror 6 editor — token-themed md highlighting (both themes), selection-aware toolbar + H1-H4 dropdown, ⌘B/⌘I/⌘K in-editor, ⌘F, list continuation, history, dirty-guard save/discard; 16.4 save/frontmatter semantics untouched; rider: per-file search in the reader file pane (user request)
 
 qa:

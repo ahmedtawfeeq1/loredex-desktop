@@ -244,3 +244,41 @@ describe('Addendum D1: edit mode + inline comments (story 16.4)', () => {
     expect(chip).toContain('text-transform: uppercase;')
   })
 })
+
+describe('Addendum D1: activity cards (story 16.6)', () => {
+  it('feed rows are cards: bg-card, hairline, radius 10, shadow-sm, 12px padding', () => {
+    const card = block('.feed-card')
+    expect(card).toContain('background: var(--bg-card);')
+    expect(card).toContain('border: 1px solid var(--hairline);')
+    expect(card).toContain('border-radius: 10px;')
+    expect(card).toContain('box-shadow: var(--shadow-card);')
+    expect(card).toContain('padding: 12px;')
+  })
+  it('kind chips are mono 9px with a kind-tinted border', () => {
+    const chip = block('.feed-kind')
+    expect(chip).toContain('font-family: var(--font-mono);')
+    expect(chip).toContain('font-size: 9px;')
+    expect(chip).toContain('border: 1px solid currentColor;')
+    expect(block('.feed-kind-route')).toContain('var(--ok)')
+    expect(block('.feed-kind-handoff')).toContain('var(--gold)')
+    expect(block('.feed-kind-status')).toContain('var(--navy)')
+  })
+  it('paths and times are mono 11px --text-2 (absolute/full ride hover titles)', () => {
+    for (const sel of ['.feed-path', '.feed-time']) {
+      const b = block(sel)
+      expect(b, sel).toContain('font-family: var(--font-mono);')
+      expect(b, sel).toContain('font-size: 11px;')
+      expect(b, sel).toContain('color: var(--text-2);')
+    }
+  })
+  it('action pills are navy outline (no second gold in the view); serif only for quoted objectives', () => {
+    const pill = block('.feed-action')
+    expect(pill).toContain('border: 1px solid var(--navy);')
+    expect(pill).toContain('color: var(--navy);')
+    expect(pill).not.toContain('--gold')
+    expect(block('.feed-summary-objective')).toContain('font-family: var(--font-serif);')
+  })
+  it('the churn flip rail is the sanctioned 2px hairline connector', () => {
+    expect(block('.feed-flips')).toContain('border-left: 2px solid var(--hairline);')
+  })
+})

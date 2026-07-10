@@ -63,3 +63,36 @@ Both themes wired and switchable (system/light/dark in Settings). `:focus-visibl
 - No serif in nav/buttons. No border > 1px. No emoji in chrome.
 - Max one gold primary per view. No web-app 24px+ padding in dense lists.
 - No dead whitespace: reader content centered; wide views use the space (graph, board columns).
+
+---
+
+## Addendum D1 (2026-07-10): density, color, and writing surfaces
+
+User-driven corrections from live usage. Binding, supersedes conflicting lines above.
+
+### Reader is full-bleed
+The note content column uses the FULL detail pane width (32px side padding, no ch-measure cap). Serif headings and 14px/1.6 body stand; width is the user's, not ours. Same for MOC/index pages — and index pages must not render their H1 twice (strip the duplicate title line when it equals the filename).
+
+### Wikilinks are always visibly links
+Inline note references: `--gold` in dark theme, `--ink`-derived accent in light (#8A6116), 500 weight, no underline at rest, underline on hover. Broken: rust dotted. A "Reading order" section must never render an empty list — if wikilink filtering empties it, show the unresolved names as plain rust text with diagnostics, not silence.
+
+### Collapsible rails
+Both the nav sidebar and the file-list pane collapse: chevron affordance in each pane header + ⌘\ (sidebar) and ⌘⇧\ (list). Collapsed sidebar = 56px icon rail (badges survive as dots); collapsed list = 0 (reader full-bleed). State persists per vault. Animation 160ms ease-out, none under reduced-motion.
+
+### Vault tree sections (Notability-style)
+Each top-level group (_index, projects) and each project gets a **rounded section row**: full-width pill (radius 8), tinted background, 11px caps label, solid 8px color dot, chevron to collapse. Project colors are deterministic (hash of name) from this 8-tint set — light theme bg at 12% alpha, dark at 20%; dot solid:
+sage `#7C9A6D` · clay `#C07856` · slate `#6B7FA3` · moss `#8A8F55` · rose `#B07285` · sand `#B99B5F` · teal `#5F9490` · plum `#8D6E97`.
+Notes under a project inherit a 2px left rail in the project color. Selection keeps the gold left rail (gold budget: selection only).
+
+### Activity cards
+Feed rows become cards: `--bg-card`, hairline, radius 10, shadow-sm, 12px padding, grouped under day headers.
+Card anatomy: kind icon chip (ROUTE/HANDOFF/CONSUME/STATUS/SYNC — mono 9px, kind-tinted border), actor + relative time (absolute on hover), one-line summary (serif only if it quotes an objective), mono path (middle-truncated, full on hover), commit sha chip.
+**Consecutive status flips on the same handoff by the same actor within 10min collapse into one card** ("status churn ×5" expandable).
+Per-kind action buttons (right-aligned, outline pills, max 2): route→Open note · handoff→View card / Consume (if open+inbound) · consume/status→View card · sync→Open Sync · contract-linked→View diff.
+
+### Edit mode + inline comments (the writing surface)
+Reader gains a per-note mode toggle Read ⇄ Edit (⌘E). Edit = monospace 13px textarea-grade editor with a minimal formatter bar (bold/italic/code/link/list/heading — inserts markdown, no WYSIWYG), unsaved dot, ⌘S saves through the core host (vault-contained paths only, git auto-commit "edit <note> (Name)"). Frontmatter renders as a locked panel in edit mode — body only is editable (agents own frontmatter).
+**Inline comments:** selecting text in Read mode shows a floating "Comment" chip → side-margin composer → creates an anchored comment note (`type: comment`, `replies_to: <note>`, `anchor: "<exact quoted text>"`) — plain vault markdown, so AI agents see comments natively via MCP/CLI. Rendered: anchored text gets a soft gold underline-highlight; comments stack in a right margin rail (cards, author + time), orphaned anchors (quote no longer found) list at note end with rust chip. No comment deletion in-app v1 (files are the API).
+
+### D1 amendment — comment hover popover (user requirement, 2026-07-10)
+Anchored (commented) text MUST show a hover popover: comment body, author name, absolute time (mono 11px), rendered as a floating `--bg-card` card (hairline, radius 10, shadow-sm, max-width 360px) above the anchor; multiple comments on one anchor stack inside the popover. Popover is keyboard-reachable (focus the anchor → same popover). The margin rail remains; the popover is the fast path.

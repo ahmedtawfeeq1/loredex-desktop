@@ -131,7 +131,7 @@ development_status:
   epic-15: in-progress     # Hardening: natives, packaging, QA action items
   15-1-native-module-correctness: done          # dual-ABI staging (predev/postdist) + packaged 30s smoke PASS
   15-2-perf-pass: done                          # 6 budgets green (atlas cold 664ms/2s); fixture flushed a YAML-Date snoozed_until board crash — fixed
-  15-3-keyboard-coverage: in-progress           # action registry + shortcuts + ⌘K hints + ? cheatsheet + coverage test
+  15-3-keyboard-coverage: done                  # one action registry: ⌘1-9/⌘N/⇧⌘R/⇧⌘S/?, ⌘K hints, cheatsheet; coverage test guards it
 
 qa:
   pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded

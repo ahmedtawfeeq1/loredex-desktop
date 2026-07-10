@@ -1722,6 +1722,18 @@ a:hover {
   text-overflow: ellipsis;
 }
 
+/* story 15.3: registry actions carry their shortcut as a kbd chip */
+.palette-item-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-2);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--bg-inset);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
 .palette-empty {
   font-family: var(--font-serif);
   font-size: 13px;
@@ -3473,4 +3485,54 @@ a.commit-chip-sha:hover {
   font-size: 12px;
   line-height: 1.5;
   color: var(--text-2);
+}
+
+/* ── ? shortcut cheatsheet (story 15.3): the keyboard map, one modal ─────── */
+
+.cheatsheet {
+  max-width: 560px;
+  width: 560px;
+}
+
+.cheatsheet-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.cheatsheet-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+
+.cheatsheet-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.cheatsheet-keys {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-1);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: var(--bg-inset);
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  min-width: 44px;
+  text-align: center;
+}
+
+.cheatsheet-label {
+  font-size: 12px;
+  color: var(--text-1);
 }

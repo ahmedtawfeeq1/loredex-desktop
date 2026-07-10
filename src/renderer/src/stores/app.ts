@@ -23,7 +23,10 @@ interface AppState {
   identity: VaultIdentity | null
   error: string | null
   view: AppView
+  /** `?` cheatsheet modal (story 15.3) */
+  cheatsheetOpen: boolean
   setView(view: AppView): void
+  setCheatsheetOpen(open: boolean): void
   init(): Promise<void>
   openVaultPicker(): Promise<string | null>
 }
@@ -34,9 +37,14 @@ export const useApp = create<AppState>((set, get) => ({
   error: null,
   // home is the default view once a vault is open (story 2.5)
   view: 'home',
+  cheatsheetOpen: false,
 
   setView(view) {
     set({ view })
+  },
+
+  setCheatsheetOpen(open) {
+    set({ cheatsheetOpen: open })
   },
 
   async init() {

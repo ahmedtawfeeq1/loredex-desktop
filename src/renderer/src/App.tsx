@@ -4,9 +4,12 @@
  * (open-count badge), Settings.
  */
 import { useEffect } from 'react'
+import { appActions, VIEW_ORDER } from './actions/registry'
+import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
 import { IdentityBadge } from './components/IdentityBadge'
+import { ShortcutCheatsheet } from './components/ShortcutCheatsheet'
 import { SuggestToastStack } from './components/SuggestToast'
 import { ToastStack } from './components/ToastStack'
 import { useApp } from './stores/app'
@@ -71,12 +74,18 @@ export default function App(): React.JSX.Element {
   }, [init])
 
   useEffect(() => {
-    // global Cmd+K: the palette works from every view (story 2.4)
+    // ONE global keydown handler over the action registry (story 15.3):
+    // ⌘K palette (works from every view/overlay — story 2.4), ⌘1-9 views,
+    // ⌘N/⇧⌘R/⇧⌘S write+sync actions, ? cheatsheet. Overlays keep their own
+    // keys (Esc/⌘⏎/↑↓⏎); the matcher guards typing + open overlays.
     function onKey(e: KeyboardEvent): void {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      const action = matchShortcut(e, appActions(), {
+        typing: isTypingTarget(e.target),
+        overlayOpen: document.querySelector('.modal-backdrop, .palette-backdrop') !== null,
+      })
+      if (action) {
         e.preventDefault()
-        const s = useSearch.getState()
-        s.setPaletteOpen(!s.paletteOpen)
+        action.run()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -130,88 +139,31 @@ export default function App(): React.JSX.Element {
       <aside className="sidebar">
         <div className="sidebar-drag" />
         <nav aria-label="Views">
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'home'}
-            onClick={() => setView('home')}
-          >
-            Home
-          </button>
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'reader'}
-            onClick={() => setView('reader')}
-          >
-            Reader
-          </button>
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'handoffs'}
-            onClick={() => setView('handoffs')}
-          >
-            Handoffs
-            {openInbound > 0 && <span className="nav-badge">{openInbound}</span>}
-          </button>
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'atlas'}
-            title="Vault Atlas — the whole vault as a map (story 10.2)"
-            onClick={() => setView('atlas')}
-          >
-            Atlas
-          </button>
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'contracts'}
-            title="Contract change timeline (story 11.2)"
-            onClick={() => setView('contracts')}
-          >
-            Contracts
-          </button>
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'search'}
-            title="Search the vault (⌘K)"
-            onClick={() => setView('search')}
-          >
-            Search
-          </button>
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'feed'}
-            onClick={() => setView('feed')}
-          >
-            Activity
-          </button>
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'sync'}
-            onClick={() => setView('sync')}
-          >
-            Sync
-          </button>
-          <button
-            type="button"
-            className="nav-item"
-            aria-current={view === 'settings'}
-            onClick={() => setView('settings')}
-          >
-            Settings
-          </button>
+          {/* the registry's VIEW_ORDER is the nav — order, labels and ⌘1-9
+              hints can never drift apart (story 15.3) */}
+          {VIEW_ORDER.map(({ view: v, label }, i) => (
+            <button
+              key={v}
+              type="button"
+              className="nav-item"
+              aria-current={view === v}
+              title={`${label} (⌘${i + 1})`}
+              aria-keyshortcuts={`Meta+${i + 1}`}
+              onClick={() => setView(v)}
+            >
+              {label}
+              {v === 'handoffs' && openInbound > 0 && (
+                <span className="nav-badge">{openInbound}</span>
+              )}
+            </button>
+          ))}
         </nav>
         {status === 'ready' && (
           <button
             type="button"
             className="button-quiet sidebar-action"
-            title="Pick a markdown file to file into the vault (story 7.4)"
+            title="Pick a markdown file to file into the vault (⇧⌘R)"
+            aria-keyshortcuts="Meta+Shift+R"
             onClick={() => void useRoute.getState().start()}
           >
             Route a note…
@@ -269,6 +221,7 @@ export default function App(): React.JSX.Element {
         <div className="empty-state" />
       )}
       <Palette />
+      <ShortcutCheatsheet />
       <CreateVaultWizard />
       <JoinVaultWizard />
       <ComposeHandoffModal />

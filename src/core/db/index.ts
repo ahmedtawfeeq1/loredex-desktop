@@ -123,6 +123,32 @@ export function normalizeRemote(url: string): string {
   return `${host.toLowerCase()}/${path.replace(/^\/+/, '').replace(/\.git$/, '')}`
 }
 
+// ── poll_cursor (story 9.1 owns the semantics; the table ships here) ────────
+
+export interface PollCursor {
+  branch: string
+  lastSeenSha: string
+  lastFetchAt: string | null
+}
+
+export function getPollCursor(db: AppDb, vaultId: string): PollCursor | null {
+  const row = db
+    .prepare('SELECT branch, last_seen_sha, last_fetch_at FROM poll_cursor WHERE vault_id = ?')
+    .get(vaultId) as
+    | { branch: string; last_seen_sha: string; last_fetch_at: string | null }
+    | undefined
+  if (!row) return null
+  return { branch: row.branch, lastSeenSha: row.last_seen_sha, lastFetchAt: row.last_fetch_at }
+}
+
+export function setPollCursor(db: AppDb, vaultId: string, cursor: PollCursor): void {
+  db.prepare(
+    `INSERT INTO poll_cursor (vault_id, branch, last_seen_sha, last_fetch_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT(vault_id) DO UPDATE SET branch = excluded.branch,
+       last_seen_sha = excluded.last_seen_sha, last_fetch_at = excluded.last_fetch_at`,
+  ).run(vaultId, cursor.branch, cursor.lastSeenSha, cursor.lastFetchAt)
+}
+
 // ── meta + app_settings key/value helpers ───────────────────────────────────
 
 export function metaGet(db: AppDb, key: string): string | null {

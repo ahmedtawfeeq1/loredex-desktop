@@ -32,6 +32,9 @@ export function registerCoreHandlers(
   ipc: CoreIpc,
   // story 3.7: display requests travel core → main; tests default to a no-op
   postToMain: (msg: MainControlMessage) => void = () => {},
+  // story 9.1: mutable hooks filled in AFTER wiring (the poller needs the
+  // notifier this function returns) — a manual sync resets the poll clock
+  hooks: { onSyncRun?: () => void } = {},
 ): HandoffNotifier {
   // v0.1 has no poller — the notification/badge check rides every refresh action
   const notifier = createHandoffNotifier({
@@ -310,6 +313,7 @@ export function registerCoreHandlers(
       for (const text of report.warnings) ipc.emit({ kind: 'git.warning', text })
       ipc.emit({ kind: 'sync.changed', health: after })
       if (report.pulled > 0) ipc.emit({ kind: 'vault.changed', paths: [] }) // integrated notes → refetch
+      hooks.onSyncRun?.() // story 9.1: "Sync now" resets the poll clock
       return report
     }),
   )

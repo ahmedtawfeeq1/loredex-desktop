@@ -102,6 +102,10 @@ function buildMenu(): void {
 
 app.whenReady().then(() => {
   buildMenu()
+  // story 9.1: window focus state drives the core host's poll cadence
+  // (60 s focused / 5 min blurred). Forwarding only — no logic here.
+  app.on('browser-window-focus', () => core?.postMessage({ t: 'focus', focused: true }))
+  app.on('browser-window-blur', () => core?.postMessage({ t: 'focus', focused: false }))
   ipcMain.handle('loredex:pick-vault', (event) =>
     pickVault(BrowserWindow.fromWebContents(event.sender)),
   )

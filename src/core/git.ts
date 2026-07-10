@@ -11,7 +11,8 @@
  *   effect is identical per-command injection. Recorded deviation; a lib PR
  *   revision threading `-c` args replaces this.
  */
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
+import { promisify } from 'node:util'
 import type { Identity } from '../shared/types'
 
 /**
@@ -24,6 +25,32 @@ export function gitLog(vaultPath: string, args: readonly string[]): string {
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
   })
+}
+
+const execFileAsync = promisify(execFile)
+
+/**
+ * Async git runner for the poller's tick path (story 9.1): fetch and the
+ * read-only queries run without blocking the core host. Failures throw with
+ * git's stderr in the message so callers can surface it (F8 — never swallow).
+ */
+export async function gitAsync(
+  cwd: string,
+  args: readonly string[],
+  opts: { timeoutMs?: number } = {},
+): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync('git', [...args], {
+      cwd,
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+      timeout: opts.timeoutMs ?? 60_000,
+    })
+    return stdout
+  } catch (e) {
+    const stderr = (e as { stderr?: string }).stderr?.trim()
+    throw new Error(stderr || (e instanceof Error ? e.message : String(e)))
+  }
 }
 
 export function gitIdentityArgs(identity: Identity): string[] {

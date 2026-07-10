@@ -35,6 +35,7 @@ import {
   previewRoute,
   PRODUCT_BRIEF_NAME,
   type ProductDashboard,
+  rebuildIndexes,
   renderDashboardMarkdown,
   replyToHandoff,
   resolveNoteInsideVault,
@@ -248,6 +249,19 @@ export function pullPush(): { pulled: boolean; pushed: boolean } {
 /** Vault schema vs this engine (story 5.2 handshake, NFR8) — lib check. */
 export function schemaStatus(): VaultSchemaStatus {
   return vaultSchemaStatus(getConfig().vaultPath)
+}
+
+/** Lib parseDoc for out-of-tree content (story 9.1: remote refs via git show). */
+export function parseMarkdown(raw: string): Doc {
+  return parseDoc(raw)
+}
+
+/**
+ * Rebuild generated indexes from filesystem truth (story 9.1 post-integrate
+ * reconcile, F4 rule). A vault write — callers hold the write lock.
+ */
+export function rebuildVaultIndexes(): void {
+  rebuildIndexes(getConfig().vaultPath)
 }
 
 /**

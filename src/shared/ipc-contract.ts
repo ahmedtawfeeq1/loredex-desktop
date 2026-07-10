@@ -149,6 +149,10 @@ export type MainControlMessage =
   | { t: 'notify'; title: string; body: string; relPath: string }
   | { t: 'badge'; count: number }
 
+/** Main → core over the same fork channel: brokered ports (story 1.1) and
+ *  window focus state driving the poller cadence (story 9.1). */
+export type CoreControlMessage = { t: 'port' } | { t: 'focus'; focused: boolean }
+
 export function isMainControlMessage(v: unknown): v is MainControlMessage {
   if (typeof v !== 'object' || v === null || !('t' in v)) return false
   const m = v as MainControlMessage

@@ -36,6 +36,28 @@ export async function pickVaultDialog(win: BrowserWindow | null): Promise<string
 }
 
 /**
+ * Native save panel for atlas exports (story 10.7). Display-only main-process
+ * work: the renderer hands finished bytes; main only picks where they land.
+ * Returns the written path, or null when the user cancels.
+ */
+export async function saveExportDialog(
+  win: BrowserWindow | null,
+  defaultName: string,
+  data: string | ArrayBuffer,
+): Promise<string | null> {
+  const ext = defaultName.split('.').pop() ?? 'svg'
+  const opts = {
+    title: 'Export atlas view',
+    defaultPath: defaultName,
+    filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
+  }
+  const result = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+  if (result.canceled || !result.filePath) return null
+  writeFileSync(result.filePath, typeof data === 'string' ? data : Buffer.from(data))
+  return result.filePath
+}
+
+/**
  * Native markdown-file picker for route-a-note (story 7.4). Same TCC rule:
  * file access only via the panel or an explicit drop — never a cold scan.
  */

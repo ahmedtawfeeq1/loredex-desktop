@@ -14,6 +14,7 @@ declare global {
       onOpenHandoff(cb: (relPath: string) => void): Unsubscribe
       pickRouteFile(): Promise<string | null>
       pathForFile(file: File): string
+      saveExport(defaultName: string, data: string | ArrayBuffer): Promise<string | null>
     }
   }
 }
@@ -51,4 +52,9 @@ export function pickRouteFile(): Promise<string | null> {
 /** Real filesystem path of a dropped File (preload webUtils, story 7.4). */
 export function pathForFile(file: File): string {
   return window.loredex.pathForFile(file)
+}
+
+/** Atlas export save panel (story 10.7, main-owned): null = user cancelled. */
+export function saveExport(defaultName: string, data: string | ArrayBuffer): Promise<string | null> {
+  return window.loredex.saveExport(defaultName, data)
 }

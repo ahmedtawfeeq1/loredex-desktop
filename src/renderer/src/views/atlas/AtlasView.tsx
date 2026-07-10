@@ -14,7 +14,10 @@ import { activeFilterCount, applyAtlasFilters, focusNeighborhood } from './atlas
 import { AtlasFilterPanel } from './AtlasFilterPanel'
 import { visibleAtlas } from './atlas-visibility'
 import { BlockedList } from './BlockedList'
+import { affectedNodeIds, clusterChangedCounts } from './changed-since'
+import { ChangedSinceToggle } from './ChangedSinceToggle'
 import type { AtlasDecor } from './decor'
+import { exportAtlasView } from './export'
 import { PathTrace } from './PathTrace'
 import { activateNode, performResolution, resolveEdgeTarget } from './resolve'
 import { TourPanel } from './TourPanel'
@@ -49,6 +52,9 @@ export function AtlasView(): React.JSX.Element {
   const setFocus = useAtlas((s) => s.setFocus)
   const pathResult = useAtlas((s) => s.pathResult)
   const searchRings = useAtlas((s) => s.searchRings)
+  const overlayOn = useAtlas((s) => s.overlayOn)
+  const overlayChanged = useAtlas((s) => s.overlayChanged)
+  const toggleOverlay = useAtlas((s) => s.toggleOverlay)
 
   useEffect(() => {
     // live data (watcher/poller) keeps it fresh after this first fetch
@@ -81,16 +87,27 @@ export function AtlasView(): React.JSX.Element {
 
   const decor = useMemo<AtlasDecor>(() => {
     const path = pathResult && pathResult !== 'none' ? pathResult : null
+    // the overlay composes with filters/focus (10.7 AC2): sets derive over the
+    // SHOWN edges; toggling it off restores the plain canvas
+    const changed = overlayOn && overlayChanged.size > 0 ? overlayChanged : null
     return {
       ...(tourHighlight.length > 0 ? { tour: new Set(tourHighlight) } : {}),
       ...(searchRings.size > 0 ? { search: searchRings } : {}),
       ...(path ? { path: new Set(path.nodeIds), pathEdges: new Set(path.edgeIds) } : {}),
+      ...(changed && shownGraph
+        ? { changed, affected: affectedNodeIds(changed, shownGraph.edges) }
+        : {}),
       // focus composes with the filtered set (10.6 AC5): 1-hop over shown edges
       ...(focusId && shownGraph
         ? { focus: focusNeighborhood(focusId, shownGraph.edges) }
         : {}),
     }
-  }, [tourHighlight, searchRings, pathResult, focusId, shownGraph])
+  }, [tourHighlight, searchRings, pathResult, focusId, shownGraph, overlayOn, overlayChanged])
+
+  const changedCounts = useMemo(
+    () => (overlayOn ? clusterChangedCounts(overlayChanged) : undefined),
+    [overlayOn, overlayChanged],
+  )
 
   // the selected node's project — lets the Learn segment work from Overview
   const selectedProject = useMemo(() => {
@@ -172,6 +189,34 @@ export function AtlasView(): React.JSX.Element {
           >
             Blocked
           </button>
+          <button
+            type="button"
+            className="atlas-tool"
+            aria-pressed={overlayOn}
+            title="Glow what changed since a date or your last visit"
+            onClick={() => {
+              if (overlayOn && panel !== 'changed') setPanel('changed')
+              else toggleOverlay()
+            }}
+          >
+            Changed
+          </button>
+          <button
+            type="button"
+            className="atlas-tool"
+            title="Export the current view as a standalone SVG"
+            onClick={() => void exportAtlasView('svg')}
+          >
+            Export SVG
+          </button>
+          <button
+            type="button"
+            className="atlas-tool"
+            title="Export the current view as a PNG"
+            onClick={() => void exportAtlasView('png')}
+          >
+            PNG
+          </button>
         </div>
       </div>
       {error && <div className="note-error">{error}</div>}
@@ -220,11 +265,13 @@ export function AtlasView(): React.JSX.Element {
             }}
             decor={decor}
             fitToIds={tourHighlight}
+            changedCounts={changedCounts}
           />
           {panel === 'tour' && <TourPanel />}
           {panel === 'filters' && <AtlasFilterPanel />}
           {panel === 'path' && <PathTrace />}
           {panel === 'blocked' && <BlockedList />}
+          {panel === 'changed' && <ChangedSinceToggle />}
         </div>
       )}
     </div>

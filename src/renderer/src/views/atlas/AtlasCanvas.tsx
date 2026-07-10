@@ -139,6 +139,7 @@ export function AtlasCanvas({
   onFocusKey,
   decor,
   fitToIds,
+  changedCounts,
 }: {
   graph: AtlasGraph
   /** nodes after collapsed-atom filtering (atlas-visibility) */
@@ -158,6 +159,8 @@ export function AtlasCanvas({
   decor?: AtlasDecor
   /** fit the viewport AROUND these nodes (tour step, story 10.5 AC3) */
   fitToIds?: string[]
+  /** changed-since counts per project cluster (story 10.7 AC1) */
+  changedCounts?: ReadonlyMap<string, number>
 }): React.JSX.Element {
   const paneRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -327,6 +330,9 @@ export function AtlasCanvas({
               onActivate={onActivate}
               nodeRef={refFor(node.id)}
               decorClass={nodeDecorClass(node.id, decor)}
+              changedCount={
+                node.type === 'project' ? (changedCounts?.get(node.label) ?? 0) : 0
+              }
             />
           ))}
         </g>

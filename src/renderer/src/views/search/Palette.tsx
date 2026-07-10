@@ -11,6 +11,7 @@ import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import { useRoute } from '../../stores/route'
 import { openSearchResult, useSearch } from '../../stores/search'
+import { exportAtlasView } from '../atlas/export'
 import { activateNode } from '../atlas/resolve'
 import { handoffRefFromNote } from '../handoffs/compose-form'
 import { clampSelection, moveSelection } from './palette-nav'
@@ -104,6 +105,24 @@ function actionItems(q: string): PaletteItem[] {
           ? 'Atlas: Blocked on — show everything again'
           : 'Atlas: Blocked on — isolate blocking chains',
         run: () => atlas.toggleBlocked(),
+      },
+      // story 10.7: overlay toggle + both exports, keyboard-reachable
+      {
+        key: 'action:atlas-overlay',
+        title: atlas.overlayOn
+          ? 'Atlas: hide changed-since overlay'
+          : 'Atlas: show changed-since overlay',
+        run: () => atlas.toggleOverlay(),
+      },
+      {
+        key: 'action:atlas-export-svg',
+        title: 'Atlas: export view (SVG)',
+        run: () => void exportAtlasView('svg'),
+      },
+      {
+        key: 'action:atlas-export-png',
+        title: 'Atlas: export view (PNG)',
+        run: () => void exportAtlasView('png'),
       },
     )
     if (selected) {

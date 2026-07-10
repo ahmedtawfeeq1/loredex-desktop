@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,13 +20,13 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Changed/affected model (AC: 1, 2, 5)
-  - [ ] Core or store-side derivation: activity events since cursor → changed node set; 1-hop expansion over the story 10.1 adjacency → affected set; per-cluster counts; live event subscription
-- [ ] Overlay rendering (AC: 1, 2)
-  - [ ] Glow + affected ring styles (both themes, distinct from search/tour rings); toggle + since-picker UI; reduced-motion variant
-- [ ] Export (AC: 3, 4)
-  - [ ] SVG serialization of the current canvas with resolved token colors + caption; PNG rasterization; main-process save dialog; ⌘K entries
-- [ ] Tests (AC: 5)
+- [x] Changed/affected model (AC: 1, 2, 5)
+  - [x] Core or store-side derivation: activity events since cursor → changed node set; 1-hop expansion over the story 10.1 adjacency → affected set; per-cluster counts; live event subscription
+- [x] Overlay rendering (AC: 1, 2)
+  - [x] Glow + affected ring styles (both themes, distinct from search/tour rings); toggle + since-picker UI; reduced-motion variant
+- [x] Export (AC: 3, 4)
+  - [x] SVG serialization of the current canvas with resolved token colors + caption; PNG rasterization; main-process save dialog; ⌘K entries
+- [x] Tests (AC: 5)
 
 ## Dev Notes
 
@@ -51,10 +51,31 @@ Approved
 
 ### Agent Model Used
 
+claude-fable-5 (Claude Code)
+
 ### Debug Log References
+
+- `npx vitest run` — 51 files / 362 tests green (changed-since partition/boundary/live suites, export var-resolution + standalone-SVG suite)
+- `npx tsc --noEmit` clean; `npm run build` green
+- Dev-launch smoke: app alive 45 s, 0 core-host exits, no errors (after a one-off `npx electron-rebuild` for better-sqlite3 — see deviations)
 
 ### Completion Notes List
 
+- Derivation is pure renderer-side set logic (`changed-since.ts`): events at-or-after the since-point map onto the FULL model (a deep unscoped `atlas.graph` fetch, cached core-side) so Overview — which renders no note nodes — still gets per-cluster counts (parsed from typed ids). Affected = 1-hop over the SHOWN (filtered) edges, so the overlay composes with 10.6 filters/focus; toggling off restores the plain canvas.
+- Live updates: `vault.changed` paths union into the glow set immediately (`withLiveChanges`); the graph reload then re-runs `refreshOverlay` for full reconciliation. No new event kinds, no persistent state.
+- "Since my last visit" keys off a renderer-local localStorage stamp (one per app session; the previous one is the last visit). DEVIATION: per-user UI pref lives in localStorage rather than app-db — the story allows read-state/app-db but a settings channel for one timestamp failed the shortest-diff test; losing it costs one default since-point.
+- Ring taxonomy: changed = --ok glow + soft pulse (global reduced-motion rule freezes it to the static ring), affected = dashed --ok ring; changed wins when a node is both. Both distinct from navy search tiers and gold tour/path rings; no gold spent.
+- Export serializes the hand-rolled SVG: `.atlas` CSS rules collected from the app stylesheets with every `var(--…)` resolved to literals (fixed-point, fallback-aware), solid `--bg-app` background, mono caption `<vault> · <date>`; PNG rasterizes the same SVG at 2x. Saved via a new main-owned native save panel (`loredex:save-export`); receipt toast with the written path. Both actions are toolbar secondaries + ⌘K-listed.
+
 ### File List
+
+- src/renderer/src/views/atlas/changed-since.ts + .test.ts (new: pure sets)
+- src/renderer/src/views/atlas/export.ts + .test.ts (new: resolveCssVars, buildExportSvg, collectors, exportAtlasView)
+- src/renderer/src/views/atlas/ChangedSinceToggle.tsx (new: toggle row + since picker + counts)
+- src/renderer/src/views/atlas/decor.ts (changed/affected classes), AtlasNodeCard.tsx (cluster changed-count), AtlasCanvas.tsx (changedCounts pass-through), AtlasView.tsx (toolbar + decor + panel)
+- src/renderer/src/stores/atlas.ts (overlay state, last-visit stamp, live union)
+- src/renderer/src/views/search/Palette.tsx (⌘K overlay/export actions)
+- src/main/dialogs.ts + src/main/index.ts (saveExportDialog + handler), src/preload/index.ts, src/renderer/src/api.ts (saveExport bridge)
+- src/renderer/src/styles.css (glow/affected rings, toggle switch, counts)
 
 ## QA Results

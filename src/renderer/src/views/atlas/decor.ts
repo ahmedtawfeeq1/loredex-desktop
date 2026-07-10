@@ -15,6 +15,10 @@ export interface AtlasDecor {
   pathEdges?: ReadonlySet<string>
   /** focus mode: the visible 1-hop set; everything else fades */
   focus?: ReadonlySet<string> | null
+  /** changed-since overlay (10.7): touched nodes glow (--ok, never gold)… */
+  changed?: ReadonlySet<string>
+  /** …and their 1-hop neighbors carry a distinct affected ring */
+  affected?: ReadonlySet<string>
 }
 
 export function nodeDecorClass(id: string, decor: AtlasDecor | undefined): string {
@@ -24,6 +28,8 @@ export function nodeDecorClass(id: string, decor: AtlasDecor | undefined): strin
   const tier = decor.search?.get(id)
   if (tier !== undefined) cls += ` atlas-ring-search-${tier}`
   if (decor.path?.has(id)) cls += ' atlas-node-path'
+  if (decor.changed?.has(id)) cls += ' atlas-node-changed'
+  else if (decor.affected?.has(id)) cls += ' atlas-node-affected'
   if (decor.focus && !decor.focus.has(id)) cls += ' atlas-node-faded'
   return cls
 }

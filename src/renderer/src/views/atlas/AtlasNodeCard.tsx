@@ -198,6 +198,7 @@ export function AtlasNodeCard({
   nodeRef,
   describe,
   decorClass = '',
+  changedCount = 0,
 }: {
   node: AtlasNode
   selected: boolean
@@ -209,6 +210,8 @@ export function AtlasNodeCard({
   describe: string
   /** ring decoration classes (tour/search/path/… — views/atlas/decor.ts) */
   decorClass?: string
+  /** project clusters at Overview: changed-since count (story 10.7 AC1) */
+  changedCount?: number
 }): React.JSX.Element {
   const disabledSource = node.type === 'source' && node.localPath == null
   return (
@@ -242,6 +245,11 @@ export function AtlasNodeCard({
         rx={12}
       />
       <Body node={node} />
+      {node.type === 'project' && changedCount > 0 && (
+        <text className="atlas-node-changed-count" x={14} y={NODE_H - 32} aria-hidden>
+          {changedCount} changed
+        </text>
+      )}
     </g>
   )
 }

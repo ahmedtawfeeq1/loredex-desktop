@@ -9,6 +9,7 @@ import { isErrEnvelope } from '../../../shared/ipc-contract'
 import type {
   AtlasGraph,
   AtlasLevel,
+  AtlasNode,
   AtlasPathResult,
   AtlasScope,
   TourDef,
@@ -18,6 +19,7 @@ import {
   EMPTY_FILTERS,
   searchRingTiers,
 } from '../views/atlas/atlas-filters'
+import { changedNodeIds, withLiveChanges } from '../views/atlas/changed-since'
 import { clampStep, playbackActionFor } from '../views/atlas/tour-playback'
 import { invoke, onEvent } from '../api'
 import { useApp } from './app'
@@ -45,15 +47,26 @@ interface AtlasState {
   /** visited levels/nodes — bounded back/forward stack (story 10.3) */
   history: AtlasHistoryEntry[]
   historyIndex: number
-  /** the one open side panel (10.5 tours; 10.6 filters/path/blocked) */
-  panel: 'tour' | 'filters' | 'path' | 'blocked' | null
+  /** the one open side panel (10.5 tours; 10.6 filters/path/blocked; 10.7 changed) */
+  panel: 'tour' | 'filters' | 'path' | 'blocked' | 'changed' | null
   /** tours from atlas.tours — recomputed with graph invalidation (10.5 AC5) */
   tours: TourDef[] | null
   activeTour: TourDef | null
   tourStep: number
   /** node ids the current step highlights (pulse ring + viewport fit) */
   tourHighlight: string[]
-  setPanel(panel: 'tour' | 'filters' | 'path' | 'blocked' | null): void
+  setPanel(panel: 'tour' | 'filters' | 'path' | 'blocked' | 'changed' | null): void
+  /** story 10.7: changed-since overlay — glow + affected rings, live-updating */
+  overlayOn: boolean
+  /** since-point: full ISO or YYYY-MM-DD; boundary events included */
+  overlaySince: string | null
+  overlayChanged: Set<string>
+  /** full (deep, unscoped) node list — events map onto ALL nodes, not just
+   *  the current level's (Overview renders no note-level nodes) */
+  overlayNodes: AtlasNode[]
+  toggleOverlay(): void
+  setOverlaySince(since: string): void
+  refreshOverlay(): Promise<void>
   /** story 10.6: AND-composed facets + the blocked preset */
   filters: AtlasFilters
   setFilters(patch: Partial<AtlasFilters>): void
@@ -94,6 +107,16 @@ interface AtlasState {
 
 const errText = (e: unknown): string => (isErrEnvelope(e) ? `${e.code}: ${e.message}` : String(e))
 
+// "Since my last visit" (story 10.7): the previous app-session's atlas stamp.
+// Renderer-local UI pref (localStorage) — deliberately NOT vault or app-db
+// state; losing it costs one default since-point, nothing more.
+const LAST_VISIT_KEY = 'loredex.atlas.lastVisit'
+let previousVisit: string | null = null
+
+export function atlasLastVisit(): string | null {
+  return previousVisit
+}
+
 /** Pure history push: truncate the forward tail, cap at MAX_HISTORY. */
 export function pushHistory(
   history: AtlasHistoryEntry[],
@@ -127,9 +150,51 @@ export const useAtlas = create<AtlasState>((set, get) => ({
   pathTo: null,
   pathResult: null,
   searchRings: new Map(),
+  overlayOn: false,
+  overlaySince: null,
+  overlayChanged: new Set(),
+  overlayNodes: [],
 
   setPanel(panel) {
     set({ panel })
+  },
+
+  // the overlay is a toggle (10.7 AC2): on opens the since-picker panel and
+  // computes the sets; off restores the plain canvas
+  toggleOverlay() {
+    const on = !get().overlayOn
+    const since = get().overlaySince ?? atlasLastVisit() ?? new Date().toISOString().slice(0, 10)
+    set({
+      overlayOn: on,
+      overlaySince: since,
+      panel: on ? 'changed' : get().panel === 'changed' ? null : get().panel,
+      ...(on ? {} : { overlayChanged: new Set<string>() }),
+    })
+    if (on) void get().refreshOverlay()
+  },
+
+  setOverlaySince(since) {
+    set({ overlaySince: since })
+    if (get().overlayOn) void get().refreshOverlay()
+  },
+
+  async refreshOverlay() {
+    const { overlaySince } = get()
+    if (!overlaySince) return
+    try {
+      // map events over the FULL model (deep, unscoped — cached core-side):
+      // Overview renders no note nodes but must still count per cluster
+      const [events, deep] = await Promise.all([
+        invoke('activity.feed', { since: overlaySince }),
+        invoke('atlas.graph', { level: 'deep' }),
+      ])
+      set({
+        overlayNodes: deep.nodes,
+        overlayChanged: changedNodeIds(events, overlaySince, deep.nodes),
+      })
+    } catch {
+      set({ overlayChanged: new Set<string>() }) // feed unavailable → plain canvas
+    }
   },
 
   setFilters(patch) {
@@ -235,6 +300,8 @@ export const useAtlas = create<AtlasState>((set, get) => ({
       // AC4 (10.3): selection survives a transition when the node still exists
       const keep = selectedId && graph.nodes.some((n) => n.id === selectedId)
       set({ graph, loading: false, error: null, selectedId: keep ? selectedId : null })
+      // the overlay maps events onto the CURRENT graph's nodes — remap (10.7)
+      if (get().overlayOn) void get().refreshOverlay()
     } catch (e) {
       set({ graph: null, loading: false, error: errText(e) })
     }
@@ -323,6 +390,10 @@ export const useAtlas = create<AtlasState>((set, get) => ({
       pathTo: null,
       pathResult: null,
       searchRings: new Map(),
+      overlayOn: false,
+      overlaySince: null,
+      overlayChanged: new Set(),
+      overlayNodes: [],
     })
   },
 }))
@@ -351,6 +422,13 @@ export function applySearchRings(
 // so the stamp flips before (and regardless of) the refetch.
 // (bridge guard keeps this importable from node unit tests)
 if (typeof window !== 'undefined' && window.loredex) {
+  // one visit stamp per app session; the PREVIOUS one is "my last visit"
+  try {
+    previousVisit = window.localStorage.getItem(LAST_VISIT_KEY)
+    window.localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString())
+  } catch {
+    previousVisit = null
+  }
   useSearch.subscribe((state) => {
     applySearchRings(state.q, state.hits, useApp.getState().identity?.vaultPath ?? '')
   })
@@ -362,6 +440,13 @@ if (typeof window !== 'undefined' && window.loredex) {
         n.type === 'handoff' && n.label === e.id ? { ...n, status: e.to } : n,
       )
       useAtlas.setState({ graph: { ...s.graph, nodes } })
+    }
+    // changed-since overlay updates live as events arrive (10.7 AC2): touched
+    // paths glow immediately; the post-load refreshOverlay reconciles fully
+    if (e.kind === 'vault.changed' && s.overlayOn && e.paths.length > 0) {
+      useAtlas.setState({
+        overlayChanged: withLiveChanges(s.overlayChanged, e.paths, s.overlayNodes),
+      })
     }
     if (
       e.kind === 'vault.changed' ||

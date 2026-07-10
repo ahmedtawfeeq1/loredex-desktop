@@ -1,57 +1,40 @@
-/* Loredex Desktop — DESIGN.md tokens + shell. "Card catalog": archival reading
-   surface, disciplined dense chrome. Tokens implemented exactly as specified. */
+/* Loredex Desktop — DESIGN.md v2 tokens + shell. "Card catalog, daylight
+   edition": warm paper-grey ground, white cards, navy ink, gold spent only on
+   primary actions and open-handoff state. Tokens implemented exactly as
+   specified; dark theme is the same tokens flipped via [data-theme='dark']
+   (the theme store stamps the resolved theme on <html> — 'system' follows the
+   OS through a prefers-color-scheme listener). */
 
 :root {
-  --bg-sidebar: rgba(236, 236, 238, 0.72);
-  --bg-content: #ffffff;
-  --bg-raised: #fafaf8;
-  --hairline: #e3e3e0;
-  --text-1: #1d1d1f;
+  --bg-app: #f6f5f1;
+  --bg-card: #ffffff;
+  --bg-inset: #efeee9;
+  --hairline: #e4e2db;
+  --text-1: #131826;
   --text-2: #6e6e73;
-  --ink: #2e6e5e;
-  --stamp: #a16a1b;
+  --gold: #c08a2d;
+  --gold-ink: #131826;
+  --navy: #131826;
   --rust: #a63d2f;
+  --ok: #2e6e5e;
+  --shadow-card: 0 1px 3px rgba(19, 24, 38, 0.06);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-sidebar: rgba(28, 28, 30, 0.72);
-    --bg-content: #232326;
-    --bg-raised: #2a2a2e;
-    --hairline: #3a3a3e;
-    --text-1: #ededef;
-    --text-2: #98989e;
-    --ink: #63b3a1;
-    --stamp: #d9a441;
-    --rust: #d4715f;
-  }
-}
-
-/* app setting wins over the OS theme (no toggle UI yet — hook is live) */
-:root[data-theme='light'] {
-  --bg-sidebar: rgba(236, 236, 238, 0.72);
-  --bg-content: #ffffff;
-  --bg-raised: #fafaf8;
-  --hairline: #e3e3e0;
-  --text-1: #1d1d1f;
-  --text-2: #6e6e73;
-  --ink: #2e6e5e;
-  --stamp: #a16a1b;
-  --rust: #a63d2f;
-}
 :root[data-theme='dark'] {
-  --bg-sidebar: rgba(28, 28, 30, 0.72);
-  --bg-content: #232326;
-  --bg-raised: #2a2a2e;
-  --hairline: #3a3a3e;
-  --text-1: #ededef;
-  --text-2: #98989e;
-  --ink: #63b3a1;
-  --stamp: #d9a441;
+  --bg-app: #131826;
+  --bg-card: #1c2536;
+  --bg-inset: #182032;
+  --hairline: #2a3347;
+  --text-1: #f2efe8;
+  --text-2: #98a0b0;
+  --gold: #e0a83e;
+  --gold-ink: #131826;
+  --navy: #f2efe8;
   --rust: #d4715f;
+  --ok: #63b3a1;
 }
 
-/* ── type roles ────────────────────────────────────────────────────────── */
+/* ── type roles (unchanged from v1) ────────────────────────────────────── */
 
 :root {
   --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
@@ -68,7 +51,6 @@ html,
 body,
 #root {
   height: 100%;
-  background: transparent; /* window vibrancy shows through the sidebar */
 }
 
 body {
@@ -76,6 +58,7 @@ body {
   font-size: 13px;
   font-weight: 400;
   color: var(--text-1);
+  background: var(--bg-app); /* window ground — flat, no vibrancy dependency */
   overflow: hidden;
   user-select: none;
 }
@@ -85,8 +68,9 @@ body {
   font-size: 11px;
 }
 
+/* quality floor: 2px gold ring offset 2px, everywhere */
 :focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--gold);
   outline-offset: 2px;
 }
 
@@ -99,8 +83,14 @@ button {
   cursor: pointer;
 }
 
+/* links: navy, underline on hover (dark: paper via the token flip) */
 a {
-  color: var(--ink);
+  color: var(--navy);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -112,11 +102,26 @@ a {
   }
 }
 
-/* ── three-pane layout ─────────────────────────────────────────────────── */
+/* ── three-pane skeleton on the paper ground; every content region a card ── */
 
 .app {
   display: flex;
   height: 100%;
+  gap: 12px;
+  padding: 0 12px 12px 0;
+}
+
+/* card surface recipe: --bg-card + 1px hairline + radius 12 + shadow-sm.
+   Empty states are cards only at pane level (nested ones inherit the pane). */
+.pane-list,
+.pane-reader,
+.pane-board,
+.app > .empty-state {
+  margin-top: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
 }
 
 .sidebar {
@@ -124,7 +129,7 @@ a {
   flex: none;
   display: flex;
   flex-direction: column;
-  background: var(--bg-sidebar);
+  background: transparent; /* flat on --bg-app (v2: no vibrancy dependency) */
 }
 
 .sidebar-drag {
@@ -143,8 +148,9 @@ a {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 5px 8px;
-  border-radius: 5px;
+  padding: 5px 8px 5px 12px;
+  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-radius: 0 6px 6px 0;
   transition: background 100ms ease-out;
 }
 
@@ -152,8 +158,11 @@ a {
   background: color-mix(in srgb, var(--text-1) 7%, transparent);
 }
 
+/* active nav: gold left rail (4px) + inset fill + navy 600 text */
 .nav-item[aria-current='true'] {
-  background: color-mix(in srgb, var(--ink) 14%, transparent);
+  border-left-color: var(--gold);
+  background: var(--bg-inset);
+  color: var(--navy);
   font-weight: 600;
 }
 
@@ -162,9 +171,6 @@ a {
   flex: none;
   display: flex;
   flex-direction: column;
-  background: var(--bg-content);
-  border-left: 1px solid var(--hairline);
-  border-right: 1px solid var(--hairline);
   overflow-y: auto;
 }
 
@@ -172,10 +178,11 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 8px 4px 12px;
+  padding: 12px 12px 4px 16px;
   position: sticky;
   top: 0;
-  background: var(--bg-content);
+  background: var(--bg-card);
+  border-radius: 12px 12px 0 0;
 }
 
 .pane-list-title {
@@ -190,16 +197,15 @@ a {
   position: relative; /* anchors the diagnostics pill/panel */
   flex: 1;
   min-width: 0;
-  background: var(--bg-content);
   overflow-y: auto;
 }
 
-/* ── vault tree (story 2.1) ────────────────────────────────────────────── */
+/* ── vault tree (story 2.1): dense 38px rows ───────────────────────────── */
 
 .tree-branch {
   list-style: none;
   margin: 0;
-  padding: 0 0 8px 0;
+  padding: 0 8px 8px 0;
 }
 
 .tree-branch .tree-branch {
@@ -208,11 +214,11 @@ a {
 
 .tree-dir {
   display: block;
-  padding: 4px 8px 4px 12px;
+  padding: 8px 8px 8px 16px;
   font-weight: 600;
   color: var(--text-2);
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 0 6px 6px 0;
   transition: background 100ms ease-out;
 }
 
@@ -228,9 +234,11 @@ a {
 .tree-file {
   display: block;
   width: 100%;
+  min-height: 38px;
   text-align: left;
-  padding: 4px 8px 4px 12px;
-  border-left: 4px solid transparent;
+  padding: 10px 8px 10px 12px;
+  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-radius: 0 6px 6px 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -244,29 +252,31 @@ a {
 }
 
 .tree-file[aria-current='true'] {
-  border-left-color: var(--ink); /* 4px Archive Ink left rail */
-  background: var(--bg-raised);
+  border-left-color: var(--gold);
+  background: var(--bg-inset);
+  color: var(--navy);
   font-weight: 600;
 }
 
 .tree-empty {
   font-family: var(--font-serif);
   color: var(--text-2);
-  padding: 16px 12px;
+  padding: 16px;
 }
 
-/* ── vault identity chip (permanent — the F6 fix made visible) ─────────── */
+/* ── vault identity chip: white card, permanent (the F6 fix visible) ────── */
 
 .vault-chip {
   flex: none;
   display: flex;
   gap: 8px;
   align-items: flex-start;
-  margin: 8px;
+  margin: 8px 8px 0;
   padding: 8px;
   border: 1px solid var(--hairline);
-  border-radius: 8px;
-  background: var(--bg-raised);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
 }
 
 .vault-chip-dot {
@@ -275,7 +285,7 @@ a {
   margin-top: 4px;
   flex: none;
   border-radius: 50%;
-  background: var(--ink); /* ink = clean; amber = ahead/behind; rust = error */
+  background: var(--ok); /* ok = in sync; gold = ahead/behind; rust = error */
 }
 
 .vault-chip-text {
@@ -301,7 +311,7 @@ a {
   text-align: left;
 }
 
-/* ── empty states: one serif sentence + one button ─────────────────────── */
+/* ── empty states: one serif sentence + one action ─────────────────────── */
 
 .empty-state {
   flex: 1;
@@ -310,8 +320,6 @@ a {
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: var(--bg-content);
-  border-left: 1px solid var(--hairline);
 }
 
 .empty-state p {
@@ -320,18 +328,62 @@ a {
   color: var(--text-2);
 }
 
+/* ── buttons: gold pill primary / navy outline secondary / rust outline
+     destructive. One gold primary per view, maximum. ─────────────────────── */
+
 .button-primary {
-  padding: 5px 14px;
-  border-radius: 6px;
-  background: var(--ink);
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--gold);
+  color: var(--gold-ink);
   font-weight: 600;
+  transition: filter 100ms ease-out;
+}
+
+.button-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--navy);
+  color: var(--navy);
+  font-weight: 600;
+  background: transparent;
   transition: background 100ms ease-out;
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
+}
+
+.button-destructive {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--rust);
+  color: var(--rust);
+  font-weight: 600;
+  background: transparent;
+  transition: background 100ms ease-out;
+}
+
+.button-destructive:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--rust) 8%, transparent);
 }
 
 .button-quiet {
   padding: 3px 8px;
-  border-radius: 5px;
+  border-radius: 6px;
   color: var(--text-2);
   font-size: 11px;
   transition: background 100ms ease-out;
@@ -341,12 +393,51 @@ a {
   background: color-mix(in srgb, var(--text-1) 7%, transparent);
 }
 
-/* ── reader ────────────────────────────────────────────────────────────── */
+/* ── segmented control (modal/settings pattern): inset track, card-white
+     active segment ────────────────────────────────────────────────────────── */
+
+.seg-control {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--bg-inset);
+}
+
+.seg-option {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  transition: background 100ms ease-out;
+}
+
+.seg-option[aria-pressed='true'] {
+  background: var(--bg-card);
+  color: var(--text-1);
+  font-weight: 600;
+  box-shadow: var(--shadow-card);
+}
+
+/* toggle/settings row: label left, control right, dense 38px */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+}
+
+.toggle-row > span:first-child {
+  color: var(--text-1);
+}
+
+/* ── reader: centered column, 68–76ch measure — no dead left gutter ─────── */
 
 .note {
-  max-width: 68ch;
-  margin: 0 auto;
-  padding: 40px 24px 64px;
+  max-width: 72ch;
+  margin-inline: auto;
+  padding: 32px 24px 64px;
   user-select: text;
 }
 
@@ -360,7 +451,7 @@ a {
 .frontmatter {
   border: 1px solid var(--hairline);
   border-radius: 8px;
-  background: var(--bg-raised);
+  background: var(--bg-inset);
   padding: 8px 12px;
   margin-bottom: 24px;
 }
@@ -421,14 +512,14 @@ a {
 .note-body code {
   font-family: var(--font-mono);
   font-size: 12px;
-  background: var(--bg-raised);
+  background: var(--bg-inset);
   border: 1px solid var(--hairline);
   border-radius: 4px;
   padding: 0 3px;
 }
 
 .note-body pre {
-  background: var(--bg-raised);
+  background: var(--bg-inset);
   border: 1px solid var(--hairline);
   border-radius: 8px;
   padding: 12px;
@@ -443,7 +534,7 @@ a {
 }
 
 .note-body blockquote {
-  border-left: 2px solid var(--hairline);
+  border-left: 1px solid var(--hairline); /* Don't list: no border > 1px */
   padding-left: 12px;
   color: var(--text-2);
 }
@@ -464,11 +555,11 @@ a {
 
 .note-body th {
   font-weight: 600;
-  background: var(--bg-raised);
+  background: var(--bg-inset);
 }
 
 .note-body a {
-  color: var(--ink);
+  color: var(--navy);
   text-decoration: none;
 }
 
@@ -489,11 +580,11 @@ a {
   padding: 16px 24px;
 }
 
-/* ── wikilinks (story 2.2): ink at rest, underline on hover; broken = rust
+/* ── wikilinks (story 2.2): navy at rest, underline on hover; broken = rust
      dotted with diagnostic tooltip — never a created file ───────────────── */
 
 .note-body a.wikilink {
-  color: var(--ink);
+  color: var(--navy);
   text-decoration: none;
   cursor: pointer;
 }
@@ -521,10 +612,10 @@ a {
   display: block;
   min-width: 260px;
   max-width: 420px;
-  background: var(--bg-raised);
+  background: var(--bg-card);
   border: 1px solid var(--hairline);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
   padding: 8px;
 }
 
@@ -542,13 +633,13 @@ a {
   text-align: left;
   padding: 5px 4px;
   border-radius: 5px;
-  border-left: 4px solid transparent;
+  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
   transition: background 100ms ease-out;
 }
 
 .wikilink-candidate:hover {
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
-  border-left-color: var(--ink);
+  background: var(--bg-inset);
+  border-left-color: var(--gold);
 }
 
 .wikilink-candidate-project {
@@ -584,7 +675,7 @@ a {
   line-height: 1.5;
 }
 
-/* ── diagnostics (story 2.2) ───────────────────────────────────────────── */
+/* ── broken-link diagnostics (stories 2.2 + 14.2): clickable badge → panel ── */
 
 .diag-pill {
   position: sticky;
@@ -599,7 +690,7 @@ a {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  background: var(--bg-content);
+  background: var(--bg-card);
 }
 
 .diag-panel {
@@ -607,8 +698,9 @@ a {
   bottom: 0;
   max-height: 40%;
   overflow-y: auto;
-  background: var(--bg-raised);
+  background: var(--bg-inset);
   border-top: 1px solid var(--hairline);
+  border-radius: 0 0 12px 12px;
   padding: 8px 16px 16px;
 }
 
@@ -633,11 +725,21 @@ a {
   margin-top: 8px;
 }
 
+/* each row is a button that jumps to the source note (defect 14.2-4) */
 .diag-row {
+  display: block;
+  width: 100%;
+  text-align: left;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--rust);
-  padding: 2px 0 2px 12px;
+  padding: 4px 0 4px 12px;
+  border-radius: 5px;
+  transition: background 100ms ease-out;
+}
+
+.diag-row:hover {
+  background: color-mix(in srgb, var(--text-1) 6%, transparent);
 }
 
 /* ── handoff board (story 3.2) ─────────────────────────────────────────── */
@@ -647,8 +749,6 @@ a {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--bg-content);
-  border-left: 1px solid var(--hairline);
   overflow-y: auto;
 }
 
@@ -663,12 +763,13 @@ a {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px 4px;
+  padding: 12px 16px 8px;
   position: sticky;
   top: 0;
   z-index: 1;
-  background: var(--bg-content);
+  background: var(--bg-card);
   border-bottom: 1px solid var(--hairline);
+  border-radius: 12px 12px 0 0;
 }
 
 .board-switcher {
@@ -681,7 +782,7 @@ a {
 .board-tab {
   flex: none;
   padding: 3px 8px;
-  border-radius: 5px;
+  border-radius: 6px;
   font-size: 11px;
   color: var(--text-2);
   transition: background 100ms ease-out;
@@ -692,9 +793,9 @@ a {
 }
 
 .board-tab[aria-selected='true'] {
-  color: var(--ink);
+  color: var(--navy);
   font-weight: 600;
-  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  background: var(--bg-inset);
 }
 
 .board-groups {
@@ -702,7 +803,7 @@ a {
 }
 
 .board-group-title {
-  padding: 4px 12px;
+  padding: 4px 16px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-2);
@@ -713,9 +814,9 @@ a {
 
 .board-lanes {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: flex-start;
-  padding: 8px 12px 16px;
+  padding: 8px 16px 16px;
 }
 
 .board-lane {
@@ -723,7 +824,7 @@ a {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .board-lane-title {
@@ -741,12 +842,14 @@ a {
   padding: 8px 0;
 }
 
-/* ── the routing-slip handoff card (DESIGN.md signature) ───────────────── */
+/* ── the routing-slip handoff card (DESIGN.md signature, v2 skin): white
+     card, hairline, radius 12 ─────────────────────────────────────────────── */
 
 .handoff-card {
-  background: var(--bg-raised);
+  background: var(--bg-card);
   border: 1px solid var(--hairline);
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
   padding: 12px;
   cursor: pointer;
   transition:
@@ -755,7 +858,7 @@ a {
 }
 
 .handoff-card:hover {
-  border-color: color-mix(in srgb, var(--ink) 40%, var(--hairline));
+  border-color: color-mix(in srgb, var(--gold) 55%, var(--hairline));
 }
 
 .handoff-card.skeleton {
@@ -803,8 +906,9 @@ a {
   color: var(--text-2);
 }
 
-/* stamp chip: 1px border in state color, state-color text, transparent fill —
-   a rubber stamp, not a pill */
+/* stamp chip: 10px mono uppercase letterspaced, 1px border, transparent fill.
+   v2 palette: OPEN gold, ACCEPTED navy, DECLINED/STALE rust, CONSUMED/DONE
+   text-2, SNOOZED text-2 dashed. */
 .status-chip {
   flex: none;
   font-family: var(--font-mono);
@@ -817,15 +921,31 @@ a {
 }
 
 .chip-open {
-  color: var(--stamp);
+  color: var(--gold);
 }
 
-.chip-consumed {
+.chip-accepted {
+  color: var(--navy);
+}
+
+.chip-declined,
+.chip-stale {
+  color: var(--rust);
+}
+
+.chip-consumed,
+.chip-done {
   color: var(--text-2);
 }
 
-.chip-stale {
-  color: var(--rust);
+.chip-snoozed {
+  color: var(--text-2);
+  border-style: dashed;
+}
+
+/* request cards carry a navy REQUEST chip beside the stamp (v2 thread spec) */
+.chip-request {
+  color: var(--navy);
 }
 
 /* consume = stamp press: the app's ONE bespoke animation (120ms ease-out);
@@ -843,13 +963,13 @@ a {
   animation: stamp-press 120ms ease-out;
 }
 
-/* nav open-count badge: amber pill, 10px mono */
+/* nav open-count badge: gold pill, --gold-ink text */
 .nav-badge {
   float: right;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: #fff;
-  background: var(--stamp);
+  color: var(--gold-ink);
+  background: var(--gold);
   border-radius: 999px;
   padding: 1px 6px;
 }
@@ -871,8 +991,9 @@ a {
 
 .ro-item {
   border: 1px solid var(--hairline);
-  border-radius: 8px;
-  background: var(--bg-raised);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
   padding: 8px 12px;
   margin: 8px 0;
 }
@@ -902,14 +1023,16 @@ a {
   flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink);
+  color: var(--navy);
+  border: 1px solid var(--hairline);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: 999px;
   transition: background 100ms ease-out;
 }
 
 .consume-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  background: var(--bg-inset);
+  border-color: var(--navy);
 }
 
 .consume-button:disabled {
@@ -918,11 +1041,13 @@ a {
   cursor: default;
 }
 
+/* success receipt: --ok is status-only in v2 */
 .receipt {
-  margin: 8px 12px 0;
-  border: 1px solid var(--ink);
-  border-radius: 8px;
-  background: var(--bg-raised);
+  margin: 8px 16px 0;
+  border: 1px solid var(--ok);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
   padding: 12px;
 }
 
@@ -937,7 +1062,7 @@ a {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--ink);
+  color: var(--ok);
   border: 1px solid currentColor;
   border-radius: 3px;
   padding: 1px 5px;
@@ -973,37 +1098,46 @@ a {
 }
 
 .receipt-after {
-  color: var(--ink);
+  color: var(--ok);
 }
 
 .receipt-push {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink);
+  color: var(--ok);
 }
 
 .receipt-push-pending {
-  color: var(--stamp);
+  color: var(--gold);
 }
 
-/* ── settings (story 3.4) ──────────────────────────────────────────────── */
+/* ── settings (stories 3.4 + 14.1/14.2): section cards, dense rows ──────── */
 
 .settings {
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
 }
 
 .settings-section {
   max-width: 68ch;
-  padding: 16px 24px;
+  margin: 12px 16px 0;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-/* section header, not reading surface — sans per DESIGN.md (serif is confined
-   to the reader and empty states); QA fix */
+.settings-section:last-child {
+  margin-bottom: 16px;
+}
+
+/* section header, not reading surface — sans per DESIGN.md */
 .settings-title {
   font-size: 13px;
   font-weight: 600;
@@ -1017,6 +1151,7 @@ a {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 38px;
 }
 
 .settings-field span {
@@ -1029,15 +1164,10 @@ a {
   max-width: 320px;
   font: inherit;
   color: var(--text-1);
-  background: var(--bg-raised);
+  background: var(--bg-inset);
   border: 1px solid var(--hairline);
   border-radius: 6px;
   padding: 4px 8px;
-}
-
-.settings-field input:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
 }
 
 .settings-actions {
@@ -1055,7 +1185,7 @@ a {
 .settings-saved {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink);
+  color: var(--ok);
 }
 
 .settings-error {
@@ -1064,8 +1194,7 @@ a {
   color: var(--rust);
 }
 
-/* ── activity feed (story 6.2): rows per the type roles — 13px summary,
-     11px mono metadata; status stays typography, no icon soup ───────────── */
+/* ── activity feed (story 6.2): dense 38px rows, mono metadata ─────────── */
 
 .feed {
   flex: 1;
@@ -1076,8 +1205,10 @@ a {
 }
 
 .feed-list {
-  max-width: 68ch;
-  padding: 4px 12px 24px;
+  max-width: 72ch;
+  width: 100%;
+  margin-inline: auto;
+  padding: 4px 16px 24px;
 }
 
 .feed-day {
@@ -1089,7 +1220,7 @@ a {
   padding: 12px 0 4px;
   position: sticky;
   top: 0;
-  background: var(--bg-content);
+  background: var(--bg-card);
 }
 
 .feed-row {
@@ -1097,18 +1228,19 @@ a {
   align-items: flex-start;
   gap: 8px;
   width: 100%;
+  min-height: 38px;
   text-align: left;
   padding: 6px 8px 6px 4px;
-  border-left: 4px solid transparent;
-  border-radius: 0 5px 5px 0;
+  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-radius: 0 6px 6px 0;
   transition:
     background 100ms ease-out,
     border-color 100ms ease-out;
 }
 
 .feed-row:hover {
-  background: var(--bg-raised);
-  border-left-color: var(--ink);
+  background: var(--bg-inset);
+  border-left-color: var(--gold);
 }
 
 .feed-avatar {
@@ -1118,7 +1250,7 @@ a {
   margin-top: 1px;
   border: 1px solid var(--hairline);
   border-radius: 50%;
-  background: var(--bg-raised);
+  background: var(--bg-inset);
   color: var(--text-2);
   font-family: var(--font-mono);
   font-size: 9px;
@@ -1159,7 +1291,7 @@ a {
 }
 
 .feed-kind-handoff {
-  color: var(--stamp); /* an open ask travelling between teams — attention */
+  color: var(--gold); /* an open ask travelling between teams — attention */
 }
 
 .feed-more {
@@ -1167,7 +1299,7 @@ a {
   margin: 12px auto 0;
 }
 
-/* ── sync health panel (story 5.2) ─────────────────────────────────────── */
+/* ── sync health panel (stories 5.2 + 14.2 density) ────────────────────── */
 
 .sync {
   flex: 1;
@@ -1177,7 +1309,8 @@ a {
   overflow-y: auto;
 }
 
-/* sync dot semantics: ink = clean, amber = ahead/behind, rust = error */
+/* sync dot semantics: ok = clean, gold = ahead/behind, rust = error
+   (class names kept from the story-5.2 store: ink/amber/rust tones) */
 .sync-dot {
   width: 8px;
   height: 8px;
@@ -1187,12 +1320,12 @@ a {
 
 .sync-dot-ink,
 .vault-chip-dot.sync-dot-ink {
-  background: var(--ink);
+  background: var(--ok);
 }
 
 .sync-dot-amber,
 .vault-chip-dot.sync-dot-amber {
-  background: var(--stamp);
+  background: var(--gold);
 }
 
 .sync-dot-rust,
@@ -1201,33 +1334,36 @@ a {
 }
 
 .sync-banner {
-  margin: 8px 12px 0;
+  margin: 12px 16px 0;
   border: 1px solid var(--rust);
-  border-radius: 8px;
-  background: var(--bg-raised);
+  border-radius: 12px;
+  background: var(--bg-card);
   color: var(--rust);
   padding: 8px 12px;
   font-size: 13px;
 }
 
 .sync-banner-action {
-  color: var(--ink);
+  color: var(--navy);
   font-weight: 600;
   text-decoration: underline;
 }
 
 .sync-grid {
   max-width: 68ch;
-  margin: 8px 12px;
+  margin: 12px 16px;
   border: 1px solid var(--hairline);
-  border-radius: 8px;
-  background: var(--bg-raised);
-  padding: 4px 12px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
+  padding: 4px 16px;
 }
 
 .sync-row {
   display: flex;
+  align-items: center;
   gap: 12px;
+  min-height: 38px;
   padding: 4px 0;
   border-bottom: 1px solid var(--hairline);
 }
@@ -1242,7 +1378,6 @@ a {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-2);
-  padding-top: 1px;
 }
 
 .sync-row-value {
@@ -1253,11 +1388,11 @@ a {
 }
 
 .sync-ok {
-  color: var(--ink);
+  color: var(--ok);
 }
 
 .sync-warn {
-  color: var(--stamp);
+  color: var(--gold);
 }
 
 .sync-bad {
@@ -1266,7 +1401,12 @@ a {
 
 .sync-section {
   max-width: 68ch;
-  padding: 8px 12px;
+  margin: 0 16px 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card);
 }
 
 .sync-section-title {
@@ -1281,7 +1421,7 @@ a {
 .sync-report-line {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--ink);
+  color: var(--ok);
 }
 
 .sync-warning-row {
@@ -1311,7 +1451,7 @@ a {
   overflow-y: auto;
 }
 
-/* freshness badge: quiet when fresh; amber = aging attention; rust = stale */
+/* freshness badge: quiet when fresh; gold = aging attention; rust = stale */
 .freshness {
   flex: none;
   font-family: var(--font-mono);
@@ -1328,7 +1468,7 @@ a {
 }
 
 .freshness-aging {
-  color: var(--stamp);
+  color: var(--gold);
 }
 
 .freshness-stale {
@@ -1340,8 +1480,8 @@ a {
   font-size: 15px;
   color: var(--text-2);
   border: 1px solid var(--hairline);
-  border-radius: 8px;
-  background: var(--bg-raised);
+  border-radius: 12px;
+  background: var(--bg-inset);
   padding: 8px 12px;
   margin-bottom: 16px;
 }
@@ -1356,7 +1496,7 @@ a {
 }
 
 .search-controls {
-  padding: 8px 12px;
+  padding: 8px 16px 12px;
   border-bottom: 1px solid var(--hairline);
   display: flex;
   flex-direction: column;
@@ -1367,7 +1507,7 @@ a {
 .palette-input {
   font: inherit;
   color: var(--text-1);
-  background: var(--bg-raised);
+  background: var(--bg-inset);
   border: 1px solid var(--hairline);
   border-radius: 6px;
   padding: 5px 8px;
@@ -1392,7 +1532,7 @@ a {
   font: inherit;
   font-size: 11px;
   color: var(--text-1);
-  background: var(--bg-raised);
+  background: var(--bg-inset);
   border: 1px solid var(--hairline);
   border-radius: 5px;
   padding: 2px 4px;
@@ -1401,15 +1541,17 @@ a {
 .search-results {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0 16px;
+  padding: 4px 8px 16px;
 }
 
 .search-row {
   display: block;
   width: 100%;
+  min-height: 38px;
   text-align: left;
   padding: 6px 12px 6px 8px;
-  border-left: 4px solid transparent;
+  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-radius: 0 6px 6px 0;
   transition:
     background 100ms ease-out,
     border-color 100ms ease-out;
@@ -1420,8 +1562,8 @@ a {
 }
 
 .search-row[aria-current='true'] {
-  border-left-color: var(--ink);
-  background: var(--bg-raised);
+  border-left-color: var(--gold);
+  background: var(--bg-inset);
 }
 
 .search-row-title {
@@ -1451,18 +1593,18 @@ a {
 
 .search-row mark,
 .palette-item mark {
-  background: color-mix(in srgb, var(--ink) 18%, transparent);
+  background: color-mix(in srgb, var(--gold) 22%, transparent);
   color: inherit;
   border-radius: 2px;
 }
 
-/* ── Cmd+K palette (story 2.4): overlay on --bg-raised ─────────────────── */
+/* ── Cmd+K palette (story 2.4): centered card overlay ──────────────────── */
 
 .palette-backdrop {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(19, 24, 38, 0.24);
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -1472,10 +1614,10 @@ a {
   margin-top: 96px;
   width: 560px;
   max-width: calc(100vw - 48px);
-  background: var(--bg-raised);
+  background: var(--bg-card);
   border: 1px solid var(--hairline);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -1492,15 +1634,16 @@ a {
   align-items: baseline;
   gap: 8px;
   width: 100%;
+  min-height: 38px;
   text-align: left;
-  padding: 5px 8px 5px 4px;
-  border-left: 4px solid transparent;
-  border-radius: 0 5px 5px 0;
+  padding: 9px 8px 9px 4px;
+  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-radius: 0 6px 6px 0;
 }
 
 .palette-item[aria-current='true'] {
-  border-left-color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  border-left-color: var(--gold);
+  background: var(--bg-inset);
 }
 
 .palette-item-title {
@@ -1535,4 +1678,33 @@ a {
   color: var(--text-2);
   border-top: 1px solid var(--hairline);
   padding: 6px 4px 0;
+}
+
+/* ── toasts (v2 spec): bottom-right receipt card, mono details line ─────── */
+
+.toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  min-width: 260px;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 12px;
+}
+
+.toast-detail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  margin-top: 4px;
 }

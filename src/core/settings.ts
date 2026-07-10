@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isValidIdentity } from '../shared/identity'
+import { isThemeSetting, type ThemeSetting } from '../shared/theme'
 import type { Identity } from '../shared/types'
 
 let settingsFile: string | null = null
@@ -40,6 +41,17 @@ export function loadIdentityProfile(): Identity | null {
 
 export function saveIdentityProfile(identity: Identity): void {
   writeAll({ identity })
+}
+
+// ── Theme preference (story 14.1) ───────────────────────────────────────────
+
+export function loadThemeSetting(): ThemeSetting {
+  const { theme } = readAll()
+  return isThemeSetting(theme) ? theme : 'system'
+}
+
+export function saveThemeSetting(theme: ThemeSetting): void {
+  writeAll({ theme })
 }
 
 // ── MCP host settings (story 1.6) ───────────────────────────────────────────

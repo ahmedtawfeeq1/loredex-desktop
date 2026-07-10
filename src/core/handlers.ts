@@ -4,6 +4,7 @@
  */
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
+import { isThemeSetting } from '../shared/theme'
 import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
 import type { SyncReport } from '../shared/types'
 import * as engine from './engine'
@@ -13,7 +14,13 @@ import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { getMcpStatus } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
-import { loadIdentityProfile, saveIdentityProfile, saveMcpPortOverride } from './settings'
+import {
+  loadIdentityProfile,
+  loadThemeSetting,
+  saveIdentityProfile,
+  saveMcpPortOverride,
+  saveThemeSetting,
+} from './settings'
 import { listMarkdownFiles, walkVault } from './tree'
 import { withWriteLock } from './write-lock'
 
@@ -134,6 +141,14 @@ export function registerCoreHandlers(
   // MCP host state + port override (story 1.6). The override applies on the
   // next core-host start — no live rebind, the discovery file must stay true.
   ipc.register('mcp.status', () => getMcpStatus())
+  // Theme preference (story 14.1): per-user app state, applied renderer-side.
+  ipc.register('settings.theme.get', () => loadThemeSetting())
+  ipc.register('settings.theme.set', ({ theme }) => {
+    if (!isThemeSetting(theme)) {
+      throw ipcError('INTERNAL', 'theme must be one of system, light, dark')
+    }
+    saveThemeSetting(theme)
+  })
   ipc.register('settings.mcpPort.set', ({ port }) => {
     if (port !== null && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
       throw ipcError('INTERNAL', 'MCP port must be an integer between 1024 and 65535')

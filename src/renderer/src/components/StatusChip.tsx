@@ -3,9 +3,15 @@
  * color, transparent fill — a rubber stamp, not a pill. Renders arbitrary
  * status strings so M2 states drop in without rework (story 3.2 dev note).
  */
+/** v2 stamp palette: OPEN gold, ACCEPTED navy, DECLINED/STALE rust,
+ *  CONSUMED/DONE text-2, SNOOZED text-2 dashed (DESIGN.md#signature). */
 const STATE_CLASS: Record<string, string> = {
   open: 'chip-open',
+  accepted: 'chip-accepted',
+  declined: 'chip-declined',
+  snoozed: 'chip-snoozed',
   consumed: 'chip-consumed',
+  done: 'chip-done',
   stale: 'chip-stale',
 }
 

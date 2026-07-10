@@ -4,6 +4,7 @@
  * one push event channel. All payload types live here or in ./types.ts.
  */
 import type { Config, Doc, ProductDashboard, SearchHit } from 'loredex'
+import type { ThemeSetting } from './theme'
 import type {
   ActivityEvent,
   ConsumeReceipt,
@@ -55,6 +56,10 @@ export interface CoreApi {
    *  The override applies on the next core-host start (vault switch or relaunch). */
   'mcp.status': { in: void; out: McpStatus }
   'settings.mcpPort.set': { in: { port: number | null }; out: void }
+  /** app-local contract evolution (story 14.1): theme preference — per-user app
+   *  state, persisted core-side (settings JSON → app.db seam, story 9.2) */
+  'settings.theme.get': { in: void; out: ThemeSetting }
+  'settings.theme.set': { in: { theme: ThemeSetting }; out: void }
   'route.preview': { in: { file: string }; out: RoutePreview } // (lib PR-3)
   'route.undo': { in: { receiptId: string }; out: void } // (lib PR-3)
   'sync.status': { in: void; out: SyncHealth } // (lib PR-4)

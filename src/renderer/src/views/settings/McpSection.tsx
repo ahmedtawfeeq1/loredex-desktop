@@ -62,7 +62,8 @@ export function McpSection(): React.JSX.Element {
         />
       </label>
       <div className="settings-actions">
-        <button type="button" className="button-primary" onClick={() => void save()}>
+        {/* secondary: one gold primary per view (Save identity owns it) */}
+        <button type="button" className="button-secondary" onClick={() => void save()}>
           Save port
         </button>
         {saved && <span className="settings-saved">Saved — applies when the vault is reopened</span>}

@@ -85,3 +85,11 @@ Fable 5 (claude-fable-5)
 - `src/renderer/src/styles.css` — card variant classes, stamps, chips, edge hit/dash styles
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS — after a QA fix.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Hyperlink-everything audited row-for-row against ATLAS-CONCEPT §3 (`resolve.test.ts`, 16 cases): note→Reader (+readState.mark), handoff→brief with thread rail, project→drill, source→editor deep link with roots-map re-resolution and honest copy-path fallback, commit→GitHub page or copy-sha on non-GitHub remotes, edges→their creating handoff / direction-of-click. External jumps ride main's allow-list (`windows.ts`: https + editor-scheme regex, everything else denied).
+- **Defect found & fixed (QA):** the `contract` row was a dead end — `performResolution` showed a stale "timeline arrives with epic 11" toast although 11.2 shipped. Now: contract click opens the Contracts view pre-scoped to the file's project and focus-rings the file's newest change (`resolve.ts`; `project` passthrough added in `contracts.ts`/`atlas.ts`/`types.ts`; regression test added). Residual gap (minor, reported): the timeline filters by project, not per-file — file-level filter would need a store/view extension.
+- Wiring: canvas node + edge clicks, path-trace chain, blocked list, tour steps and ⌘K all route through the same `resolveNode`/`performResolution` pair — one table, one code path.

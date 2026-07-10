@@ -82,3 +82,11 @@ Claude Fable 5 (claude-fable-5)
 - `src/renderer/src/views/settings/ContractsSection.tsx` (new), `SettingsView.tsx`, `src/renderer/src/styles.css` (roots rows + textarea)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Discovery + incremental scan + merged date-sorted timeline unit-covered (`contracts.test.ts`); fixed glob set (openapi/postman/graphql) + user globs; roots precedence config-file-first then app-db (`resolveRoots`).
+- E2E drive: with the REAL `loredex-simulation/nimbus-backend` registered as a root, `contracts.timeline` returned `openapi.yaml` history including the actual agent-config-v2 commit `97d4b73` — read-only against the repo (git log/show only).
+- Post-integrate rescan wired in `core/index.ts` (fires `contract.changed` + the 12.2 suggest pipeline).

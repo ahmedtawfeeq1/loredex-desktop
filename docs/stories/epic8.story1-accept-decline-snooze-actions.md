@@ -94,3 +94,12 @@ Claude Fable 5 (claude-fable-5)
 - src/renderer/src/styles.css — `.snooze-expired`, `.snooze-quick`, `.handoff-history`
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1/2: state-legal action rows per `lifecycle.test.ts`; DeclineReasonModal (reason-gated rust confirm) and SnoozeUntilPicker (min tomorrow) wired app-root.
+- AC3: stamp chips render every v2 state — OPEN gold / ACCEPTED navy / DECLINED rust / CONSUMED text-2 / SNOOZED dashed — verified in StatusChip + design-fidelity assertions; stamp-press respects reduced-motion.
+- AC4: expired snooze is DERIVED (poller/notify tests); reopen is the only writer.
+- AC5: E2E drive stage 3: accept receipt `before: open → after: accepted` + `handoff.stateChanged` event; illegal reopen-from-accepted refused with a typed envelope.

@@ -24,19 +24,19 @@ development_status:
   epic-2: in-progress      # Vault Reader & Product Home
   2-1-vault-tree-note-rendering: done
   2-2-wikilink-resolution: done
-  2-3-vault-watcher-live-refresh: ready-for-dev
+  2-3-vault-watcher-live-refresh: done          # delivered as 9-3 (file upgraded to v2.0 in place)
   2-4-faceted-search: done
   2-5-product-home-start-here: done
   2-6-changed-since-brief-diff: ready-for-dev
   epic-2-retrospective: optional
 
-  epic-3: in-progress      # Handoffs, Consume & Notifications
+  epic-3: done             # Handoffs, Consume & Notifications — 3-5/3-6 delivered as 9-1/9-2
   3-1-loredex-pr1-listhandoffs: done
   3-2-inbox-outbox-board: done
   3-3-loredex-pr2-consume-schema: done
   3-4-in-app-consume-identity: done
-  3-5-remote-event-poller-write-lock: ready-for-dev
-  3-6-read-state-store-appdb: ready-for-dev
+  3-5-remote-event-poller-write-lock: done      # delivered as 9-1 (file upgraded to v2.0 in place)
+  3-6-read-state-store-appdb: done              # delivered as 9-2 (file upgraded to v2.0 in place)
   3-7-native-notifications-badge: done
   epic-3-retrospective: optional
 
@@ -128,35 +128,51 @@ development_status:
   epic-14-retrospective: optional
 
 qa:
-  pass_date: 2026-07-10
+  pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded
   verdicts: >
-    All 18 done stories verified (see each story's QA Results): 8 clean PASS,
-    10 PASS-with-concerns — every concern is a recorded, sanctioned deviation
-    (file: dep, v0.1 scope cuts) already tracked below. Evidence: app vitest
-    118/118, lib vitest 115/115, typecheck + production build clean, dev-launch
-    smoke (3+ min alive, clean exit, discovery file removed on shutdown), live
-    MCP checks (bearer 401/Origin 403/identity echo/same vault), and an
-    M1-DoD driver run against the real nimbus simulation vault (tree, wikilink
-    unique/ambiguous/broken, search, 8 handoffs, home brief, syncStatus ok,
-    29 activity events). Design fidelity vs DESIGN.md: tokens exact in both
-    themes, three-pane + permanent vault chip, routing-slip card to spec,
-    focus-visible rings, reduced-motion respected, no system blue.
+    All 26 M2-cycle done stories verified (epics 7-14 + upgraded 2.3/3.5/3.6;
+    see each story's QA Results): 23 clean PASS, 3 PASS-with-notes (7.1 pin/publish
+    release blocker, 7.4 undo deferred to epic 4 — both sanctioned; 10.4 fixed in
+    QA, see below). Evidence: app vitest 488/488 (63 files), lib vitest 143/143,
+    typecheck (node+web) + production build clean, and a NEW scripted end-to-end
+    module drive (tests/m2-e2e-drive.test.ts) against sandboxed clones of the
+    nimbus simulation remote: compose request -> reply (inverted route,
+    replies_to) -> accept (receipt + illegal-transition refusal) -> fulfilling
+    delivery -> thread rail shows fulfilledBy/fulfills -> poller seeds quietly
+    then sees a REAL second-clone push (handoff.new + gated integrate + cursor
+    advance) -> atlas.graph carries the new nodes with thread+route edges ->
+    contract timeline reads the real nimbus-backend openapi history (97d4b73)
+    and serves the pinned diff. Design v2 fidelity: exact tokens both themes,
+    Don't-list, focus rings, reduced motion, stamps incl. SNOOZED dashed /
+    REQUEST / FULFILLED, thread-rail 2px hairline, reader measure, Sync/Settings
+    density — enforced by design-fidelity.test.ts; screenshots skipped (dev
+    launch needs electron-rebuild, would break the node test ABI). All five
+    v0.1 defects verified still fixed with regression tests.
   fixes_applied:
-    - loredex tests/handoff.test.ts consume test flaked under parallel load
-      (5s default timeout); given the same explicit 30s timeout as its sibling.
-    - styles.css .settings-title was serif outside the reading surface /
-      empty states (DESIGN.md violation); now 13px/600 sans.
+    - "M2: src/core/sync.test.ts sync.run test flaked under parallel load (5s
+      default timeout); given the suite's explicit 30s timeout convention."
+    - "M2 (story 10.4 hyperlink-everything): contract Atlas nodes dead-ended in
+      a stale 'timeline arrives with epic 11' toast although 11.2 shipped —
+      resolution now opens the Contracts view pre-scoped to the file's project
+      and focus-rings the file's newest change (resolve.ts + project passthrough
+      contracts.ts/atlas.ts/types.ts, regression test added)."
+    - "M1: loredex tests/handoff.test.ts consume-test 30s timeout; styles.css
+      .settings-title serif -> 13px/600 sans (kept, still asserted)."
 
 action_items:
-  - loredex lib: HandoffCard.id (note basename) is NOT unique across projects — nimbus vault has
-    two open "2026-07-09-handoff-nimbus-backend-2" (to frontend and to mobile); consumeHandoff
-    picks the first match and the board keys collide. Fix in lib (qualify id or consume by path).
-    [SCHEDULED: story 7-1 AC4 (qualified-id fix, AMBIGUOUS_HANDOFF)]
-  - release-time TODO: package.json pins loredex as file:../loredex (local link while lib PRs
-    land); switch to the published pinned 2.x version before release.
-  - story 3.7 leftovers for 3.6/6.3: snooze respect needs the app.db store; two-clone latency
-    test rides the Playwright harness. [SCHEDULED: snooze respect in stories 9-2/9-3]
-  - dev-launch env note (found in 10-7 smoke): node_modules natives (better-sqlite3, @parcel/watcher)
-    are built for system node (v20, tests) — a real `npm run dev` launch needs a one-off
-    `npx electron-rebuild` (Electron ABI 148) or the core host crash-loops on app.db import;
-    packaging is unaffected (electron-builder rebuilds natives). Consider a predev script.
+  - "RELEASE BLOCKER — lib version/publish: desktop pins file:../loredex/loredex-2.1.0.tgz
+    whose CONTENT is 2 commits past published 2.1.0 (d92146d write APIs, 7d7b9a6
+    previewRoute — both unpushed). Ship = push main, release 2.2.0, npm publish,
+    repin desktop to the published version."
+  - "RELEASE TODO — signing/notarization + auto-update: stories 1-8/1-9 still
+    ready-for-dev; v0.2 cannot ship signed without them (release.yml exists,
+    needs cert secrets + channel wiring)."
+  - "MINOR (from 10.4 QA fix): contract timeline filters by project, not per-file —
+    a file-level filter needs a small contracts store/view extension."
+  - "dev-launch env note (unchanged): node natives are built for system node —
+    `npm run dev` needs a one-off `npx electron-rebuild` (Electron ABI 148) or
+    the core host crash-loops on app.db import; packaging unaffected. Consider
+    a predev script."
+  - "M1 leftovers still open: 1-5 (PR-5 async git) partial, 1-7 proxy/doctor,
+    2-6 changed-since brief, epic 4 routing safety (undo receipts — 7.4 depends
+    on it for undo), 5-3/5-4/5-7 registry, 6-3 e2e suite."

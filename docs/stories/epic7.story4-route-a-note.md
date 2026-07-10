@@ -83,3 +83,11 @@ Fable 5 (claude-fable-5)
 - src/core/handlers.ts + src/shared/ipc-contract.ts (route channels, in 7.2 commit)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS (sanctioned deviation).** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1/2: native markdown picker lives in main (`dialogs.ts pickRouteFile`, no cold scans — NFR12); `RouteDropTarget` overlay + `webUtils` path extraction; both feed the plan-first confirm card.
+- AC3/4/5: `route.preview` (lib previewRoute) renders destination + invented frontmatter before any write; `route.file` under the write lock; blocked-glob explanation + error envelopes covered in `compose.test.ts`.
+- Deviation (recorded on the board): receipt **undo** rides epic 4 (PR-3) — the confirm card is the consent step meanwhile.

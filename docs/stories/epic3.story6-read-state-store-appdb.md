@@ -95,3 +95,13 @@ Fable 5 (claude-fable-5)
 - tests/native-smoke/sqlite.test.ts (new)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10 (v2.0 / story 9.2 scope)
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1/2: WAL app.db opened by the core host only; `PRAGMA user_version` migrations idempotent (`db.test.ts` runs them twice); M2 schema tables all present, keyed on vault_id (normalized remote).
+- AC3: v0.1 JSON shim imported once then renamed `.bak`; renderer reads/writes read-state via the IPC pair only (grep-verified: no renderer sqlite).
+- AC4/5: snooze mirror reconciles from frontmatter on board load + post-integrate; expiry sweep emits once per machine (`notified` flag); corrupt/missing db recreates fresh.
+- AC6: `tests/native-smoke/sqlite.test.ts` runs against the packaged Electron ABI in CI (`.github/workflows/ci.yml`).
+- E2E drive exercised the db live (poll cursor, project roots, contract scan cache).

@@ -86,3 +86,13 @@ claude-fable-5 (Fable 5)
 - src/renderer/src/design-fidelity.test.ts (centering + density assertions)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean. — all five v0.1 defects stay fixed, each with regression coverage:
+
+1. Start-Here heading rendered once (`brief-title.test.ts`).
+2. Feed dedupe by commit sha + full paths on hover (`feed-logic.test.ts`, store wires `dedupeBySha`).
+3. Reader centered at 68–76ch, no dead gutter (`design-fidelity.test.ts`).
+4. Broken-links badge → Diagnostics panel, rows jump to source (`diagnostics.test.ts`, rendered app-root).
+5. Sync/Settings on v2 card density, 38px-class rows (fidelity assertions).

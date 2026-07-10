@@ -108,3 +108,10 @@ Claude Fable 5 (claude-fable-5)
 - `src/renderer/src/styles.css` — .commit-chip / .commit-pr styles; .feed-row cursor
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- One remote-URL derivation (`shared/github.ts`, unit-tested: ssh/https/`.git`-suffix normalization, non-GitHub → null); session-cached per repo core-side.
+- Commit chips in rendered notes via the `shaLinks` markdown pipeline stage (`shaLinks.test.ts`) + `CommitChip.test.ts`; non-GitHub remotes degrade to mono text + copy-sha (m2 §6) — the same rule the Atlas commit row follows.

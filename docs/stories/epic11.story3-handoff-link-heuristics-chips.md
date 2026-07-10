@@ -80,3 +80,10 @@ Claude Fable 5 (claude-fable-5)
 - `src/renderer/src/styles.css` (chip buttons, focus ring)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Link tiers computed fresh, never persisted (`contract-links.test.ts`): `mentioned` = sha in a handoff body/objective (solid chip), `heuristic` = same project + same day, ALWAYS labeled — dashed `--text-2` chips (`chip-heuristic`), display-only, never notifications.
+- Chips navigate both directions (timeline↔handoff); sha chips stayed plain mono until 12.1 landed, as the board sequencing note records.

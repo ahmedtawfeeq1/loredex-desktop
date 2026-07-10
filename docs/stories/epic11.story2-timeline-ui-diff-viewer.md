@@ -79,3 +79,10 @@ Claude Fable 5 (claude-fable-5)
 - `src/renderer/src/styles.css` (timeline rail, change cards, chips, diff viewer)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Timeline per the DESIGN data-viz spec: vertical rail, mono dates, one card per change (+/- counts in --ok/rust), project filter, empty-state matrix (`diff-logic.test.ts`).
+- Diff pinned to commits (`git show <sha> -- <file>`, never the worktree), registered-roots-only, 200 KB cap with a visible truncated flag (`capDiff` unit tests). E2E drive: the `97d4b73` diff renders `escalation_rules`, `truncated: false`.

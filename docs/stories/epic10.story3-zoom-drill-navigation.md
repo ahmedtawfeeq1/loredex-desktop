@@ -81,3 +81,10 @@ Fable 5 (claude-fable-5)
 - `src/renderer/src/styles.css` — breadcrumbs/history/topic-atom classes
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Overview ↔ Learn ↔ Deep Dive are discrete `atlas.graph` levels (never camera zoom) — scope filtering unit-covered in `atlas-visibility.test.ts`; topic groups honor the single-child-dissolve collapsed-atom rule.
+- Breadcrumbs + bounded history in the atlas store; every navigation action is ⌘K-listed while the atlas is open (`Palette.tsx` injects atlas actions dynamically).

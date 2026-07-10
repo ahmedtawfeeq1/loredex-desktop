@@ -89,3 +89,13 @@ Claude Fable 5 (claude-fable-5)
 - loredex-desktop: `package.json`, `package-lock.json` (pin bump), `src/core/notify.test.ts`, `docs/stories/epic7.story1-loredex-pr11-write-apis-schema-v2.md`, `docs/stories/sprint-status.yaml`
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS (with release concern).** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1-3: lib suite covers the schema-v2 round-trip, state-machine matrix and typed errors (143/143). E2E drive: composed note lands with `loredex_schema: 2` + `kind` on disk; reopen-from-accepted refused with a typed envelope.
+- AC4: qualified ids exercised end-to-end (`nimbus-frontend/<name>` for setStatus/reply/thread) — the V1 colliding-basename action item is closed.
+- AC5: `handoff.created`/`handoff.stateChanged` observed over the seam; push to a real shared bare remote verified (commit visible in origin log).
+- AC6: CLI subcommands present (`handoffs --accept/--decline/--snooze/--reopen/--annotate`, `--consume`); doctor/engine.json degradation covered lib-side.
+- **Concern (release blocker, not a code defect):** the pin is `file:../loredex/loredex-2.1.0.tgz` but the tarball content is 2 commits PAST the published 2.1.0 (d92146d, 7d7b9a6, both unpushed). Ship = push, version-bump (2.2.0), npm publish, repin.

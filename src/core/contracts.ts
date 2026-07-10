@@ -378,6 +378,7 @@ export function contractChangesForAtlas(
     file: c.file,
     sha: c.sha,
     date: c.date,
+    project: c.project,
     links: c.links,
   }))
 }

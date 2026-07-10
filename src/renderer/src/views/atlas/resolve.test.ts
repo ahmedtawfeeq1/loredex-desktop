@@ -116,6 +116,23 @@ describe('resolveNode — the §3 table, row for row', () => {
       file: 'openapi.yaml',
     })
   })
+
+  it('contract with a project carries it so the timeline opens pre-scoped', () => {
+    const n = node({
+      id: 'contract:/repos/b/openapi.yaml',
+      type: 'contract',
+      label: 'openapi.yaml',
+      project: 'nimbus-backend',
+      repoRoot: '/repos/b',
+      file: 'openapi.yaml',
+    })
+    expect(resolveNode(n, ctx)).toEqual({
+      kind: 'contract-timeline',
+      repoRoot: '/repos/b',
+      file: 'openapi.yaml',
+      project: 'nimbus-backend',
+    })
+  })
 })
 
 describe('editorUrl', () => {

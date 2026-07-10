@@ -94,3 +94,11 @@ Fable 5 (claude-fable-5)
 - src/main/index.ts (browser-window-focus/blur forwarding — display-state only)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10 (v2.0 / story 9.1 scope)
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1: focus/blur cadence (60s/5min) + control-channel forwarding + Sync-now clock reset covered in `poller.test.ts`.
+- AC2/3: fetch-only parse (`git show origin/<branch>:<path>`), cursor advances only after emit, fresh cursor seeds silently — all unit-covered AND proven live in the E2E drive: quiet seed tick, then a genuine second-clone push produced `handoff.new` for exactly the pushed card, the gated integrate pulled it to disk, and the cursor advanced.
+- AC4/5: single-flight `write-lock.ts` gates every lib write (tryAcquire for the poller, blocking acquire for sync.run) — `write-lock.test.ts`; post-pull F4 reconcile incl. snooze mirror.

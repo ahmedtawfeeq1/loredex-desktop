@@ -78,3 +78,11 @@ Fable 5 (claude-fable-5)
 - `src/core/atlas.test.ts` — NEW: 28 tests (pure, channel over fixture vault, nimbus contract suite)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC coverage: `atlas.test.ts` locks the binding taxonomy (exactly 6 node types / 6 edge categories asserted per node), clusters from explicit topic folders, confidence tiers verbatim from the 11.1 provider, invalidation on vault.changed/post-pull (`invalidateAtlas` called from the shared reconcile in `core/index.ts`).
+- E2E drive: after real composes + a poller-integrated second-clone push, `atlas.graph deep` returned the new handoff nodes with `thread` edges for both `replies_to` and `fulfills` plus `route` edges — the graph is genuinely recomputed truth, not cache residue.
+- QA fix rode this model (see 10.4): contract nodes now carry `project` (scan row → `AtlasContractChange.project?` → node) so their resolution can scope the timeline; additive, covered by re-run atlas + contracts suites.

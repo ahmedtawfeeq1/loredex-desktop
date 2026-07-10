@@ -88,3 +88,11 @@ claude-fable-5 (Fable 5)
 - src/renderer/src/design-fidelity.test.ts (new)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- `design-fidelity.test.ts` enforces the spec mechanically: exact v2 hex table on :root + [data-theme='dark'], zero v1 orphan tokens, Don't-list (no system blue/purple/gradients, no >1px borders beyond the sanctioned 4px rails, serif never in nav/buttons), 2px gold focus-visible ring offset 2, reduced-motion, card recipe, gold pill primary.
+- Theme switcher (system/light/dark) wired through `settings.theme.get/set` + `shared/theme.ts` (unit-tested); gold budget audited per view — board pairs the view primary ("New handoff") with per-card lifecycle primaries exactly as stories 7.2/8.1 mandate (recorded tension, not a violation); modals/toasts own their primary per the reference pattern.
+- Screenshots skipped: a dev launch needs `npx electron-rebuild` (Electron ABI 148) which would break the system-node test ABI — code-verified instead per QA scope.

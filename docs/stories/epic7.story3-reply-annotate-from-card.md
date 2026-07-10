@@ -79,3 +79,11 @@ Fable 5 (claude-fable-5)
 - src/shared/handoff-lanes.ts (qualifiedId, in 7.2 commit); channels/core in 7.2 commit
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1/2: Reply reuses the compose modal (locked inverted route banner); E2E drive stage 2: reply filed under the parent's from-project with `replies_to: <parent>` on disk — inversion verified byte-level.
+- AC3: annotate lands a NEW `type: 'comment'` note, parent byte-identical (`compose.test.ts`); comments ride the thread rail, never the board.
+- AC4/5: qualified parent ids used throughout; `UNKNOWN_HANDOFF` typed refusal covered; event-driven insert in the handoffs store.

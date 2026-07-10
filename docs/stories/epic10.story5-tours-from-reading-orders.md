@@ -83,3 +83,10 @@ claude-fable-5 (Claude Code)
 - src/renderer/src/styles.css (tour panel + pulse ring)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- `atlas.tours` extraction (`tours.test.ts`): handoff Reading orders → steps, thread chains, topic date-order; heuristic BFS fallback when a handoff lacks a reading order (marked `atlas-tour-heuristic`).
+- Playback (`tour-playback.test.ts` + TourPanel): step highlight, auto-open owning cluster, viewport fit, prev/next; step activation performs the step node's §3 resolution; tour Start is the view's gold spend; pulse honors reduced-motion.

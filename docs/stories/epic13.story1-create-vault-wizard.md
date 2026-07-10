@@ -89,3 +89,10 @@ claude-fable-5 (Claude Code)
 - `src/renderer/src/styles.css` — wizard step list / failure / identity styles (DESIGN v2 tokens)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Stepped modal per the DESIGN wizard pattern; `wizard.validateRemote` ls-remote preflight with typed failures (auth/not-found/not-empty…) rendered actionably (`wizard.test.ts` + `wizard-errors.test.ts`); scaffold via lib `scaffoldVault` under the write lock; core host restart on vault switch.
+- Integration path covered in `wizard.integration.test.ts` against real temp git remotes.

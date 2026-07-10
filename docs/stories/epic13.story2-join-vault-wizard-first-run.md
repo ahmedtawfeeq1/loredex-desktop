@@ -89,3 +89,10 @@ claude-fable-5 (Claude Code)
 - `src/renderer/src/styles.css` — schema banner, roots list, first-run cards
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Join = clone + engine handshake; FirstRun screen (three cards on --bg-app, serif sentence, deliberately no gold primary) gates the empty state; `wizard.integration.test.ts` drives a real clone.
+- `loredex://` deep link: main only registers + forwards the raw URL (`setAsDefaultProtocolClient` + open-url + pre-window queue in `main/index.ts`); parsing renderer-side (`join-link.test.ts` — malformed links rejected).

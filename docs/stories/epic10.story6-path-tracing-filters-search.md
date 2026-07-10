@@ -82,3 +82,10 @@ claude-fable-5 (Claude Code)
 - src/renderer/src/styles.css (panel, chain, blocked rows, ring taxonomy)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- `atlas.path` BFS in the core host (`atlas-path.test.ts`: shortest path, disconnected → null over the seam); rendered as the gold routing-slip chain, each chain node click-resolving (PathTrace → activateNode).
+- Filters at the binding granularity (node type, handoff status, topic, edge category, confidence tier — `atlas-filters.test.ts`); `vault.search` hits tier the highlight rings; focus mode = 1-hop isolate; blocked-on preset rides BlockedList with card resolution.

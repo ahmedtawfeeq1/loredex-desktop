@@ -83,3 +83,10 @@ Fable 5 (claude-fable-5)
 - `src/renderer/src/styles.css` — atlas classes, token-only (both themes)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Deterministic left→right depth layout computed core-side (`atlas-layout.ts` + geometry tests) — renderer never lays out; SVG only, no chart lib (DESIGN data-viz rule).
+- Cluster cards with gold open-count badges; aggregated inter-cluster route edges carry `N open / M total`; pan/zoom + empty/loading states per DESIGN (empty state = serif sentence + one action, and it is the view's one gold primary only when the tour panel is absent).

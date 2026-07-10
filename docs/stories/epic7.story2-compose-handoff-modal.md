@@ -89,3 +89,10 @@ Fable 5 (claude-fable-5)
 - src/renderer/src/styles.css (modal/toast/picker CSS)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1/2/5: modal wired from the board's one gold primary and ⌘K ("New handoff…"); segmented kind control, registered-project select, note scope picker per `compose-form.test.ts`; keyboard matrix unit-tested.
+- AC3/4: `src/core/compose.test.ts` — create over the seam lands the v2 note, emits `handoff.created` + `vault.changed`, maps unknown-note/missing-identity to actionable envelopes. E2E drive stage 1: request composed against a sandboxed clone of the nimbus remote, `pushed: true`, card event observed.

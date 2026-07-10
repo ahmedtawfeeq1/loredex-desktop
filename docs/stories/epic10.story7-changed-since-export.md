@@ -79,3 +79,10 @@ claude-fable-5 (Claude Code)
 - src/renderer/src/styles.css (glow/affected rings, toggle switch, counts)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- Changed-since overlay derived from the activity feed (`changed-since.test.ts`): touched nodes glow `--ok` (never gold — gold stays path/blocked/primary), 1-hop neighbors ring; reduced-motion respected.
+- Standalone SVG/PNG export of the current viewport (`export.test.ts`), reachable from ⌘K; export inlines the computed theme tokens so the artifact is self-contained.

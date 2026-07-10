@@ -83,3 +83,11 @@ Claude Fable 5 (claude-fable-5)
 - src/core/threads.test.ts — fulfills both-ways integration
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1/2: compose kind=delivery offers the fulfills picker (open requests addressed to the sender, qualified ids); retro-link via LinkRequestModal wired app-root; compose-time field is the write path (PR-11).
+- AC3/4: E2E drive stage 4: delivery with `fulfills` → request's thread reports `fulfilledBy` and the delivery resolves `fulfills` back to the request — status never auto-written; FULFILLED chip uses `--ok` (`chip-fulfilled`); rail renders the labeled fulfills connector.
+- AC5: picker filters consumed/declined requests; serif empty state.

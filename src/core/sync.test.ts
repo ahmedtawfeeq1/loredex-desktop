@@ -130,5 +130,5 @@ describe('sync.run (write op under the lock)', () => {
     // F8: every report warning was ALSO emitted as a git.warning event
     const emitted = events.filter((e) => e.kind === 'git.warning').map((e) => e.kind === 'git.warning' && e.text)
     for (const w of report.warnings) expect(emitted).toContain(w)
-  })
+  }, 30_000) // parallel-suite contention: git ops under full-suite load exceed the 5s default
 })

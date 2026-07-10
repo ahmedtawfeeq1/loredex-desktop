@@ -83,3 +83,12 @@ Claude Fable 5 (claude-fable-5)
 - src/renderer/src/design-fidelity.test.ts — sanction the 2px hairline connector
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1: REQUEST navy chip (`chip-request`) beside the stamp; deliveries and v1 notes unchanged.
+- AC2/3: `handoffs.thread` derived core-side (`threads.test.ts`: ancestors walk, depth-first rail, comments included); ThreadRail rendered under the focused card in the Reader.
+- AC4: broken `replies_to`/`fulfills` refs render as diagnostic chips, never crash the rail (unit-covered).
+- AC5: E2E drive: thread refetched over the seam shows the reply immediately after `handoff.created`.

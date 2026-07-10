@@ -10,6 +10,7 @@ import type { AtlasEdge, AtlasNode } from '../../../../shared/types'
 import { invoke } from '../../api'
 import { useApp } from '../../stores/app'
 import { useAtlas } from '../../stores/atlas'
+import { useContracts } from '../../stores/contracts'
 import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import { useToasts } from '../../stores/toasts'
@@ -27,8 +28,9 @@ export type Resolution =
   | { kind: 'external'; url: string; via: 'editor' | 'github' }
   /** honest disabled state: nothing local to open — copy instead */
   | { kind: 'copy'; text: string; reason: string }
-  /** contract → timeline filtered to the file (view ships with story 11.2) */
-  | { kind: 'contract-timeline'; repoRoot: string; file: string }
+  /** contract → the timeline (story 11.2 view), scoped to the file's project
+   *  and scrolled to the file's newest change */
+  | { kind: 'contract-timeline'; repoRoot: string; file: string; project?: string }
 
 /** `editor: system|vscode|cursor|windsurf|custom` → deep-link URL. */
 export function editorUrl(editor: string | null | undefined, absPath: string): string {
@@ -59,7 +61,12 @@ export function resolveNode(node: AtlasNode, ctx: { editor: string | null }): Re
       return { kind: 'copy', text: node.sha ?? node.label, reason: 'non-GitHub remote' }
     }
     case 'contract':
-      return { kind: 'contract-timeline', repoRoot: node.repoRoot ?? '', file: node.file ?? '' }
+      return {
+        kind: 'contract-timeline',
+        repoRoot: node.repoRoot ?? '',
+        file: node.file ?? '',
+        ...(node.project ? { project: node.project } : {}),
+      }
   }
 }
 
@@ -147,11 +154,17 @@ export function performResolution(res: Resolution): void {
       return
     }
     case 'contract-timeline': {
-      // contract nodes only exist once the story 11.1 scan provides them; the
-      // timeline view rides story 11.2. Until then this row stays honest.
-      useToasts
-        .getState()
-        .push('Contract timeline', `${res.file} — the timeline view arrives with epic 11`)
+      // §3 row: the contract timeline, scoped to the file's project, scrolled
+      // to (and ringed on) the file's newest change — never a describing toast
+      const contracts = useContracts.getState()
+      useApp.getState().setView('contracts')
+      contracts.setProject(res.project ?? 'all')
+      void contracts.load().then(() => {
+        const latest = (useContracts.getState().changes ?? []).find(
+          (c) => c.repoRoot === res.repoRoot && c.file === res.file,
+        )
+        if (latest) useContracts.getState().focus(latest.sha)
+      })
       return
     }
   }

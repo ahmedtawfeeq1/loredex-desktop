@@ -93,3 +93,11 @@ Fable 5 (claude-fable-5)
 - .github/workflows/ci.yml (native-smoke vs packaged Electron ABI step — shared with story 9.2)
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10 (v2.0 / story 9.3 scope)
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- AC1/2/3: @parcel/watcher subscribe with .git ignore + debounce (`watcher.test.ts`); batches refresh changed paths, storms trigger the shared F4 `reconcileState()` — the same entry point the poller calls post-integrate (verified in `src/core/index.ts` wiring).
+- AC4/5: snooze-respecting notification routing + badge = open ∪ expired-snooze inbound only (`notify.test.ts` matrix); `snooze.expired` toast once per machine.
+- AC6: watcher native-smoke vs packaged Electron ABI stays in CI.

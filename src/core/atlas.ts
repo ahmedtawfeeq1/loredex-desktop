@@ -418,6 +418,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
         id: contractId,
         type: 'contract',
         label: change.file,
+        project: change.project,
         x: 0,
         y: 0,
         file: change.file,

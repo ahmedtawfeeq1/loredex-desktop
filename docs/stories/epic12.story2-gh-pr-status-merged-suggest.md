@@ -121,3 +121,10 @@ Claude Fable 5 (claude-fable-5)
 - `src/renderer/src/styles.css` — suggest-stack/toast/actions styles
 
 ## QA Results
+
+### Review — QA agent (fresh eyes), 2026-07-10
+
+**Verdict: PASS.** Suites: app vitest 488/488 (63 files, incl. the new `tests/m2-e2e-drive.test.ts` module drive), lib vitest 143/143, typecheck (node+web) clean, production build clean.
+
+- gh CLI only, no OAuth: capability probed once at startup and cached in app-db meta (`initGhCapability`), Settings re-checks with `{refresh}`; absent gh degrades to plain links (`github.test.ts`).
+- PR lookup 5s-timeout + per-sha session cache; merged→suggest pipeline (`suggests.test.ts`) SUGGESTS only — never writes; SuggestToast wired app-root; dismissals persisted per vault (`suggest.dismiss`).

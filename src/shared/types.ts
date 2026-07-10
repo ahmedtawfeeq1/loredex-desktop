@@ -427,6 +427,9 @@ export interface AtlasContractChange {
   file: string
   sha: string
   date: string
+  /** registered project name (roots map) — lets a contract node's resolution
+   *  open the timeline pre-scoped to its project (§3 hyperlink table) */
+  project?: string
   links: Array<{ handoffId: string; confidence: 'mentioned' | 'heuristic' }>
 }
 

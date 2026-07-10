@@ -4,6 +4,7 @@
  * keeps a prefers-color-scheme listener attached so OS flips apply instantly.
  */
 import { create } from 'zustand'
+import { isErrEnvelope } from '../../../shared/ipc-contract'
 import { resolveTheme, type ThemeSetting } from '../../../shared/theme'
 import { invoke } from '../api'
 
@@ -29,7 +30,9 @@ export const useTheme = create<ThemeState>((set, get) => ({
       const setting = await invoke('settings.theme.get', undefined)
       set({ setting, loaded: true })
       apply(setting)
-    } catch {
+    } catch (e) {
+      // first-attach port swap drops early invokes — retry once (app.init pattern)
+      if (isErrEnvelope(e) && e.code === 'PORT_SWAPPED') return get().load()
       set({ loaded: true }) // no core yet — keep following the OS
     }
   },

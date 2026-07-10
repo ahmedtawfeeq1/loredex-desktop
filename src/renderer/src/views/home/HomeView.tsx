@@ -9,6 +9,7 @@ import { useApp } from '../../stores/app'
 import { useHome } from '../../stores/home'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { remoteCommitBase } from '../../markdown/shaLinks'
+import { DEFAULT_BRIEF_TITLE, splitLeadingH1 } from './brief-title'
 import { formatFreshness } from './freshness'
 
 export function HomeView(): React.JSX.Element {
@@ -23,6 +24,8 @@ export function HomeView(): React.JSX.Element {
   }, [brief, load])
 
   const freshness = brief ? formatFreshness(brief.mtime) : null
+  // defect 14.2-1: one title owner — the chrome lifts the brief's own H1
+  const split = brief ? splitLeadingH1(brief.markdown) : null
 
   return (
     <div className="home">
@@ -47,14 +50,16 @@ export function HomeView(): React.JSX.Element {
         </div>
       ) : (
         <article className="note">
-          <h1 className="note-title">Start Here — Product</h1>
+          <h1 className="note-title">{split?.title ?? DEFAULT_BRIEF_TITLE}</h1>
           {brief.generated && (
             <p className="home-generated-hint">
               No curated brief in this vault yet — this is a live snapshot of the current project
               states. Run <span className="mono">loredex product</span> to curate one.
             </p>
           )}
-          <div className="note-body">{renderMarkdown(brief.markdown, remoteCommitBase(remote))}</div>
+          <div className="note-body">
+            {renderMarkdown(split?.body ?? brief.markdown, remoteCommitBase(remote))}
+          </div>
         </article>
       )}
     </div>

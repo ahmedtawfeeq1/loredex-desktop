@@ -112,9 +112,9 @@ development_status:
   13-2-join-vault-wizard-first-run: ready-for-dev
   epic-13-retrospective: optional
 
-  epic-14: in-progress     # DESIGN v2 Reskin & Defect Burn-down (run last)
+  epic-14: done            # DESIGN v2 Reskin & Defect Burn-down
   14-1-design-v2-token-layout-migration: done
-  14-2-v01-defect-burndown: ready-for-dev
+  14-2-v01-defect-burndown: done
   epic-14-retrospective: optional
 
 qa:

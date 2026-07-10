@@ -9,7 +9,7 @@ import type { ActivityEvent } from '../../../../shared/types'
 import { useApp } from '../../stores/app'
 import { useFeed } from '../../stores/feed'
 import { useReader } from '../../stores/reader'
-import { dayLabel, groupByDay, initials, targetOf } from './feed-logic'
+import { dayLabel, groupByDay, initials, noteBasename, targetOf } from './feed-logic'
 
 function open(event: ActivityEvent): void {
   const target = targetOf(event)
@@ -26,8 +26,16 @@ function open(event: ActivityEvent): void {
 }
 
 function EventRow({ event }: { event: ActivityEvent }): React.JSX.Element {
+  const path = event.subject.path
   return (
-    <button type="button" className="feed-row" onClick={() => open(event)}>
+    // dense row shows the basename; the hover title carries the full vault
+    // path (defect 14.2-2)
+    <button
+      type="button"
+      className="feed-row"
+      title={path ?? undefined}
+      onClick={() => open(event)}
+    >
       <span className="feed-avatar" aria-hidden>
         {initials(event.actor.name)}
       </span>
@@ -36,7 +44,7 @@ function EventRow({ event }: { event: ActivityEvent }): React.JSX.Element {
         <span className="feed-meta">
           <span className={`feed-kind feed-kind-${event.kind}`}>{event.kind}</span>{' '}
           {event.actor.name} · {event.at.slice(11, 16)}
-          {event.subject.path ? ` · ${event.subject.path}` : ''}
+          {path ? ` · ${noteBasename(path)}` : ''}
         </span>
       </span>
     </button>

@@ -1,7 +1,8 @@
-/** Story 6.2: day grouping, day labels, avatar determinism, navigation mapping. */
+/** Story 6.2: day grouping, day labels, avatar determinism, navigation mapping.
+ *  Story 14.2: dedupe-by-commit-hash + dense-row basename. */
 import { describe, expect, it } from 'vitest'
 import type { ActivityEvent } from '../../../../shared/types'
-import { dayLabel, groupByDay, initials, targetOf } from './feed-logic'
+import { dayLabel, dedupeBySha, groupByDay, initials, noteBasename, targetOf } from './feed-logic'
 
 const event = (over: Partial<ActivityEvent>): ActivityEvent => ({
   kind: 'sync',
@@ -47,6 +48,41 @@ describe('initials', () => {
     expect(initials('Maya de la Chen')).toBe('MC')
     expect(initials('maya')).toBe('M')
     expect(initials('  ')).toBe('?')
+  })
+})
+
+describe('dedupeBySha (defect 14.2-2: one commit = one event row)', () => {
+  it('collapses 3 raw events for the same commit into 1 row, keeping the first', () => {
+    const events = [
+      event({ sha: 'abc1234', summary: 'first pass' }),
+      event({ sha: 'abc1234', summary: 'second pass' }),
+      event({ sha: 'abc1234', summary: 'third pass' }),
+    ]
+    const rows = dedupeBySha(events)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.summary).toBe('first pass')
+  })
+  it('keeps distinct commits in input order', () => {
+    const events = [
+      event({ sha: 'aaa', summary: 'a' }),
+      event({ sha: 'bbb', summary: 'b' }),
+      event({ sha: 'aaa', summary: 'a again' }),
+      event({ sha: 'ccc', summary: 'c' }),
+    ]
+    expect(dedupeBySha(events).map((e) => e.sha)).toEqual(['aaa', 'bbb', 'ccc'])
+  })
+  it('passes an already-unique feed through untouched', () => {
+    const events = [event({ sha: 'a' }), event({ sha: 'b' })]
+    expect(dedupeBySha(events)).toEqual(events)
+  })
+})
+
+describe('noteBasename (dense rows; full path rides the hover title)', () => {
+  it('returns the file name for a vault path', () => {
+    expect(noteBasename('projects/nimbus-backend/handoffs/2026-07-09-handoff.md')).toBe(
+      '2026-07-09-handoff.md',
+    )
+    expect(noteBasename('note.md')).toBe('note.md')
   })
 })
 

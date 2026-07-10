@@ -6,6 +6,7 @@
 import { create } from 'zustand'
 import { isErrEnvelope } from '../../../shared/ipc-contract'
 import type { ActivityEvent } from '../../../shared/types'
+import { dedupeBySha } from '../views/feed/feed-logic'
 import { invoke, onEvent } from '../api'
 
 const PAGE = 100
@@ -30,7 +31,8 @@ export const useFeed = create<FeedState>((set, get) => ({
     set({ loading: true })
     try {
       const events = await invoke('activity.feed', { limit: get().limit })
-      set({ events, loading: false, error: null })
+      // one commit = one row, however many parse passes ran (defect 14.2-2)
+      set({ events: dedupeBySha(events), loading: false, error: null })
     } catch (e) {
       set({
         events: [],

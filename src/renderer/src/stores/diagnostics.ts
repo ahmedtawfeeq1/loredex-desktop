@@ -15,6 +15,18 @@ interface DiagnosticsState {
   setOpen(open: boolean): void
 }
 
+/** Panel ordering: the open note first, then alphabetical (pure, story 14.2). */
+export function orderNotes(byNote: Record<string, string[]>, selected: string | null): string[] {
+  return Object.keys(byNote).sort((a, b) =>
+    a === selected ? -1 : b === selected ? 1 : a.localeCompare(b),
+  )
+}
+
+/** Total broken links across the vault — the badge count (pure, story 14.2). */
+export function brokenLinkCount(byNote: Record<string, string[]>): number {
+  return Object.values(byNote).reduce((n, links) => n + links.length, 0)
+}
+
 export const useDiagnostics = create<DiagnosticsState>((set) => ({
   open: false,
   byNote: {},

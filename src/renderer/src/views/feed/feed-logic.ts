@@ -36,6 +36,24 @@ export function initials(name: string): string {
   return (first + second).toUpperCase()
 }
 
+/**
+ * Defect 14.2-2: one commit = one event row, however many parse passes ran.
+ * Keeps the first (newest-parse) event per commit hash, input order preserved.
+ */
+export function dedupeBySha(events: ActivityEvent[]): ActivityEvent[] {
+  const seen = new Set<string>()
+  return events.filter((event) => {
+    if (seen.has(event.sha)) return false
+    seen.add(event.sha)
+    return true
+  })
+}
+
+/** Dense row text: note basename; the full path lives in the hover title. */
+export function noteBasename(path: string): string {
+  return path.split('/').pop() ?? path
+}
+
 export type FeedTarget = { kind: 'board' } | { kind: 'note'; path: string } | { kind: 'sync' }
 
 /**

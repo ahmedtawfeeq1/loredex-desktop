@@ -1,9 +1,10 @@
 /**
- * Broken-link diagnostics (story 2.2): current note first, then the per-vault
- * list fed lazily as notes render. A count pill floats in the reader; the
- * panel opens from it or from clicking a broken link.
+ * Broken-link diagnostics (story 2.2, upgraded by 14.2-4): the count badge is
+ * a button opening a panel that lists every broken link — source note + raw
+ * target — and each row navigates to the source note. Links are never
+ * auto-created.
  */
-import { useDiagnostics } from '../../stores/diagnostics'
+import { brokenLinkCount, orderNotes, useDiagnostics } from '../../stores/diagnostics'
 import { useReader } from '../../stores/reader'
 
 export function Diagnostics(): React.JSX.Element | null {
@@ -11,16 +12,20 @@ export function Diagnostics(): React.JSX.Element | null {
   const byNote = useDiagnostics((s) => s.byNote)
   const setOpen = useDiagnostics((s) => s.setOpen)
   const selected = useReader((s) => s.selected)
+  const openNote = useReader((s) => s.open)
 
-  const notes = Object.keys(byNote).sort((a, b) =>
-    a === selected ? -1 : b === selected ? 1 : a.localeCompare(b),
-  )
-  const count = notes.reduce((n, note) => n + (byNote[note]?.length ?? 0), 0)
+  const notes = orderNotes(byNote, selected)
+  const count = brokenLinkCount(byNote)
   if (count === 0) return null
 
   if (!open) {
     return (
-      <button type="button" className="diag-pill" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="diag-pill"
+        title="Open link diagnostics"
+        onClick={() => setOpen(true)}
+      >
         {count} broken {count === 1 ? 'link' : 'links'}
       </button>
     )
@@ -42,9 +47,15 @@ export function Diagnostics(): React.JSX.Element | null {
         <div key={note} className="diag-note">
           <div className="diag-note-path">{note === selected ? `${note} (open note)` : note}</div>
           {(byNote[note] ?? []).map((link) => (
-            <div key={link} className="diag-row">
+            <button
+              key={link}
+              type="button"
+              className="diag-row"
+              title={`Open ${note}`}
+              onClick={() => void openNote(note)}
+            >
               [[{link}]]
-            </div>
+            </button>
           ))}
         </div>
       ))}

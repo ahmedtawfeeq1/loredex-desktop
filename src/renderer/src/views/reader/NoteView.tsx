@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Doc } from '../../../../shared/ipc-contract'
 import type { NoteComment } from '../../../../shared/types'
+import { BrandMark } from '../../components/BrandMark'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useComments } from '../../stores/comments'
 import { useDiagnostics } from '../../stores/diagnostics'
@@ -76,8 +77,14 @@ export function NoteView(): React.JSX.Element {
 
   if (!selected) {
     return (
-      <div className="empty-state" style={{ border: 'none' }}>
+      <div className="empty-state reader-empty">
+        <div className="empty-state-icon">
+          <BrandMark size={44} />
+        </div>
         <p>Select a note to read.</p>
+        <span className="empty-state-hint">
+          Browse the vault tree, filter files, or press ⌘K to search everything.
+        </span>
       </div>
     )
   }

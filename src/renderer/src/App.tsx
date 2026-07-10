@@ -8,6 +8,7 @@ import { appActions, VIEW_ORDER } from './actions/registry'
 import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
+import { BrandMark } from './components/BrandMark'
 import { IdentityBadge } from './components/IdentityBadge'
 import { NavIcon, RailChevron } from './components/NavIcon'
 import { ShortcutCheatsheet } from './components/ShortcutCheatsheet'
@@ -153,6 +154,10 @@ export default function App(): React.JSX.Element {
         {/* Addendum D1 collapsible rails (story 16.2): chevron in the pane
             header + ⌘\ — collapsed = 56px icon rail, badges become dots */}
         <div className="sidebar-head">
+          <div className="sidebar-brand" title="Loredex">
+            <BrandMark size={22} />
+            <span className="sidebar-wordmark">Loredex</span>
+          </div>
           <button
             type="button"
             className="rail-toggle"

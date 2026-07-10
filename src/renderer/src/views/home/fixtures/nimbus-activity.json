@@ -1,0 +1,889 @@
+[
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T15:56:43+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-10-handoff-nimbus-ai-engine.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-10-handoff-nimbus-ai-engine"
+    },
+    "summary": "loredex: handoff nimbus-ai-engine -> nimbus-frontend (ahmedtawfeeq1)",
+    "sha": "4f77cce47cc1d6e83d8cb559bf31396992519db6"
+  },
+  {
+    "kind": "sync",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T15:55:26+03:00",
+    "subject": {
+      "path": "projects/nimbus-ai-engine/handoffs/2026-07-10-comment-noted.md",
+      "project": "nimbus-ai-engine"
+    },
+    "summary": "loredex: comment on 2026-07-09-handoff-nimbus-frontend",
+    "sha": "464300017f34bbae98d4336bb6166b77a84afded"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T06:44:18+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-3.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-3"
+    },
+    "summary": "loredex: consume handoff 2026-07-10-handoff-nimbus-frontend-3",
+    "sha": "3f65a1b2ed284f9ce7bb3b466242e2943174a6b1"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:47+03:00",
+    "subject": {
+      "path": "projects/nimbus-mobile/handoffs/2026-07-10-handoff-nimbus-backend-2.md",
+      "project": "nimbus-mobile",
+      "handoffId": "2026-07-10-handoff-nimbus-backend-2"
+    },
+    "summary": "loredex: handoff nimbus-backend -> nimbus-mobile (Rae Ito)",
+    "sha": "5d1b6d5e1d026c9835455f56362ef36cc1b9005f"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:44+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-mobile-2.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-mobile-2"
+    },
+    "summary": "loredex: handoff nimbus-mobile -> nimbus-backend (Rae Ito)",
+    "sha": "c46f632117b104e6de801d329e97690444f31364"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:40+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-4.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-4"
+    },
+    "summary": "loredex: consume handoff 2026-07-10-handoff-nimbus-frontend-4",
+    "sha": "6d4259c041354b53a92ac686837a24a56edf401c"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:37+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-4.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-4"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-frontend-4 open -> accepted",
+    "sha": "5297541eef1a2ef6c5c9de604a1648faf4fbfc5d"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:34+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-4.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-4"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-frontend-4 declined -> open",
+    "sha": "75c9231a56df81f664fe2183516459c25bc59e26"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:30+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-4.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-4"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-frontend-4 open -> declined",
+    "sha": "08eea69da7b47b387912e924737e8e152ce95135"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:27+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-4.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-4"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-frontend-4 snoozed -> open",
+    "sha": "a9c7b78fd898b540c9ef589edd30e0e30f4e15c1"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:23+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-4.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-4"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-frontend-4 open -> snoozed",
+    "sha": "ee0337e2f577e5571d7c1c53678afcdf1698a921"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:42:20+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-4.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-4"
+    },
+    "summary": "loredex: handoff nimbus-frontend -> nimbus-backend (Rae Ito)",
+    "sha": "bcff379dfd7d38461636dbca1f098d3e89f4cb7c"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:41:42+03:00",
+    "subject": {
+      "path": "projects/nimbus-mobile/handoffs/2026-07-10-handoff-nimbus-backend.md",
+      "project": "nimbus-mobile",
+      "handoffId": "2026-07-10-handoff-nimbus-backend"
+    },
+    "summary": "loredex: handoff nimbus-backend -> nimbus-mobile (Rae Ito)",
+    "sha": "c9437f4875460e1414d7b4db7ce0664232dbe780"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:41:38+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-mobile.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-mobile"
+    },
+    "summary": "loredex: handoff nimbus-mobile -> nimbus-backend (Rae Ito)",
+    "sha": "c1b1646556cbc49b2358fc002514a5feb6c5aa13"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:41:35+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-3.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-3"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-frontend-3 open -> accepted",
+    "sha": "9d4d2303af813c782f436d659025b0cd1363d85c"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rae Ito",
+      "email": "rae@nimbus.dev"
+    },
+    "at": "2026-07-10T06:41:32+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-3.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-3"
+    },
+    "summary": "loredex: handoff nimbus-frontend -> nimbus-backend (Rae Ito)",
+    "sha": "abea8a994b9fa2925a8217553040b14157f9fdbe"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T06:05:25+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/streaming/2026-07-10-sse-retry-findings-2.md",
+      "project": "nimbus-backend"
+    },
+    "summary": "loredex: route 1 note(s)",
+    "sha": "5b1911a2028c6f9e8356d6b9ae9bdffe205c0c89"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rana Sabbah",
+      "email": "rana@nimbus.dev"
+    },
+    "at": "2026-07-10T06:05:22+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-2.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend-2"
+    },
+    "summary": "loredex: handoff nimbus-frontend -> nimbus-backend (Rana Sabbah)",
+    "sha": "4af17ecea2b00b1f75d3bcb63fa043b9f9f8da40"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rana Sabbah",
+      "email": "rana@nimbus.dev"
+    },
+    "at": "2026-07-10T06:05:18+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-10-handoff-nimbus-backend-2.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-10-handoff-nimbus-backend-2"
+    },
+    "summary": "loredex: handoff nimbus-backend -> nimbus-frontend (Rana Sabbah)",
+    "sha": "27eb80c4b02a1e565f100c1262126a8f84df42d6"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T06:05:07+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/streaming/2026-07-10-sse-retry-findings.md",
+      "project": "nimbus-backend"
+    },
+    "summary": "loredex: route 1 note(s)",
+    "sha": "8d7d4058ef36456f5ebd74ce6d98c5b05940d507"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rana Sabbah",
+      "email": "rana@nimbus.dev"
+    },
+    "at": "2026-07-10T06:05:04+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-frontend"
+    },
+    "summary": "loredex: handoff nimbus-frontend -> nimbus-backend (Rana Sabbah)",
+    "sha": "12600520f0c41fae208285b9200b172599140757"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "Rana Sabbah",
+      "email": "rana@nimbus.dev"
+    },
+    "at": "2026-07-10T06:05:00+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-10-handoff-nimbus-backend.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-10-handoff-nimbus-backend"
+    },
+    "summary": "loredex: handoff nimbus-backend -> nimbus-frontend (Rana Sabbah)",
+    "sha": "bb0f8916ef345b314e4c5a2529df49a2f420e06f"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T05:31:07+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-ai-engine-2.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-ai-engine-2"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-ai-engine-2 snoozed -> open",
+    "sha": "f6e46835693584905eb8b9f081ce09e45047dc57"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T05:31:00+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-ai-engine-2.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-ai-engine-2"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-ai-engine-2 open -> snoozed",
+    "sha": "4980333d7986667d64b207c2aef1715af0592398"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T05:29:46+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-ai-engine-2.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-ai-engine-2"
+    },
+    "summary": "loredex: handoff nimbus-ai-engine -> nimbus-backend (Rana)",
+    "sha": "e45aa31697254a9d4203b84cb1080f4805ec999b"
+  },
+  {
+    "kind": "sync",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T05:29:10+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-comment-gateway-caveat.md",
+      "project": "nimbus-backend"
+    },
+    "summary": "loredex: comment on 2026-07-10-handoff-nimbus-ai-engine",
+    "sha": "55ee51c598efca473f365a5b3a61cb93676a2f5e"
+  },
+  {
+    "kind": "status",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T05:29:07+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-ai-engine.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-ai-engine"
+    },
+    "summary": "loredex: handoff 2026-07-10-handoff-nimbus-ai-engine open -> accepted",
+    "sha": "5961d1653927ff3623f7caf30df2b6fb27f4d66c"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T05:29:03+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-ai-engine.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-10-handoff-nimbus-ai-engine"
+    },
+    "summary": "loredex: handoff nimbus-ai-engine -> nimbus-backend (Rana)",
+    "sha": "5705f79d09261339a1e165cfbb43166d4fe94589"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T03:57:37+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend-2.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-09-handoff-nimbus-backend-2"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-backend-2",
+    "sha": "6de05198e5643ae18a46f5259bc68d78d82b2840"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T03:57:33+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend-2.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-09-handoff-nimbus-backend-2"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-backend-2",
+    "sha": "0bdab7e02641809b1dc4d575bf0b9b3619d97b81"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T03:57:22+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend-2.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-09-handoff-nimbus-backend-2"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-backend-2",
+    "sha": "14678397153f031d2bc805f26e9425bd2fffe98e"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-10T02:48:53+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend-2.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-09-handoff-nimbus-backend-2"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-backend-2",
+    "sha": "6aa877e8d4d06102ff73936bf7a945d21c9e2d15"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "Machine Two",
+      "email": "machine2@nimbus.dev"
+    },
+    "at": "2026-07-10T01:49:50+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-mobile.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-09-handoff-nimbus-mobile"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-mobile",
+    "sha": "e7603497d0fdaaaac6b6277ba52c56a54fb05e81"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T23:08:35+03:00",
+    "subject": {
+      "path": "projects/nimbus-mobile/handoffs/2026-07-09-handoff-nimbus-backend-2.md",
+      "project": "nimbus-mobile",
+      "handoffId": "2026-07-09-handoff-nimbus-backend-2"
+    },
+    "summary": "loredex: handoff nimbus-backend -> nimbus-mobile",
+    "sha": "28c779c4d45ae97df53f378cdb7179b647e34a8a"
+  },
+  {
+    "kind": "sync",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:59:06+03:00",
+    "subject": {
+      "path": "Start Here - Product.md"
+    },
+    "summary": "loredex: curate --product",
+    "sha": "b9f4a6cac70127ea94f9e22697ea8976608e8e33"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:52:54+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend-2.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-09-handoff-nimbus-backend-2"
+    },
+    "summary": "loredex: handoff nimbus-backend -> nimbus-frontend",
+    "sha": "58dbe55dbc7ad771fae76721fe1a36ae346d4fa7"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:51:54+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/agent-config/2026-07-09-agents-api-v2.md",
+      "project": "nimbus-backend"
+    },
+    "summary": "loredex: route 1 note(s)",
+    "sha": "ab579c28c9a01cd565345880cd6a805f7cb65ef9"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:49:27+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-ai-engine-2.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-09-handoff-nimbus-ai-engine-2"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-ai-engine-2",
+    "sha": "68641e87398a57bf2a6a9a3ed8203d98ba8a3687"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:45:30+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-ai-engine-2.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-09-handoff-nimbus-ai-engine-2"
+    },
+    "summary": "loredex: handoff nimbus-ai-engine -> nimbus-backend",
+    "sha": "2329620df44bd1228e0b7b98bdec6f99d8a2eadd"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:43:55+03:00",
+    "subject": {
+      "path": "projects/nimbus-ai-engine/agent-config/2026-07-09-agent-config-v2.md",
+      "project": "nimbus-ai-engine"
+    },
+    "summary": "loredex: route 2 note(s)",
+    "sha": "2dbed8a12d6c779c2664e4dbc0a548129d866d3e"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:42:31+03:00",
+    "subject": {
+      "path": "projects/nimbus-ai-engine/handoffs/2026-07-09-handoff-nimbus-frontend.md",
+      "project": "nimbus-ai-engine",
+      "handoffId": "2026-07-09-handoff-nimbus-frontend"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-frontend",
+    "sha": "ff2070be9aaf4e4313a9539e2d438fbafde54a67"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:38:06+03:00",
+    "subject": {
+      "path": "projects/nimbus-ai-engine/handoffs/2026-07-09-handoff-nimbus-frontend.md",
+      "project": "nimbus-ai-engine",
+      "handoffId": "2026-07-09-handoff-nimbus-frontend"
+    },
+    "summary": "loredex: handoff nimbus-frontend -> nimbus-ai-engine",
+    "sha": "6595efb9aaa4164ed2c3335b3c5a5e033067fa7f"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:36:58+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/agent-config/2026-07-09-schema-v2-request.md",
+      "project": "nimbus-frontend"
+    },
+    "summary": "loredex: route 1 note(s)",
+    "sha": "989f39d304f0f39cbff98a268603fe67e4b4fdac"
+  },
+  {
+    "kind": "sync",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:34:24+03:00",
+    "subject": {},
+    "summary": "loredex: sync (regenerate indexes)",
+    "sha": "1599d01a44350ae8895dff8cb21334a5877962d1"
+  },
+  {
+    "kind": "sync",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:34:23+03:00",
+    "subject": {},
+    "summary": "loredex: sync",
+    "sha": "0bca582a1f9b713d4947ba33c1b137fb78331080"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:33:11+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-mobile.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-09-handoff-nimbus-mobile"
+    },
+    "summary": "loredex: handoff nimbus-mobile -> nimbus-backend",
+    "sha": "67734f32716d7a9b63c68c65f7a9a7d4ecf29555"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:32:08+03:00",
+    "subject": {
+      "path": "projects/nimbus-mobile/channels/2026-07-09-mobile-channel-notes.md",
+      "project": "nimbus-mobile"
+    },
+    "summary": "loredex: route 2 note(s)",
+    "sha": "d0e5758f7d7ad516b91afdc98eabcb7dcf8eb060"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:30:19+03:00",
+    "subject": {
+      "path": "projects/nimbus-mobile/handoffs/2026-07-09-handoff-nimbus-backend.md",
+      "project": "nimbus-mobile",
+      "handoffId": "2026-07-09-handoff-nimbus-backend"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-backend",
+    "sha": "d21706e73ac9a94c3806e16ea7c5749cee203499"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:26:59+03:00",
+    "subject": {
+      "path": "projects/nimbus-mobile/handoffs/2026-07-09-handoff-nimbus-backend.md",
+      "project": "nimbus-mobile",
+      "handoffId": "2026-07-09-handoff-nimbus-backend"
+    },
+    "summary": "loredex: handoff nimbus-backend -> nimbus-mobile",
+    "sha": "1cdd04e2522abcfe94305641b1acd1c9f41711c6"
+  },
+  {
+    "kind": "sync",
+    "actor": {
+      "name": "Nimbus Sim",
+      "email": "sim@nimbus.dev"
+    },
+    "at": "2026-07-09T22:25:42+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/channels/2026-07-09-whatsapp-channel-2.md",
+      "project": "nimbus-backend"
+    },
+    "summary": "Remove duplicate whatsapp-channel note (watch/route race)",
+    "sha": "b0dc591aede176a4d3563f708d1628435b52acae"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:23:34+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/channels/2026-07-09-whatsapp-channel-2.md",
+      "project": "nimbus-backend"
+    },
+    "summary": "loredex: route 2 note(s)",
+    "sha": "99c917c33b91347fd1064b45d4f18287934ee543"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:23:28+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/channels/2026-07-09-whatsapp-channel.md",
+      "project": "nimbus-backend"
+    },
+    "summary": "loredex: route 1 note(s)",
+    "sha": "1e8487830cae584be779de8cbf703414c73cb469"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:18:44+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/streaming/2026-07-09-streaming-ui.md",
+      "project": "nimbus-frontend"
+    },
+    "summary": "loredex: route 1 note(s)",
+    "sha": "f81695fd5519b5644fe1a751e585efd38fed3913"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:17:20+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-09-handoff-nimbus-backend"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-backend",
+    "sha": "cbb9526472e4dcce7d87bc4f9e3af724701d4abe"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:13:49+03:00",
+    "subject": {
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend.md",
+      "project": "nimbus-frontend",
+      "handoffId": "2026-07-09-handoff-nimbus-backend"
+    },
+    "summary": "loredex: handoff nimbus-backend -> nimbus-frontend",
+    "sha": "95f4f1529c3e0df11dac97f5608ef61f1f8bd987"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:12:04+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/streaming/2026-07-09-streaming-api.md",
+      "project": "nimbus-backend"
+    },
+    "summary": "loredex: route 1 note(s)",
+    "sha": "5200fdcb9c0d4e6256d04f92684c01fa33f7b960"
+  },
+  {
+    "kind": "consume",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:09:51+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-ai-engine.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-09-handoff-nimbus-ai-engine"
+    },
+    "summary": "loredex: consume handoff 2026-07-09-handoff-nimbus-ai-engine",
+    "sha": "9faa5791fe9491725a107f2df93c6062fa6e7e15"
+  },
+  {
+    "kind": "handoff",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:06:04+03:00",
+    "subject": {
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-ai-engine.md",
+      "project": "nimbus-backend",
+      "handoffId": "2026-07-09-handoff-nimbus-ai-engine"
+    },
+    "summary": "loredex: handoff nimbus-ai-engine -> nimbus-backend",
+    "sha": "b924019f7fe0e788ff83dbcaf7135b6d772c84da"
+  },
+  {
+    "kind": "route",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T22:04:28+03:00",
+    "subject": {
+      "path": "projects/nimbus-ai-engine/streaming/2026-07-09-streaming-design.md",
+      "project": "nimbus-ai-engine"
+    },
+    "summary": "loredex: route 1 note(s)",
+    "sha": "07238672f35fc43c5178fb28d0d19d8a1bed3066"
+  },
+  {
+    "kind": "sync",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T21:58:44+03:00",
+    "subject": {
+      "path": "_index/Home.md"
+    },
+    "summary": "loredex: sync (regenerate indexes)",
+    "sha": "d62f9a192124840a577d69af8175d611c140e722"
+  },
+  {
+    "kind": "sync",
+    "actor": {
+      "name": "ahmedtawfeeq1",
+      "email": "ahmed.tawfeeq@ejust.edu.eg"
+    },
+    "at": "2026-07-09T21:57:18+03:00",
+    "subject": {
+      "path": "_index/Home.md"
+    },
+    "summary": "loredex: initialize vault",
+    "sha": "fff8cb75dd8069388510a793e5b091ef1713f5a8"
+  }
+]

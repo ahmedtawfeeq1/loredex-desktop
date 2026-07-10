@@ -3,14 +3,17 @@
  * the sanctioned markdown pipeline. No edit affordances — v1 product cut.
  */
 import { useMemo } from 'react'
+import type { Doc } from '../../../../shared/ipc-contract'
 import { renderMarkdown } from '../../markdown/pipeline'
+import { useDiagnostics } from '../../stores/diagnostics'
 import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import { qualifiedId } from '../../../../shared/handoff-lanes'
+import { stripDuplicateH1 } from '../home/brief-title'
 import { handoffRefFromNote } from '../handoffs/compose-form'
 import { attributionLines } from '../handoffs/lifecycle'
 import { ContractChips } from '../contracts/ContractChips'
-import { ReadingOrderInline } from '../handoffs/ReadingOrderInline'
+import { ReadingOrderInline, readingOrderEmptied } from '../handoffs/ReadingOrderInline'
 import { ThreadRail } from '../handoffs/ThreadRail'
 
 export function formatValue(value: unknown): string {
@@ -49,9 +52,6 @@ export function NoteView(): React.JSX.Element {
   const docError = useReader((s) => s.docError)
   const readingOrder = useReader((s) => s.readingOrder)
 
-  // memoize per note content — a 1 MB note re-renders only when it changes
-  const rendered = useMemo(() => (doc ? renderMarkdown(doc.body) : null), [doc])
-
   if (!selected) {
     return (
       <div className="empty-state" style={{ border: 'none' }}>
@@ -61,8 +61,28 @@ export function NoteView(): React.JSX.Element {
   }
   if (docError) return <div className="note-error">{docError}</div>
   if (!doc) return <div />
+  return <NoteArticle selected={selected} doc={doc} readingOrder={readingOrder} />
+}
 
+/** The note itself, props-driven (store-free below NoteView — testable). */
+export function NoteArticle({
+  selected,
+  doc,
+  readingOrder,
+}: {
+  selected: string
+  doc: Doc
+  readingOrder: string[]
+}): React.JSX.Element {
   const title = (selected.split('/').pop() ?? selected).replace(/\.md$/, '')
+  // memoize per note content — a 1 MB note re-renders only when it changes.
+  // Addendum D1: index/MOC pages never render their H1 twice — a leading H1
+  // equal to the chrome title (the filename) is stripped before the pipeline.
+  const rendered = useMemo(
+    () => renderMarkdown(stripDuplicateH1(doc.body, title)),
+    [doc, title],
+  )
+
   // story 7.3 AC1: the open handoff brief is the "detail view" — same actions
   const handoffRef = handoffRefFromNote(selected, doc.meta as Record<string, unknown>)
   return (
@@ -100,6 +120,20 @@ export function NoteView(): React.JSX.Element {
       )}
       <FrontmatterPanel meta={doc.meta as Record<string, unknown>} />
       <div className="note-body">{rendered}</div>
+      {/* Addendum D1: a Reading order section never renders as silence — the
+          2026-07-10 defect (writers emitted the heading with zero notes) */}
+      {readingOrderEmptied(doc.body) && (
+        <p className="ro-empty" role="note">
+          Reading order lists no notes — this handoff was written without any.{' '}
+          <button
+            type="button"
+            className="ro-empty-action"
+            onClick={() => useDiagnostics.getState().setOpen(true)}
+          >
+            Open Link Diagnostics
+          </button>
+        </p>
+      )}
       <ReadingOrderInline targets={readingOrder} from={selected} />
       {handoffRef && <ThreadRail id={qualifiedId(handoffRef)} />}
     </article>

@@ -17,6 +17,7 @@
   --navy: #131826;
   --rust: #a63d2f;
   --ok: #2e6e5e;
+  --wikilink: #8a6116; /* Addendum D1: inline note references, light theme */
   --shadow-card: 0 1px 3px rgba(19, 24, 38, 0.06);
 }
 
@@ -32,6 +33,7 @@
   --navy: #f2efe8;
   --rust: #d4715f;
   --ok: #63b3a1;
+  --wikilink: #e0a83e; /* Addendum D1: gold in dark */
 }
 
 /* ── type roles (unchanged from v1) ────────────────────────────────────── */
@@ -432,12 +434,11 @@ a:hover {
   color: var(--text-1);
 }
 
-/* ── reader: centered column, 68–76ch measure — no dead left gutter ─────── */
+/* ── reader: full-bleed (Addendum D1) — the full detail-pane width, 32px side
+     padding, no ch-measure cap; same for MOC/index pages and handoff notes ── */
 
 .note {
-  max-width: 72ch;
-  margin-inline: auto;
-  padding: 32px 24px 64px;
+  padding: 32px 32px 64px;
   user-select: text;
 }
 
@@ -580,11 +581,13 @@ a:hover {
   padding: 16px 24px;
 }
 
-/* ── wikilinks (story 2.2): navy at rest, underline on hover; broken = rust
-     dotted with diagnostic tooltip — never a created file ───────────────── */
+/* ── wikilinks (story 2.2 + Addendum D1): always visibly links — gold-family
+     token (#8a6116 light / gold dark), 500 weight, underline on hover only;
+     broken = rust dotted with diagnostic tooltip — never a created file ──── */
 
 .note-body a.wikilink {
-  color: var(--navy);
+  color: var(--wikilink);
+  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
 }
@@ -1025,6 +1028,33 @@ a:hover {
 
 .ro-broken {
   color: var(--rust);
+}
+
+/* Addendum D1: unresolved reading-order names — plain rust text wired to
+   Link Diagnostics; a wikilink list section never renders an empty list */
+
+.ro-unresolved {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--rust);
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.ro-empty {
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--rust);
+}
+
+.ro-empty-action {
+  color: var(--rust);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 /* ── consume + receipt (story 3.4) ─────────────────────────────────────── */

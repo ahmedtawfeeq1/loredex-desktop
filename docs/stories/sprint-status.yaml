@@ -134,6 +134,9 @@ development_status:
   15-3-keyboard-coverage: done                  # one action registry: ⌘1-9/⌘N/⇧⌘R/⇧⌘S/?, ⌘K hints, cheatsheet; coverage test guards it
   15-4-public-docs: done                        # README rewrite (hero/tour/install/arch) + docs/USER-GUIDE.md; every claim code-verified, links checked
   15-5-home-dashboard: done                     # Home = full-width insight dashboard (docs/plan/wireframe-home-dashboard.html); pure insights module + nimbus-fixture vitest, debounced live recompute, no Refresh
+  # ---- M4 cycle (UI polish, DESIGN.md Addendum D1) ---------------------------
+  epic-16: in-progress     # Reader & writing-surface polish per DESIGN.md Addendum D1
+  16-1-reader-full-bleed-wikilinks: done        # full-bleed reader; duplicate-H1 strip; D1 wikilink colors; empty reading order fixed at writer (lib b5c3ffc, local) + renderer rust state
 
 qa:
   pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded

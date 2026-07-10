@@ -23,3 +23,14 @@ export function splitLeadingH1(markdown: string): BriefTitle {
   if (!match) return { title: null, body: markdown }
   return { title: match[1] ?? null, body: lines.slice(i + 1).join('\n') }
 }
+
+/**
+ * Addendum D1 (same defect class as 14.2-1, now for index/MOC pages): the
+ * reader chrome shows the filename as the title, so a leading H1 that merely
+ * repeats it is stripped. A DIFFERENT leading H1 (curated wording) is kept.
+ */
+export function stripDuplicateH1(markdown: string, title: string): string {
+  const { title: leading, body } = splitLeadingH1(markdown)
+  if (leading !== null && leading.trim().toLowerCase() === title.trim().toLowerCase()) return body
+  return markdown
+}

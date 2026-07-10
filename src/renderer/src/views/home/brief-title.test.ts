@@ -1,6 +1,6 @@
 /** Defect 14.2-1: the brief title renders exactly once — the chrome owns it. */
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_BRIEF_TITLE, splitLeadingH1 } from './brief-title'
+import { DEFAULT_BRIEF_TITLE, splitLeadingH1, stripDuplicateH1 } from './brief-title'
 
 describe('splitLeadingH1', () => {
   it('lifts a leading H1 into the chrome title and strips it from the body', () => {
@@ -26,5 +26,22 @@ describe('splitLeadingH1', () => {
     expect(splitLeadingH1('## Not a title\n# later').title).toBeNull()
     const { body } = splitLeadingH1('# Title\ntext\n# Another H1 stays')
     expect(body).toContain('# Another H1 stays')
+  })
+})
+
+describe('stripDuplicateH1 (Addendum D1 — index/MOC duplicate title, story 16.1)', () => {
+  it('strips the leading H1 when it repeats the chrome title (case-insensitive)', () => {
+    const md = '# nimbus-backend\n\n## streaming — 2026-07-10\n\n- [[a-note]]\n'
+    const out = stripDuplicateH1(md, 'nimbus-backend')
+    expect(out).not.toContain('# nimbus-backend')
+    expect(out).toContain('## streaming')
+    expect(stripDuplicateH1('# Home\nbody', 'home')).toBe('body')
+  })
+
+  it('keeps a leading H1 with its own wording, and bodies without one, verbatim', () => {
+    const curated = '# Handoff — a → b\n\ntext'
+    expect(stripDuplicateH1(curated, '2026-07-10-handoff-a')).toBe(curated)
+    const plain = 'no heading here'
+    expect(stripDuplicateH1(plain, 'anything')).toBe(plain)
   })
 })

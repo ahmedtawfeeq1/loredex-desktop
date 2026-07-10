@@ -8,6 +8,18 @@ import type { Doc } from '../../../../shared/ipc-contract'
 import type { LinkResolution } from '../../../../shared/types'
 import { previewCached, resolveCached } from '../../markdown/resolveCache'
 import { renderMarkdown } from '../../markdown/pipeline'
+import { useDiagnostics } from '../../stores/diagnostics'
+
+/**
+ * Addendum D1: writers used to emit a `## Reading order` heading with zero
+ * notes (2026-07-10 defect — reply handoffs carry none). Detect that shape so
+ * the reader can render a rust diagnostic line instead of silence.
+ */
+export function readingOrderEmptied(body: string): boolean {
+  const section = body.split(/^#{1,6}\s+Reading order\s*$/im)[1]?.split(/^#{1,6}\s/m)[0]
+  if (section === undefined) return false
+  return !/\[\[[^[\]]+\]\]/.test(section)
+}
 
 function useCacheEntry<T>(entry: { promise: Promise<T>; result?: T }): T | undefined {
   const [, bump] = useState(0)
@@ -23,8 +35,29 @@ function useCacheEntry<T>(entry: { promise: Promise<T>; result?: T }): T | undef
   return entry.result
 }
 
+/**
+ * Addendum D1: an unresolved name is plain rust text wired to Link
+ * Diagnostics — it reports itself as a diagnostic and click opens the panel.
+ */
+function UnresolvedName({ name, from }: { name: string; from: string }): React.JSX.Element {
+  useEffect(() => {
+    if (from) useDiagnostics.getState().report(from, name)
+  }, [from, name])
+  return (
+    <button
+      type="button"
+      className="ro-unresolved"
+      title={`No note in this vault matches “${name}” — click to open Link Diagnostics`}
+      onClick={() => useDiagnostics.getState().setOpen(true)}
+    >
+      {name} — not found in this vault
+    </button>
+  )
+}
+
 function InlineNote({ target, from }: { target: string; from: string }): React.JSX.Element {
   const resolution: LinkResolution | undefined = useCacheEntry(resolveCached(target, from))
+  if (resolution?.status === 'broken') return <UnresolvedName name={target} from={from} />
   const path = resolution?.status === 'resolved' ? resolution.target : undefined
   return (
     <details className="ro-item" open={false}>
@@ -33,12 +66,10 @@ function InlineNote({ target, from }: { target: string; from: string }): React.J
         <p className="ro-meta">resolving…</p>
       ) : path ? (
         <InlineNoteBody path={path} />
-      ) : resolution.status === 'ambiguous' ? (
+      ) : (
         <p className="ro-meta ro-broken">
           ambiguous — {resolution.candidates?.length ?? 0} matches; open it from the tree
         </p>
-      ) : (
-        <p className="ro-meta ro-broken">not found in this vault</p>
       )}
     </details>
   )

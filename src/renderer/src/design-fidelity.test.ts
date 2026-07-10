@@ -125,17 +125,39 @@ describe('v2 surfaces', () => {
 })
 
 describe('v0.1 defects stay fixed (story 14.2)', () => {
-  it('reader content is centered at a 68–76ch measure — no dead gutter', () => {
+  it('reader is full-bleed (Addendum D1 supersedes the ch measure): 32px sides, no cap', () => {
     const note = block('.note')
-    expect(note).toContain('margin-inline: auto;')
-    const measure = Number(note.match(/max-width:\s*(\d+)ch/)?.[1])
-    expect(measure).toBeGreaterThanOrEqual(68)
-    expect(measure).toBeLessThanOrEqual(76)
+    expect(note).not.toContain('max-width')
+    expect(note).not.toContain('margin-inline')
+    expect(note).toContain('padding: 32px 32px 64px;')
   })
   it('sync + settings rows are dense 38px-class rows, not web-app 24px pads', () => {
     for (const sel of ['.sync-row', '.settings-field', '.toggle-row']) {
       expect(block(sel), sel).toContain('min-height: 38px;')
     }
     expect(block('.settings-section')).toContain('padding: 16px;')
+  })
+})
+
+describe('Addendum D1: wikilinks are always visibly links (story 16.1)', () => {
+  it('wikilink token is #8a6116 light / gold (#e0a83e) dark', () => {
+    expect(block(':root')).toContain('--wikilink: #8a6116;')
+    expect(block(":root[data-theme='dark']")).toContain('--wikilink: #e0a83e;')
+  })
+  it('wikilinks: token color, 500 weight, no underline at rest, underline on hover', () => {
+    const link = block('.note-body a.wikilink')
+    expect(link).toContain('color: var(--wikilink);')
+    expect(link).toContain('font-weight: 500;')
+    expect(link).toContain('text-decoration: none;')
+    expect(block('.note-body a.wikilink:hover')).toContain('text-decoration: underline;')
+  })
+  it('broken wikilinks stay rust dotted', () => {
+    const broken = block('.note-body a.wikilink-broken')
+    expect(broken).toContain('color: var(--rust);')
+    expect(broken).toContain('dotted')
+  })
+  it('reading order never renders silence: unresolved names + empty state are rust', () => {
+    expect(block('.ro-unresolved')).toContain('color: var(--rust);')
+    expect(block('.ro-empty')).toContain('color: var(--rust);')
   })
 })

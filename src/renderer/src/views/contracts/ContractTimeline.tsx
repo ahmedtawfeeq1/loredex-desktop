@@ -86,8 +86,10 @@ function ChangeCard({
           </span>
           <span className="contract-subject">{change.subject}</span>
           <span className="contract-meta">
-            {/* story 12.1: linked when this repo's real origin is GitHub */}
-            <CommitChip sha={change.sha} base={change.commitBase} /> · {change.author} ·{' '}
+            {/* story 12.1: linked when this repo's real origin is GitHub;
+                story 12.2: repoRoot arms the gh PR lookup for this sha */}
+            <CommitChip sha={change.sha} base={change.commitBase} repoRoot={change.repoRoot} /> ·{' '}
+            {change.author} ·{' '}
             {change.project}
             <LinkChips links={change.links} />
           </span>

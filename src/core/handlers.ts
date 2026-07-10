@@ -5,29 +5,38 @@
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting } from '../shared/theme'
-import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
-import type { Identity, ProjectRootsMap, SyncReport } from '../shared/types'
+import { type CoreEvent, ipcError, type MainControlMessage } from '../shared/ipc-contract'
+import type { HandoffCard, Identity, ProjectRootsMap, SyncReport } from '../shared/types'
 import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import {
   capDiff,
+  computeLinks,
   diffArgs,
   handoffNoteViews,
   isCommitSha,
   loadContractGlobs,
   loadProjectRoots,
+  type NewContractRow,
   resolveRoots,
   saveContractGlobs,
   saveProjectRoots,
   scanContracts,
   timelineWithLinks,
 } from './contracts'
-import { getAppDb, vaultId } from './db/index'
+import { appSettingGet, appSettingSet, getAppDb, vaultId } from './db/index'
 import { getReadState, markRead } from './db/read-state'
 import { reconcileSnoozeTimers } from './db/snooze'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
 import { gitAsync, withGitIdentity } from './git'
-import { remoteWebBase } from './github'
+import {
+  dismissKey,
+  ghCapability,
+  initGhCapability,
+  prForCommit,
+  remoteWebBase,
+  suggestFromFreshChanges,
+} from './github'
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { getMcpStatus } from './mcp-server'
@@ -42,6 +51,58 @@ import {
 import { buildThread, collectComments } from './threads'
 import { listMarkdownFiles, walkVault } from './tree'
 import { withWriteLock } from './write-lock'
+
+/**
+ * Story 12.2 (AC3): evaluate freshly-scanned contract changes for status
+ * suggestions — both scan paths feed it (the on-demand contracts.timeline
+ * scan here, the post-integrate scan in core/index.ts). Read-only: it emits
+ * suggest.statusChange events and writes nothing; Apply is the user's click
+ * on the ordinary writer channels. Fire-and-forget, never blocks a caller.
+ */
+export function runSuggestionScan(
+  emit: (event: CoreEvent) => void,
+  fresh: readonly NewContractRow[],
+): void {
+  if (fresh.length === 0) return
+  const db = getAppDb()
+  if (!db) return
+  let vid: string
+  let cards: HandoffCard[]
+  try {
+    const id = engine.identity()
+    vid = vaultId(id.vaultPath, id.remote)
+    cards = engine.handoffs({ direction: 'all' })
+  } catch {
+    return // no config (picker pending) — nothing to suggest
+  }
+  const notes = handoffNoteViews(cards, (abs) => {
+    try {
+      return engine.readNote(abs).body
+    } catch {
+      return null
+    }
+  })
+  const links = computeLinks(fresh, notes)
+  void suggestFromFreshChanges(
+    {
+      emit,
+      cards: () => cards,
+      myProjects: () => {
+        try {
+          return engine.registeredProjects()
+        } catch {
+          return []
+        }
+      },
+      linksFor: (sha) => links.get(sha) ?? [],
+      isDismissed: (handoffId, sha) => appSettingGet(db, vid, dismissKey(handoffId, sha)) !== null,
+      prFor: (repoRoot, sha) => prForCommit(repoRoot, sha, { db }),
+    },
+    fresh,
+  ).catch(() => {
+    // gh flaking mid-scan is not this app's problem — next scan re-evaluates
+  })
+}
 
 export function registerCoreHandlers(
   ipc: CoreIpc,
@@ -153,7 +214,9 @@ export function registerCoreHandlers(
     // on-demand incremental scan (only since the newest cached sha per file),
     // then the merged cache with link tiers derived fresh (story 11.3 — the
     // tier is ALWAYS labeled; nothing about links is persisted)
-    await scanContracts({ db, roots, userGlobs: globs, git: gitAsync })
+    const fresh = await scanContracts({ db, roots, userGlobs: globs, git: gitAsync })
+    // story 12.2: new rows may reference open handoffs — suggest, never write
+    runSuggestionScan((e) => ipc.emit(e), fresh)
     const notes = handoffNoteViews(engine.handoffs({ direction: 'all' }), (abs) => {
       try {
         return engine.readNote(abs).body
@@ -199,6 +262,30 @@ export function registerCoreHandlers(
   ipc.register('settings.contractGlobs.set', ({ globs }) => {
     const { db, vid } = requireDb()
     saveContractGlobs(db, vid, globs)
+  })
+  // M2 GitHub layer (story 12.2): PR lookup via gh only — capability-gated,
+  // 5 s timeout, per-sha session cache; null degrades to the plain link. The
+  // repoRoot must be a registered project root or the vault itself (git/gh
+  // only ever run where the user pointed the app — same rule as contracts.diff).
+  ipc.register('github.prForCommit', async ({ repoRoot, sha }) => {
+    if (!isCommitSha(sha)) {
+      throw ipcError('INTERNAL', `not a commit hash: ${sha}`)
+    }
+    const { roots } = contractRoots()
+    if (!(repoRoot in roots) && repoRoot !== engine.getConfig().vaultPath) {
+      throw ipcError('INTERNAL', 'that folder is not a registered project root — add it in Settings')
+    }
+    return prForCommit(repoRoot, sha, { db: getAppDb() })
+  })
+  // gh capability for the Settings hint row (app-local contract evolution);
+  // refresh=true is the m2 §6 "re-checked on settings change" path.
+  ipc.register('github.capability', async ({ refresh }) => ({
+    gh: refresh ? await initGhCapability(getAppDb()) : ghCapability(getAppDb()),
+  }))
+  // Suggestion dismissal (story 12.2 AC4): persisted per vault — never re-fires.
+  ipc.register('suggest.dismiss', ({ handoffId, sha }) => {
+    const { db, vid } = requireDb()
+    appSettingSet(db, vid, dismissKey(handoffId, sha), new Date().toISOString())
   })
   // Consume is a lib write op: write lock (3.5 shim) + per-command git identity.
   ipc.register('handoffs.consume', ({ id, identity }) =>

@@ -6,6 +6,7 @@
 import { useEffect } from 'react'
 import { onEvent, onOpenHandoff, onVaultChanged } from './api'
 import { IdentityBadge } from './components/IdentityBadge'
+import { SuggestToastStack } from './components/SuggestToast'
 import { ToastStack } from './components/ToastStack'
 import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
@@ -13,6 +14,7 @@ import { useContracts } from './stores/contracts'
 import { useHandoffs } from './stores/handoffs'
 import { useReader } from './stores/reader'
 import { useRoute } from './stores/route'
+import { useSuggests } from './stores/suggests'
 import { openCount } from '../../shared/handoff-lanes'
 import { useFeed } from './stores/feed'
 import { useHome } from './stores/home'
@@ -70,6 +72,7 @@ export default function App(): React.JSX.Element {
       useFeed.getState().reset()
       useAtlas.getState().reset()
       useContracts.getState().reset()
+      useSuggests.getState().reset()
       void init()
     })
   }, [init])
@@ -265,6 +268,7 @@ export default function App(): React.JSX.Element {
       <LinkRequestModal />
       <RouteConfirmCard />
       <ToastStack />
+      <SuggestToastStack />
     </div>
   )
 }

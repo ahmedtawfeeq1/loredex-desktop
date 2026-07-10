@@ -112,9 +112,9 @@ development_status:
   11-3-handoff-link-heuristics-chips: done   # note: ran before 12.1 (batch order); hash chips stay plain mono until 12.1
   epic-11-retrospective: optional
 
-  epic-12: in-progress     # GitHub Layer (gh CLI, no OAuth)
+  epic-12: done            # GitHub Layer (gh CLI, no OAuth)
   12-1-commit-pr-chips-remote-url: done
-  12-2-gh-pr-status-merged-suggest: in-progress
+  12-2-gh-pr-status-merged-suggest: done
   epic-12-retrospective: optional
 
   epic-13: backlog         # Wizards (paste-URL only; supersede 5-5/5-6)

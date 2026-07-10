@@ -429,6 +429,20 @@ export interface AtlasContractChange {
   links: Array<{ handoffId: string; confidence: 'mentioned' | 'heuristic' }>
 }
 
+// ── GitHub layer (epic 12 — architecture-m2.md §6, gh CLI only, no OAuth) ───
+
+/** One PR from `gh pr list --json number,title,state,mergedAt,url` (story
+ *  12.2). null crosses the seam when gh is absent/unauthenticated, the repo
+ *  is not GitHub, no PR references the sha, or the 5 s lookup timed out —
+ *  the chip degrades to a plain commit link, never an error. */
+export interface PrInfo {
+  url: string
+  number: number
+  title: string
+  state: 'OPEN' | 'CLOSED' | 'MERGED'
+  mergedAt: string | null
+}
+
 export interface WizardInput {
   mode: 'create' | 'join'
   vaultPath: string

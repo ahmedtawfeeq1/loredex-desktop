@@ -13,7 +13,8 @@ import { removeDiscovery } from './discovery'
 import * as engine from './engine'
 import { clearFacetCache } from './facets'
 import { gitAsync, withGitIdentity } from './git'
-import { registerCoreHandlers } from './handlers'
+import { initGhCapability } from './github'
+import { registerCoreHandlers, runSuggestionScan } from './handlers'
 import { createCoreIpc } from './ipc'
 import { invalidateLinkIndex } from './links'
 import { bootMcpServer, PREFERRED_MCP_PORT } from './mcp-server'
@@ -46,6 +47,10 @@ const hooks: { onSyncRun?: () => void } = {}
 const notifier = registerCoreHandlers(ipc, (msg) => process.parentPort.postMessage(msg), hooks)
 // Startup check: seed the snapshot + set the badge before any user action.
 notifier.refresh()
+// gh capability probe (story 12.2 AC1): detected once at startup, cached in
+// app-db meta (the meta cache answers until the probe lands); Settings
+// re-checks via github.capability {refresh}. Absent gh = plain links, no PRs.
+void initGhCapability(appDb)
 
 // vault_id scopes every app-db row (story 9.2); null without a config or db.
 const vid = config && appDb ? vaultId(config.vaultPath, engine.identity().remote) : null
@@ -99,6 +104,9 @@ function scanContractsAfterIntegrate(): void {
       for (const row of fresh) {
         ipc.emit({ kind: 'contract.changed', project: row.project, file: row.file, sha: row.sha })
       }
+      // story 12.2 (AC3): poller-integrate scan feeds the suggest pipeline —
+      // merged PR / mentioned commit ↔ open|accepted handoffs; SUGGESTS only
+      runSuggestionScan((e) => ipc.emit(e), fresh)
     })
     .catch(() => {
       // a repo being mid-rewrite is not this app's problem — next scan catches up

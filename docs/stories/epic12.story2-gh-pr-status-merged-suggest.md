@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,12 +20,12 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Capability + lookup (AC: 1, 2)
-  - [ ] `src/core/github.ts`: detect + cache `gh` capability; `prForCommit` exec with timeout + session cache; register the channel; CommitChip PR rendering; Settings hint row
-- [ ] Suggest pipeline (AC: 3, 4)
-  - [ ] Evaluate on poller integrate + contract scan: merged PR / mentioned commit ↔ open|accepted handoffs owned by my project; check dismissals; emit `suggest.statusChange`
-  - [ ] `SuggestToast.tsx`: evidence line (sha/PR), Apply → `handoffs.setStatus`, Dismiss → persist dismissal
-- [ ] Tests (AC: 5)
+- [x] Capability + lookup (AC: 1, 2)
+  - [x] `src/core/github.ts`: detect + cache `gh` capability; `prForCommit` exec with timeout + session cache; register the channel; CommitChip PR rendering; Settings hint row
+- [x] Suggest pipeline (AC: 3, 4)
+  - [x] Evaluate on poller integrate + contract scan: merged PR / mentioned commit ↔ open|accepted handoffs owned by my project; check dismissals; emit `suggest.statusChange`
+  - [x] `SuggestToast.tsx`: evidence line (sha/PR), Apply → `handoffs.setStatus`, Dismiss → persist dismissal
+- [x] Tests (AC: 5)
 
 ## Dev Notes
 
@@ -51,10 +51,73 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5)
+
 ### Debug Log References
+
+- `npx tsc --noEmit` (both projects), `npx vitest run` → 58 files / 442 tests green,
+  `npm run build` green.
+- Real-path smoke on this machine: `gh auth status` → logged in; the exact decided command
+  (`gh pr list --repo ahmedtawfeeq1/nimbus --search <HEAD sha> --state all --json
+  number,title,state,mergedAt,url`) runs clean and returns `[]` → parsePrList → null →
+  plain-link degradation (the sim repo has no PRs; both gh-present and gh-absent paths are
+  additionally unit-tested with stubbed exec).
 
 ### Completion Notes List
 
+- **Apply routing deviation (AC4 wording)**: the lib's `HandoffTransition` union has no
+  `consumed` arm (consume is its own writer, m2 §2 verbatim) — Apply for `suggested:
+  'consumed'` rides the ordinary `handoffs.consume` channel; `'accepted'` rides
+  `handoffs.setStatus`. Both are the same guarantees the AC wants: user click → write lock →
+  attributed lib write → commit/push. Pure `applyChannel()` unit-tests the routing.
+- **Toast persistence deviation (sanctioned by the story)**: suggestion toasts persist until
+  Apply/Dismiss (own `SuggestToastStack`, stacked above the 5 s receipt stack, gold left
+  rail). Receipt toasts after Apply still auto-dismiss per DESIGN.
+- **Suggestion matrix, decided**: merged PR → suggest `consumed` (open→consumed stays the
+  legal skip-accept path); mentioned commit without a merged PR → suggest `accepted`, only
+  from `open`. Ownership = handoff's TO project ∈ registered projects (recipient
+  transitions); zero registered projects = every project mine (story 3.7 notifier rule).
+  Only `mentioned` tier enters (heuristic filtered by type, story 11.3 guardrail).
+- **Session dedupe**: a suggestion fires once per core-host lifetime (in-memory key set)
+  even when not dismissed — rescans must not re-toast; Dismiss additionally persists
+  (`app_settings dismissed:<handoffId>:<sha>`) and never re-fires across restarts.
+- **No-write guarantee is tested two ways**: the pipeline's dependency surface contains no
+  writer (compile-time impossibility), plus a source-scan test pins `core/github.ts` to
+  never import `./engine`, `./write-lock`, or `loredex`.
+- **App-local contract evolution (recorded)**: `github.capability {refresh?}` (Settings hint
+  + the m2 "re-checked on settings change" path) and `suggest.dismiss` (persisting a
+  dismissal is a renderer-initiated app-db write, so it needs a channel). Apply is
+  deliberately NOT a channel.
+- **PR lookups are armed only on contract-timeline chips** (repoRoot prop): a 200-row
+  activity feed would otherwise fan out up to 200 gh executions; feed/home chips stay
+  link-only. The renderer memoizes per repoRoot:sha on top of the core session cache.
+- `github.prForCommit` guards repoRoot to registered roots + the vault path (same rule as
+  contracts.diff: gh/git only run where the user pointed the app).
+- gh capability: startup probe is async; until it lands, `ghCapability()` answers from the
+  app-db meta cache of the previous run (false on first ever run) — never a guess, never a
+  block.
+
 ### File List
+
+- `src/core/github.ts` — gh detection/capability (meta-cached), prListArgs/parsePrList,
+  prForCommit (5 s timeout, per-sha session cache), evaluateSuggestions +
+  suggestFromFreshChanges (emit-only pipeline), dismissKey
+- `src/core/github.test.ts` — detection matrix, parse/timeout/cache, trigger matrix,
+  no-write guarantees, real-vault gate
+- `src/core/handlers.ts` — runSuggestionScan glue; channels github.prForCommit /
+  github.capability / suggest.dismiss; timeline scan feeds suggestions
+- `src/core/index.ts` — startup `initGhCapability`; post-integrate scan feeds suggestions
+- `src/shared/types.ts` — `PrInfo`
+- `src/shared/ipc-contract.ts` — the two channels + `suggest.dismiss` + the
+  `suggest.statusChange` CoreEvent
+- `src/renderer/src/components/CommitChip.tsx` — PR slot self-loads via repoRoot (memoized)
+- `src/renderer/src/components/SuggestToast.tsx` (new) — persistent suggestion stack
+- `src/renderer/src/stores/suggests.ts` (new) + `suggests.test.ts` (new) — event intake,
+  Apply/Dismiss, applyChannel routing
+- `src/renderer/src/views/settings/GitHubSection.tsx` (new) + `SettingsView.tsx` — the
+  "install gh for PR chips" hint + re-check
+- `src/renderer/src/views/contracts/ContractTimeline.tsx` — repoRoot arms the PR lookup
+- `src/renderer/src/App.tsx` — SuggestToastStack mount + vault-change reset
+- `src/renderer/src/styles.css` — suggest-stack/toast/actions styles
 
 ## QA Results

@@ -1766,6 +1766,32 @@ a:hover {
   margin-top: 4px;
 }
 
+/* suggestion toasts (story 12.2): same receipt-style card, but PERSISTENT —
+   stacked above the auto-dismiss receipts so neither hides the other */
+.suggest-stack {
+  bottom: 96px;
+}
+
+.suggest-toast {
+  border-left: 4px solid var(--gold); /* the one sanctioned rail treatment */
+}
+
+.suggest-evidence a {
+  color: var(--navy);
+}
+
+.suggest-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.suggest-apply {
+  height: 24px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
 /* ── modals (DESIGN v2, stories 7.2-7.4): centered card 480-560, radius 16,
      title 17/600, footer Cancel left / one gold primary right ─────────────── */
 

@@ -5,31 +5,62 @@
  * External open rides the existing main-process guard (setWindowOpenHandler →
  * shell.openExternal); the renderer never opens URLs itself.
  *
- * PR slot (AC4): `pr` is populated by story 12.2's gh lookup; undefined/null
- * renders nothing — the chip is complete without gh.
+ * PR slot (story 12.2): pass `repoRoot` and the chip looks the PR up itself
+ * through github.prForCommit (gh CLI core-side: capability-gated, 5 s timeout,
+ * per-sha session cache; a renderer memo avoids repeat invokes). No gh / no
+ * PR / non-GitHub → the slot renders nothing and the chip stays a plain link.
  */
+import { useEffect, useState } from 'react'
 import { commitUrl, shortSha } from '../../../shared/github'
+import type { PrInfo } from '../../../shared/types'
+import { invoke } from '../api'
 
-/** gh pr list row (story 12.2 shape, stubbed here so the slot exists). */
-export interface PrInfo {
-  url: string
-  number: number
-  title: string
-  state: 'OPEN' | 'CLOSED' | 'MERGED'
-  mergedAt: string | null
+export type { PrInfo }
+
+/** renderer-side memo per repoRoot:sha (the core cache still backs it) */
+const prMemo = new Map<string, PrInfo | null>()
+
+function usePrLookup(repoRoot: string | undefined, sha: string): PrInfo | null {
+  const key = repoRoot ? `${repoRoot}:${sha}` : null
+  const [pr, setPr] = useState<PrInfo | null>(key ? (prMemo.get(key) ?? null) : null)
+  useEffect(() => {
+    if (!repoRoot || !key) return
+    if (prMemo.has(key)) {
+      setPr(prMemo.get(key) ?? null)
+      return
+    }
+    let live = true
+    invoke('github.prForCommit', { repoRoot, sha })
+      .then((result) => {
+        prMemo.set(key, result)
+        if (live) setPr(result)
+      })
+      .catch(() => {
+        prMemo.set(key, null) // degraded (old core / unregistered root) — plain link
+      })
+    return () => {
+      live = false
+    }
+  }, [repoRoot, sha, key])
+  return pr
 }
 
 export function CommitChip({
   sha,
   base,
+  repoRoot,
   pr,
 }: {
   sha: string
   /** normalized GitHub web base for the repo this sha lives in; null = plain */
   base: string | null
-  /** story 12.2 fills this; absent = slot renders nothing */
+  /** set to enable the gh PR lookup for this sha (story 12.2) */
+  repoRoot?: string
+  /** explicit PR (tests / pre-fetched); wins over the lookup */
   pr?: PrInfo | null
 }): React.JSX.Element {
+  const looked = usePrLookup(pr === undefined ? repoRoot : undefined, sha)
+  const shown = pr === undefined ? looked : pr
   return (
     <span className="commit-chip">
       {base ? (
@@ -48,7 +79,7 @@ export function CommitChip({
           {shortSha(sha)}
         </span>
       )}
-      {pr && <PrChip pr={pr} />}
+      {shown && <PrChip pr={shown} />}
     </span>
   )
 }

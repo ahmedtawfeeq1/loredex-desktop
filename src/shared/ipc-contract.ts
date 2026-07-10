@@ -26,6 +26,7 @@ import type {
   IdentitySettings,
   LinkResolution,
   McpStatus,
+  PrInfo,
   ProjectRootsMap,
   ReplyHandoffInput,
   RoutePreview,
@@ -147,6 +148,18 @@ export interface CoreApi {
   /** User contract globs, added to the fixed pattern set (app-db, per vault). */
   'settings.contractGlobs.get': { in: void; out: { globs: string[] } }
   'settings.contractGlobs.set': { in: { globs: string[] }; out: void }
+  /** M2 GitHub layer (story 12.2, m2 §8 verbatim): PR referencing a commit via
+   *  the gh CLI — 5 s timeout, per-sha session cache; null = no gh / no PR /
+   *  non-GitHub (chip degrades to the plain commit link). */
+  'github.prForCommit': { in: { repoRoot: string; sha: string }; out: PrInfo | null }
+  /** app-local contract evolution (story 12.2): gh capability for the Settings
+   *  hint row; refresh=true re-runs detection (the "settings change" re-check). */
+  'github.capability': { in: { refresh?: boolean }; out: { gh: boolean } }
+  /** app-local contract evolution (story 12.2 AC4): persist a suggestion
+   *  dismissal (app_settings key `dismissed:<handoffId>:<sha>`) — the
+   *  suggestion never re-fires. Apply is NOT a channel: it rides the ordinary
+   *  handoffs.setStatus / handoffs.consume writers. */
+  'suggest.dismiss': { in: { handoffId: string; sha: string }; out: void }
   'vault.createOrJoin': { in: WizardInput; out: WizardResult }
   /** app-local contract evolution (story 6.2): optional window size for paging */
   'activity.feed': { in: { since?: string; limit?: number }; out: ActivityEvent[] } // (lib PR-6)
@@ -173,6 +186,15 @@ export type CoreEvent =
   /** M2 (story 9.2): a snooze's `snoozed_until` passed — fired ONCE per machine
    *  (app-db notified flag). A toast + board resort; NEVER an auto status write. */
   | { kind: 'snooze.expired'; handoffId: string }
+  /** M2 (story 12.2, m2 §6): a merged PR / mentioned-tier commit references an
+   *  open|accepted handoff owned by my project — a SUGGESTION toast with
+   *  one-click Apply. Silent auto-transitions are a bug, categorically. */
+  | {
+      kind: 'suggest.statusChange'
+      handoffId: string
+      suggested: 'consumed' | 'accepted'
+      evidence: { sha: string; prUrl?: string }
+    }
   /** M2 (story 11.1): the post-integrate scan found a new contract change —
    *  the Contracts view refreshes; never a notification (m2 §5 honesty rule). */
   | { kind: 'contract.changed'; project: string; file: string; sha: string }

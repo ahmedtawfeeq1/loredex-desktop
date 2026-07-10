@@ -103,3 +103,19 @@ The edit surface upgrades from plain textarea to **CodeMirror 6** (the standard;
 - Toolbar (icon buttons, 28px, hairline group borders, tooltips with shortcuts): headings dropdown H1–H4 · bold ⌘B · italic ⌘I · strikethrough · inline code · code block · wikilink [[ ]] · md link ⌘K-in-editor · quote · bullet list · numbered list · task list · table snippet · horizontal rule · undo/redo. All insert/wrap markdown; selection-aware (wrap selection, toggle off when already applied).
 - Frontmatter stays locked (not part of the editable doc). Save semantics unchanged (⌘S → note.save, receipt, activity). Dirty-guard on view/note switch (save/discard prompt).
 - Editor fills the pane full-bleed like Read mode; 13px mono; gutter line numbers OFF by default (notes, not code).
+
+### D1 amendment 3 — comprehension pass (user feedback on real vault, 2026-07-10)
+
+**Atlas must explain itself and read in a direction.** Learn/Deep panels stop being scattered islands:
+- Topic groups arrange in a **recency-ordered reading flow**: newest-activity topic top-left, flowing left→right then row-down; each topic group is a bordered sub-card (radius 10, topic label + note count + newest date), notes inside ordered newest-first with a small `01 02 03…` order chip. The eye always knows where to start.
+- Relationships render INSIDE the panel: wikilink/thread/provenance edges between visible notes draw as thin curved connectors (hairline; gold when part of an open thread); a note with no visible edges gets none — but the topic sub-card borders carry the grouping so nothing floats naked.
+- **"How to read this map" affordance**: a `?` button in the atlas header opens a compact legend popover — node types, edge types, zoom levels, what Tours/Path/Blocked do, one suggested first action ("Start with the Tours button — it walks you through a real handoff chain"). First-ever visit to Atlas auto-opens it once (app.db flag).
+- **Header redesign**: proper toolbar row (44px, hairline bottom): left = VAULT ATLAS eyebrow + zoom as a real segmented control (`--bg-inset` track, white/dark active segment); center = breadcrumb (unchanged); right = actions grouped with 8px gaps as icon+label pill buttons with tooltips — [Tours] [Filters·n] [Path] | [Blocked] [Changed] | [Export ▾ (SVG/PNG submenu — one button, not two)] [?]. No naked text buttons.
+
+**Read-mode find bar (⌘F).** VS Code/Obsidian pattern: floating bar top-right of the note pane — query input, match counter `3/17`, prev/next (↑↓ buttons + Enter/⇧Enter), case-sensitive toggle (Aa), close (Esc). All matches highlighted (`--bg-inset` + hairline ring), current match gold. Debounced 150ms, works on the rendered note. Edit mode keeps CodeMirror's own ⌘F.
+
+**Humanized note titles.** Everywhere a note NAME renders as a title (reader header, tree rows, search results, atlas cards, handoff reading orders): strip the leading `YYYY-MM-DD-` date, replace dashes with spaces, Title Case words (small words lowercased: a, an, the, of, to, for, and, or, in, on — first word always capitalized); the stripped date renders as mono `--text-2` metadata (reader: line under the serif title; tree rows: right-aligned small; atlas cards: existing date line). The real filename stays visible in the frontmatter panel + tooltips. Pure `humanizeTitle(name)` util, unit-tested, used by ALL surfaces — no per-view drift.
+
+**Resizable list pane.** Drag handle on the file-list/reader divider: 200–480px, cursor col-resize, double-click resets to 300, persisted per vault next to the rails state. Collapse behavior (⌘⇧\) unchanged.
+
+**File-pane search modes.** The "Search files…" box gains a segmented mode toggle: **Name** (current filter) | **Content** (vault.search full-text) — content mode shows a flat result list (humanized title, project tint dot, snippet with highlighted term, date) replacing the tree while active; Enter opens the top hit; Esc clears back to the tree.

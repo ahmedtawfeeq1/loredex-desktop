@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo } from 'react'
 import type { AtlasLevel, AtlasNode } from '../../../../shared/types'
+import './atlas.css'
 import { useAtlas } from '../../stores/atlas'
 import { useHandoffs } from '../../stores/handoffs'
 import { AtlasBreadcrumbs } from './AtlasBreadcrumbs'

@@ -1,9 +1,25 @@
 /**
- * Pure SVG geometry for the Atlas canvas (story 10.2) — viewBox fit, wheel
- * zoom, edge anchoring between card boxes, and keyboard traversal order.
+ * Pure SVG geometry for the Atlas canvas (story 10.2, reworked by the epic10
+ * layout-v2 defect burndown) — fit-to-content viewBox (48px padding, centered,
+ * zoom clamped 0.5–2 around the fit), orthogonal elbow edge routing through
+ * the card-free channels the core layout reserves, label-chip anchoring that
+ * can never clip under a card, and keyboard traversal order.
  * No DOM, fully unit-tested; the canvas component just applies the numbers.
  */
-import { MARGIN, NODE_H, NODE_W } from '../../../../shared/atlas-layout'
+import { FIT_PAD, PANEL_PAD, type Rect } from '../../../../shared/atlas-layout'
+
+// the geometry both sides of the seam must agree on (card boxes, overlap
+// test, orthogonal routing, chips, lanes) lives in shared/atlas-layout —
+// re-exported here so the canvas keeps one geometry import
+export {
+  chipRect,
+  laneOffsets,
+  nodeRect,
+  type OrthoRoute,
+  orthoRoute,
+  type Rect,
+  rectsOverlap,
+} from '../../../../shared/atlas-layout'
 
 export interface ViewBox {
   x: number
@@ -12,28 +28,63 @@ export interface ViewBox {
   h: number
 }
 
-export const MIN_ZOOM_W = 320
-export const MAX_ZOOM_W = 6000
-
-/** ViewBox that contains every node card plus a margin; a sane default when empty. */
-export function fitViewBox(nodes: FocusTarget[], paneW: number, paneH: number): ViewBox {
-  if (nodes.length === 0) return { x: 0, y: 0, w: Math.max(paneW, 1), h: Math.max(paneH, 1) }
-  let maxX = 0
-  let maxY = 0
-  for (const n of nodes) {
-    maxX = Math.max(maxX, n.x + NODE_W)
-    maxY = Math.max(maxY, n.y + NODE_H)
+/** The focused-cluster panel: bounding box of its members plus padding —
+ *  drawn as one large white card (radius 16) behind them. */
+export function panelRect(members: Rect[]): Rect | null {
+  if (members.length === 0) return null
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const m of members) {
+    minX = Math.min(minX, m.x)
+    minY = Math.min(minY, m.y)
+    maxX = Math.max(maxX, m.x + m.w)
+    maxY = Math.max(maxY, m.y + m.h)
   }
-  const w = Math.max(maxX + MARGIN, paneW)
-  const h = Math.max(maxY + MARGIN, paneH)
-  // preserve the pane's aspect so 1 SVG unit ≈ 1 px at fit
-  const scale = Math.max(w / Math.max(paneW, 1), h / Math.max(paneH, 1))
-  return { x: 0, y: 0, w: Math.max(paneW, 1) * scale, h: Math.max(paneH, 1) * scale }
+  return {
+    x: minX - PANEL_PAD,
+    y: minY - PANEL_PAD,
+    w: maxX - minX + PANEL_PAD * 2,
+    h: maxY - minY + PANEL_PAD * 2,
+  }
 }
 
-/** Wheel zoom about a pointer position (SVG coords), clamped. */
-export function zoomViewBox(vb: ViewBox, factor: number, atX: number, atY: number): ViewBox {
-  const w = Math.min(Math.max(vb.w * factor, MIN_ZOOM_W), MAX_ZOOM_W)
+/** ViewBox fitted to the content bounding box: FIT_PAD padding, content
+ *  CENTERED (never bunched top-left), pane aspect preserved, and never
+ *  zoomed past 1:1 — small graphs sit centered at natural size. */
+export function fitViewBox(rects: Rect[], paneW: number, paneH: number): ViewBox {
+  const w0 = Math.max(paneW, 1)
+  const h0 = Math.max(paneH, 1)
+  if (rects.length === 0) return { x: 0, y: 0, w: w0, h: h0 }
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (const r of rects) {
+    minX = Math.min(minX, r.x)
+    minY = Math.min(minY, r.y)
+    maxX = Math.max(maxX, r.x + r.w)
+    maxY = Math.max(maxY, r.y + r.h)
+  }
+  const needW = maxX - minX + FIT_PAD * 2
+  const needH = maxY - minY + FIT_PAD * 2
+  const scale = Math.max(needW / w0, needH / h0, 1) // never above 100%
+  const w = w0 * scale
+  const h = h0 * scale
+  return { x: (minX + maxX) / 2 - w / 2, y: (minY + maxY) / 2 - h / 2, w, h }
+}
+
+/** Wheel/pinch zoom about a pointer position (SVG coords), clamped to
+ *  0.5×–2× of the fitted view (`fitW` = the fit viewBox width). */
+export function zoomViewBox(
+  vb: ViewBox,
+  factor: number,
+  atX: number,
+  atY: number,
+  fitW: number,
+): ViewBox {
+  const w = Math.min(Math.max(vb.w * factor, fitW / 2), fitW * 2)
   const scale = w / vb.w
   const h = vb.h * scale
   return { x: atX - (atX - vb.x) * scale, y: atY - (atY - vb.y) * scale, w, h }
@@ -43,26 +94,14 @@ export function panViewBox(vb: ViewBox, dx: number, dy: number): ViewBox {
   return { ...vb, x: vb.x + dx, y: vb.y + dy }
 }
 
-/** Edge endpoints clipped to the card borders: leaves the source's right or
- *  left edge center toward the target (layout is left→right by depth). */
-export function edgeAnchors(
-  a: Pick<FocusTarget, 'x' | 'y'>,
-  b: Pick<FocusTarget, 'x' | 'y'>,
-): { x1: number; y1: number; x2: number; y2: number; midX: number; midY: number } {
-  const leftToRight = a.x + NODE_W / 2 <= b.x + NODE_W / 2
-  const x1 = leftToRight ? a.x + NODE_W : a.x
-  const y1 = a.y + NODE_H / 2
-  const x2 = leftToRight ? b.x : b.x + NODE_W
-  const y2 = b.y + NODE_H / 2
-  return { x1, y1, x2, y2, midX: (x1 + x2) / 2, midY: (y1 + y2) / 2 }
-}
-
 /** ViewBox fitted AROUND a highlighted subset (tour steps, story 10.5):
- *  centered on the set's bounding box, pane aspect preserved, zoom clamped. */
+ *  centered on the set's bounding box, pane aspect preserved, zoom clamped
+ *  to the same 0.5×–2× band around the full fit. */
 export function fitViewBoxAround(
-  targets: FocusTarget[],
+  targets: Rect[],
   paneW: number,
   paneH: number,
+  fitW: number,
   pad = 80,
 ): ViewBox | null {
   if (targets.length === 0) return null
@@ -73,22 +112,25 @@ export function fitViewBoxAround(
   for (const t of targets) {
     minX = Math.min(minX, t.x)
     minY = Math.min(minY, t.y)
-    maxX = Math.max(maxX, t.x + NODE_W)
-    maxY = Math.max(maxY, t.y + NODE_H)
+    maxX = Math.max(maxX, t.x + t.w)
+    maxY = Math.max(maxY, t.y + t.h)
   }
   const w0 = maxX - minX + pad * 2
   const h0 = maxY - minY + pad * 2
   const scale = Math.max(w0 / Math.max(paneW, 1), h0 / Math.max(paneH, 1))
   let w = Math.max(paneW, 1) * scale
   let h = Math.max(paneH, 1) * scale
-  if (w < MIN_ZOOM_W) {
-    h = (h * MIN_ZOOM_W) / w
-    w = MIN_ZOOM_W
+  const minW = fitW / 2
+  if (w < minW) {
+    h = (h * minW) / w
+    w = minW
   }
   const cx = (minX + maxX) / 2
   const cy = (minY + maxY) / 2
   return { x: cx - w / 2, y: cy - h / 2, w, h }
 }
+
+// ── keyboard traversal (unchanged from story 10.2) ───────────────────────────
 
 /** Anything focusable on the canvas: node cards and topic atoms alike. */
 export interface FocusTarget {

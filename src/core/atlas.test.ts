@@ -8,6 +8,13 @@ import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
+import {
+  chipRect,
+  laneOffsets,
+  nodeRect,
+  orthoRoute,
+  rectsOverlap,
+} from '../shared/atlas-layout'
 import { createIpcClient } from '../shared/ipc-client'
 import type { PortLike } from '../shared/ipc-contract'
 import type { AtlasEdge, AtlasGraph, AtlasNode, HandoffCard } from '../shared/types'
@@ -86,6 +93,65 @@ function vaultSource(
 const ids = (nodes: AtlasNode[]): string[] => nodes.map((n) => n.id).sort()
 const ofCategory = (edges: AtlasEdge[], category: AtlasEdge['category']): AtlasEdge[] =>
   edges.filter((e) => e.category === category)
+
+/** The binding layout-v2 invariants, asserted on any projected graph:
+ *  dedupe (qualified ids unique), no card-rect intersections, no orphans
+ *  (every non-project node has a rendered edge or lives inside a focused
+ *  panel), and aggregated label chips clear of every card. */
+function assertLayoutInvariants(g: AtlasGraph): void {
+  // dedupe: node ids are unique, qualified project/name ids
+  const seen = new Set(g.nodes.map((n) => n.id))
+  expect(seen.size).toBe(g.nodes.length)
+
+  // no-overlap: every card rect is pairwise disjoint
+  const rects = g.nodes.map((n) => ({ id: n.id, r: nodeRect(n, g.level) }))
+  for (let i = 0; i < rects.length; i++) {
+    for (let j = i + 1; j < rects.length; j++) {
+      const a = rects[i] as (typeof rects)[number]
+      const b = rects[j] as (typeof rects)[number]
+      expect(rectsOverlap(a.r, b.r), `${g.level}: ${a.id} overlaps ${b.id}`).toBe(false)
+    }
+  }
+
+  // no orphans: a rendered non-project node either carries ≥1 rendered edge
+  // or lives inside a focused-cluster panel (its topic-column home)
+  const connected = new Set<string>()
+  for (const e of g.edges) {
+    connected.add(e.source)
+    connected.add(e.target)
+  }
+  const panelOwners = new Set(g.level === 'overview' ? [] : g.clusters.map((c) => c.project))
+  const panelMemberIds = new Set(
+    g.clusters.flatMap((c) => c.topics.flatMap((t) => t.nodeIds)),
+  )
+  for (const n of g.nodes) {
+    if (n.type === 'project') continue
+    const inPanel =
+      panelMemberIds.has(n.id) ||
+      ((n.type === 'source' || n.type === 'commit' || n.type === 'contract') &&
+        n.project !== undefined &&
+        panelOwners.has(n.project))
+    if (!inPanel) {
+      expect(connected.has(n.id), `${g.level}: ${n.id} floats with no edge`).toBe(true)
+    }
+  }
+
+  // label clearance: aggregated `N open / M total` chips ride card-free
+  // channel segments — clipping under a card is a layout bug by definition
+  const byId = new Map(g.nodes.map((n) => [n.id, n]))
+  const lanes = laneOffsets(g.edges)
+  for (const e of g.edges) {
+    if (e.totalCount === undefined) continue
+    const a = byId.get(e.source)
+    const b = byId.get(e.target)
+    if (!a || !b) continue
+    const route = orthoRoute(nodeRect(a, g.level), nodeRect(b, g.level), lanes.get(e.id) ?? 0)
+    const chip = chipRect(route.label)
+    for (const { id, r } of rects) {
+      expect(rectsOverlap(chip, r), `${g.level}: chip of ${e.id} clips under ${id}`).toBe(false)
+    }
+  }
+}
 
 // ── pure helpers ─────────────────────────────────────────────────────────────
 
@@ -366,6 +432,55 @@ describe('buildAtlasModel', () => {
     ])
     expect(model.nodes.get('project:alpha')?.noteCount).toBe(3)
   })
+
+  it('dedupes double-listed cards by path — one file is one node, counted once', () => {
+    // a direction-'all' listing that surfaces the same file twice must not
+    // double-count routes or duplicate the handoff node (layout-v2 burndown)
+    const same = card('h1', 'beta')
+    const model = buildAtlasModel(sourceOf({ cards: [same, { ...same }] }))
+    expect([...model.nodes.keys()].filter((id) => id.startsWith('handoff:'))).toEqual([
+      'handoff:beta/h1',
+    ])
+    expect(ofCategory(model.edges, 'route')).toHaveLength(1)
+    expect(model.aggregated[0]).toMatchObject({ openCount: 1, totalCount: 1 })
+  })
+
+  it('same-named cards in two projects stay two qualified nodes; scan links reach every candidate', () => {
+    // the unqualified-id collision: `2026-07-10-handoff-x` can exist in two
+    // projects' handoffs/ folders — silently keeping one was the mislink bug
+    const inBeta = card('same-name', 'beta')
+    const inGamma = card('same-name', 'gamma', {
+      to: 'gamma',
+      path: `${V}/projects/gamma/handoffs/same-name.md`,
+    })
+    const model = buildAtlasModel(
+      vaultSource(
+        {
+          'projects/beta/handoffs/same-name.md': { meta: {}, body: '' },
+          'projects/gamma/handoffs/same-name.md': { meta: {}, body: '' },
+        },
+        {
+          cards: [inBeta, inGamma],
+          contracts: [
+            {
+              repoRoot: '/repos/x',
+              file: 'openapi.yaml',
+              sha: 'a1b2c3d4',
+              date: '2026-07-09',
+              links: [{ handoffId: 'same-name', confidence: 'mentioned' }],
+            },
+          ],
+        },
+      ),
+    )
+    expect(model.nodes.has('handoff:beta/same-name')).toBe(true)
+    expect(model.nodes.has('handoff:gamma/same-name')).toBe(true)
+    const linked = ofCategory(model.edges, 'contract-link')
+      .filter((e) => e.source === 'contract:/repos/x/openapi.yaml')
+      .map((e) => e.target)
+      .sort()
+    expect(linked).toEqual(['commit:a1b2c3d4', 'handoff:beta/same-name', 'handoff:gamma/same-name'])
+  })
 })
 
 // ── level projection + positions ─────────────────────────────────────────────
@@ -412,10 +527,11 @@ describe('projectAtlas levels', () => {
     const a = projectAtlas(buildAtlasModel(src), 'learn', { project: 'alpha' })
     const b = projectAtlas(buildAtlasModel(src), 'learn', { project: 'alpha' })
     expect(a).toEqual(b)
+    // layout-v2: topics are panel COLUMN groups — same x, date-sorted top→bottom
     const design = a.nodes.find((n) => n.id === 'note:alpha/streaming/design') as AtlasNode
     const later = a.nodes.find((n) => n.id === 'note:alpha/streaming/later') as AtlasNode
-    expect(design.y).toBe(later.y) // same topic row
-    expect(design.x).toBeLessThan(later.x) // date-sorted left→right
+    expect(design.x).toBe(later.x) // same topic column
+    expect(design.y).toBeLessThan(later.y) // date-sorted top→bottom
   })
 
   it('overview columns order projects left→right by route-dependency depth', () => {
@@ -423,6 +539,26 @@ describe('projectAtlas levels', () => {
     const alpha = g.nodes.find((n) => n.id === 'project:alpha') as AtlasNode
     const beta = g.nodes.find((n) => n.id === 'project:beta') as AtlasNode
     expect(alpha.x).toBeLessThan(beta.x) // alpha sends to beta → beta sits right
+  })
+
+  it('layout-v2 invariants hold at every level (fixture source)', () => {
+    const model = buildAtlasModel(src)
+    assertLayoutInvariants(projectAtlas(model, 'overview', {}))
+    assertLayoutInvariants(projectAtlas(model, 'learn', { project: 'alpha' }))
+    assertLayoutInvariants(projectAtlas(model, 'deep', { project: 'alpha' }))
+    assertLayoutInvariants(projectAtlas(model, 'deep', {}))
+    assertLayoutInvariants(projectAtlas(model, 'deep', { project: 'alpha', topic: 'streaming' }))
+  })
+
+  it('deep boundary nodes are always positioned — nothing piles at the origin', () => {
+    // the (0,0) pile-up of cross-project boundary cards was the visual
+    // "duplicate floating cards under a cluster" defect
+    const g = projectAtlas(buildAtlasModel(src), 'deep', { project: 'alpha' })
+    const boundary = g.nodes.filter((n) => n.project !== 'alpha')
+    expect(boundary.length).toBeGreaterThan(0)
+    for (const n of boundary) {
+      expect(`${n.id}@${n.x},${n.y}`).not.toBe(`${n.id}@0,0`)
+    }
   })
 })
 
@@ -497,6 +633,8 @@ describe('atlas.graph channel (fixture vault)', () => {
 // ── contract suite against the real nimbus simulation vault ─────────────────
 
 describe.skipIf(!existsSync(NIMBUS_VAULT))('atlas model (nimbus simulation vault)', () => {
+  let model: ReturnType<typeof buildAtlasModel>
+  let cardCount = 0
   let graphDeep: AtlasGraph
   let graphOverview: AtlasGraph
 
@@ -526,7 +664,8 @@ describe.skipIf(!existsSync(NIMBUS_VAULT))('atlas model (nimbus simulation vault
       readRepoRemote: () => null,
       vaultRemote: 'git@github.com:nimbus/vault.git',
     }
-    const model = buildAtlasModel(source)
+    cardCount = new Set(source.cards.map((c) => c.path)).size
+    model = buildAtlasModel(source)
     graphDeep = projectAtlas(model, 'deep', {})
     graphOverview = projectAtlas(model, 'overview', {})
   })
@@ -610,5 +749,35 @@ describe.skipIf(!existsSync(NIMBUS_VAULT))('atlas model (nimbus simulation vault
       expect(Number.isFinite(n.x)).toBe(true)
       expect(Number.isFinite(n.y)).toBe(true)
     }
+  })
+
+  // ── layout-v2 binding assertions on the REAL vault (defect burndown) ───────
+
+  it('layout-v2 invariants hold across all three zoom levels', () => {
+    assertLayoutInvariants(graphOverview)
+    assertLayoutInvariants(projectAtlas(model, 'learn', { project: 'nimbus-backend' }))
+    assertLayoutInvariants(projectAtlas(model, 'deep', { project: 'nimbus-backend' }))
+    assertLayoutInvariants(graphDeep) // deep, unscoped: every project a panel
+    for (const project of ['nimbus-ai-engine', 'nimbus-frontend', 'nimbus-mobile']) {
+      assertLayoutInvariants(projectAtlas(model, 'learn', { project }))
+      assertLayoutInvariants(projectAtlas(model, 'deep', { project }))
+    }
+  })
+
+  it('same-named handoff files across projects stay distinct qualified nodes — no dedupe loss', () => {
+    // nimbus-frontend and nimbus-mobile both hold e.g.
+    // handoffs/2026-07-10-handoff-nimbus-backend.md — 2 files, 2 nodes
+    const handoffNodes = [...model.nodes.values()].filter((n) => n.type === 'handoff')
+    expect(handoffNodes.length).toBe(cardCount)
+    expect(model.nodes.has('handoff:nimbus-frontend/2026-07-10-handoff-nimbus-backend')).toBe(true)
+    expect(model.nodes.has('handoff:nimbus-mobile/2026-07-10-handoff-nimbus-backend')).toBe(true)
+  })
+
+  it('deep-scoped boundary cards land in context columns, never at the origin pile', () => {
+    const g = projectAtlas(model, 'deep', { project: 'nimbus-backend' })
+    const boundary = g.nodes.filter((n) => n.project !== 'nimbus-backend')
+    expect(boundary.length).toBeGreaterThan(0)
+    const atOrigin = boundary.filter((n) => n.x === 0 && n.y === 0)
+    expect(atOrigin.map((n) => n.id)).toEqual([])
   })
 })

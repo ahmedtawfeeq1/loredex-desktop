@@ -55,12 +55,14 @@ describe('clampStep', () => {
 })
 
 describe('fitViewBoxAround', () => {
+  const FIT_W = 1400 // the full-content fit width the zoom band centers on
+
   it('produces a viewBox containing every highlighted card, centered', () => {
     const targets = [
-      { id: 'a', x: 100, y: 100 },
-      { id: 'b', x: 900, y: 500 },
+      { x: 100, y: 100, w: NODE_W, h: NODE_H },
+      { x: 900, y: 500, w: NODE_W, h: NODE_H },
     ]
-    const vb = fitViewBoxAround(targets, 1200, 800)
+    const vb = fitViewBoxAround(targets, 1200, 800, FIT_W)
     expect(vb).not.toBeNull()
     if (!vb) return
     for (const t of targets) {
@@ -74,12 +76,12 @@ describe('fitViewBoxAround', () => {
     expect(vb.x + vb.w / 2).toBeCloseTo(cx, 5)
   })
 
-  it('clamps single-node fits to the minimum zoom (no vertigo zoom-in)', () => {
-    const vb = fitViewBoxAround([{ id: 'a', x: 0, y: 0 }], 1200, 800)
-    expect(vb?.w).toBeGreaterThanOrEqual(320)
+  it('clamps single-node fits to the 2× zoom band (no vertigo zoom-in)', () => {
+    const vb = fitViewBoxAround([{ x: 0, y: 0, w: NODE_W, h: NODE_H }], 1200, 800, FIT_W)
+    expect(vb?.w).toBeGreaterThanOrEqual(FIT_W / 2)
   })
 
   it('returns null for an empty set (canvas keeps its viewport)', () => {
-    expect(fitViewBoxAround([], 1200, 800)).toBeNull()
+    expect(fitViewBoxAround([], 1200, 800, FIT_W)).toBeNull()
   })
 })

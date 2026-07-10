@@ -7,8 +7,13 @@
  * (outbound affordance), project (open-count gold badge). Atlas cards never
  * stamp-press — that animation stays exclusive to the board card.
  */
-import { NODE_H, NODE_W } from '../../../../shared/atlas-layout'
+import { CLUSTER_W, NODE_H, NODE_W, PILL_H, PILL_W } from '../../../../shared/atlas-layout'
 import type { AtlasNode } from '../../../../shared/types'
+
+/** How a node renders (layout-v2): `card` = mini routing-slip; `cluster` =
+ *  wide overview project card; `pill` = collapsed neighbor at learn/deep;
+ *  `header` = the focused panel's title bar. */
+export type AtlasNodeVariant = 'card' | 'cluster' | 'pill' | 'header'
 
 export function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
@@ -46,17 +51,17 @@ function Chip({
   )
 }
 
-function ProjectBody({ node }: { node: AtlasNode }): React.JSX.Element {
+function ProjectBody({ node, width }: { node: AtlasNode; width: number }): React.JSX.Element {
   const open = node.openCount ?? 0
   return (
     <>
       <text className="atlas-node-name" x={14} y={30}>
-        {truncate(node.label, 20)}
+        {truncate(node.label, Math.floor((width - 60) / 7.2))}
       </text>
       {open > 0 && (
         <g className="atlas-badge-open" aria-hidden>
-          <rect x={NODE_W - 40} y={12} width={28} height={18} rx={9} />
-          <text x={NODE_W - 26} y={25} textAnchor="middle">
+          <rect x={width - 40} y={12} width={28} height={18} rx={9} />
+          <text x={width - 26} y={25} textAnchor="middle">
             {open}
           </text>
         </g>
@@ -65,6 +70,26 @@ function ProjectBody({ node }: { node: AtlasNode }): React.JSX.Element {
         {node.noteCount === 1 ? '1 note' : `${node.noteCount ?? 0} notes`}
         {open > 0 ? ` · ${open} open` : ''}
       </text>
+    </>
+  )
+}
+
+/** Compact neighbor pill / focused-panel header bar (layout-v2). */
+function ProjectPillBody({ node, header }: { node: AtlasNode; header: boolean }): React.JSX.Element {
+  const open = node.openCount ?? 0
+  return (
+    <>
+      <text className={header ? 'atlas-panel-title' : 'atlas-pill-name'} x={12} y={25}>
+        {truncate(node.label, 18)}
+      </text>
+      {open > 0 && (
+        <g className="atlas-badge-open" aria-hidden>
+          <rect x={PILL_W - 36} y={11} width={26} height={18} rx={9} />
+          <text x={PILL_W - 23} y={24} textAnchor="middle">
+            {open}
+          </text>
+        </g>
+      )}
     </>
   )
 }
@@ -173,10 +198,14 @@ function CommitBody({ node }: { node: AtlasNode }): React.JSX.Element {
   )
 }
 
-function Body({ node }: { node: AtlasNode }): React.JSX.Element {
+function Body({ node, variant }: { node: AtlasNode; variant: AtlasNodeVariant }): React.JSX.Element {
   switch (node.type) {
     case 'project':
-      return <ProjectBody node={node} />
+      return variant === 'cluster' ? (
+        <ProjectBody node={node} width={CLUSTER_W} />
+      ) : (
+        <ProjectPillBody node={node} header={variant === 'header'} />
+      )
     case 'note':
       return <NoteBody node={node} />
     case 'handoff':
@@ -192,19 +221,25 @@ function Body({ node }: { node: AtlasNode }): React.JSX.Element {
 
 export function AtlasNodeCard({
   node,
+  variant = 'card',
   selected,
   onActivate,
   onSelect,
+  onHover,
   nodeRef,
   describe,
   decorClass = '',
   changedCount = 0,
 }: {
   node: AtlasNode
+  /** layout-v2 render mode — sizes MUST match shared atlasNodeBox */
+  variant?: AtlasNodeVariant
   selected: boolean
   /** Enter / click: the §3 resolution for this node type */
   onActivate: (node: AtlasNode) => void
   onSelect: (node: AtlasNode) => void
+  /** hover emphasis (layout-v2): connected edges light up, others fade */
+  onHover?: (id: string | null) => void
   nodeRef?: (el: SVGGElement | null) => void
   /** accessible label ("project nimbus-backend, 3 open handoffs") */
   describe: string
@@ -214,11 +249,13 @@ export function AtlasNodeCard({
   changedCount?: number
 }): React.JSX.Element {
   const disabledSource = node.type === 'source' && node.localPath == null
+  const w = variant === 'cluster' ? CLUSTER_W : variant === 'card' ? NODE_W : PILL_W
+  const h = variant === 'pill' || variant === 'header' ? PILL_H : NODE_H
   return (
     // biome-ignore lint: SVG card is a button — full keyboard path via tabIndex/Enter
     <g
       ref={nodeRef}
-      className={`atlas-node atlas-node-${node.type}${disabledSource ? ' atlas-node-disabled' : ''}${decorClass}`}
+      className={`atlas-node atlas-node-${node.type} atlas-variant-${variant}${disabledSource ? ' atlas-node-disabled' : ''}${decorClass}`}
       transform={`translate(${node.x}, ${node.y})`}
       tabIndex={0}
       role="button"
@@ -231,6 +268,8 @@ export function AtlasNodeCard({
         onActivate(node)
       }}
       onFocus={() => onSelect(node)}
+      onPointerEnter={() => onHover?.(node.id)}
+      onPointerLeave={() => onHover?.(null)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target === e.currentTarget) {
           e.stopPropagation()
@@ -239,13 +278,13 @@ export function AtlasNodeCard({
       }}
     >
       <rect
-        className={`atlas-card${selected ? ' atlas-card-selected' : ''}`}
-        width={NODE_W}
-        height={NODE_H}
-        rx={12}
+        className={`atlas-card${variant === 'pill' ? ' atlas-pill-card' : ''}${variant === 'header' ? ' atlas-header-card' : ''}${selected ? ' atlas-card-selected' : ''}`}
+        width={w}
+        height={h}
+        rx={variant === 'pill' || variant === 'header' ? PILL_H / 2 : 12}
       />
-      <Body node={node} />
-      {node.type === 'project' && changedCount > 0 && (
+      <Body node={node} variant={variant} />
+      {node.type === 'project' && variant === 'cluster' && changedCount > 0 && (
         <text className="atlas-node-changed-count" x={14} y={NODE_H - 32} aria-hidden>
           {changedCount} changed
         </text>

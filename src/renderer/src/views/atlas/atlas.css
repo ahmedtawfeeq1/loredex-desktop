@@ -1,0 +1,96 @@
+/* ── Atlas layout-v2 (epic10 defect burndown) ────────────────────────────────
+   The canvas is a designed surface, not dead whitespace: one --bg-card card
+   (the .atlas-pane in styles.css) with a faint 24px dot grid; focused-cluster
+   panels; compact neighbor pills; orthogonal edges with white label chips;
+   hover = raised card + gold ring, connected edges emphasized, non-neighbors
+   faded to 30%. Token-only — both themes ride the same rules. */
+
+/* faint 24px dot grid on the canvas card */
+.atlas-dot {
+  fill: rgba(19, 24, 38, 0.03);
+}
+
+:root[data-theme='dark'] .atlas-dot {
+  fill: rgba(242, 239, 232, 0.04);
+}
+
+.atlas-grid {
+  cursor: grab;
+}
+
+/* focused-cluster panel: one large white card — radius 16, hairline, shadow-sm */
+.atlas-panel {
+  fill: var(--bg-card);
+  stroke: var(--hairline);
+  stroke-width: 1;
+  filter: drop-shadow(0 1px 3px rgba(19, 24, 38, 0.06));
+}
+
+/* the panel's title bar (the focused project node) */
+.atlas-header-card {
+  fill: var(--bg-inset);
+  stroke: none;
+}
+
+.atlas-panel-title {
+  fill: var(--navy);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* collapsed neighbor pill */
+.atlas-pill-card {
+  fill: var(--bg-card);
+  stroke: var(--hairline);
+}
+
+.atlas-pill-name {
+  fill: var(--navy);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* topic column heads inside a panel */
+.atlas-topic-label {
+  fill: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+/* aggregated-route label chips: WHITE pill (--bg-card + hairline, mono 10px)
+   anchored on the horizontal channel segment — never under a card */
+.atlas-edge-badge rect {
+  fill: var(--bg-card);
+  stroke: var(--hairline);
+}
+
+/* hover emphasis: raised shadow + gold ring on the node (gold ring itself is
+   the story 10.2 rule in styles.css)… */
+.atlas-node:hover .atlas-card,
+.atlas-node:focus-visible .atlas-card {
+  filter: drop-shadow(0 4px 12px rgba(19, 24, 38, 0.16));
+}
+
+/* …connected edges emphasized… */
+.atlas-edge-hot .atlas-edge-line {
+  stroke: var(--navy);
+  stroke-width: 2;
+}
+
+.atlas-edge-hot .atlas-edge-line.atlas-edge-blocking {
+  stroke: var(--gold);
+}
+
+/* …and non-neighbors fade to 30% while something is hovered */
+.atlas-hovering .atlas-node.atlas-dim,
+.atlas-hovering .atlas-edge.atlas-dim {
+  opacity: 0.3;
+}
+
+.atlas-node,
+.atlas-edge {
+  transition: opacity 120ms ease;
+}

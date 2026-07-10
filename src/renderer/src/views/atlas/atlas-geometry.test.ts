@@ -1,17 +1,33 @@
 /**
- * Story 10.2: pure canvas geometry — viewBox fit/zoom/pan, edge anchoring,
- * keyboard traversal order, aggregation badge text.
+ * Story 10.2 (reworked by the epic10 layout-v2 defect burndown): pure canvas
+ * geometry — fit-to-content viewBox (48px pad, centered, zoom clamped 0.5–2),
+ * orthogonal elbow routing through card-free channels, label-chip clearance,
+ * parallel-lane offsets, keyboard traversal order, aggregation badge text.
  */
 import { describe, expect, it } from 'vitest'
-import { NODE_H, NODE_W } from '../../../../shared/atlas-layout'
+import {
+  CLUSTER_H,
+  CLUSTER_W,
+  FIT_PAD,
+  GUTTER,
+  NODE_H,
+  NODE_W,
+  PILL_H,
+  PILL_W,
+  V_GAP,
+} from '../../../../shared/atlas-layout'
 import type { AtlasNode } from '../../../../shared/types'
 import {
-  edgeAnchors,
+  chipRect,
   fitViewBox,
-  MAX_ZOOM_W,
-  MIN_ZOOM_W,
+  laneOffsets,
   nextFocus,
+  nodeRect,
+  orthoRoute,
+  panelRect,
   panViewBox,
+  type Rect,
+  rectsOverlap,
   routeBadge,
   traversalOrder,
   zoomViewBox,
@@ -25,14 +41,34 @@ const node = (id: string, x: number, y: number): AtlasNode => ({
   y,
 })
 
+const rect = (x: number, y: number, w = NODE_W, h = NODE_H): Rect => ({ x, y, w, h })
+
+describe('nodeRect', () => {
+  it('projects are cluster cards at overview and pills at drilled levels', () => {
+    expect(nodeRect(node('p', 0, 0), 'overview')).toEqual({ x: 0, y: 0, w: CLUSTER_W, h: CLUSTER_H })
+    expect(nodeRect(node('p', 0, 0), 'learn')).toEqual({ x: 0, y: 0, w: PILL_W, h: PILL_H })
+    expect(nodeRect({ type: 'note', x: 5, y: 6 }, 'deep')).toEqual({ x: 5, y: 6, w: NODE_W, h: NODE_H })
+  })
+})
+
 describe('fitViewBox', () => {
-  it('contains every card plus margin and preserves the pane aspect', () => {
-    const vb = fitViewBox([node('a', 0, 0), node('b', 900, 400)], 800, 600)
-    expect(vb.x).toBe(0)
-    expect(vb.y).toBe(0)
-    expect(vb.w).toBeGreaterThanOrEqual(900 + NODE_W)
-    expect(vb.h).toBeGreaterThanOrEqual(400 + NODE_H)
+  it('fits the content bounding box with FIT_PAD padding, centered', () => {
+    const vb = fitViewBox([rect(0, 0), rect(2000, 1200)], 800, 600)
+    // contains everything plus the pad
+    expect(vb.x).toBeLessThanOrEqual(-FIT_PAD)
+    expect(vb.y).toBeLessThanOrEqual(-FIT_PAD)
+    expect(vb.x + vb.w).toBeGreaterThanOrEqual(2000 + NODE_W + FIT_PAD)
+    expect(vb.y + vb.h).toBeGreaterThanOrEqual(1200 + NODE_H + FIT_PAD)
+    // aspect preserved, content centered — no dead top-left corner
     expect(vb.w / vb.h).toBeCloseTo(800 / 600, 5)
+    expect(vb.x + vb.w / 2).toBeCloseTo((2000 + NODE_W) / 2, 5)
+    expect(vb.y + vb.h / 2).toBeCloseTo((1200 + NODE_H) / 2, 5)
+  })
+
+  it('never zooms past 1:1 — small graphs sit centered at natural size', () => {
+    const vb = fitViewBox([rect(0, 0)], 1200, 800)
+    expect(vb.w).toBe(1200) // scale clamped to 1, not blown up to fill
+    expect(vb.x + vb.w / 2).toBeCloseTo(NODE_W / 2, 5) // still centered
   })
 
   it('degrades to the pane box when the graph is empty', () => {
@@ -43,13 +79,13 @@ describe('fitViewBox', () => {
 describe('zoom + pan', () => {
   const vb = { x: 0, y: 0, w: 1000, h: 750 }
 
-  it('zooms about the pointer and clamps to the min/max width', () => {
-    const zoomed = zoomViewBox(vb, 0.5, 500, 375)
-    expect(zoomed.w).toBe(500)
+  it('zooms about the pointer and clamps to 0.5×–2× of the fit', () => {
+    const zoomed = zoomViewBox(vb, 0.5, 500, 375, 1000)
+    expect(zoomed.w).toBe(500) // 2× zoom in — the clamp boundary
     expect(zoomed.x).toBe(250) // pointer point stays put
     expect(zoomed.y).toBe(187.5)
-    expect(zoomViewBox(vb, 0.0001, 0, 0).w).toBe(MIN_ZOOM_W)
-    expect(zoomViewBox(vb, 100000, 0, 0).w).toBe(MAX_ZOOM_W)
+    expect(zoomViewBox(vb, 0.0001, 0, 0, 1000).w).toBe(500) // never past 2×
+    expect(zoomViewBox(vb, 100000, 0, 0, 1000).w).toBe(2000) // never past 0.5×
   })
 
   it('pans by deltas without touching the size', () => {
@@ -57,17 +93,92 @@ describe('zoom + pan', () => {
   })
 })
 
-describe('edgeAnchors', () => {
-  it('leaves the right edge toward a rightward target, left edge otherwise', () => {
-    const a = node('a', 0, 0)
-    const b = node('b', 600, 100)
-    const fwd = edgeAnchors(a, b)
-    expect(fwd.x1).toBe(NODE_W) // right edge of a
-    expect(fwd.x2).toBe(600) // left edge of b
-    expect(fwd.y1).toBe(NODE_H / 2)
-    const back = edgeAnchors(b, a)
-    expect(back.x1).toBe(600) // left edge of b
-    expect(back.x2).toBe(NODE_W) // right edge of a
+describe('orthoRoute', () => {
+  it('routes forward edges H→V→H with the vertical run in the gutter', () => {
+    const a = rect(0, 0, CLUSTER_W, CLUSTER_H)
+    const b = rect(CLUSTER_W + GUTTER, 300, CLUSTER_W, CLUSTER_H)
+    const { points, label } = orthoRoute(a, b)
+    expect(points[0]).toEqual({ x: CLUSTER_W, y: CLUSTER_H / 2 }) // leaves a's right edge
+    expect(points[points.length - 1]).toEqual({ x: CLUSTER_W + GUTTER, y: 300 + CLUSTER_H / 2 }) // enters b's left edge
+    // every vertical run sits strictly inside the gutter channel
+    for (let i = 1; i < points.length; i++) {
+      const p = points[i - 1] as { x: number; y: number }
+      const q = points[i] as { x: number; y: number }
+      expect(p.x === q.x || p.y === q.y).toBe(true) // orthogonal only
+      if (p.x === q.x && p.y !== q.y) {
+        expect(p.x).toBeGreaterThan(CLUSTER_W)
+        expect(p.x).toBeLessThan(CLUSTER_W + GUTTER)
+      }
+    }
+    // the label chip rides the horizontal channel segment, clear of both cards
+    expect(rectsOverlap(chipRect(label), a)).toBe(false)
+    expect(rectsOverlap(chipRect(label), b)).toBe(false)
+  })
+
+  it('routes long spans through the corridor band, never across a lane card', () => {
+    const pitch = CLUSTER_W + GUTTER
+    const a = rect(0, 0, CLUSTER_W, CLUSTER_H)
+    const between = rect(pitch, 0, CLUSTER_W, CLUSTER_H) // same row, middle lane
+    const b = rect(pitch * 2, 0, CLUSTER_W, CLUSTER_H)
+    const { points, label } = orthoRoute(a, b)
+    // no segment may cross the middle card
+    for (let i = 1; i < points.length; i++) {
+      const p = points[i - 1] as { x: number; y: number }
+      const q = points[i] as { x: number; y: number }
+      const seg: Rect = {
+        x: Math.min(p.x, q.x),
+        y: Math.min(p.y, q.y),
+        w: Math.abs(p.x - q.x) || 0.1,
+        h: Math.abs(p.y - q.y) || 0.1,
+      }
+      expect(rectsOverlap(seg, between)).toBe(false)
+    }
+    expect(rectsOverlap(chipRect(label), between)).toBe(false)
+  })
+
+  it('routes backward and same-lane pairs without touching either card', () => {
+    const a = rect(CLUSTER_W + GUTTER, 0, CLUSTER_W, CLUSTER_H)
+    const b = rect(0, 200, CLUSTER_W, CLUSTER_H)
+    const back = orthoRoute(a, b)
+    expect((back.points[0] as { x: number }).x).toBe(a.x) // leaves a's left edge
+    expect((back.points[back.points.length - 1] as { x: number }).x).toBe(b.x + b.w)
+    const sameLane = orthoRoute(rect(0, 0), rect(0, 400))
+    for (const p of sameLane.points.slice(1, -1)) {
+      expect(p.x).toBeLessThanOrEqual(0) // loops out the lane's left channel
+    }
+  })
+
+  it('fans parallel edges between the same pair out by 12px per lane', () => {
+    const offsets = laneOffsets([
+      { id: 'e1', source: 'a', target: 'b' },
+      { id: 'e2', source: 'b', target: 'a' },
+      { id: 'lone', source: 'a', target: 'c' },
+    ])
+    expect(offsets.get('e1')).toBe(-6)
+    expect(offsets.get('e2')).toBe(6)
+    expect(Math.abs((offsets.get('e1') ?? 0) - (offsets.get('e2') ?? 0))).toBe(12)
+    expect(offsets.get('lone')).toBe(0)
+    // reciprocal same-row chips separate further than the lines — never stacked
+    const a = rect(0, 0, CLUSTER_W, CLUSTER_H)
+    const b = rect(CLUSTER_W + GUTTER, 0, CLUSTER_W, CLUSTER_H)
+    const chipA = chipRect(orthoRoute(a, b, -6).label)
+    const chipB = chipRect(orthoRoute(b, a, 6).label)
+    expect(rectsOverlap(chipA, chipB)).toBe(false)
+  })
+})
+
+describe('panelRect', () => {
+  it('wraps the members with panel padding; empty set yields no panel', () => {
+    const p = panelRect([rect(100, 100), rect(340, 244)])
+    expect(p).toEqual({ x: 76, y: 76, w: 24 * 2 + 240 + NODE_W, h: 24 * 2 + 144 + NODE_H })
+    expect(panelRect([])).toBeNull()
+  })
+})
+
+describe('rectsOverlap', () => {
+  it('detects intersections and clears V_GAP-separated cards', () => {
+    expect(rectsOverlap(rect(0, 0), rect(NODE_W - 1, 0))).toBe(true)
+    expect(rectsOverlap(rect(0, 0), rect(0, NODE_H + V_GAP))).toBe(false)
   })
 })
 

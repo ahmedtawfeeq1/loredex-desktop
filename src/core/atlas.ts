@@ -42,7 +42,21 @@ import { buildTours, filterTours } from './tours'
 import { listMarkdownFiles } from './tree'
 
 // layout constants live in shared/atlas-layout.ts (renderer draws with them)
-import { COL_W, MARGIN, NODE_W, ROW_H } from '../shared/atlas-layout'
+import {
+  CLUSTER_H,
+  CLUSTER_W,
+  GRID,
+  GUTTER,
+  MARGIN,
+  NODE_H,
+  NODE_W,
+  NOTE_ROW_PITCH,
+  PANEL_PAD,
+  PILL_H,
+  PILL_W,
+  TOPIC_COL_PITCH,
+  V_GAP,
+} from '../shared/atlas-layout'
 
 /** note freshness horizon — same rust-at-7-days rule as the home brief badge */
 export const STALE_AFTER_DAYS = 7
@@ -157,11 +171,15 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
     edges.push(edge)
   }
 
-  // handoff cards keyed by vault-relative path (they are handoff nodes, not notes)
+  // handoff cards keyed by vault-relative path (they are handoff nodes, not
+  // notes). The map also DEDUPES: a direction-'all' listing must never count
+  // one file twice — the file is the qualified identity, not the card name
+  // (two projects can hold same-named cards; layout-v2 burndown).
   const cardByRel = new Map<string, HandoffCard>()
-  for (const card of source.cards) {
-    cardByRel.set(toVaultRelative(card.path, source.vaultPath), card)
+  for (const rawCard of source.cards) {
+    cardByRel.set(toVaultRelative(rawCard.path, source.vaultPath), rawCard)
   }
+  const cards = [...cardByRel.values()]
 
   // 1 — parse notes (everything under projects/ that is not a handoff card)
   const notes: ParsedNote[] = []
@@ -183,7 +201,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
   // 2 — project cluster nodes (the vault folders ARE the layers — no inference)
   const projectNames = new Set<string>()
   for (const note of notes) projectNames.add(note.project)
-  for (const card of source.cards) {
+  for (const card of cards) {
     if (card.from) projectNames.add(card.from)
     if (card.to) projectNames.add(card.to)
     const rel = toVaultRelative(card.path, source.vaultPath)
@@ -191,7 +209,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
     if (seg) projectNames.add(seg[1] as string)
   }
   for (const name of [...projectNames].sort()) {
-    const open = source.cards.filter(
+    const open = cards.filter(
       (c) => c.to === name && (c.status === 'open' || c.expired),
     ).length
     nodes.set(projectIdOf(name), {
@@ -228,7 +246,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
   }
 
   // 4 — handoff nodes (straight off the lib cards, mirroring the board)
-  for (const card of source.cards) {
+  for (const card of cards) {
     const rel = toVaultRelative(card.path, source.vaultPath)
     const owner = /^projects\/([^/]+)\//.exec(rel)?.[1] ?? card.to
     const id = handoffIdOf(owner, card.id)
@@ -260,7 +278,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
   }
 
   // 5 — route edges (handoff from_project → to_project, lifted verbatim)
-  for (const card of source.cards) {
+  for (const card of cards) {
     if (!card.from || !card.to) continue
     const rel = toVaultRelative(card.path, source.vaultPath)
     const owner = /^projects\/([^/]+)\//.exec(rel)?.[1] ?? card.to
@@ -294,7 +312,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
       field,
     })
   }
-  for (const card of source.cards) {
+  for (const card of cards) {
     const rel = toVaultRelative(card.path, source.vaultPath)
     const owner = /^projects\/([^/]+)\//.exec(rel)?.[1] ?? card.to
     const id = handoffIdOf(owner, card.id)
@@ -402,12 +420,18 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
     }
   }
 
-  // 10 — contract nodes + tiered links from the story 11.1 provider (verbatim)
-  const handoffNodeByCardId = new Map<string, string>()
-  for (const card of source.cards) {
+  // 10 — contract nodes + tiered links from the story 11.1 provider (verbatim).
+  // Scan links carry UNQUALIFIED card ids; two projects can hold same-named
+  // cards, so the lookup is id → ALL qualified handoff nodes. Linking every
+  // candidate is honest — silently keeping the last map entry was the
+  // mislinked-duplicate bug (layout-v2 burndown).
+  const handoffNodesByCardId = new Map<string, string[]>()
+  for (const card of cards) {
     const rel = toVaultRelative(card.path, source.vaultPath)
     const owner = /^projects\/([^/]+)\//.exec(rel)?.[1] ?? card.to
-    handoffNodeByCardId.set(card.id, handoffIdOf(owner, card.id))
+    const list = handoffNodesByCardId.get(card.id) ?? []
+    list.push(handoffIdOf(owner, card.id))
+    handoffNodesByCardId.set(card.id, list)
   }
   for (const change of source.contracts) {
     const contractId = `contract:${change.repoRoot}/${change.file}`
@@ -446,15 +470,15 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
       category: 'contract-link',
     })
     for (const link of change.links) {
-      const handoffNodeId = handoffNodeByCardId.get(link.handoffId)
-      if (!handoffNodeId) continue
-      pushEdge({
-        id: `contract-link:${contractId}->${handoffNodeId}:${change.sha}`,
-        source: contractId,
-        target: handoffNodeId,
-        category: 'contract-link',
-        confidence: link.confidence, // tier passes through UNTOUCHED
-      })
+      for (const handoffNodeId of handoffNodesByCardId.get(link.handoffId) ?? []) {
+        pushEdge({
+          id: `contract-link:${contractId}->${handoffNodeId}:${change.sha}`,
+          source: contractId,
+          target: handoffNodeId,
+          category: 'contract-link',
+          confidence: link.confidence, // tier passes through UNTOUCHED
+        })
+      }
     }
   }
 
@@ -514,7 +538,7 @@ export function buildAtlasModel(source: AtlasSource): BaseModel {
   // Open counting matches the board convention: expired snoozes are due again
   // and count with open; snoozed-and-current never count.
   const aggMap = new Map<string, AtlasEdge>()
-  for (const card of source.cards) {
+  for (const card of cards) {
     if (!card.from || !card.to) continue
     const key = `project:${card.from}->project:${card.to}`
     const open = card.status === 'open' || card.expired
@@ -628,7 +652,18 @@ export function shortestPath(
   return null // disconnected — the UI says so in one honest sentence
 }
 
-// ── level projection + deterministic column layout ──────────────────────────
+// ── level projection + deterministic lane/panel layout (layout-v2) ──────────
+//
+// The binding spec (epic10 layout-v2 defect burndown):
+// - overview: lane columns by route-dependency depth — cluster cards CLUSTER_W
+//   wide, vertical gaps ≥ V_GAP, GUTTER-wide card-free channels between lanes
+//   for orthogonal edges; cards NEVER overlap (unit-asserted);
+// - learn/deep: the focused cluster expands into one large panel — topic
+//   COLUMN groups on the GRID-aligned pitch, handoffs in their own trailing
+//   lane; neighboring clusters collapse to compact side pills; boundary nodes
+//   stack in context columns under their project's pill (never unpositioned —
+//   the (0,0) pile-up WAS the overlap/duplicate-looking defect);
+// - no randomness anywhere: every tie broken by date, then label, then id.
 
 function positionProjects(model: BaseModel, included: AtlasNode[]): void {
   const byColumn = new Map<number, AtlasNode[]>()
@@ -642,52 +677,72 @@ function positionProjects(model: BaseModel, included: AtlasNode[]): void {
   for (const [col, list] of byColumn) {
     list.sort((a, b) => a.label.localeCompare(b.label)) // alpha tie-break
     list.forEach((node, i) => {
-      node.x = MARGIN + col * COL_W
-      node.y = MARGIN + i * ROW_H
+      node.x = MARGIN + col * (CLUSTER_W + GUTTER) // GUTTER = edge channel
+      node.y = MARGIN + i * (CLUSTER_H + V_GAP)
     })
   }
 }
 
-/** Topics stacked (alpha), notes date-sorted left→right within a topic row;
- *  source/commit/contract neighbors get their own trailing rows. Returns the
- *  next free y (blocks stack for the unscoped deep level). */
-function positionProjectBlock(
+const byDateThenLabel = (a: AtlasNode, b: AtlasNode): number =>
+  (a.date ?? '') === (b.date ?? '')
+    ? a.label.localeCompare(b.label)
+    : (a.date ?? '').localeCompare(b.date ?? '')
+
+/** Panel columns left→right: topic folders alpha with `handoffs` forced last
+ *  (its own lane, thread rails ride it), then source/commit/contract context
+ *  columns at deep. Members stack top→bottom, date-sorted. */
+function panelColumns(
   cluster: AtlasCluster,
   nodeById: Map<string, AtlasNode>,
   extras: AtlasNode[],
-  startY: number,
-): number {
-  let y = startY
-  for (const topic of cluster.topics) {
+): AtlasNode[][] {
+  const topics = [...cluster.topics].sort((a, b) =>
+    a.name === 'handoffs' ? 1 : b.name === 'handoffs' ? -1 : a.name.localeCompare(b.name),
+  )
+  const columns: AtlasNode[][] = []
+  for (const topic of topics) {
     const members = topic.nodeIds
       .map((id) => nodeById.get(id))
       .filter((n): n is AtlasNode => n !== undefined)
-      .sort((a, b) =>
-        (a.date ?? '') === (b.date ?? '')
-          ? a.label.localeCompare(b.label)
-          : (a.date ?? '').localeCompare(b.date ?? ''),
-      )
-    members.forEach((node, i) => {
-      node.x = MARGIN + i * (NODE_W + 40)
-      node.y = y
-    })
-    y += ROW_H
+      .sort(byDateThenLabel)
+    if (members.length > 0) columns.push(members)
   }
-  const extraRows: Array<[string, AtlasNode[]]> = [
-    ['source', extras.filter((n) => n.type === 'source')],
-    ['commit', extras.filter((n) => n.type === 'commit')],
-    ['contract', extras.filter((n) => n.type === 'contract')],
-  ]
-  for (const [, row] of extraRows) {
-    if (row.length === 0) continue
-    row.sort((a, b) => a.id.localeCompare(b.id))
-    row.forEach((node, i) => {
-      node.x = MARGIN + i * (NODE_W + 40)
-      node.y = y
-    })
-    y += ROW_H
+  for (const type of ['source', 'commit', 'contract'] as const) {
+    const column = extras.filter((n) => n.type === type).sort((a, b) => a.id.localeCompare(b.id))
+    if (column.length > 0) columns.push(column)
   }
-  return y
+  return columns
+}
+
+/** Lay one focused-cluster panel: header bar top-left, columns on the GRID
+ *  pitch. Returns the panel's outer box (the renderer draws the big white
+ *  card exactly around what was positioned here). */
+function positionPanel(
+  header: AtlasNode | undefined,
+  columns: AtlasNode[][],
+  x0: number,
+  y0: number,
+): { w: number; h: number } {
+  if (header) {
+    header.x = x0 + PANEL_PAD
+    header.y = y0 + PANEL_PAD
+  }
+  const contentTop = y0 + PANEL_PAD + PILL_H + GRID
+  let maxRows = 0
+  columns.forEach((column, t) => {
+    column.forEach((node, i) => {
+      node.x = x0 + PANEL_PAD + t * TOPIC_COL_PITCH
+      node.y = contentTop + i * NOTE_ROW_PITCH
+    })
+    maxRows = Math.max(maxRows, column.length)
+  })
+  const contentW =
+    columns.length > 0 ? (columns.length - 1) * TOPIC_COL_PITCH + NODE_W : PILL_W
+  const contentH = maxRows > 0 ? (maxRows - 1) * NOTE_ROW_PITCH + NODE_H : 0
+  return {
+    w: PANEL_PAD * 2 + Math.max(contentW, PILL_W),
+    h: contentTop - y0 + contentH + PANEL_PAD,
+  }
 }
 
 export function projectAtlas(
@@ -764,32 +819,96 @@ export function projectAtlas(
     ...aggEdges.filter((e) => nodeById.has(e.source) && nodeById.has(e.target)),
   ]
 
-  // layout: scoped project blocks stacked; project clusters in a leading column
+  // layout-v2: focused panels + side pills + context columns. EVERY included
+  // node gets a position — unpositioned boundary nodes piling at (0,0) under
+  // the header row was the overlap/floating-duplicate defect.
   const clusters = model.clusters.filter((c) => projectsInPlay.has(c.project))
   const scopedClusters = scope.project
     ? clusters.filter((c) => c.project === scope.project)
     : clusters
-  let y = MARGIN + ROW_H // row 0 belongs to the project header column
-  for (const cluster of scopedClusters) {
-    const scopedTopics = scope.topic
+  const panelOwners = new Set(scopedClusters.map((c) => c.project))
+
+  // what each panel will actually place: its (topic-scoped) column members
+  // plus its source/commit/contract extras at deep
+  const scopedTopicsOf = (cluster: AtlasCluster): AtlasCluster =>
+    scope.topic
       ? { ...cluster, topics: cluster.topics.filter((t) => t.name === scope.topic) }
       : cluster
-    const extras = nodes.filter(
-      (n) =>
-        (n.type === 'source' || n.type === 'commit' || n.type === 'contract') &&
-        (n.project === cluster.project || !n.project),
-    )
-    y = positionProjectBlock(scopedTopics, nodeById, level === 'deep' ? extras : [], y) + 40
+  const panelMemberIds = new Set<string>()
+  for (const cluster of scopedClusters) {
+    for (const topic of scopedTopicsOf(cluster).topics) {
+      for (const id of topic.nodeIds) if (nodeById.has(id)) panelMemberIds.add(id)
+    }
   }
-  // project header nodes: alpha row along the top (scoped project first)
-  const projectNodes = nodes
-    .filter((n) => n.type === 'project')
-    .sort((a, b) =>
-      a.label === scope.project ? -1 : b.label === scope.project ? 1 : a.label.localeCompare(b.label),
+  const isExtra = (n: AtlasNode): boolean =>
+    level === 'deep' &&
+    (n.type === 'source' || n.type === 'commit' || n.type === 'contract') &&
+    n.project !== undefined &&
+    panelOwners.has(n.project)
+  const inPanel = (n: AtlasNode): boolean => panelMemberIds.has(n.id) || isExtra(n)
+
+  // context: nodes outside every panel (cross-project boundary cards, out-of-
+  // scope topic neighbors, projectless commits), grouped by project ('' = none)
+  const contextGroups = new Map<string, AtlasNode[]>()
+  for (const n of nodes) {
+    if (n.type === 'project' || inPanel(n)) continue
+    const key = n.project ?? ''
+    const list = contextGroups.get(key) ?? []
+    list.push(n)
+    contextGroups.set(key, list)
+  }
+
+  // side pills: card-less neighbors sit left of the panels; neighbors with
+  // boundary cards head a context column on the right
+  const pillNodes = nodes.filter((n) => n.type === 'project' && !panelOwners.has(n.label))
+  const leftPills = pillNodes
+    .filter((p) => !contextGroups.has(p.label))
+    .sort((a, b) => a.label.localeCompare(b.label))
+  leftPills.forEach((pill, i) => {
+    pill.x = MARGIN
+    pill.y = MARGIN + i * (PILL_H + V_GAP)
+  })
+
+  // panels stacked vertically, all sharing one left edge (aligned columns
+  // keep the inter-column bands card-free for orthogonal edge channels)
+  const panelX = MARGIN + (leftPills.length > 0 ? PILL_W + GUTTER : 0)
+  let panelY = MARGIN
+  let panelsRight = panelX
+  for (const cluster of scopedClusters) {
+    const extras = nodes.filter((n) => isExtra(n) && n.project === cluster.project)
+    const header = nodeById.get(projectIdOf(cluster.project))
+    const box = positionPanel(
+      header,
+      panelColumns(scopedTopicsOf(cluster), nodeById, extras),
+      panelX,
+      panelY,
     )
-  projectNodes.forEach((node, i) => {
-    node.x = MARGIN + i * (NODE_W + 60)
-    node.y = MARGIN
+    panelsRight = Math.max(panelsRight, panelX + box.w)
+    panelY += box.h + 2 * V_GAP
+  }
+
+  // right context columns: pill on top (when the project exists as a node),
+  // that project's boundary cards stacked beneath — connected by the edges
+  // that pulled them in, never floating
+  const rightX = panelsRight + GUTTER
+  const rightGroups = [...contextGroups.entries()].sort(([a], [b]) => a.localeCompare(b))
+  rightGroups.forEach(([project, members], g) => {
+    const x = rightX + g * TOPIC_COL_PITCH
+    // never reposition a panel header — a topic-scoped panel's own project
+    // heads the panel, not its out-of-scope context column
+    const pill =
+      project && !panelOwners.has(project) ? nodeById.get(projectIdOf(project)) : undefined
+    let yy = MARGIN
+    if (pill) {
+      pill.x = x
+      pill.y = yy
+      yy += PILL_H + V_GAP
+    }
+    for (const member of [...members].sort(byDateThenLabel)) {
+      member.x = x
+      member.y = yy
+      yy += NOTE_ROW_PITCH
+    }
   })
 
   return {

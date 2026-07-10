@@ -1,13 +1,215 @@
 /**
- * Atlas layout constants shared by the core-side layout (story 10.1) and the
- * renderer's SVG geometry (story 10.2). Positions are computed core-side; the
- * renderer only needs the card box and grid metrics to draw and fit.
+ * Atlas layout constants shared by the core-side layout (story 10.1, reworked
+ * by the epic10 layout-v2 defect burndown) and the renderer's SVG geometry
+ * (story 10.2). Positions are computed core-side; the renderer only needs the
+ * card boxes and grid metrics to draw, route edges, and fit.
+ *
+ * Layout-v2 lane spec (binding):
+ * - overview: columns by route-dependency depth, cluster cards CLUSTER_W wide,
+ *   vertical gaps ≥ V_GAP, horizontal gutters ≥ GUTTER reserved as edge
+ *   channels — cards NEVER overlap (asserted in unit tests);
+ * - learn/deep: the focused cluster expands into one large panel — topic
+ *   column groups on a GRID-aligned pitch, handoffs in their own lane;
+ *   neighboring clusters collapse to compact side pills.
  */
 
 /** mini routing-slip card box (DESIGN.md data-visualizations spec) */
 export const NODE_W = 200
 export const NODE_H = 84
-/** overview cluster columns: left→right by route-dependency depth */
-export const COL_W = 300
-export const ROW_H = 130
-export const MARGIN = 40
+/** overview project cluster card — wider than a note card, same height */
+export const CLUSTER_W = 280
+export const CLUSTER_H = 84
+/** collapsed neighbor pill at learn/deep (and the focused panel's header bar) */
+export const PILL_W = 160
+export const PILL_H = 40
+/** minimum vertical gap between stacked cards */
+export const V_GAP = 40
+/** horizontal gutter between lanes — reserved as an edge channel (card-free) */
+export const GUTTER = 160
+/** canvas margin around the whole layout */
+export const MARGIN = 48
+/** panel dot-grid pitch; panel card positions land on this grid */
+export const GRID = 24
+export const PANEL_PAD = 24
+/** topic column pitch inside a panel: NODE_W + 40, GRID-aligned (24 × 10) */
+export const TOPIC_COL_PITCH = 240
+/** note row pitch inside a panel: NODE_H + 60 gap, GRID-aligned (24 × 6) */
+export const NOTE_ROW_PITCH = 144
+/** aggregated `N open / M total` label chip (white pill, mono 10px) */
+export const CHIP_W = 112
+export const CHIP_H = 18
+/** fit-to-content padding (viewport spec) */
+export const FIT_PAD = 48
+
+export interface AtlasBox {
+  w: number
+  h: number
+}
+
+/**
+ * The card box a node renders (and is laid out) with. Projects are cluster
+ * cards at overview and compact pills / panel headers at drilled levels;
+ * everything else is the mini routing-slip card. Core layout and renderer
+ * geometry MUST agree on this — it is the no-overlap contract.
+ */
+export function atlasNodeBox(node: { type: string }, level: 'overview' | 'learn' | 'deep'): AtlasBox {
+  if (node.type !== 'project') return { w: NODE_W, h: NODE_H }
+  return level === 'overview' ? { w: CLUSTER_W, h: CLUSTER_H } : { w: PILL_W, h: PILL_H }
+}
+
+// ── shared card/edge geometry (core layout tests + renderer canvas) ──────────
+
+export interface Rect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/** Axis-aligned intersection — THE no-overlap test the layout is held to. */
+export function rectsOverlap(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+}
+
+/** The box a node draws with (the shared contract, as a positioned rect). */
+export function nodeRect(
+  node: { type: string; x: number; y: number },
+  level: 'overview' | 'learn' | 'deep',
+): Rect {
+  const box = atlasNodeBox(node, level)
+  return { x: node.x, y: node.y, w: box.w, h: box.h }
+}
+
+export interface OrthoRoute {
+  /** polyline points, source anchor → target anchor (arrowhead at the end) */
+  points: Array<{ x: number; y: number }>
+  /** label-chip center — ALWAYS on a horizontal channel segment, card-free */
+  label: { x: number; y: number }
+}
+
+const dedupePoints = (
+  pts: Array<{ x: number; y: number }>,
+): Array<{ x: number; y: number }> =>
+  pts.filter(
+    (p, i) =>
+      i === 0 ||
+      p.x !== (pts[i - 1] as { x: number }).x ||
+      p.y !== (pts[i - 1] as { y: number }).y,
+  )
+
+/**
+ * Route an edge between two card rects with orthogonal elbows (H→V→H). The
+ * vertical run always lives in a card-free channel: the gutter between lanes
+ * for adjacent lanes, the corridor band above the target row for long spans,
+ * and the channel left of the lane for same-lane pairs. `off` staggers
+ * parallel edges between the same pair (±12px per lane); `stub` is how far
+ * the route reaches into the channel (GUTTER/2 between lanes, smaller inside
+ * panels).
+ */
+export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoRoute {
+  const ay = a.y + a.h / 2 + off
+  const by = b.y + b.h / 2 + off
+  const aRight = a.x + a.w
+  const bRight = b.x + b.w
+  // chips separate further than lines so reciprocal same-row chips never stack
+  const chipOff = off * 1.5
+
+  if (b.x >= aRight + 8) {
+    // forward: leave a's right edge, enter b's left edge
+    const gap = b.x - aRight
+    if (gap <= GUTTER * 1.5) {
+      const cx = aRight + gap / 2 + off
+      return {
+        points: dedupePoints([
+          { x: aRight, y: ay },
+          { x: cx, y: ay },
+          { x: cx, y: by },
+          { x: b.x, y: by },
+        ]),
+        label: { x: cx, y: ay + chipOff },
+      }
+    }
+    // long span: travel the card-free corridor band just above the target row
+    const cx1 = aRight + Math.min(stub, gap / 2) + off
+    const cx2 = b.x - Math.min(stub, gap / 2) - off
+    const corridorY = b.y - V_GAP / 2 + off
+    return {
+      points: dedupePoints([
+        { x: aRight, y: ay },
+        { x: cx1, y: ay },
+        { x: cx1, y: corridorY },
+        { x: cx2, y: corridorY },
+        { x: cx2, y: by },
+        { x: b.x, y: by },
+      ]),
+      label: { x: (cx1 + cx2) / 2, y: corridorY + chipOff - off },
+    }
+  }
+
+  if (a.x >= bRight + 8) {
+    // backward: leave a's left edge, enter b's right edge
+    const gap = a.x - bRight
+    if (gap <= GUTTER * 1.5) {
+      const cx = bRight + gap / 2 - off
+      return {
+        points: dedupePoints([
+          { x: a.x, y: ay },
+          { x: cx, y: ay },
+          { x: cx, y: by },
+          { x: bRight, y: by },
+        ]),
+        label: { x: cx, y: ay + chipOff },
+      }
+    }
+    const cx1 = a.x - Math.min(stub, gap / 2) - off
+    const cx2 = bRight + Math.min(stub, gap / 2) + off
+    const corridorY = b.y - V_GAP / 2 + off
+    return {
+      points: dedupePoints([
+        { x: a.x, y: ay },
+        { x: cx1, y: ay },
+        { x: cx1, y: corridorY },
+        { x: cx2, y: corridorY },
+        { x: cx2, y: by },
+        { x: bRight, y: by },
+      ]),
+      label: { x: (cx1 + cx2) / 2, y: corridorY + chipOff - off },
+    }
+  }
+
+  // same lane (x-overlap): loop out the left side through the lane's channel
+  const lx = Math.min(a.x, b.x) - stub + off
+  return {
+    points: dedupePoints([
+      { x: a.x, y: ay },
+      { x: lx, y: ay },
+      { x: lx, y: by },
+      { x: b.x, y: by },
+    ]),
+    label: { x: lx, y: ay + chipOff },
+  }
+}
+
+/** The white pill chip box for an aggregated-route label. */
+export function chipRect(label: { x: number; y: number }): Rect {
+  return { x: label.x - CHIP_W / 2, y: label.y - CHIP_H / 2, w: CHIP_W, h: CHIP_H }
+}
+
+/** Parallel edges between the same (unordered) node pair fan out ±12px. */
+export function laneOffsets(
+  edges: ReadonlyArray<{ id: string; source: string; target: string }>,
+): Map<string, number> {
+  const groups = new Map<string, string[]>()
+  for (const e of edges) {
+    const key = [e.source, e.target].sort().join('⇄')
+    const list = groups.get(key) ?? []
+    list.push(e.id)
+    groups.set(key, list)
+  }
+  const offsets = new Map<string, number>()
+  for (const list of groups.values()) {
+    list.sort()
+    list.forEach((id, i) => offsets.set(id, (i - (list.length - 1) / 2) * 12))
+  }
+  return offsets
+}

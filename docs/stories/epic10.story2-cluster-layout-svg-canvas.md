@@ -47,6 +47,7 @@ Done
 |---|---|---|---|
 | 2026-07-10 | 0.1 | Drafted from ATLAS-CONCEPT.md §5 (ATLAS-2); supersedes epic10.story2-svg-graph-view | Bob (SM) |
 | 2026-07-10 | 1.0 | Approved | Sarah (PO) |
+| 2026-07-10 | 1.1 | layout-v2 defect burndown: lane/panel layout, orthogonal edge channels, chip clearance, no-overlap/no-orphan invariants, fit-to-content viewport, designed canvas surface | Dev agent (Fable 5) |
 
 ## Dev Agent Record
 
@@ -81,6 +82,71 @@ Fable 5 (claude-fable-5)
 - `src/renderer/src/App.tsx`, `src/renderer/src/stores/app.ts` — sidebar nav entry + view route
 - `src/renderer/src/views/search/Palette.tsx` — ⌘K "Vault Atlas" action
 - `src/renderer/src/styles.css` — atlas classes, token-only (both themes)
+
+### layout-v2 defect burndown (2026-07-10, Fable 5)
+
+User-reported defects from real screenshots: cards overlapping cluster nodes, edge
+count labels clipping under cards, "duplicate" OPEN/REQUEST cards floating with no
+edges, content bunched top-left over dead whitespace, clusters cramped in one row,
+canvas reading as raw whitespace.
+
+**Root causes found**
+
+- The drilled-level projection (`projectAtlas`) included 1-hop boundary nodes
+  (cross-project handoffs/notes, commits) but never positioned them — they piled at
+  the base model's default (0,0) under the header row. That single bug produced the
+  overlap, the "floating detached cards", AND the "duplicates": two *distinct*
+  handoff files whose names differ only by a `-2` suffix (`nimbus-frontend` and
+  `nimbus-mobile` both hold `handoffs/2026-07-10-handoff-nimbus-backend.md`)
+  truncate to identical card labels and were stacked at the same unpositioned spot.
+  The model itself never emitted duplicate nodes (verified against the nimbus
+  vault: 20 card files → 20 qualified handoff nodes).
+- A real unqualified-id bug DID exist one layer down: `handoffNodeByCardId` keyed
+  contract-scan links by the lib card id, so same-named cards in two projects
+  silently kept only the last entry (mislinked contract edges). Fixed: the lookup
+  is now id → all qualified candidates, and cards are deduped by vault-relative
+  path at model build.
+- Edge count badges rendered at the raw straight-line midpoint between node
+  centers — under cards by construction.
+- `fitViewBox` anchored at (0,0) and never centered, so content hugged the
+  top-left; overview column/row pitch left no reserved edge channels.
+
+**Layout mechanism (binding spec implemented)**
+
+- Overview: lane columns by route-dependency depth (existing depth logic), cluster
+  cards 280px wide, 40px vertical gaps, 160px gutters reserved as card-free edge
+  channels (`shared/atlas-layout.ts` is the single box/pitch contract for core
+  layout and renderer geometry).
+- Edges: orthogonal elbows (H→V→H) with the vertical run always in a channel —
+  gutter between lanes, corridor band above the target row for multi-lane spans,
+  left channel for same-lane pairs; 1.5px, arrowhead at target; parallel edges
+  between the same pair fan ±12px. `N open / M total` labels are white pill chips
+  (--bg-card + hairline, mono 10px) anchored ON the horizontal channel segment —
+  clearance is geometric, and unit-asserted.
+- Learn/Deep: the focused cluster expands into one large white panel (radius 16,
+  hairline, shadow-sm) — topic COLUMN groups on the 24px grid (240/144 pitch),
+  handoffs in their own trailing lane (thread rails ride its edges); neighboring
+  clusters collapse to compact side pills (card-less senders left, neighbors with
+  boundary cards head right-side context columns, pill on top, cards beneath).
+- Viewport: fit-to-content (48px pad, centered, never past 1:1) on load and level
+  change; drag pan; wheel/pinch zoom clamped 0.5×–2× around the fit; ⌘0 refits.
+- Surface: the canvas card carries a faint 24px dot grid (both themes); hover =
+  raised shadow + gold ring, connected edges emphasized navy, non-neighbors faded
+  to 30%. Deterministic throughout — every tie broken by date, label, or id.
+
+**Test evidence**
+
+- `src/core/atlas.test.ts`: `assertLayoutInvariants` (dedupe, pairwise no-overlap
+  of real card rects, no-orphans-outside-panels, chip clearance against every
+  card) asserted across all three zoom levels — on the fixture source AND the real
+  nimbus simulation vault (`loredex-simulation/_machine2/nimbus-vault`), including
+  unscoped deep and topic-scoped deep; plus card-dedupe-by-path and
+  same-named-cards-stay-distinct/contract-links-reach-every-candidate tests.
+- `src/renderer/src/views/atlas/atlas-geometry.test.ts`: elbow routing stays in
+  channels, long spans avoid intermediate lane cards, chip clearance, lane fan-out,
+  centered fit, zoom clamp band.
+- `npm run typecheck`, `npx vitest run` (64 files / 505 tests), `npm run build` —
+  all green.
 
 ## QA Results
 

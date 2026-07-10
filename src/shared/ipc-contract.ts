@@ -74,6 +74,11 @@ export interface CoreApi {
   /** M2 threads (story 8.2): DERIVED from listHandoffs + replies_to/fulfills
    *  edges — no new persistent state; comments ride the rail, never the board. */
   'handoffs.thread': { in: { id: string }; out: HandoffThread }
+  /** M2 read-state (story 9.2): per-user unread tracking in app.db — the
+   *  renderer's ONLY access path (core host is the sole SQLite opener).
+   *  Paths are vault-relative note paths; read_at null = never read. */
+  'readState.get': { in: { paths: string[] }; out: Record<string, string | null> }
+  'readState.mark': { in: { paths: string[] }; out: void }
   /** app-local contract evolution (story 3.4): identity profile, app-side only —
    *  persisted in the core host's settings JSON (app.db seam, story 3.6) */
   'settings.identity.get': { in: void; out: IdentitySettings }
@@ -128,6 +133,9 @@ export type CoreEvent =
       reason?: string
       until?: string
     }
+  /** M2 (story 9.2): a snooze's `snoozed_until` passed — fired ONCE per machine
+   *  (app-db notified flag). A toast + board resort; NEVER an auto status write. */
+  | { kind: 'snooze.expired'; handoffId: string }
   | { kind: 'route.completed'; receipt: RoutePreview }
   | { kind: 'vault.changed'; paths: string[] }
   | { kind: 'sync.changed'; health: SyncHealth }

@@ -3,12 +3,13 @@
  * who/when + loredex_schema in vault frontmatter — via the lib export only —
  * and the settings channels persist the identity profile app-side.
  */
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createIpcClient, type IpcClient } from '../shared/ipc-client'
 import type { PortLike } from '../shared/ipc-contract'
+import { getAppDb, initAppDb, metaGet } from './db/index'
 import { initEngine } from './engine'
 import { registerCoreHandlers } from './handlers'
 import { createCoreIpc, type CoreIpc } from './ipc'
@@ -49,6 +50,7 @@ beforeAll(() => {
   process.env.LOREDEX_CONFIG_DIR = configDir
   initEngine()
   userData = mkdtempSync(join(tmpdir(), 'loredex-consume-userdata-'))
+  initAppDb(userData) // story 9.2: settings persist in app.db meta
   initSettings(userData)
 
   ipc = createCoreIpc()
@@ -61,7 +63,7 @@ beforeAll(() => {
 })
 
 describe('settings.identity channels (app-side profile, never the vault)', () => {
-  it('round-trips the profile through the settings JSON and offers an ambient default', async () => {
+  it('round-trips the profile through app.db and offers an ambient default', async () => {
     const empty = await client.invoke('settings.identity.get', undefined)
     expect(empty.profile).toBeNull()
     expect(empty.ambient).toHaveProperty('name') // git config or 'unknown'
@@ -70,9 +72,10 @@ describe('settings.identity channels (app-side profile, never the vault)', () =>
     const loaded = await client.invoke('settings.identity.get', undefined)
     expect(loaded.profile).toEqual(dana)
 
-    // persisted under main's userData dir, NOT inside the vault
-    const raw = JSON.parse(readFileSync(join(userData, 'settings.json'), 'utf8'))
-    expect(raw.identity).toEqual(dana)
+    // persisted in app.db under main's userData dir, NOT inside the vault (9.2)
+    const db = getAppDb()
+    expect(db).not.toBeNull()
+    expect(JSON.parse(metaGet(db!, 'settings:identity') ?? 'null')).toEqual(dana)
   })
 
   it('rejects an unusable identity', async () => {

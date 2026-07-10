@@ -8,6 +8,9 @@ import { isThemeSetting } from '../shared/theme'
 import { ipcError, type MainControlMessage } from '../shared/ipc-contract'
 import type { Identity, SyncReport } from '../shared/types'
 import * as engine from './engine'
+import { getAppDb, vaultId } from './db/index'
+import { getReadState, markRead } from './db/read-state'
+import { reconcileSnoozeTimers } from './db/snooze'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
 import { withGitIdentity } from './git'
 import type { CoreIpc } from './ipc'
@@ -62,11 +65,41 @@ export function registerCoreHandlers(
     const vaultPath = engine.getConfig().vaultPath
     return aggregateFacetValues(vaultPath, listMarkdownFiles(vaultPath), engine.noteMeta)
   })
+  // vault_id: computed once per vault open = once per core-host lifetime (the
+  // host restarts on vault switch). Null while no config/db (picker pending).
+  let cachedVaultId: string | null = null
+  const currentVaultId = (): string | null => {
+    if (cachedVaultId) return cachedVaultId
+    try {
+      const id = engine.identity()
+      cachedVaultId = vaultId(id.vaultPath, id.remote)
+    } catch {
+      return null
+    }
+    return cachedVaultId
+  }
   ipc.register('handoffs.list', ({ scope, project }) => {
     // every board fetch doubles as the new-handoff check (story 3.7)
     const all = notifier.refresh()
+    // story 9.2 AC4: board load reconciles snooze timers from frontmatter truth
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (db && vid) reconcileSnoozeTimers(db, vid, all)
     if (!project) return all // company-wide: direction is ignored without a project
     return engine.handoffs({ direction: scope, project })
+  })
+  // M2 read-state (story 9.2): per-user, app.db only — never the vault. No db
+  // (bare test host) degrades to "everything unread" / mark as no-op.
+  ipc.register('readState.get', ({ paths }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (!db || !vid) return Object.fromEntries(paths.map((p) => [p, null]))
+    return getReadState(db, vid, paths)
+  })
+  ipc.register('readState.mark', ({ paths }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (db && vid && paths.length > 0) markRead(db, vid, paths)
   })
   // Consume is a lib write op: write lock (3.5 shim) + per-command git identity.
   ipc.register('handoffs.consume', ({ id, identity }) =>

@@ -17,6 +17,7 @@ export function HandoffCardView({
   onComment,
   fulfilledBy,
   onLinkRequest,
+  unread,
 }: {
   card: HandoffCard
   onOpen: (card: HandoffCard) => void
@@ -33,6 +34,8 @@ export function HandoffCardView({
   fulfilledBy?: string[]
   /** story 8.3 AC2: retro-link a delivery without `fulfills` to its request */
   onLinkRequest?: (card: HandoffCard) => void
+  /** story 9.2: never opened on this machine (app-db read-state) — gold dot */
+  unread?: boolean
 }): React.JSX.Element {
   const notes = card.readingOrder.length
   const snoozed = card.status === 'snoozed'
@@ -49,6 +52,7 @@ export function HandoffCardView({
       }}
     >
       <div className="handoff-card-top">
+        {unread && <span className="unread-dot" role="status" aria-label="unread" />}
         <StatusChip status={card.status} pressed={pressed} />
         {/* story 8.2 AC1: request cards carry a navy REQUEST chip beside the
             stamp; kind absent in v1 notes defaults to delivery (lib) */}

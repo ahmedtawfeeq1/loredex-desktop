@@ -27,6 +27,7 @@ import {
 export function openBrief(card: HandoffCard): void {
   const vaultPath = useApp.getState().identity?.vaultPath ?? ''
   useApp.getState().setView('reader')
+  useHandoffs.getState().markRead(card) // story 9.2: opening marks read
   void useReader.getState().open(toVaultRelative(card.path, vaultPath), card.readingOrder)
 }
 
@@ -129,6 +130,7 @@ function Lane({
   const openCompose = useHandoffs((s) => s.openCompose)
   const openAnnotate = useHandoffs((s) => s.openAnnotate)
   const openLinkRequest = useHandoffs((s) => s.openLinkRequest)
+  const readAt = useHandoffs((s) => s.readAt)
   // story 8.3 AC3: derived reverse fulfills edges — recomputed per render
   const fulfilled = fulfilledByMap(useHandoffs((s) => s.cards) ?? [])
   return (
@@ -145,6 +147,7 @@ function Lane({
             pressed={pressedId === card.id}
             onReply={(c) => openCompose(c)}
             onComment={(c) => openAnnotate(c)}
+            unread={readAt[card.id] === null}
             {...(fulfilled.has(card.id) ? { fulfilledBy: fulfilled.get(card.id) } : {})}
             {...(!inbound && card.kind === 'delivery' && !card.fulfills
               ? { onLinkRequest: (c: HandoffCard) => openLinkRequest(c) }

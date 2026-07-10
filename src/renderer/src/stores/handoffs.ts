@@ -25,6 +25,9 @@ export interface ComposePrefill {
 interface HandoffsState {
   /** null until first load (skeleton); company-wide, lanes derived per project */
   cards: HandoffCard[] | null
+  /** story 9.2: read_at per card id from app-db read-state; null = unread dot.
+   *  Absent key = read-state not loaded yet (no dot flash). */
+  readAt: Record<string, string | null>
   error: string | null
   /** 'all' = company-wide PM view */
   project: string | 'all'
@@ -49,6 +52,8 @@ interface HandoffsState {
   /** comment modal target (story 7.3) */
   annotateFor: HandoffRef | null
   load(): Promise<void>
+  /** story 9.2: opening a handoff marks it read (per-user, app-db via IPC) */
+  markRead(card: HandoffCard): void
   consume(card: HandoffCard): Promise<void>
   /** story 8.1: accept/decline/snooze/reopen through the one lib writer */
   setStatus(card: HandoffCard, transition: HandoffTransition): Promise<void>
@@ -69,8 +74,14 @@ interface HandoffsState {
   reset(): void
 }
 
+/** Read-state rows key on vault-relative note paths (stable across machines). */
+function relPath(card: HandoffCard): string {
+  return toVaultRelative(card.path, useApp.getState().identity?.vaultPath ?? '')
+}
+
 export const useHandoffs = create<HandoffsState>((set, get) => ({
   cards: null,
+  readAt: {},
   error: null,
   project: 'all',
   receipt: null,
@@ -89,9 +100,24 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
     try {
       const cards = await invoke('handoffs.list', { scope: 'all' })
       set({ cards, error: null })
+      // story 9.2: unread dots — read-state rides every board load, best-effort
+      try {
+        const byPath = await invoke('readState.get', { paths: cards.map(relPath) })
+        set({
+          readAt: Object.fromEntries(cards.map((c) => [c.id, byPath[relPath(c)] ?? null])),
+        })
+      } catch {
+        // no read-state (old core host) — no dots, board still works
+      }
     } catch (e) {
       set({ cards: [], error: isErrEnvelope(e) ? `${e.code}: ${e.message}` : String(e) })
     }
+  },
+
+  markRead(card) {
+    if (get().readAt[card.id]) return // already read — no write, no re-render
+    set({ readAt: { ...get().readAt, [card.id]: new Date().toISOString() } })
+    void invoke('readState.mark', { paths: [relPath(card)] }).catch(() => {})
   },
 
   /** AC5: optimistic flip + stamp press now; the lib write follows; revert on failure.
@@ -233,6 +259,7 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
   reset() {
     set({
       cards: null,
+      readAt: {},
       error: null,
       project: 'all',
       receipt: null,

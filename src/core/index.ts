@@ -4,6 +4,7 @@
  * seam over them (dispatch + event fan-out in ./ipc).
  */
 import type { PortLike } from '../shared/ipc-contract'
+import { initAppDb } from './db/index'
 import { removeDiscovery } from './discovery'
 import { initEngine } from './engine'
 import { registerCoreHandlers } from './handlers'
@@ -17,9 +18,12 @@ import { initSettings, loadMcpPortOverride, loadOrCreateMcpToken } from './setti
 const vaultFlag = process.argv.indexOf('--vault')
 const vaultOverride = vaultFlag !== -1 ? process.argv[vaultFlag + 1] : undefined
 const config = initEngine(vaultOverride)
-// App-side settings (identity profile) live under main's userData dir (story 3.4).
+// app.db opens FIRST (story 9.2 — the core host is the sole opener); settings
+// then live in its meta table, importing the v0.1 settings.json shim once.
 const userDataFlag = process.argv.indexOf('--user-data')
-initSettings(userDataFlag !== -1 ? process.argv[userDataFlag + 1] : undefined)
+const userDataDir = userDataFlag !== -1 ? process.argv[userDataFlag + 1] : undefined
+initAppDb(userDataDir)
+initSettings(userDataDir)
 const ipc = createCoreIpc()
 // Display requests (native notifications, dock badge) go to main over the
 // control channel — core decides, main displays (story 3.7).

@@ -23,7 +23,9 @@
   fill: var(--bg-card);
   stroke: var(--hairline);
   stroke-width: 1;
-  filter: drop-shadow(0 1px 3px rgba(19, 24, 38, 0.06));
+  /* no drop-shadow filter — the canvas pans/zooms via SVG transform and any
+     filter region forces compositor work that can drop raster tiles; the
+     hairline on the paper ground separates the panel without one */
 }
 
 /* the panel's title bar (the focused project node) */
@@ -108,12 +110,10 @@
   stroke: var(--hairline);
 }
 
-/* hover emphasis: raised shadow + gold ring on the node (gold ring itself is
-   the story 10.2 rule in styles.css)… */
-.atlas-node:hover .atlas-card,
-.atlas-node:focus-visible .atlas-card {
-  filter: drop-shadow(0 4px 12px rgba(19, 24, 38, 0.16));
-}
+/* hover emphasis: the gold ring (stroke, in styles.css) carries it. NO
+   `filter: drop-shadow` here — a filter that toggles on per node while
+   panning a large Deep-Dive graph is exactly the raster-tile-corruption
+   trigger; the ring alone reads as raised without a GPU layer. */
 
 /* …connected edges emphasized… */
 .atlas-edge-hot .atlas-edge-line {

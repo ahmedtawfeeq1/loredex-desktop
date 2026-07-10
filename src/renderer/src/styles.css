@@ -2576,7 +2576,11 @@ a:hover {
   fill: var(--bg-card);
   stroke: var(--hairline);
   stroke-width: 1;
-  filter: drop-shadow(0 1px 2px rgba(19, 24, 38, 0.08));
+  /* NO per-node `filter: drop-shadow` — in Deep Dive that is hundreds of GPU
+     filter layers inside one pan/zoom-transformed <svg>, which overruns
+     Chromium's raster-tile compositor and drops tiles to blank background on
+     hover repaints (the "UI is damaged" corruption). The hairline stroke +
+     gold hover ring below delineate cards without a per-element GPU layer. */
   transition: stroke 120ms ease;
 }
 
@@ -3379,21 +3383,13 @@ button.atlas-crumb:hover {
 
 /* glow = --ok (never gold: gold stays path/blocked/primary). Reduced-motion
    freezes the pulse to the static glow ring via the global rule. */
+/* changed = solid --ok ring. NO drop-shadow filter and NO perpetual animation:
+   in a large Deep-Dive graph with many changed nodes, an animated filter per
+   card pulsing forever is a heavy compositor load and a raster-tile-corruption
+   vector. A static bright green ring reads as "changed" without either. */
 .atlas-node-changed .atlas-card {
   stroke: var(--ok);
   stroke-width: 2;
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ok) 55%, transparent));
-  animation: atlas-changed-glow 1.8s ease-in-out infinite;
-}
-
-@keyframes atlas-changed-glow {
-  0%,
-  100% {
-    stroke-opacity: 1;
-  }
-  50% {
-    stroke-opacity: 0.5;
-  }
 }
 
 /* affected = 1-hop neighbor ring: dashed --ok, no glow — distinct from the

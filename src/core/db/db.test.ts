@@ -111,6 +111,17 @@ describe('snooze_timers', () => {
     db.close()
   })
 
+  it('survives a YAML Date snoozed_until (hand-authored unquoted date — story 15.2)', () => {
+    // gray-matter parses unquoted `snoozed_until: 2026-07-09` as a JS Date;
+    // binding it raw crashed handoffs.list. Normalized to YYYY-MM-DD instead.
+    const db = openAppDb(tmp())
+    reconcileSnoozeTimers(db, 'v1', [
+      { id: 'h1', status: 'snoozed', snoozedUntil: new Date('2026-07-09T00:00:00Z') },
+    ])
+    expect(sweepExpiredSnoozes(db, 'v1', '2026-07-10')).toEqual(['h1'])
+    db.close()
+  })
+
   it('does not fire before snoozed_until passes (until < today, same rule as the lib)', () => {
     const db = openAppDb(tmp())
     reconcileSnoozeTimers(db, 'v1', [{ ...snoozedCard, snoozedUntil: '2026-07-10' }])

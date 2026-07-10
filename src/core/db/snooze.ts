@@ -10,7 +10,20 @@ import type { AppDb } from './index'
 export interface SnoozeSource {
   id: string
   status: string
-  snoozedUntil?: string | undefined
+  /** YAML surprise (story 15.2): a hand-authored unquoted
+   *  `snoozed_until: 2026-01-01` parses as a JS Date, not a string — the lib
+   *  normalizes `date:` but passes this field through, and binding a Date
+   *  crashed handoffs.list. Accept both; never crash a board load. */
+  snoozedUntil?: string | Date | undefined
+}
+
+/** Normalize to `YYYY-MM-DD` (the vault format); non-date garbage → null. */
+function untilString(value: string | Date | undefined): string | null {
+  if (typeof value === 'string') return value
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10)
+  }
+  return null
 }
 
 /**
@@ -33,9 +46,10 @@ export function reconcileSnoozeTimers(db: AppDb, vaultId: string, cards: SnoozeS
   db.transaction(() => {
     const snoozed = new Set<string>()
     for (const card of cards) {
-      if (card.status === 'snoozed' && card.snoozedUntil) {
+      const until = untilString(card.snoozedUntil)
+      if (card.status === 'snoozed' && until) {
         snoozed.add(card.id)
-        upsert.run(vaultId, card.id, card.snoozedUntil)
+        upsert.run(vaultId, card.id, until)
       }
     }
     for (const row of existing) {

@@ -73,11 +73,14 @@ describe("the Don't list", () => {
     expect(css).not.toMatch(/purple|#af52de|#bf5af2/i)
     expect(css).not.toMatch(/linear-gradient|radial-gradient/)
   })
-  it('no border wider than 1px except the sanctioned 4px left rails', () => {
+  it('no border wider than 1px except the sanctioned left rails', () => {
     // any border-* width > 1px (radii are not borders) …
     const wide = css.match(/border(?!-radius)[a-z-]*:\s*[^;]*\b([2-9]|\d{2,})px[^;]*/g) ?? []
     // … must be a border-left rail slot (transparent at rest, gold when active)
-    for (const decl of wide) expect(decl).toMatch(/^border-left: 4px solid/)
+    // or the thread rail's 2px hairline connector (DESIGN.md#signature, v2)
+    for (const decl of wide) {
+      expect(decl).toMatch(/^border-left: (4px solid|2px solid var\(--hairline\))/)
+    }
   })
   it('serif never leaks into nav or buttons', () => {
     expect(block('.nav-item')).not.toContain('serif')

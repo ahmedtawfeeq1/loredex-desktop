@@ -21,6 +21,7 @@ import {
   saveMcpPortOverride,
   saveThemeSetting,
 } from './settings'
+import { buildThread, collectComments } from './threads'
 import { listMarkdownFiles, walkVault } from './tree'
 import { withWriteLock } from './write-lock'
 
@@ -143,6 +144,31 @@ export function registerCoreHandlers(
       return result
     }),
   )
+  // Thread graph (story 8.2): derived read — listHandoffs + comment scan +
+  // the story 2.2 shortest-path resolver; nothing persisted, no lock.
+  ipc.register('handoffs.thread', ({ id }) => {
+    const vaultPath = engine.getConfig().vaultPath
+    const cards = engine.handoffs({ direction: 'all' })
+    const cardPaths = new Set(cards.map((c) => toVaultRelative(c.path, vaultPath)))
+    const comments = collectComments(listMarkdownFiles(vaultPath), cardPaths, (rel) => {
+      const doc = engine.readNote(rel)
+      return { meta: doc.meta as Record<string, unknown>, body: doc.body }
+    })
+    const thread = buildThread(
+      {
+        vaultPath,
+        cards,
+        comments,
+        resolveName: (name) => {
+          const r = resolveLink(vaultPath, name, '')
+          return r.status === 'resolved' ? (r.target ?? null) : null
+        },
+      },
+      id,
+    )
+    if (!thread) throw ipcError('UNKNOWN_HANDOFF', `no handoff named "${id}" in this vault`)
+    return thread
+  })
   // Route-a-note (story 7.4). Preview is read-only (no lock); route is a lib
   // write op. The picker/drop is the user's consent for that ONE file (NFR12).
   const guardRouteSource = (file: string): void => {

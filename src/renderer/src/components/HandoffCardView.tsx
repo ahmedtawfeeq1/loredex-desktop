@@ -44,6 +44,9 @@ export function HandoffCardView({
     >
       <div className="handoff-card-top">
         <StatusChip status={card.status} pressed={pressed} />
+        {/* story 8.2 AC1: request cards carry a navy REQUEST chip beside the
+            stamp; kind absent in v1 notes defaults to delivery (lib) */}
+        {card.kind === 'request' && <span className="status-chip chip-request">request</span>}
         {/* AC4 (story 8.1): expired snooze is a DERIVED treatment — the vault
             status stays snoozed until a human reopens it */}
         {snoozed && card.expired && <span className="snooze-expired">expired</span>}

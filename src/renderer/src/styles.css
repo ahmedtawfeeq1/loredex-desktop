@@ -1976,3 +1976,92 @@ a:hover {
   color: var(--text-2);
   margin-bottom: 4px;
 }
+
+/* ── thread rail (story 8.2): replies/fulfills as a left-indented rail of
+   connected cards on a 2px hairline connector; comments styled lighter ────── */
+
+.thread {
+  margin-top: 24px;
+  max-width: 76ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.thread-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+
+.thread-card {
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.thread-card:hover {
+  border-color: var(--gold);
+}
+
+.thread-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thread-card-objective {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  color: var(--text-1);
+  margin-top: 4px;
+}
+
+.thread-card-comment .thread-card-objective {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* the connector: 2px hairline the reply cards hang off */
+.thread-rail {
+  border-left: 2px solid var(--hairline);
+  padding-left: 16px;
+  margin-left: 8px;
+}
+
+.thread-focus {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  margin: 4px 0 8px 8px;
+}
+
+.thread-fulfills {
+  margin-bottom: 8px;
+}
+
+.thread-edge-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+
+/* dangling replies_to/fulfills — diagnostic, never auto-created (AC4) */
+.thread-diagnostic {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--rust);
+  border: 1px dashed var(--rust);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: inline-block;
+  margin-top: 4px;
+}

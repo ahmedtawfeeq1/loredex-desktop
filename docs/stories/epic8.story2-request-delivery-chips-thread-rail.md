@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved
+Done
 
 ## Story
 
@@ -20,14 +20,14 @@ Approved
 
 ## Tasks / Subtasks
 
-- [ ] Kind chip (AC: 1)
-  - [ ] Extend `HandoffCard` with the `REQUEST` chip (navy, beside the stamp); absent-kind default `delivery` per schema
-- [ ] Thread channel (AC: 2, 4)
-  - [ ] Core `src/core/threads.ts`: build the edge map from `listHandoffs` cards' `replies_to`/`fulfills` (note-name resolution via the existing shortest-path logic); walk ancestors + replies; unresolved name → diagnostic entry
-  - [ ] Register `handoffs.thread` in the contract + dispatcher (derived, read-only)
-- [ ] Thread rail UI (AC: 3, 5)
-  - [ ] Detail view: ancestors → focused card → indented reply rail (connected cards, comments styled lighter); subscribe events for live refresh
-- [ ] Tests
+- [x] Kind chip (AC: 1)
+  - [x] Extend `HandoffCard` with the `REQUEST` chip (navy, beside the stamp); absent-kind default `delivery` per schema
+- [x] Thread channel (AC: 2, 4)
+  - [x] Core `src/core/threads.ts`: build the edge map from `listHandoffs` cards' `replies_to`/`fulfills` (note-name resolution via the existing shortest-path logic); walk ancestors + replies; unresolved name → diagnostic entry
+  - [x] Register `handoffs.thread` in the contract + dispatcher (derived, read-only)
+- [x] Thread rail UI (AC: 3, 5)
+  - [x] Detail view: ancestors → focused card → indented reply rail (connected cards, comments styled lighter); subscribe events for live refresh
+- [x] Tests
 
 ## Dev Notes
 
@@ -53,10 +53,33 @@ Approved
 
 ### Agent Model Used
 
+Claude Fable 5 (claude-fable-5)
+
 ### Debug Log References
+
+- `npx vitest run src/core/threads.test.ts` — 10/10 (edge model + seam chain)
+- `npm run typecheck && npm test && npm run build` — 34 files / 203 tests green
 
 ### Completion Notes List
 
+- Contract evolution: the m2 sketch says `HandoffCard[]`, but comments are rail members and not HandoffCards — the channel serves a `ThreadCard` projection (vault-relative paths for the reader, comments with `status: ''`/`kind: 'comment'`), plus additive `broken` diagnostics and `fulfilledBy` (the reverse fulfills edge, populated here because it IS the edge model; story 8.3 renders it).
+- Name resolution reuses `links.resolveLink` (story 2.2 shortest-path) via injection — ambiguous names count as unresolved (diagnostic), never guessed.
+- Cycle guard: a corrupted `replies_to` loop truncates the walk; a node never appears twice (ancestor wins over rail).
+- Comments scan = `listMarkdownFiles` filtered to `projects/*/handoffs/` minus board-card paths, `type: 'comment'` only; unreadable notes skipped, never fatal. Recomputed per request — nothing persisted (state-placement rule).
+- The detail view is the reader's open handoff brief (same seam as stories 7.3/8.1) — `ThreadRail` mounts under `NoteView`, not a new `HandoffDetail.tsx`; files live in `views/handoffs/` (existing seam, never restructured).
+- Design-fidelity test updated: DESIGN v2 itself sanctions the thread rail's 2px `--hairline` connector; the border-width guard now allows exactly that declaration.
+
 ### File List
+
+- src/shared/types.ts — `ThreadCard`/`ThreadReply`/`BrokenThreadRef`/`HandoffThread`
+- src/shared/ipc-contract.ts — `handoffs.thread` channel
+- src/core/threads.ts — NEW: edge model, ancestor/reply walks, comment scan
+- src/core/threads.test.ts — NEW: pure matrix + seam integration chain
+- src/core/handlers.ts — `handoffs.thread` handler (derived, read-only)
+- src/renderer/src/views/handoffs/ThreadRail.tsx — NEW: rail UI + live refresh
+- src/renderer/src/views/reader/NoteView.tsx — mounts the rail on handoff briefs
+- src/renderer/src/components/HandoffCardView.tsx — REQUEST chip beside the stamp
+- src/renderer/src/styles.css — `.thread*` rail/connector/diagnostic styles
+- src/renderer/src/design-fidelity.test.ts — sanction the 2px hairline connector
 
 ## QA Results

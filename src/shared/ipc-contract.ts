@@ -13,6 +13,7 @@ import type {
   FacetValues,
   HandoffCard,
   HandoffCreateResult,
+  HandoffThread,
   HandoffTransition,
   HandshakeStatus,
   HomeBrief,
@@ -70,6 +71,9 @@ export interface CoreApi {
     in: { id: string; transition: HandoffTransition; identity: Identity }
     out: StatusReceipt
   }
+  /** M2 threads (story 8.2): DERIVED from listHandoffs + replies_to/fulfills
+   *  edges — no new persistent state; comments ride the rail, never the board. */
+  'handoffs.thread': { in: { id: string }; out: HandoffThread }
   /** app-local contract evolution (story 3.4): identity profile, app-side only —
    *  persisted in the core host's settings JSON (app.db seam, story 3.6) */
   'settings.identity.get': { in: void; out: IdentitySettings }

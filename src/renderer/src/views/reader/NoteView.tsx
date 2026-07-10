@@ -6,9 +6,11 @@ import { useMemo } from 'react'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
+import { qualifiedId } from '../../../../shared/handoff-lanes'
 import { handoffRefFromNote } from '../handoffs/compose-form'
 import { attributionLines } from '../handoffs/lifecycle'
 import { ReadingOrderInline } from '../handoffs/ReadingOrderInline'
+import { ThreadRail } from '../handoffs/ThreadRail'
 
 export function formatValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(', ')
@@ -92,6 +94,7 @@ export function NoteView(): React.JSX.Element {
       <FrontmatterPanel meta={doc.meta as Record<string, unknown>} />
       <div className="note-body">{rendered}</div>
       <ReadingOrderInline targets={readingOrder} from={selected} />
+      {handoffRef && <ThreadRail id={qualifiedId(handoffRef)} />}
     </article>
   )
 }

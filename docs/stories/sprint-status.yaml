@@ -79,7 +79,7 @@ development_status:
 
   epic-8: in-progress      # Handoff Lifecycle v2
   8-1-accept-decline-snooze-actions: done
-  8-2-request-delivery-chips-thread-rail: ready-for-dev
+  8-2-request-delivery-chips-thread-rail: done
   8-3-fulfills-close-the-loop: ready-for-dev
   epic-8-retrospective: optional
 

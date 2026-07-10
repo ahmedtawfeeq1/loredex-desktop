@@ -164,6 +164,57 @@ export interface McpStatus {
   discoveryPath: string | null
 }
 
+/**
+ * Thread rail types (story 8.2). The m2 contract sketches HandoffCard[] here;
+ * app-local evolution: comments (`type: 'comment'`) are rail members but never
+ * board cards, so the rail carries this projection — paths vault-relative for
+ * the reader, comments with status '' and kind 'comment'.
+ */
+export interface ThreadCard {
+  id: string
+  /** vault-relative path (reader open target) */
+  path: string
+  from: string
+  to: string
+  /** handoff objective, or the comment's title */
+  objective: string
+  date: string
+  /** handoff status; comments carry none ('') */
+  status: string
+  /** request | delivery | comment */
+  kind: string
+  repliesTo?: string
+  fulfills?: string
+  expired: boolean
+}
+
+export interface ThreadReply extends ThreadCard {
+  /** rail indent: 1 = direct reply to the focused handoff */
+  depth: number
+}
+
+/** A replies_to/fulfills name that no longer resolves — diagnostic, never
+ *  auto-created, never crashing the rail (story 8.2 AC4). */
+export interface BrokenThreadRef {
+  /** id of the note carrying the dangling reference */
+  ownerId: string
+  field: 'replies_to' | 'fulfills'
+  name: string
+}
+
+export interface HandoffThread {
+  /** root … parent (transitive replies_to walk, cycle-guarded) */
+  ancestors: ThreadCard[]
+  /** depth-first rail below the focused handoff (comments included) */
+  replies: ThreadReply[]
+  /** the request this delivery fulfills, when it resolves */
+  fulfills?: ThreadCard
+  /** deliveries whose `fulfills` resolves to this request (story 8.3 badge) —
+   *  derived from the same edge model, the request's status is never written */
+  fulfilledBy: ThreadCard[]
+  broken: BrokenThreadRef[]
+}
+
 export interface WizardInput {
   mode: 'create' | 'join'
   vaultPath: string

@@ -137,6 +137,7 @@ development_status:
   # ---- M4 cycle (UI polish, DESIGN.md Addendum D1) ---------------------------
   epic-16: in-progress     # Reader & writing-surface polish per DESIGN.md Addendum D1
   16-1-reader-full-bleed-wikilinks: done        # full-bleed reader; duplicate-H1 strip; D1 wikilink colors; empty reading order fixed at writer (lib b5c3ffc, local) + renderer rust state
+  16-2-collapsible-rails: done                  # ⌘\ 56px icon rail (dots, chip→dot) + ⌘⇧\ list→0; chevrons in both pane headers; per-vault app.db persistence; 160ms ease-out
 
 qa:
   pass_date: 2026-07-10   # M2 cycle pass (fresh-eyes QA agent); previous M1 pass same date, superseded

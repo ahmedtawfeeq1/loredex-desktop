@@ -43,9 +43,11 @@ import { getMcpStatus } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
   loadIdentityProfile,
+  loadRailsCollapsed,
   loadThemeSetting,
   saveIdentityProfile,
   saveMcpPortOverride,
+  saveRailsCollapsed,
   saveThemeSetting,
 } from './settings'
 import { buildThread, collectComments } from './threads'
@@ -521,6 +523,17 @@ export function registerCoreHandlers(
       throw ipcError('INTERNAL', 'theme must be one of system, light, dark')
     }
     saveThemeSetting(theme)
+  })
+  // Collapsible rails (story 16.2, Addendum D1): per-vault UI pref, app.db
+  // only (state-placement rule). No vault/db open yet → expanded defaults.
+  ipc.register('settings.rails.get', () => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return db && vid ? loadRailsCollapsed(db, vid) : { sidebar: false, list: false }
+  })
+  ipc.register('settings.rails.set', (rails) => {
+    const { db, vid } = requireDb()
+    saveRailsCollapsed(db, vid, { sidebar: rails.sidebar === true, list: rails.list === true })
   })
   ipc.register('settings.mcpPort.set', ({ port }) => {
     if (port !== null && (!Number.isInteger(port) || port < 1024 || port > 65535)) {

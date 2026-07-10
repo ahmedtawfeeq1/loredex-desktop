@@ -132,6 +132,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   background: transparent; /* flat on --bg-app (v2: no vibrancy dependency) */
+  transition: width 160ms ease-out; /* D1 rails; reduced-motion rule kills it */
 }
 
 .sidebar-drag {
@@ -147,6 +148,7 @@ a:hover {
 }
 
 .nav-item {
+  position: relative; /* anchors the collapsed-rail badge dot (story 16.2) */
   display: block;
   width: 100%;
   text-align: left;
@@ -174,6 +176,9 @@ a:hover {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  transition:
+    width 160ms ease-out,
+    margin-right 160ms ease-out; /* D1 rails (story 16.2) */
 }
 
 .pane-list-header {
@@ -311,6 +316,112 @@ a:hover {
   text-overflow: ellipsis;
   direction: rtl; /* keep the distinguishing tail of the path visible */
   text-align: left;
+}
+
+/* ── collapsible rails (story 16.2, DESIGN.md Addendum D1) ──────────────────
+   Sidebar ⌘\ → 56px icon rail (badges become dots, vault chip → dot+tooltip);
+   file list ⌘⇧\ → 0 (reader full-bleed). 160ms ease-out on the widths — the
+   global prefers-reduced-motion rule disables it. */
+
+.sidebar-head {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 8px 2px;
+}
+
+.rail-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 6px;
+  color: var(--text-2);
+}
+
+.rail-toggle:hover {
+  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+  color: var(--text-1);
+}
+
+.sidebar.rail-collapsed {
+  width: 56px;
+}
+
+.sidebar.rail-collapsed .sidebar-head {
+  justify-content: center;
+  padding: 0 0 2px;
+}
+
+.sidebar.rail-collapsed nav {
+  padding: 0 6px;
+}
+
+.sidebar.rail-collapsed .nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px 8px 0;
+}
+
+.nav-icon {
+  display: block;
+  flex: none;
+}
+
+/* the open-count badge survives collapse as a gold dot (D1) */
+.nav-dot {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+/* collapsed vault chip: the sync dot IS the chip; tooltip keeps identity (F6) */
+.vault-chip.rail-collapsed {
+  justify-content: center;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.vault-chip.rail-collapsed .vault-chip-dot {
+  margin-top: 0;
+}
+
+.pane-list-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* collapsed list: slide to 0, swallow the flex gap, then drop out of the
+   a11y/tab order (visibility flips AFTER the 160ms slide; expanding flips it
+   back instantly via the base transition) */
+.pane-list.rail-collapsed {
+  width: 0;
+  margin-right: -12px;
+  border-width: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition:
+    width 160ms ease-out,
+    margin-right 160ms ease-out,
+    visibility 0s 160ms,
+    border-width 0s 160ms;
+}
+
+/* expand affordance while the list is away (reader pane, top-left) */
+.rail-expander {
+  position: absolute;
+  top: 10px;
+  left: 8px;
+  z-index: 5;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
 }
 
 /* ── empty states: one serif sentence + one action ─────────────────────── */

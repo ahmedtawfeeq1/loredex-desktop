@@ -9,6 +9,7 @@ import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
 import { IdentityBadge } from './components/IdentityBadge'
+import { NavIcon, RailChevron } from './components/NavIcon'
 import { ShortcutCheatsheet } from './components/ShortcutCheatsheet'
 import { SuggestToastStack } from './components/SuggestToast'
 import { ToastStack } from './components/ToastStack'
@@ -16,6 +17,7 @@ import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
 import { useHandoffs } from './stores/handoffs'
+import { useRails } from './stores/rails'
 import { useReader } from './stores/reader'
 import { useRoute } from './stores/route'
 import { useSuggests } from './stores/suggests'
@@ -55,9 +57,13 @@ export default function App(): React.JSX.Element {
   const init = useApp((s) => s.init)
   const cards = useHandoffs((s) => s.cards)
   const openInbound = openCount(cards ?? [], 'all')
+  // collapsible rails (story 16.2, Addendum D1) — per-vault, loaded with init
+  const sidebarCollapsed = useRails((s) => s.sidebar)
+  const listCollapsed = useRails((s) => s.list)
 
   useEffect(() => {
     void init()
+    void useRails.getState().load()
     // menu-driven vault change (main) → refresh identity + reset the stores
     return onVaultChanged(() => {
       useReader.getState().reset()
@@ -69,7 +75,9 @@ export default function App(): React.JSX.Element {
       useAtlas.getState().reset()
       useContracts.getState().reset()
       useSuggests.getState().reset()
+      useRails.getState().reset()
       void init()
+      void useRails.getState().load() // the NEW vault's persisted rail state
     })
   }, [init])
 
@@ -136,8 +144,23 @@ export default function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      <aside className={sidebarCollapsed ? 'sidebar rail-collapsed' : 'sidebar'}>
         <div className="sidebar-drag" />
+        {/* Addendum D1 collapsible rails (story 16.2): chevron in the pane
+            header + ⌘\ — collapsed = 56px icon rail, badges become dots */}
+        <div className="sidebar-head">
+          <button
+            type="button"
+            className="rail-toggle"
+            title={sidebarCollapsed ? 'Expand the sidebar (⌘\\)' : 'Collapse the sidebar (⌘\\)'}
+            aria-label={sidebarCollapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
+            aria-expanded={!sidebarCollapsed}
+            aria-keyshortcuts="Meta+\"
+            onClick={() => useRails.getState().toggleSidebar()}
+          >
+            <RailChevron dir={sidebarCollapsed ? 'right' : 'left'} />
+          </button>
+        </div>
         <nav aria-label="Views">
           {/* the registry's VIEW_ORDER is the nav — order, labels and ⌘1-9
               hints can never drift apart (story 15.3) */}
@@ -148,17 +171,22 @@ export default function App(): React.JSX.Element {
               className="nav-item"
               aria-current={view === v}
               title={`${label} (⌘${i + 1})`}
+              aria-label={label}
               aria-keyshortcuts={`Meta+${i + 1}`}
               onClick={() => setView(v)}
             >
-              {label}
-              {v === 'handoffs' && openInbound > 0 && (
-                <span className="nav-badge">{openInbound}</span>
-              )}
+              {sidebarCollapsed ? <NavIcon view={v} /> : label}
+              {v === 'handoffs' &&
+                openInbound > 0 &&
+                (sidebarCollapsed ? (
+                  <span className="nav-dot" title={`${openInbound} open`} />
+                ) : (
+                  <span className="nav-badge">{openInbound}</span>
+                ))}
             </button>
           ))}
         </nav>
-        {status === 'ready' && (
+        {status === 'ready' && !sidebarCollapsed && (
           <button
             type="button"
             className="button-quiet sidebar-action"
@@ -169,7 +197,7 @@ export default function App(): React.JSX.Element {
             Route a note…
           </button>
         )}
-        <IdentityBadge />
+        <IdentityBadge collapsed={sidebarCollapsed} />
       </aside>
       {status === 'ready' ? (
         view === 'home' ? (
@@ -208,6 +236,18 @@ export default function App(): React.JSX.Element {
           <>
             <VaultTree />
             <main className="pane-reader">
+              {listCollapsed && (
+                <button
+                  type="button"
+                  className="rail-toggle rail-expander"
+                  title="Expand the file list (⇧⌘\)"
+                  aria-label="Expand the file list"
+                  aria-keyshortcuts="Meta+Shift+\"
+                  onClick={() => useRails.getState().toggleList()}
+                >
+                  <RailChevron dir="right" />
+                </button>
+              )}
               <RouteDropTarget>
                 <NoteView />
                 <Diagnostics />

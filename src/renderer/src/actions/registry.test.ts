@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useApp, type AppView } from '../stores/app'
 import { useHandoffs } from '../stores/handoffs'
+import { useRails } from '../stores/rails'
 import { actionItems } from './palette-items'
 import { appActions, VIEW_ORDER } from './registry'
 
@@ -55,6 +56,26 @@ describe('the action registry (story 15.3)', () => {
     }
   })
 
+  it('D1 rails: ⌘\\ toggles the sidebar, ⌘⇧\\ the file list (story 16.2)', () => {
+    useRails.setState({ sidebar: false, list: false })
+    const actions = appActions()
+    const sidebar = actions.find((a) => a.id === 'action:toggle-sidebar')
+    expect(sidebar?.shortcut).toBe('⌘\\')
+    expect(sidebar?.combo).toEqual({ key: '\\', meta: true })
+    const list = actions.find((a) => a.id === 'action:toggle-list')
+    expect(list?.shortcut).toBe('⇧⌘\\')
+    // macOS reports the shifted character: ⌘⇧\ arrives as '|'
+    expect(list?.combo).toEqual({ key: '|', meta: true, shift: true })
+    sidebar?.run()
+    list?.run()
+    expect(useRails.getState()).toMatchObject({ sidebar: true, list: true })
+    // titles are live — the palette row says what the toggle will DO
+    expect(appActions().find((a) => a.id === 'action:toggle-sidebar')?.title).toBe(
+      'Expand the sidebar',
+    )
+    useRails.setState({ sidebar: false, list: false })
+  })
+
   it('view actions actually switch the view; ? opens the cheatsheet', () => {
     appActions()
       .find((a) => a.id === 'view:atlas')
@@ -81,6 +102,12 @@ describe('⌘K palette coverage (AC2/AC5)', () => {
       expect(item?.title).toBe(action.title)
       if (action.shortcut) expect(item?.hint).toBe(action.shortcut)
     }
+  })
+
+  it('the D1 rail toggles are palette rows with their hints (story 16.2)', () => {
+    const items = actionItems('')
+    expect(items.find((i) => i.key === 'action:toggle-sidebar')?.hint).toBe('⌘\\')
+    expect(items.find((i) => i.key === 'action:toggle-list')?.hint).toBe('⇧⌘\\')
   })
 
   it('the query filters actions by title', () => {

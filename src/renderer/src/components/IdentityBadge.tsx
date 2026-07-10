@@ -8,10 +8,19 @@ import { formatVaultIdentity, vaultName } from '../../../shared/identity'
 import { useApp } from '../stores/app'
 import { dotTone, useSync } from '../stores/sync'
 
-export function IdentityBadge(): React.JSX.Element | null {
+export function IdentityBadge({ collapsed = false }: { collapsed?: boolean }): React.JSX.Element | null {
   const identity = useApp((s) => s.identity)
   const tone = useSync((s) => dotTone(s.health))
   if (!identity) return null
+  if (collapsed) {
+    // story 16.2 (Addendum D1): on the 56px icon rail the sync dot IS the
+    // chip — the tooltip still carries the full identity (F6 stays visible)
+    return (
+      <div className="vault-chip rail-collapsed" title={formatVaultIdentity(identity)}>
+        <span className={`vault-chip-dot sync-dot-${tone}`} aria-hidden />
+      </div>
+    )
+  }
   return (
     <div className="vault-chip" title={formatVaultIdentity(identity)}>
       <span className={`vault-chip-dot sync-dot-${tone}`} aria-hidden />

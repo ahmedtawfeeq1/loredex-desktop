@@ -139,6 +139,24 @@ describe('v0.1 defects stay fixed (story 14.2)', () => {
   })
 })
 
+describe('Addendum D1: collapsible rails (story 16.2)', () => {
+  it('collapsed sidebar is the 56px icon rail; collapsed list is 0', () => {
+    expect(block('.sidebar.rail-collapsed')).toContain('width: 56px;')
+    const list = block('.pane-list.rail-collapsed')
+    expect(list).toContain('width: 0;')
+    expect(list).toContain('margin-right: -12px;') // swallows the flex gap
+  })
+  it('the slide is 160ms ease-out on both rails (reduced-motion kills it globally)', () => {
+    expect(block('.sidebar')).toContain('width 160ms ease-out')
+    // .pane-list's first css occurrence is the card-recipe group selector, so
+    // assert the pane's own transition directly
+    expect(css).toMatch(/\.pane-list \{[^}]*width 160ms ease-out/)
+  })
+  it('the badge survives collapse as a gold dot', () => {
+    expect(block('.nav-dot')).toContain('background: var(--gold);')
+  })
+})
+
 describe('Addendum D1: wikilinks are always visibly links (story 16.1)', () => {
   it('wikilink token is #8a6116 light / gold (#e0a83e) dark', () => {
     expect(block(':root')).toContain('--wikilink: #8a6116;')

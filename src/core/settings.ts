@@ -12,8 +12,8 @@ import { existsSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting, type ThemeSetting } from '../shared/theme'
-import type { Identity } from '../shared/types'
-import { getAppDb, metaGet, metaSet } from './db/index'
+import type { Identity, RailsCollapsed } from '../shared/types'
+import { appSettingGet, appSettingSet, getAppDb, metaGet, metaSet, type AppDb } from './db/index'
 
 /** In-memory fallback when no app.db is open (bare unit tests, no userData). */
 const memory = new Map<string, string>()
@@ -83,6 +83,31 @@ export function loadThemeSetting(): ThemeSetting {
 
 export function saveThemeSetting(theme: ThemeSetting): void {
   writeKey('theme', JSON.stringify(theme))
+}
+
+// ── Collapsible rails (story 16.2, Addendum D1) ─────────────────────────────
+// PER-VAULT UI pref, so it rides app_settings (vault_id-scoped), not meta.
+
+export function loadRailsCollapsed(db: AppDb, vaultId: string): RailsCollapsed {
+  const raw = appSettingGet(db, vaultId, 'rails')
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw) as { sidebar?: unknown; list?: unknown }
+      return { sidebar: parsed.sidebar === true, list: parsed.list === true }
+    } catch {
+      // malformed row — fall through to expanded
+    }
+  }
+  return { sidebar: false, list: false }
+}
+
+export function saveRailsCollapsed(db: AppDb, vaultId: string, rails: RailsCollapsed): void {
+  appSettingSet(
+    db,
+    vaultId,
+    'rails',
+    JSON.stringify({ sidebar: rails.sidebar === true, list: rails.list === true }),
+  )
 }
 
 // ── MCP host settings (story 1.6) ───────────────────────────────────────────

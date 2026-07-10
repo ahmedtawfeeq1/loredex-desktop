@@ -30,6 +30,7 @@ import type {
   McpStatus,
   PrInfo,
   ProjectRootsMap,
+  RailsCollapsed,
   RemoteCheck,
   ReplyHandoffInput,
   RoutePreview,
@@ -102,6 +103,11 @@ export interface CoreApi {
    *  state, persisted core-side (settings JSON → app.db seam, story 9.2) */
   'settings.theme.get': { in: void; out: ThemeSetting }
   'settings.theme.set': { in: { theme: ThemeSetting }; out: void }
+  /** app-local contract evolution (story 16.2, Addendum D1): collapsible-rail
+   *  state — PER-VAULT UI pref in app.db (never the vault); get degrades to
+   *  expanded while no vault/db is open. */
+  'settings.rails.get': { in: void; out: RailsCollapsed }
+  'settings.rails.set': { in: RailsCollapsed; out: void }
   /** Story 7.4: read-only plan (lib previewRoute) for the confirm card; the
    *  in-shape gained mode/projectName over the v1 sketch (app-local evolution). */
   'route.preview': {

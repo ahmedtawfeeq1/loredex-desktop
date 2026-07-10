@@ -10,6 +10,7 @@
  */
 import { useApp, type AppView } from '../stores/app'
 import { useHandoffs } from '../stores/handoffs'
+import { useRails } from '../stores/rails'
 import { useRoute } from '../stores/route'
 import { useSearch } from '../stores/search'
 import { useSync } from '../stores/sync'
@@ -81,6 +82,24 @@ export function appActions(): AppAction[] {
       shortcut: '⇧⌘S',
       combo: { key: 's', meta: true, shift: true },
       run: () => void useSync.getState().syncNow(),
+    },
+    {
+      // Addendum D1 collapsible rails (story 16.2): ⌘\ sidebar, ⌘⇧\ list.
+      // Titles are live — the palette row says what the toggle will DO.
+      id: 'action:toggle-sidebar',
+      title: useRails.getState().sidebar ? 'Expand the sidebar' : 'Collapse the sidebar',
+      shortcut: '⌘\\',
+      combo: { key: '\\', meta: true },
+      run: () => useRails.getState().toggleSidebar(),
+    },
+    {
+      // macOS reports the SHIFTED character: ⌘⇧\ arrives as key '|' (same
+      // US-layout convention as the bare '?' row below)
+      id: 'action:toggle-list',
+      title: useRails.getState().list ? 'Expand the file list' : 'Collapse the file list',
+      shortcut: '⇧⌘\\',
+      combo: { key: '|', meta: true, shift: true },
+      run: () => useRails.getState().toggleList(),
     },
     {
       id: 'action:shortcuts',

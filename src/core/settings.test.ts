@@ -3,12 +3,14 @@ import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { initAppDb } from './db/index'
+import { appSettingSet, initAppDb, type AppDb } from './db/index'
 import {
   initSettings,
   loadIdentityProfile,
+  loadRailsCollapsed,
   loadThemeSetting,
   saveIdentityProfile,
+  saveRailsCollapsed,
   saveThemeSetting,
 } from './settings'
 
@@ -39,6 +41,42 @@ describe('theme setting persistence', () => {
     saveThemeSetting('dark')
     expect(loadThemeSetting()).toBe('dark')
     expect(loadIdentityProfile()?.name).toBe('Kai Ora')
+  })
+})
+
+describe('collapsible rails persistence — PER VAULT (story 16.2, Addendum D1)', () => {
+  const openDb = (): AppDb => {
+    const db = initAppDb(mkdtempSync(join(tmpdir(), 'loredex-rails-')))
+    expect(db).not.toBeNull()
+    return db as AppDb
+  }
+
+  it('defaults to expanded when nothing is stored', () => {
+    expect(loadRailsCollapsed(openDb(), 'vault-a')).toEqual({ sidebar: false, list: false })
+  })
+
+  it('round-trips both flags', () => {
+    const db = openDb()
+    saveRailsCollapsed(db, 'vault-a', { sidebar: true, list: true })
+    expect(loadRailsCollapsed(db, 'vault-a')).toEqual({ sidebar: true, list: true })
+    saveRailsCollapsed(db, 'vault-a', { sidebar: false, list: true })
+    expect(loadRailsCollapsed(db, 'vault-a')).toEqual({ sidebar: false, list: true })
+  })
+
+  it('vaults never clobber each other — the state is keyed by vault id', () => {
+    const db = openDb()
+    saveRailsCollapsed(db, 'vault-a', { sidebar: true, list: false })
+    saveRailsCollapsed(db, 'vault-b', { sidebar: false, list: true })
+    expect(loadRailsCollapsed(db, 'vault-a')).toEqual({ sidebar: true, list: false })
+    expect(loadRailsCollapsed(db, 'vault-b')).toEqual({ sidebar: false, list: true })
+  })
+
+  it('malformed or non-boolean rows degrade to expanded, never throw', () => {
+    const db = openDb()
+    appSettingSet(db, 'vault-a', 'rails', 'not json {')
+    expect(loadRailsCollapsed(db, 'vault-a')).toEqual({ sidebar: false, list: false })
+    appSettingSet(db, 'vault-a', 'rails', JSON.stringify({ sidebar: 'yes', list: 1 }))
+    expect(loadRailsCollapsed(db, 'vault-a')).toEqual({ sidebar: false, list: false })
   })
 })
 

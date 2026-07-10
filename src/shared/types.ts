@@ -494,3 +494,13 @@ export interface WizardFailureDetail {
   /** raw git stderr/stdout for the details expander — never the headline */
   gitOutput?: string
 }
+
+// ── Collapsible rails (story 16.2, DESIGN.md Addendum D1) ───────────────────
+
+/** Per-vault pane collapse state — UI pref, app.db only (never the vault). */
+export interface RailsCollapsed {
+  /** nav sidebar collapsed to the 56px icon rail */
+  sidebar: boolean
+  /** file-list pane collapsed to 0 (reader full-bleed) */
+  list: boolean
+}

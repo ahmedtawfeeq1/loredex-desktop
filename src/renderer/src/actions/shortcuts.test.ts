@@ -13,6 +13,9 @@ const actions: AppAction[] = [
   { id: 'action:route-note', title: 'Route…', combo: { key: 'r', meta: true, shift: true }, run: noop },
   { id: 'action:shortcuts', title: 'Shortcuts…', combo: { key: '?' }, run: noop },
   { id: 'action:palette', title: 'Palette', combo: { key: 'k', meta: true }, always: true, run: noop },
+  // D1 rails (story 16.2) — the real registry combos, stroke-verified below
+  { id: 'action:toggle-sidebar', title: 'Sidebar', combo: { key: '\\', meta: true }, run: noop },
+  { id: 'action:toggle-list', title: 'List', combo: { key: '|', meta: true, shift: true }, run: noop },
 ]
 
 const stroke = (over: Partial<KeyStroke>): KeyStroke => ({
@@ -63,6 +66,21 @@ describe('matchShortcut', () => {
     expect(matchShortcut(stroke({ key: 'k', metaKey: true }), actions, overlay)?.id).toBe(
       'action:palette',
     )
+  })
+
+  it('D1 rails (story 16.2): ⌘\\ hits the sidebar; ⌘⇧\\ arrives as | and hits the list', () => {
+    expect(matchShortcut(stroke({ key: '\\', metaKey: true }), actions, calm)?.id).toBe(
+      'action:toggle-sidebar',
+    )
+    // macOS reports the SHIFTED character for the chord
+    expect(
+      matchShortcut(stroke({ key: '|', metaKey: true, shiftKey: true }), actions, calm)?.id,
+    ).toBe('action:toggle-list')
+    // and neither fires bare (no ⌘) or while an overlay owns the keys
+    expect(matchShortcut(stroke({ key: '\\' }), actions, calm)).toBeNull()
+    expect(
+      matchShortcut(stroke({ key: '\\', metaKey: true }), actions, { ...calm, overlayOpen: true }),
+    ).toBeNull()
   })
 
   it('⌥ chords and unbound keys match nothing', () => {

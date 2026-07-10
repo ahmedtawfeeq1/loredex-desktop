@@ -145,3 +145,35 @@ Migration: existing `type: handoff` notes that were really conversational replie
 - Momentum/inertia not required; smoothness via CSS transform transitions ≤120ms, disabled under reduced-motion.
 
 **Header breathing room.** The atlas toolbar content currently touches the container edges. Fix: the atlas view container gets the standard card treatment (inset from the window ground with 16px gap like every other view), and the 44px toolbar row gets 16px horizontal padding + 12px vertical so the VAULT ATLAS eyebrow, segmented zoom control, breadcrumb, and action pills never kiss the border. Toolbar actions keep 8px inter-group gaps; a hairline divider sits below the toolbar, not at the very top edge. Same inset applies to the canvas region below.
+
+### D1 amendment 7 — v1 completion pass (user, 2026-07-11)
+
+Five workstreams that complete v1. Each is a binding spec for its agent.
+
+#### A. Solution-grade Home dashboard (redesign, epic21)
+The current KPI-row dashboard is too flat for a team knowledge/handoff product. Rebuild as a real operations dashboard, still full-width, DESIGN v2 cards, live-recompute, zero new backend (dashboard.build / handoffs.list / activity.feed / contracts.timeline / sync.status / atlas blocked model):
+- **Hero band**: 3–4 headline stat tiles WITH context — open inbound + WoW trend arrow, oldest-open age with the route, requests-waiting, contract changes (7d) — each tile clickable into the owning view.
+- **Attention column** (left, 2/3): the ranked actionable-handoff list (open/accepted/snoozed, oldest-first) with inline Consume/Snooze, and the Blocked/critical-path card beneath.
+- **Insight column** (right, 1/3): per-project pulse (note count, last activity, open in/out, brief-stale chip — as compact rows/bars), a 14-day activity sparkline (SVG, 14 bars by day, kind-tinted), contract-churn-by-file mini list, sync health mini.
+- **Velocity strip**: handoffs created vs consumed over 7d (tiny paired bars), "N handed off · M consumed · K still open".
+- Empty/degraded states per amendment (fresh vault, no remote, no contract roots hides that section). One gold primary max. No dead space — the right column fills the height.
+
+#### B. Powerful search (upgrade, epic22)
+Both the Search view and ⌘K palette. Beyond substring:
+- **Query operators** parsed client-side: `project:`, `topic:`, `type:`, `status:`, `tag:`, `from:`/`to:` (handoffs), `before:`/`after:`/`on:` (date), bare terms = full-text. Chips render parsed filters; a filter-builder row mirrors them (the existing facet selects stay, now synced to the query).
+- **Ranked results** with humanized title, project tint dot, matched-term-highlighted snippet, type/status/date meta, keyboard up/down/enter, result-count. Group-by-project toggle.
+- **Recent searches** (localStorage, last 8) + one-click re-run; **saved searches** optional (localStorage) shown as quick chips.
+- Search runs over vault.search (bodies) + frontmatter facets; operators narrow deterministically before ranking. ⌘K shows top 5 with "see all in Search →".
+
+#### C. Notion/Obsidian-style properties panel (epic20)
+Replace the flat frontmatter key/value table in the reader with a real **Properties** panel:
+- Each property is a typed row: icon + name + typed value control. Infer type from key/value — date (date picker display), tags (chip list), select/enum (status/type/kind → colored chip), url/path (link), text (default). loredex-managed fields (`loredex`, `source_path`, `source_project`, `source_rel`) render but are LOCKED (lock glyph, tooltip "managed by loredex") — never user-edited (agents own them, design principle intact).
+- **Editable** user fields (tags, custom text/date/select): inline edit → writes back frontmatter via a new core channel `note.setFrontmatter` (body untouched, git auto-commit "set property <key> on <note>", path-guarded, schema-preserving via lib serializeDoc). Add-property affordance ("+ Add property") with a small type picker. Remove property (× on the row) for user fields only.
+- Collapsible ("Properties ▸ N"), collapsed by default on long notes, expanded on short. Dense, mono values, DESIGN v2.
+- Tags become clickable → run a `tag:` search. This is the metadata upgrade the user asked for.
+
+#### D. Vault switcher + multi-window (epic23)
+The bottom-left vault identity chip becomes a **vault menu**: click (or a ▾ affordance above it) opens a popover — list of recently-opened vaults (persisted, app-wide), "Open vault…" (folder picker → switch in place), "Open in new window" (Electron new BrowserWindow on a chosen/last vault), "Create or join…" (existing wizards). Multi-window: main process supports N windows each bound to its own vault (per-window core host + vault path); the chip shows the current window's vault. Recent-vaults list in localStorage/app-db.
+
+#### E. Routing safety (Epic 4 — build the ready-for-dev stories)
+Complete the F4 gap using the existing epic4 story files (4-1…4-4) + lib PR-3 (route receipts/undo already partly in lib — verify): route produces a **receipt** (what filed where) with **Undo** (toast + reversible), **dedup** guard (warn/skip when the same source is already routed), **filing-scope control** (preview + untick before routing; "internal, never route" globs), and **drift badges + one-click reroute** when a routed source changed. Wire into the existing Route-a-note flow and the reader.

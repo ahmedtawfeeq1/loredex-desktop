@@ -301,6 +301,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* comfortable inset so the page/launcher never touches the container edge */
+  padding: 8px 24px 0;
 }
 
 /* ── Atlas reframe WP3: Deep Dive self-explains ────────────────────────────────
@@ -376,13 +378,17 @@
 }
 
 .atlas-launcher {
-  padding: 4px 4px 32px;
+  padding: 4px 0 32px;
   max-width: 1100px;
+  margin: 0 auto;
 }
 
-.atlas-launcher-grid {
+.atlas-launcher .atlas-launcher-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  /* auto-fit (not auto-fill): a few projects stretch to fill the row instead
+     of clinging to the left as a thin column with dead canvas beside them.
+     Scoped under .atlas-launcher to win over ops-health-grid-wide's auto-fill. */
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 10px;
 }
 
@@ -394,8 +400,9 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1100px;
-  padding: 4px 4px 32px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 4px 0 32px;
 }
 
 /* header — serif project name + mono counts + freshness + last activity */

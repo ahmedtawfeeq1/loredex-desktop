@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import type { SearchHit } from '../../../../shared/ipc-contract'
+import { BrandMark } from '../../components/BrandMark'
 import { humanizeTitle } from '../../humanize'
 import { openSearchResult, useSearch } from '../../stores/search'
 import { sectionTint } from '../reader/sectionTint'
@@ -167,6 +168,75 @@ function QuickChips(): React.JSX.Element | null {
   )
 }
 
+/** The operator vocabulary, shown as a compact legend on the idle state. */
+const OPERATORS: [string, string][] = [
+  ['project', 'scope to a project'],
+  ['type', 'note · handoff · brief'],
+  ['status', 'open · active · consumed'],
+  ['from', 'handoff sender'],
+  ['to', 'handoff recipient'],
+  ['before', 'dated before'],
+  ['after', 'dated after'],
+  ['tag', 'a frontmatter tag'],
+]
+
+/** Example queries seeded from THIS vault's real facet values, so the idle
+ *  state teaches the operators the placeholder hints at — and each one runs. */
+function buildExamples(values: ReturnType<typeof useSearch.getState>['values']): string[] {
+  const ex: string[] = []
+  const proj = values?.projects?.[0]
+  if (proj) ex.push(`project:${proj}`)
+  if (values?.types?.includes('handoff')) ex.push('type:handoff status:open')
+  const topic = values?.topics?.[0]
+  if (topic) ex.push(`topic:${topic}`)
+  if (proj && values?.projects?.[1]) ex.push(`from:${values.projects[1]} to:${proj}`)
+  return ex.slice(0, 4)
+}
+
+/** Idle state (no query yet): brand icon, lede, runnable examples, operator
+ *  legend, then recent/saved chips — the Reader empty-state pattern, richer. */
+function IdleEmpty(): React.JSX.Element {
+  const values = useSearch((s) => s.values)
+  const setQuery = useSearch((s) => s.setQuery)
+  const examples = buildExamples(values)
+  return (
+    <div className="search-idle">
+      <div className="empty-state search-empty">
+        <div className="empty-state-icon">
+          <BrandMark size={40} />
+        </div>
+        <p>Search everything in the vault.</p>
+        <span className="empty-state-hint">
+          Notes, briefs, and handoffs — combine operators and facets, no grep required.
+        </span>
+        {examples.length > 0 && (
+          <div className="search-examples" aria-label="Example searches">
+            {examples.map((ex) => (
+              <button
+                key={ex}
+                type="button"
+                className="search-example"
+                onClick={() => setQuery(ex)}
+              >
+                {ex}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="search-operators" aria-label="Search operators">
+          {OPERATORS.map(([key, desc]) => (
+            <span key={key} className="search-op">
+              <code>{key}:</code>
+              <span>{desc}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+      <QuickChips />
+    </div>
+  )
+}
+
 export function SearchView(): React.JSX.Element {
   const q = useSearch((s) => s.q)
   const parsed = useSearch((s) => s.parsed)
@@ -295,15 +365,16 @@ export function SearchView(): React.JSX.Element {
       </div>
       {error && <div className="note-error">{error}</div>}
       {hits === null ? (
-        <div className="search-idle">
-          <div className="empty-state" style={{ border: 'none' }}>
-            <p>Ask the vault anything — operators, facets, no grep required.</p>
-          </div>
-          <QuickChips />
-        </div>
+        <IdleEmpty />
       ) : hits.length === 0 && !searching ? (
-        <div className="empty-state" style={{ border: 'none' }}>
+        <div className="empty-state search-empty">
+          <div className="empty-state-icon">
+            <BrandMark size={40} />
+          </div>
           <p>No notes match this search.</p>
+          <span className="empty-state-hint">
+            Loosen a facet, drop an operator, or check the spelling.
+          </span>
         </div>
       ) : (
         <div className="search-results" role="listbox" aria-label="Search results">

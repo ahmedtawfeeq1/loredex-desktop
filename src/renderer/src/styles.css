@@ -2493,9 +2493,84 @@ a:hover {
 }
 
 .search-idle {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* idle/no-match empty state — the Reader empty-state pattern, richer. The
+   brand icon + lede center in the pane; examples + operator legend cluster
+   under them so the blank page teaches instead of just waiting. */
+.search-empty {
+  gap: 12px;
+  padding: 24px;
+}
+
+.search-empty .empty-state-hint {
+  max-width: 440px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.search-examples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.search-example {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 4px 12px;
+  transition:
+    border-color 100ms ease-out,
+    color 100ms ease-out;
+}
+
+.search-example:hover {
+  /* gold border only — text stays --text-1 so it reads in both themes
+     (--gold-ink is dark ink for gold FILLS, unreadable on a dark chip) */
+  border-color: var(--gold);
+  color: var(--text-1);
+  background: color-mix(in srgb, var(--gold) 10%, var(--bg-inset));
+}
+
+.search-operators {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  max-width: 560px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+
+.search-op {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.search-op code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  /* neutral key chip — readable on both themes (no gold-ink on dark) */
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 1px 5px;
 }
 
 .search-quick {

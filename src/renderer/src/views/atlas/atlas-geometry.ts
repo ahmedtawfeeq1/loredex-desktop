@@ -20,6 +20,7 @@ import {
 // shared/atlas-layout — re-exported here so the canvas keeps one geometry
 // import (panelRect moved shared in story 16.5 for the drilled invariants)
 export {
+  badgeRect,
   chipRect,
   laneOffsets,
   nodeRect,
@@ -28,6 +29,7 @@ export {
   panelRect,
   type Rect,
   rectsOverlap,
+  resolveChipCollisions,
 } from '../../../../shared/atlas-layout'
 
 export interface ViewBox {

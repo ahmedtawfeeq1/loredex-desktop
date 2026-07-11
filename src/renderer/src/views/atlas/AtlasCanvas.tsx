@@ -35,6 +35,7 @@ import { type TopicAtom, visiblePanels } from './atlas-visibility'
 import { type AtlasDecor, edgeDecorClass, nodeDecorClass } from './decor'
 import { TopicGroup } from './TopicGroup'
 import {
+  badgeRect,
   fitViewBox,
   fitViewBoxAround,
   type FocusTarget,
@@ -44,6 +45,7 @@ import {
   orthoRoute,
   panViewBox,
   type Rect,
+  resolveChipCollisions,
   routeBadge,
   traversalOrder,
   type ViewBox,
@@ -97,11 +99,12 @@ function OrthoEdge({
   decorClass = '',
   hot,
   openThread,
+  badgeShift,
 }: {
   edge: AtlasEdge
   a: Rect
   b: Rect
-  /** parallel-lane offset (±12px per lane between the same pair) */
+  /** parallel-lane offset (±LANE_STEP per lane between the same pair) */
   off: number
   onActivateEdge: (edge: AtlasEdge, nearerEnd: 'source' | 'target') => void
   /** path gold / focus fade (views/atlas/decor.ts, story 10.6) */
@@ -110,6 +113,8 @@ function OrthoEdge({
   hot?: boolean
   /** thread edge whose thread is still open — draws gold (D1 amendment 3) */
   openThread?: boolean
+  /** global chip de-collision nudge for this edge's badge (WP1) */
+  badgeShift?: { dx: number; dy: number }
 }): React.JSX.Element {
   // aggregated route chips need the full gutter channel; quiet in-panel
   // edges (thread rails, wikilinks) stay inside the 40px column gaps
@@ -156,16 +161,25 @@ function OrthoEdge({
                 : edge.category}
         </title>
       </path>
-      {aggregated && (
-        <g
-          className={`atlas-edge-badge${(edge.openCount ?? 0) > 0 ? ' atlas-edge-badge-open' : ''}`}
-        >
-          <rect x={label.x - 56} y={label.y - 9} width={112} height={18} rx={9} />
-          <text x={label.x} y={label.y + 3.5} textAnchor="middle">
-            {routeBadge(edge.openCount, edge.totalCount)}
-          </text>
-        </g>
-      )}
+      {aggregated &&
+        (() => {
+          // pill sized to its text (long "N open / M total" never spills) and
+          // nudged by the global de-collision pass so chips never stack (WP1)
+          const text = routeBadge(edge.openCount, edge.totalCount)
+          const br = badgeRect(label, text)
+          const shift = badgeShift ?? { dx: 0, dy: 0 }
+          return (
+            <g
+              className={`atlas-edge-badge${(edge.openCount ?? 0) > 0 ? ' atlas-edge-badge-open' : ''}`}
+              transform={`translate(${shift.dx} ${shift.dy})`}
+            >
+              <rect x={br.x} y={br.y} width={br.w} height={br.h} rx={9} />
+              <text x={label.x} y={label.y + 3.5} textAnchor="middle">
+                {text}
+              </text>
+            </g>
+          )
+        })()}
     </g>
   )
 }
@@ -390,8 +404,26 @@ export function AtlasCanvas({
     [hoverId, graph.edges],
   )
 
-  // parallel edges between the same pair fan out ±12px per lane
+  // parallel edges between the same pair fan out ±LANE_STEP per lane
   const lanes = useMemo(() => laneOffsets(graph.edges), [graph.edges])
+
+  // global chip de-collision (WP1): after every aggregated edge's badge is
+  // placed by orthoRoute, sweep the (text-sized) pills and nudge any that still
+  // overlap along their channel — the per-edge {dx,dy} the renderer applies to
+  // the badge group transform, so no two "N open / M total" chips ever stack.
+  const badgeShifts = useMemo(() => {
+    const chips: Array<{ id: string; rect: Rect }> = []
+    for (const edge of graph.edges) {
+      if (edge.totalCount === undefined) continue
+      const a = byId.get(edge.source)
+      const b = byId.get(edge.target)
+      if (!a || !b) continue
+      const stub = edge.category === 'route' ? GUTTER / 2 : 20
+      const { label } = orthoRoute(nodeRect(a, level), nodeRect(b, level), lanes.get(edge.id) ?? 0, stub)
+      chips.push({ id: edge.id, rect: badgeRect(label, routeBadge(edge.openCount, edge.totalCount)) })
+    }
+    return resolveChipCollisions(chips)
+  }, [graph.edges, byId, lanes, level])
 
   // D1 amendment 5 — trackpad gestures. A NATIVE, non-passive wheel listener so
   // preventDefault actually holds (React's synthetic wheel is passive): pinch
@@ -573,6 +605,7 @@ export function AtlasCanvas({
                 b={nodeRect(b, level)}
                 off={lanes.get(edge.id) ?? 0}
                 onActivateEdge={onActivateEdge}
+                badgeShift={badgeShifts.get(edge.id)}
                 openThread={openThreadEdges.has(edge.id)}
                 decorClass={`${edgeDecorClass(edge, decor)}${
                   hoverHood && !(hoverHood.has(edge.source) && hoverHood.has(edge.target))

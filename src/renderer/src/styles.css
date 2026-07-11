@@ -2915,8 +2915,25 @@ a:hover {
 
 .modal-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-top: 4px;
+}
+
+/* D1 amendment 8: why the submit is blocked, always visible — pushed left so
+   Cancel + primary stay grouped on the right */
+.modal-block-reason {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--rust);
+  max-width: 60%;
+  line-height: 1.35;
+}
+
+.modal-required {
+  color: var(--rust);
+  margin-left: 3px;
 }
 
 /* note scope picker (story 7.2): selection order = Reading order */

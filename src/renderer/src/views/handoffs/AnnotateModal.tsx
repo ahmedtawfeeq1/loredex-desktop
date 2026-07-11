@@ -57,6 +57,17 @@ export function AnnotateModal(): React.JSX.Element | null {
       onSubmit={() => void submit()}
       submitLabel={busy ? 'Adding…' : 'Comment'}
       submitDisabled={!identity || busy || !title.trim() || !body.trim()}
+      submitBlockedReason={
+        busy
+          ? null
+          : !identity
+            ? 'Set your identity in Settings first.'
+            : !title.trim()
+              ? 'Add a short title for the comment.'
+              : !body.trim()
+                ? 'Write the comment body.'
+                : null
+      }
     >
       <div className="modal-row">
         <span className="modal-label">Title</span>

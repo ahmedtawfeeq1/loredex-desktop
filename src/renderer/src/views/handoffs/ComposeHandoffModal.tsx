@@ -160,6 +160,9 @@ function ComposeForm({
       onSubmit={() => void submit()}
       submitLabel={busy ? 'Publishing…' : 'Publish'}
       submitDisabled={problem !== null || !identity || busy}
+      submitBlockedReason={
+        busy ? null : (problem ?? (!identity ? 'Set your identity in Settings first.' : null))
+      }
     >
       {replyTo && (
         <>

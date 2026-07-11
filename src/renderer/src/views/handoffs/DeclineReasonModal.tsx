@@ -22,6 +22,7 @@ function DeclineForm({ card }: { card: HandoffCard }): React.JSX.Element {
       }}
       submitLabel="Decline"
       submitDisabled={!trimmed}
+      submitBlockedReason={!trimmed ? "Write a reason so the sender knows why." : null}
       destructive
     >
       <p className="modal-banner">

@@ -223,3 +223,15 @@ Full-width Home view rebuild. DESIGN v2 tokens; dark = navy ground #131826, card
 
 ## Delivery (epic25, supersedes epic21)
 Rebuild HomeView + insights.ts (extend with velocity buckets, backlog series, on-track %, attention-queue assembly, per-project health, relations). New pure chart modules (src/renderer/src/views/home/charts/*.ts) with unit tests against nimbus-vault ground truth. Append this as "### D1 amendment 9" to docs/DESIGN.md. Story epic25.story1. Full gate green (--no-file-parallelism), commit + confirm HEAD, no push.
+# D1 amendment 8 — form validation feedback (user, 2026-07-11)
+
+Pressing a submit button that does nothing (silently disabled, or no-op on empty required fields) is a dead end — the user must always know WHY and WHAT is required. Apply consistently across EVERY modal/form in the app.
+
+- **Required fields are marked**: an asterisk or "required" affordance on the label of every required field.
+- **On submit attempt with missing/invalid required fields**: do NOT silently no-op. Show inline field-level error text (rust, below/beside the field) + a rust border on the invalid control, focus the FIRST invalid field, and (if a summary helps) a one-line "Fill the required fields" note near the submit button.
+- **Disabled submit must explain itself**: if the submit button is disabled because of missing input, it carries a tooltip ("Add an objective to publish") AND the required fields show their hint — the user never faces a disabled button with no reason. Preferred pattern: keep submit ENABLED and validate on click (showing errors) rather than a silent-disabled button, so there is always feedback.
+- **Live clearing**: an error clears as soon as the field becomes valid (on input/blur).
+- Scope — audit and fix every form: compose/Hand back (Objective required for a delivery/request), decline-reason (reason required), snooze (date required), create/join wizards (folder + URL required per step), settings identity (name/email), add-property (key required), route filing-scope, and any others found. A shared `useFormValidation`/`FieldError` helper + consistent CSS so all forms behave identically.
+- DESIGN v2: rust `--rust` for errors, 12px, respects reduced-motion (no shake unless subtle), keyboard-accessible (aria-invalid, aria-describedby on the field → error).
+
+Concrete example from the user: the "Hand back" modal Publish with an empty Objective currently gives no feedback — after this, clicking Publish highlights Objective as required, focuses it, and shows "Add an objective the other team can act on."

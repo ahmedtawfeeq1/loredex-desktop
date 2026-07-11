@@ -136,9 +136,19 @@ export function CreateVaultWizard(): React.JSX.Element | null {
   const identityReady = useIdentity((s) => s.profile !== null)
   if (flow !== 'create') return null
 
+  const formReason = !dir
+    ? 'Choose a folder for the new vault.'
+    : !identityReady
+      ? 'Set your identity in Settings first.'
+      : null
   const submit =
     phase === 'form'
-      ? { label: 'Create vault', disabled: !dir || !identityReady, act: () => void runCreate() }
+      ? {
+          label: 'Create vault',
+          disabled: !dir || !identityReady,
+          reason: formReason,
+          act: () => void runCreate(),
+        }
       : phase === 'running'
         ? { label: 'Creating…', disabled: true, act: () => {} }
         : phase === 'done'
@@ -162,6 +172,7 @@ export function CreateVaultWizard(): React.JSX.Element | null {
       onSubmit={submit.act}
       submitLabel={submit.label}
       submitDisabled={submit.disabled}
+      submitBlockedReason={'reason' in submit ? submit.reason : null}
     >
       {phase === 'form' ? (
         <CreateForm />

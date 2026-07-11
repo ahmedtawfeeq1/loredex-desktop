@@ -86,6 +86,7 @@ function LinkRequestForm({ delivery }: { delivery: HandoffCard }): React.JSX.Ele
       }}
       submitLabel="Compose the link"
       submitDisabled={!request}
+      submitBlockedReason={!request ? "Pick the request this delivery fulfills." : null}
     >
       <p className="modal-banner">
         “{delivery.objective || delivery.id}”

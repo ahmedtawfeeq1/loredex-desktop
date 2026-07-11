@@ -24,6 +24,7 @@ function SnoozeForm({ card }: { card: HandoffCard }): React.JSX.Element {
       }}
       submitLabel="Snooze"
       submitDisabled={problem !== null}
+      submitBlockedReason={problem}
     >
       <p className="modal-banner">
         “{card.objective || card.id}”

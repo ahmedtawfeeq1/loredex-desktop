@@ -11,6 +11,7 @@ export function Modal({
   onSubmit,
   submitLabel,
   submitDisabled,
+  submitBlockedReason,
   destructive,
   children,
 }: {
@@ -19,10 +20,15 @@ export function Modal({
   onSubmit: () => void
   submitLabel: string
   submitDisabled?: boolean
+  /** D1 amendment 8: WHY submit is blocked — no silent dead buttons. Rendered as
+   *  a rust hint by the footer and as the disabled button's tooltip. Forms that
+   *  already compute a problem string pass it here instead of discarding it. */
+  submitBlockedReason?: string | null
   /** story 8.1 (decline): the confirm renders as a rust outline, not gold */
   destructive?: boolean
   children: React.ReactNode
 }): React.JSX.Element {
+  const blocked = Boolean(submitDisabled && submitBlockedReason)
   const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,6 +63,13 @@ export function Modal({
         <h2 className="modal-title">{title}</h2>
         {children}
         <div className="modal-footer">
+          {/* D1 amendment 8: the reason a submit is blocked is always visible —
+              never a dead button with no explanation. */}
+          {blocked && (
+            <span className="modal-block-reason" role="status">
+              {submitBlockedReason}
+            </span>
+          )}
           <button type="button" className="button-secondary" onClick={onClose}>
             Cancel
           </button>
@@ -64,7 +77,8 @@ export function Modal({
             type="button"
             className={destructive ? 'button-destructive' : 'button-primary'}
             disabled={submitDisabled}
-            title={`${submitLabel} (⌘⏎)`}
+            title={blocked ? (submitBlockedReason ?? undefined) : `${submitLabel} (⌘⏎)`}
+            aria-describedby={blocked ? 'modal-block-reason' : undefined}
             onClick={onSubmit}
           >
             {submitLabel}

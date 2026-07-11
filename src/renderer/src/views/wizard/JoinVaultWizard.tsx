@@ -120,9 +120,19 @@ export function JoinVaultWizard(): React.JSX.Element | null {
   const openVault = useWizard((s) => s.openVault)
   if (flow !== 'join') return null
 
+  const formReason = !joinUrl.trim()
+    ? 'Paste the vault repository URL to clone.'
+    : !dest
+      ? 'Choose where to clone the vault.'
+      : null
   const submit =
     phase === 'form'
-      ? { label: 'Join vault', disabled: !joinUrl.trim() || !dest, act: () => void runJoin() }
+      ? {
+          label: 'Join vault',
+          disabled: !joinUrl.trim() || !dest,
+          reason: formReason,
+          act: () => void runJoin(),
+        }
       : phase === 'running'
         ? { label: 'Joining…', disabled: true, act: () => {} }
         : phase === 'done'
@@ -142,6 +152,7 @@ export function JoinVaultWizard(): React.JSX.Element | null {
       onSubmit={submit.act}
       submitLabel={submit.label}
       submitDisabled={submit.disabled}
+      submitBlockedReason={'reason' in submit ? submit.reason : null}
     >
       {phase === 'form' ? (
         <JoinForm />

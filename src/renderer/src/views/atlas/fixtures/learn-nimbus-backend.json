@@ -1,0 +1,484 @@
+{
+  "level": "learn",
+  "scope": {
+    "project": "nimbus-backend"
+  },
+  "nodes": [
+    {
+      "id": "handoff:nimbus-backend/2026-07-09-handoff-nimbus-ai-engine",
+      "type": "handoff",
+      "label": "2026-07-09-handoff-nimbus-ai-engine",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-09",
+      "x": 1648,
+      "y": 302,
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-ai-engine.md",
+      "summary": "Expose streaming replies over the public API (SSE) and update the API contract accordingly",
+      "status": "consumed",
+      "kind": "delivery",
+      "from": "nimbus-ai-engine",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-09-handoff-nimbus-ai-engine-2",
+      "type": "handoff",
+      "label": "2026-07-09-handoff-nimbus-ai-engine-2",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-09",
+      "x": 1648,
+      "y": 446,
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-ai-engine-2.md",
+      "summary": "Expose agent-config v2 fields (tone, escalation_rules) through the agents API + contract",
+      "status": "consumed",
+      "kind": "delivery",
+      "from": "nimbus-ai-engine",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-09-handoff-nimbus-mobile",
+      "type": "handoff",
+      "label": "2026-07-09-handoff-nimbus-mobile",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-09",
+      "x": 1648,
+      "y": 590,
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-handoff-nimbus-mobile.md",
+      "summary": "Answer mobile's open questions on the WhatsApp escalation push: FCM payload contract, device-token registration endpoint, feed transport decision, and the per-channel setup checklist — expected to land as openapi.yaml updates",
+      "status": "consumed",
+      "kind": "delivery",
+      "from": "nimbus-mobile",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-10-handoff-nimbus-ai-engine",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-ai-engine",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 1168,
+      "y": 446,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-ai-engine.md",
+      "summary": "wire the streaming endpoints into the API gateway",
+      "status": "accepted",
+      "kind": "request",
+      "from": "nimbus-ai-engine",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-10-handoff-nimbus-ai-engine-2",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-ai-engine-2",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 1168,
+      "y": 590,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-ai-engine-2.md",
+      "summary": "v2-stamped open handoff for CLI back-compat check",
+      "status": "open",
+      "kind": "delivery",
+      "from": "nimbus-ai-engine",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-10-handoff-nimbus-frontend",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-frontend",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 1168,
+      "y": 734,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend.md",
+      "summary": "Status panel delivered — SSE contract confirmed",
+      "status": "open",
+      "kind": "delivery",
+      "from": "nimbus-frontend",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-10-handoff-nimbus-frontend-2",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-frontend-2",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 1408,
+      "y": 158,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-2.md",
+      "summary": "Status panel delivered — SSE contract confirmed",
+      "status": "open",
+      "kind": "delivery",
+      "from": "nimbus-frontend",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-10-handoff-nimbus-frontend-3",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-frontend-3",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 1408,
+      "y": 302,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-3.md",
+      "summary": "Epic 8 DoD walk: expose the retry budget in the status API",
+      "status": "consumed",
+      "kind": "request",
+      "from": "nimbus-frontend",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-10-handoff-nimbus-frontend-4",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-frontend-4",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 1408,
+      "y": 446,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-frontend-4.md",
+      "summary": "Epic 8 DoD walk: expose the retry budget in the status API",
+      "status": "consumed",
+      "kind": "request",
+      "from": "nimbus-frontend",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-10-handoff-nimbus-mobile",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-mobile",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 1408,
+      "y": 590,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-mobile.md",
+      "summary": "Epic 8 DoD: need paginated sync deltas for offline mode",
+      "status": "open",
+      "kind": "request",
+      "from": "nimbus-mobile",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-backend/2026-07-10-handoff-nimbus-mobile-2",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-mobile-2",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 1408,
+      "y": 734,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-handoff-nimbus-mobile-2.md",
+      "summary": "Epic 8 DoD: need paginated sync deltas for offline mode",
+      "status": "open",
+      "kind": "request",
+      "from": "nimbus-mobile",
+      "to": "nimbus-backend",
+      "expired": false
+    },
+    {
+      "id": "note:nimbus-backend/agent-config/2026-07-09-agents-api-v2",
+      "type": "note",
+      "label": "2026-07-09-agents-api-v2",
+      "project": "nimbus-backend",
+      "topic": "agent-config",
+      "x": 688,
+      "y": 158,
+      "path": "projects/nimbus-backend/agent-config/2026-07-09-agents-api-v2.md",
+      "date": "2026-07-09",
+      "noteType": "note",
+      "summary": "Decision: the agent-config schema v2 fields from ai-engine's canonical",
+      "stale": false
+    },
+    {
+      "id": "note:nimbus-backend/channels/2026-07-09-whatsapp-channel",
+      "type": "note",
+      "label": "2026-07-09-whatsapp-channel",
+      "project": "nimbus-backend",
+      "topic": "channels",
+      "x": 928,
+      "y": 158,
+      "path": "projects/nimbus-backend/channels/2026-07-09-whatsapp-channel.md",
+      "date": "2026-07-09",
+      "noteType": "note",
+      "summary": "Decision record for wiring WhatsApp (Meta Cloud API) as Nimbus's first",
+      "stale": false
+    },
+    {
+      "id": "note:nimbus-backend/handoffs/2026-07-09-findings",
+      "type": "note",
+      "label": "2026-07-09-findings",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "x": 1648,
+      "y": 158,
+      "path": "projects/nimbus-backend/handoffs/2026-07-09-findings.md",
+      "date": "2026-07-09",
+      "noteType": "finding",
+      "summary": "Task: consume the nimbus-ai-engine token-streaming handoff, expose it as a",
+      "stale": false
+    },
+    {
+      "id": "note:nimbus-backend/handoffs/2026-07-10-comment-gateway-caveat",
+      "type": "note",
+      "label": "2026-07-10-comment-gateway-caveat",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "x": 1168,
+      "y": 158,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-comment-gateway-caveat.md",
+      "date": "2026-07-10",
+      "noteType": "comment",
+      "summary": "On 2026-07-10-handoff-nimbus-ai-engine:",
+      "stale": false
+    },
+    {
+      "id": "note:nimbus-backend/handoffs/2026-07-10-comment-qa-thread-check",
+      "type": "note",
+      "label": "2026-07-10-comment-qa-thread-check",
+      "project": "nimbus-backend",
+      "topic": "handoffs",
+      "x": 1168,
+      "y": 302,
+      "path": "projects/nimbus-backend/handoffs/2026-07-10-comment-qa-thread-check.md",
+      "date": "2026-07-10",
+      "noteType": "comment",
+      "summary": "On 2026-07-10-handoff-nimbus-ai-engine:",
+      "stale": false
+    },
+    {
+      "id": "note:nimbus-backend/streaming/2026-07-09-streaming-api",
+      "type": "note",
+      "label": "2026-07-09-streaming-api",
+      "project": "nimbus-backend",
+      "topic": "streaming",
+      "x": 448,
+      "y": 446,
+      "path": "projects/nimbus-backend/streaming/2026-07-09-streaming-api.md",
+      "date": "2026-07-09",
+      "noteType": "note",
+      "summary": "The engine's token streaming (runstream() in nimbus-ai-engine, handoff",
+      "stale": false
+    },
+    {
+      "id": "note:nimbus-backend/streaming/2026-07-10-sse-retry-findings",
+      "type": "note",
+      "label": "2026-07-10-sse-retry-findings",
+      "project": "nimbus-backend",
+      "topic": "streaming",
+      "x": 448,
+      "y": 158,
+      "path": "projects/nimbus-backend/streaming/2026-07-10-sse-retry-findings.md",
+      "date": "2026-07-10",
+      "noteType": "finding",
+      "summary": "Routed from Loredex Desktop (M2 DoD run).",
+      "stale": false
+    },
+    {
+      "id": "note:nimbus-backend/streaming/2026-07-10-sse-retry-findings-2",
+      "type": "note",
+      "label": "2026-07-10-sse-retry-findings-2",
+      "project": "nimbus-backend",
+      "topic": "streaming",
+      "x": 448,
+      "y": 302,
+      "path": "projects/nimbus-backend/streaming/2026-07-10-sse-retry-findings-2.md",
+      "date": "2026-07-10",
+      "noteType": "finding",
+      "summary": "Routed from Loredex Desktop (M2 DoD run).",
+      "stale": false
+    },
+    {
+      "id": "project:nimbus-ai-engine",
+      "type": "project",
+      "label": "nimbus-ai-engine",
+      "project": "nimbus-ai-engine",
+      "x": 48,
+      "y": 48,
+      "openCount": 1,
+      "noteCount": 6
+    },
+    {
+      "id": "project:nimbus-backend",
+      "type": "project",
+      "label": "nimbus-backend",
+      "project": "nimbus-backend",
+      "x": 448,
+      "y": 72,
+      "openCount": 5,
+      "noteCount": 19
+    },
+    {
+      "id": "project:nimbus-frontend",
+      "type": "project",
+      "label": "nimbus-frontend",
+      "project": "nimbus-frontend",
+      "x": 48,
+      "y": 128,
+      "openCount": 3,
+      "noteCount": 7
+    },
+    {
+      "id": "project:nimbus-mobile",
+      "type": "project",
+      "label": "nimbus-mobile",
+      "project": "nimbus-mobile",
+      "x": 48,
+      "y": 208,
+      "openCount": 3,
+      "noteCount": 6
+    }
+  ],
+  "edges": [
+    {
+      "id": "wikilink:note:nimbus-backend/channels/2026-07-09-whatsapp-channel->note:nimbus-backend/streaming/2026-07-09-streaming-api",
+      "source": "note:nimbus-backend/channels/2026-07-09-whatsapp-channel",
+      "target": "note:nimbus-backend/streaming/2026-07-09-streaming-api",
+      "category": "wikilink"
+    },
+    {
+      "id": "wikilink:note:nimbus-backend/handoffs/2026-07-09-findings->handoff:nimbus-backend/2026-07-09-handoff-nimbus-ai-engine",
+      "source": "note:nimbus-backend/handoffs/2026-07-09-findings",
+      "target": "handoff:nimbus-backend/2026-07-09-handoff-nimbus-ai-engine",
+      "category": "wikilink"
+    },
+    {
+      "id": "wikilink:note:nimbus-backend/streaming/2026-07-10-sse-retry-findings-2->note:nimbus-backend/streaming/2026-07-10-sse-retry-findings",
+      "source": "note:nimbus-backend/streaming/2026-07-10-sse-retry-findings-2",
+      "target": "note:nimbus-backend/streaming/2026-07-10-sse-retry-findings",
+      "category": "wikilink"
+    },
+    {
+      "id": "wikilink:note:nimbus-backend/streaming/2026-07-10-sse-retry-findings-2->note:nimbus-backend/streaming/2026-07-09-streaming-api",
+      "source": "note:nimbus-backend/streaming/2026-07-10-sse-retry-findings-2",
+      "target": "note:nimbus-backend/streaming/2026-07-09-streaming-api",
+      "category": "wikilink"
+    },
+    {
+      "id": "wikilink:note:nimbus-backend/streaming/2026-07-10-sse-retry-findings->note:nimbus-backend/streaming/2026-07-09-streaming-api",
+      "source": "note:nimbus-backend/streaming/2026-07-10-sse-retry-findings",
+      "target": "note:nimbus-backend/streaming/2026-07-09-streaming-api",
+      "category": "wikilink"
+    },
+    {
+      "id": "route-agg:project:nimbus-ai-engine->project:nimbus-backend",
+      "source": "project:nimbus-ai-engine",
+      "target": "project:nimbus-backend",
+      "category": "route",
+      "openCount": 1,
+      "totalCount": 4,
+      "blocking": true
+    },
+    {
+      "id": "route-agg:project:nimbus-backend->project:nimbus-ai-engine",
+      "source": "project:nimbus-backend",
+      "target": "project:nimbus-ai-engine",
+      "category": "route",
+      "openCount": 1,
+      "totalCount": 1,
+      "blocking": true
+    },
+    {
+      "id": "route-agg:project:nimbus-backend->project:nimbus-frontend",
+      "source": "project:nimbus-backend",
+      "target": "project:nimbus-frontend",
+      "category": "route",
+      "openCount": 2,
+      "totalCount": 4,
+      "blocking": true
+    },
+    {
+      "id": "route-agg:project:nimbus-backend->project:nimbus-mobile",
+      "source": "project:nimbus-backend",
+      "target": "project:nimbus-mobile",
+      "category": "route",
+      "openCount": 3,
+      "totalCount": 4,
+      "blocking": false
+    },
+    {
+      "id": "route-agg:project:nimbus-frontend->project:nimbus-backend",
+      "source": "project:nimbus-frontend",
+      "target": "project:nimbus-backend",
+      "category": "route",
+      "openCount": 2,
+      "totalCount": 4,
+      "blocking": false
+    },
+    {
+      "id": "route-agg:project:nimbus-mobile->project:nimbus-backend",
+      "source": "project:nimbus-mobile",
+      "target": "project:nimbus-backend",
+      "category": "route",
+      "openCount": 2,
+      "totalCount": 3,
+      "blocking": true
+    }
+  ],
+  "clusters": [
+    {
+      "project": "nimbus-backend",
+      "topics": [
+        {
+          "name": "agent-config",
+          "nodeIds": [
+            "note:nimbus-backend/agent-config/2026-07-09-agents-api-v2"
+          ],
+          "singleChild": true
+        },
+        {
+          "name": "channels",
+          "nodeIds": [
+            "note:nimbus-backend/channels/2026-07-09-whatsapp-channel"
+          ],
+          "singleChild": true
+        },
+        {
+          "name": "handoffs",
+          "nodeIds": [
+            "handoff:nimbus-backend/2026-07-09-handoff-nimbus-ai-engine",
+            "handoff:nimbus-backend/2026-07-09-handoff-nimbus-ai-engine-2",
+            "handoff:nimbus-backend/2026-07-09-handoff-nimbus-mobile",
+            "handoff:nimbus-backend/2026-07-10-handoff-nimbus-ai-engine",
+            "handoff:nimbus-backend/2026-07-10-handoff-nimbus-ai-engine-2",
+            "handoff:nimbus-backend/2026-07-10-handoff-nimbus-frontend",
+            "handoff:nimbus-backend/2026-07-10-handoff-nimbus-frontend-2",
+            "handoff:nimbus-backend/2026-07-10-handoff-nimbus-frontend-3",
+            "handoff:nimbus-backend/2026-07-10-handoff-nimbus-frontend-4",
+            "handoff:nimbus-backend/2026-07-10-handoff-nimbus-mobile",
+            "handoff:nimbus-backend/2026-07-10-handoff-nimbus-mobile-2",
+            "note:nimbus-backend/handoffs/2026-07-09-findings",
+            "note:nimbus-backend/handoffs/2026-07-10-comment-gateway-caveat",
+            "note:nimbus-backend/handoffs/2026-07-10-comment-qa-thread-check"
+          ],
+          "singleChild": false
+        },
+        {
+          "name": "streaming",
+          "nodeIds": [
+            "note:nimbus-backend/streaming/2026-07-09-streaming-api",
+            "note:nimbus-backend/streaming/2026-07-10-sse-retry-findings",
+            "note:nimbus-backend/streaming/2026-07-10-sse-retry-findings-2"
+          ],
+          "singleChild": false
+        }
+      ]
+    }
+  ],
+  "cyclic": true
+}

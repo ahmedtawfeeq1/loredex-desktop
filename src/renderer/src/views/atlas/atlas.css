@@ -291,3 +291,259 @@
 .atlas-rel-chip-blocking {
   border-color: var(--gold);
 }
+
+/* ── Atlas reframe WP1: the readable project PAGE (Learn) ──────────────────────
+   Full-width scrollable HTML document that replaces the Learn SVG graph. DESIGN
+   v2 cards, serif headings, one gold accent budget spent on open/blocked state.
+   Theme-aware through the tokens (light + dark both wired). */
+.atlas-body-page {
+  display: block;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.project-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1100px;
+  padding: 4px 4px 32px;
+}
+
+/* header — serif project name + mono counts + freshness + last activity */
+.pp-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-title {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.15;
+}
+
+.pp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.pp-counts {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.pp-last {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.pp-brief-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--hairline);
+  border-radius: 5px;
+  padding: 2px 7px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.pp-brief-fresh {
+  color: var(--ok);
+  border-color: currentColor;
+}
+.pp-brief-stale {
+  color: var(--rust);
+  border-color: currentColor;
+}
+.pp-brief-chip:hover {
+  background: var(--bg-inset);
+}
+
+/* attention line — links into the board / blocked */
+.pp-attention {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+}
+
+.pp-attention-link {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gold);
+}
+.pp-attention-link:hover {
+  text-decoration: underline;
+}
+.pp-attention-blocked {
+  color: var(--rust);
+}
+
+/* flows-with strip — reuses the atlas-rel-chip vocabulary */
+.pp-flows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.pp-flow-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-flow-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* topic sections */
+.pp-topic {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pp-topic-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.pp-topic-name {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-1);
+  text-transform: capitalize;
+}
+
+.pp-topic-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* note cards — humanized serif title, type/topic chips, excerpt, date */
+.pp-note-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.pp-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(19, 24, 38, 0.06);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.pp-note:hover {
+  border-color: var(--navy);
+}
+.pp-note:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+/* stale rail as an inset shadow (a 2px border would break the ≤1px rule) */
+.pp-note-stale {
+  box-shadow:
+    inset 2px 0 0 var(--rust),
+    0 1px 3px rgba(19, 24, 38, 0.06);
+}
+
+.pp-note-title {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.25;
+}
+
+.pp-note-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.pp-chip {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.pp-chip-topic {
+  color: var(--navy);
+  border-color: color-mix(in srgb, var(--navy) 40%, transparent);
+}
+
+.pp-note-excerpt {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pp-note-date {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+.pp-note-date-stale {
+  color: var(--rust);
+}
+
+/* handoffs section — reuse the routing-slip HandoffCardView */
+.pp-handoff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+
+/* trace-connections affordance into Deep Dive */
+.pp-trace-row {
+  display: flex;
+  padding-top: 4px;
+}

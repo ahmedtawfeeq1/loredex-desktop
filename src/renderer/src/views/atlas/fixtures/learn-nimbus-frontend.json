@@ -1,0 +1,222 @@
+{
+  "level": "learn",
+  "scope": {
+    "project": "nimbus-frontend"
+  },
+  "nodes": [
+    {
+      "id": "handoff:nimbus-frontend/2026-07-09-handoff-nimbus-backend",
+      "type": "handoff",
+      "label": "2026-07-09-handoff-nimbus-backend",
+      "project": "nimbus-frontend",
+      "topic": "handoffs",
+      "date": "2026-07-09",
+      "x": 1168,
+      "y": 158,
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend.md",
+      "summary": "Consume the SSE streaming endpoint in the console chat tester",
+      "status": "consumed",
+      "kind": "delivery",
+      "from": "nimbus-backend",
+      "to": "nimbus-frontend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-frontend/2026-07-09-handoff-nimbus-backend-2",
+      "type": "handoff",
+      "label": "2026-07-09-handoff-nimbus-backend-2",
+      "project": "nimbus-frontend",
+      "topic": "handoffs",
+      "date": "2026-07-09",
+      "x": 1168,
+      "y": 302,
+      "path": "projects/nimbus-frontend/handoffs/2026-07-09-handoff-nimbus-backend-2.md",
+      "summary": "agent-config v2 fields live in the API — build the builder UI",
+      "status": "consumed",
+      "kind": "delivery",
+      "from": "nimbus-backend",
+      "to": "nimbus-frontend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-frontend/2026-07-10-handoff-nimbus-ai-engine",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-ai-engine",
+      "project": "nimbus-frontend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 928,
+      "y": 158,
+      "path": "projects/nimbus-frontend/handoffs/2026-07-10-handoff-nimbus-ai-engine.md",
+      "summary": "do this in order",
+      "status": "open",
+      "kind": "delivery",
+      "from": "nimbus-ai-engine",
+      "to": "nimbus-frontend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-frontend/2026-07-10-handoff-nimbus-backend",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-backend",
+      "project": "nimbus-frontend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 928,
+      "y": 302,
+      "path": "projects/nimbus-frontend/handoffs/2026-07-10-handoff-nimbus-backend.md",
+      "summary": "Render the streaming API status panel from the new endpoints",
+      "status": "open",
+      "kind": "request",
+      "from": "nimbus-backend",
+      "to": "nimbus-frontend",
+      "expired": false
+    },
+    {
+      "id": "handoff:nimbus-frontend/2026-07-10-handoff-nimbus-backend-2",
+      "type": "handoff",
+      "label": "2026-07-10-handoff-nimbus-backend-2",
+      "project": "nimbus-frontend",
+      "topic": "handoffs",
+      "date": "2026-07-10",
+      "x": 928,
+      "y": 446,
+      "path": "projects/nimbus-frontend/handoffs/2026-07-10-handoff-nimbus-backend-2.md",
+      "summary": "Render the streaming API status panel from the new endpoints",
+      "status": "open",
+      "kind": "request",
+      "from": "nimbus-backend",
+      "to": "nimbus-frontend",
+      "expired": false
+    },
+    {
+      "id": "note:nimbus-frontend/agent-config/2026-07-09-schema-v2-request",
+      "type": "note",
+      "label": "2026-07-09-schema-v2-request",
+      "project": "nimbus-frontend",
+      "topic": "agent-config",
+      "x": 448,
+      "y": 158,
+      "path": "projects/nimbus-frontend/agent-config/2026-07-09-schema-v2-request.md",
+      "date": "2026-07-09",
+      "noteType": "note",
+      "summary": "This is a request to nimbus-ai-engine (schema owner), not delivered work.",
+      "stale": false
+    },
+    {
+      "id": "note:nimbus-frontend/streaming/2026-07-09-streaming-ui",
+      "type": "note",
+      "label": "2026-07-09-streaming-ui",
+      "project": "nimbus-frontend",
+      "topic": "streaming",
+      "x": 688,
+      "y": 158,
+      "path": "projects/nimbus-frontend/streaming/2026-07-09-streaming-ui.md",
+      "date": "2026-07-09",
+      "noteType": "finding",
+      "summary": "useStreamingReply() (in src/App.tsx, commit eb6cccd) wires the console",
+      "stale": false
+    },
+    {
+      "id": "project:nimbus-ai-engine",
+      "type": "project",
+      "label": "nimbus-ai-engine",
+      "project": "nimbus-ai-engine",
+      "x": 48,
+      "y": 48,
+      "openCount": 1,
+      "noteCount": 6
+    },
+    {
+      "id": "project:nimbus-backend",
+      "type": "project",
+      "label": "nimbus-backend",
+      "project": "nimbus-backend",
+      "x": 48,
+      "y": 128,
+      "openCount": 5,
+      "noteCount": 19
+    },
+    {
+      "id": "project:nimbus-frontend",
+      "type": "project",
+      "label": "nimbus-frontend",
+      "project": "nimbus-frontend",
+      "x": 448,
+      "y": 72,
+      "openCount": 3,
+      "noteCount": 7
+    }
+  ],
+  "edges": [
+    {
+      "id": "route-agg:project:nimbus-ai-engine->project:nimbus-frontend",
+      "source": "project:nimbus-ai-engine",
+      "target": "project:nimbus-frontend",
+      "category": "route",
+      "openCount": 1,
+      "totalCount": 1,
+      "blocking": false
+    },
+    {
+      "id": "route-agg:project:nimbus-backend->project:nimbus-frontend",
+      "source": "project:nimbus-backend",
+      "target": "project:nimbus-frontend",
+      "category": "route",
+      "openCount": 2,
+      "totalCount": 4,
+      "blocking": true
+    },
+    {
+      "id": "route-agg:project:nimbus-frontend->project:nimbus-ai-engine",
+      "source": "project:nimbus-frontend",
+      "target": "project:nimbus-ai-engine",
+      "category": "route",
+      "openCount": 0,
+      "totalCount": 1,
+      "blocking": false
+    },
+    {
+      "id": "route-agg:project:nimbus-frontend->project:nimbus-backend",
+      "source": "project:nimbus-frontend",
+      "target": "project:nimbus-backend",
+      "category": "route",
+      "openCount": 2,
+      "totalCount": 4,
+      "blocking": false
+    }
+  ],
+  "clusters": [
+    {
+      "project": "nimbus-frontend",
+      "topics": [
+        {
+          "name": "agent-config",
+          "nodeIds": [
+            "note:nimbus-frontend/agent-config/2026-07-09-schema-v2-request"
+          ],
+          "singleChild": true
+        },
+        {
+          "name": "handoffs",
+          "nodeIds": [
+            "handoff:nimbus-frontend/2026-07-09-handoff-nimbus-backend",
+            "handoff:nimbus-frontend/2026-07-09-handoff-nimbus-backend-2",
+            "handoff:nimbus-frontend/2026-07-10-handoff-nimbus-ai-engine",
+            "handoff:nimbus-frontend/2026-07-10-handoff-nimbus-backend",
+            "handoff:nimbus-frontend/2026-07-10-handoff-nimbus-backend-2"
+          ],
+          "singleChild": false
+        },
+        {
+          "name": "streaming",
+          "nodeIds": [
+            "note:nimbus-frontend/streaming/2026-07-09-streaming-ui"
+          ],
+          "singleChild": true
+        }
+      ]
+    }
+  ],
+  "cyclic": true
+}

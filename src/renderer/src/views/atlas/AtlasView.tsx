@@ -23,6 +23,7 @@ import type { AtlasDecor } from './decor'
 import { exportAtlasView } from './export'
 import { PathTrace } from './PathTrace'
 import { activateNode, performResolution, resolveEdgeTarget } from './resolve'
+import { ProjectLauncher } from './ProjectLauncher'
 import { ProjectPage } from './ProjectPage'
 import { TourPanel } from './TourPanel'
 
@@ -63,6 +64,10 @@ export function AtlasView(): React.JSX.Element {
   const openLegend = useAtlas((s) => s.openLegend)
   const maybeAutoOpenLegend = useAtlas((s) => s.maybeAutoOpenLegend)
   const [exportOpen, setExportOpen] = useState(false)
+  // Atlas reframe WP2: Overview defaults to the readable project LAUNCHER; the
+  // SVG topology is one "Flow view" toggle away (topology preserved for who
+  // wants it). Local UI state — resets to the launcher each visit, by design.
+  const [flowView, setFlowView] = useState(false)
 
   useEffect(() => {
     // live data (watcher/poller) keeps it fresh after this first fetch
@@ -133,6 +138,8 @@ export function AtlasView(): React.JSX.Element {
   // SVG graph. The neighbor-flow relationship strip moved onto that page's
   // flows-with section, so the header no longer renders it.
   const showProjectPage = level === 'learn'
+  // Overview renders the launcher by default; Flow view falls back to the graph
+  const showLauncher = level === 'overview' && !flowView
 
   function onActivate(node: AtlasNode): void {
     // §3 resolution table, one click per row (story 10.4): project drills
@@ -278,6 +285,34 @@ export function AtlasView(): React.JSX.Element {
         </div>
         <div className="atlas-header-nav">
           <AtlasBreadcrumbs />
+          {level === 'overview' && (
+            <div
+              className="seg-control atlas-flow-toggle"
+              role="tablist"
+              aria-label="Overview display"
+            >
+              <button
+                type="button"
+                className="seg-option"
+                role="tab"
+                aria-selected={!flowView}
+                title="Read the vault as a grid of project cards"
+                onClick={() => setFlowView(false)}
+              >
+                Launcher
+              </button>
+              <button
+                type="button"
+                className="seg-option"
+                role="tab"
+                aria-selected={flowView}
+                title="See the project flow topology as a graph"
+                onClick={() => setFlowView(true)}
+              >
+                Flow view
+              </button>
+            </div>
+          )}
         </div>
       </div>
       {legendOpen && <AtlasLegend />}
@@ -313,6 +348,12 @@ export function AtlasView(): React.JSX.Element {
             <div className="atlas-loading-card" />
           </div>
         )
+      ) : showLauncher ? (
+        // Atlas reframe (spec §Overview): Overview renders the readable project
+        // LAUNCHER by default; the SVG topology is the Flow-view toggle above.
+        <div className="atlas-body atlas-body-page">
+          <ProjectLauncher />
+        </div>
       ) : (
         <div className="atlas-body">
           <AtlasCanvas

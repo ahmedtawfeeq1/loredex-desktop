@@ -303,6 +303,28 @@
   overflow-y: auto;
 }
 
+/* ── Atlas reframe WP2: the Overview project LAUNCHER ──────────────────────────
+   A readable card grid (Home ops-health cards) that replaces the SVG graph as
+   the Overview default; the Flow-view toggle swaps back to AtlasCanvas. */
+.atlas-flow-toggle {
+  margin-left: auto;
+}
+
+.atlas-launcher {
+  padding: 4px 4px 32px;
+  max-width: 1100px;
+}
+
+.atlas-launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.atlas-launcher-counts {
+  color: var(--text-2);
+}
+
 .project-page {
   display: flex;
   flex-direction: column;

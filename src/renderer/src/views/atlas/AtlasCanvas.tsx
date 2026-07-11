@@ -117,6 +117,7 @@ function OrthoEdge({
   decorClass = '',
   hot,
   openThread,
+  quiet,
 }: {
   edge: AtlasEdge
   a: Rect
@@ -136,6 +137,10 @@ function OrthoEdge({
   hot?: boolean
   /** thread edge whose thread is still open — draws gold (D1 amendment 3) */
   openThread?: boolean
+  /** WP-D: a drilled-level route connector, now redundant with the Learn
+   *  relationship strip — drawn thin + label-less, no width/dot/callout, just
+   *  hover-only emphasis. Overview edges (the primary viz) keep their encoding. */
+  quiet?: boolean
 }): React.JSX.Element {
   // aggregated route edges need the full gutter channel; quiet in-panel
   // edges (thread rails, wikilinks) stay inside the 40px column gaps
@@ -150,15 +155,18 @@ function OrthoEdge({
   const aggregated = edge.totalCount !== undefined
   const openCount = edge.openCount ?? 0
   // in-panel relationship connectors (everything but the aggregated project
-  // routes) draw as thin, soft-cornered curves; open threads glow gold
-  const inPanel = edge.category !== 'route'
+  // routes) draw as thin, soft-cornered curves; open threads glow gold. WP-D: a
+  // quiet drilled-level route joins them — thin + hover-only, the strip carries
+  // the counts now.
+  const inPanel = edge.category !== 'route' || quiet === true
   const threadGold = openThread === true
   const d = pathOf(points)
   // WP-A: magnitude lives on the edge — stroke width ∝ total. Inline so it wins
   // over the base .atlas-edge-line width; hover recolours (gold) but the encoded
-  // width stays. Non-aggregated relationship edges keep their CSS hairline.
-  const lineStyle = aggregated ? { strokeWidth: edgeWidth(edge.totalCount) } : undefined
-  const dot = aggregated && openCount > 0 ? openDotAt(points) : null
+  // width stays. Non-aggregated relationship edges keep their CSS hairline. WP-D:
+  // a quiet drilled route drops the width encoding + open dot + hover callout.
+  const lineStyle = aggregated && !quiet ? { strokeWidth: edgeWidth(edge.totalCount) } : undefined
+  const dot = aggregated && !quiet && openCount > 0 ? openDotAt(points) : null
   return (
     <g
       className={`atlas-edge atlas-edge-${edge.category}${inPanel ? ' atlas-edge-inpanel' : ''}${threadGold ? ' atlas-edge-open-thread' : ''}${decorClass}${hot ? ' atlas-edge-hot' : ''}`}
@@ -181,7 +189,7 @@ function OrthoEdge({
           onActivateEdge(edge, nearerEndOf(e, start, end))
         }}
         onMouseEnter={
-          aggregated
+          aggregated && !quiet
             ? (e) =>
                 onShowCallout(
                   edgeCallout(fromLabel, toLabel, edge.openCount, edge.totalCount),
@@ -191,7 +199,7 @@ function OrthoEdge({
             : undefined
         }
         onMouseMove={
-          aggregated
+          aggregated && !quiet
             ? (e) =>
                 onShowCallout(
                   edgeCallout(fromLabel, toLabel, edge.openCount, edge.totalCount),
@@ -200,7 +208,7 @@ function OrthoEdge({
                 )
             : undefined
         }
-        onMouseLeave={aggregated ? onHideCallout : undefined}
+        onMouseLeave={aggregated && !quiet ? onHideCallout : undefined}
       >
         <title>
           {edge.category === 'route'
@@ -663,6 +671,7 @@ export function AtlasCanvas({
                 onShowCallout={showCallout}
                 onHideCallout={hideCallout}
                 openThread={openThreadEdges.has(edge.id)}
+                quiet={level !== 'overview' && edge.category === 'route'}
                 decorClass={`${edgeDecorClass(edge, decor)}${
                   hoverHood && !(hoverHood.has(edge.source) && hoverHood.has(edge.target))
                     ? ' atlas-dim'

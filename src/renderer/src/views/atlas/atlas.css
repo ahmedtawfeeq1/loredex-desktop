@@ -216,3 +216,78 @@
 .atlas-zoom-btn:hover {
   background: var(--bg-inset);
 }
+
+/* ── WP-D: Learn relationship strip ──────────────────────────────────────────
+   The focused project's neighbor handoff flow as relations-as-list (research
+   §Learn; Linear/GitHub). Sits under the breadcrumb at Learn only. Compact
+   DESIGN v2 pill chips, mono counts (gold when a lane still has open handoffs);
+   clicking a chip drills the focus onto that neighbor. This replaces the
+   crossing neighbor-edge labels — the canvas connectors go thin/hover-only. */
+.atlas-rel-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  margin-top: 8px;
+}
+
+.atlas-rel-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.atlas-rel-dir {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.atlas-rel-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 3px 9px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.atlas-rel-chip:hover {
+  background: var(--bg-card);
+  border-color: var(--navy);
+}
+
+/* mono count — gold once the lane still carries open handoffs (the urgent bit) */
+.atlas-rel-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.atlas-rel-count-open {
+  color: var(--gold);
+}
+
+.atlas-rel-prep {
+  color: var(--text-2);
+}
+
+.atlas-rel-name {
+  font-weight: 500;
+}
+
+/* a blocking lane gets a gold ring (the app's blocking/open-heavy accent) */
+.atlas-rel-chip-blocking {
+  border-color: var(--gold);
+}

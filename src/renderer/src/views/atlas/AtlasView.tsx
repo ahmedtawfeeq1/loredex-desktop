@@ -22,6 +22,7 @@ import { ChangedSinceToggle } from './ChangedSinceToggle'
 import type { AtlasDecor } from './decor'
 import { exportAtlasView } from './export'
 import { PathTrace } from './PathTrace'
+import { type RelationshipChip, relationshipStrip } from '../../../../shared/atlas-relationships'
 import { activateNode, performResolution, resolveEdgeTarget } from './resolve'
 import { TourPanel } from './TourPanel'
 
@@ -127,6 +128,17 @@ export function AtlasView(): React.JSX.Element {
     return node?.type === 'project' ? node.label : node?.project
   }, [graph, selectedId])
   const learnTarget = scope.project ?? selectedProject
+
+  // WP-D: at Learn, summarize the focused project's neighbor handoff flow as a
+  // relationship strip (inbound ← / outbound →) derived from the aggregated
+  // route edges touching it — the relations-as-list that replaces the crossing
+  // neighbor-edge labels (research §Learn). Only the focused-project scope has a
+  // single owner to summarize around; overview/deep don't render the strip.
+  const relStrip = useMemo(() => {
+    if (level !== 'learn' || !scope.project || !shownGraph) return null
+    const strip = relationshipStrip(scope.project, shownGraph.edges)
+    return strip.inbound.length + strip.outbound.length > 0 ? strip : null
+  }, [level, scope.project, shownGraph])
 
   function onActivate(node: AtlasNode): void {
     // §3 resolution table, one click per row (story 10.4): project drills
@@ -273,6 +285,30 @@ export function AtlasView(): React.JSX.Element {
         <div className="atlas-header-nav">
           <AtlasBreadcrumbs />
         </div>
+        {relStrip && (
+          <div className="atlas-rel-strip" aria-label="Neighbor handoff flow">
+            {relStrip.inbound.length > 0 && (
+              <div className="atlas-rel-group">
+                <span className="atlas-rel-dir" aria-hidden>
+                  ←
+                </span>
+                {relStrip.inbound.map((chip) => (
+                  <RelChip key={`in:${chip.nodeId}`} chip={chip} preposition="from" onPick={drillProject} />
+                ))}
+              </div>
+            )}
+            {relStrip.outbound.length > 0 && (
+              <div className="atlas-rel-group">
+                <span className="atlas-rel-dir" aria-hidden>
+                  →
+                </span>
+                {relStrip.outbound.map((chip) => (
+                  <RelChip key={`out:${chip.nodeId}`} chip={chip} preposition="to" onPick={drillProject} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {legendOpen && <AtlasLegend />}
       {error && <div className="note-error">{error}</div>}
@@ -331,5 +367,34 @@ export function AtlasView(): React.JSX.Element {
         </div>
       )}
     </div>
+  )
+}
+
+/** One relationship-strip chip (WP-D): `<count> <preposition> <project>` with a
+ *  mono count (gold when the lane still has open handoffs), clicking drills the
+ *  focus onto that neighbor project. DESIGN v2 pill. */
+function RelChip({
+  chip,
+  preposition,
+  onPick,
+}: {
+  chip: RelationshipChip
+  preposition: 'from' | 'to'
+  onPick: (project: string) => void
+}): React.JSX.Element {
+  const open = chip.open > 0
+  return (
+    <button
+      type="button"
+      className={`atlas-rel-chip${chip.blocking ? ' atlas-rel-chip-blocking' : ''}`}
+      title={`${chip.total} handoff${chip.total === 1 ? '' : 's'} ${preposition} ${chip.project}${
+        open ? ` · ${chip.open} still open` : ''
+      }${chip.blocking ? ' · blocking' : ''} — open ${chip.project}`}
+      onClick={() => onPick(chip.project)}
+    >
+      <span className={`atlas-rel-count${open ? ' atlas-rel-count-open' : ''}`}>{chip.total}</span>
+      <span className="atlas-rel-prep">{preposition}</span>
+      <span className="atlas-rel-name">{chip.project}</span>
+    </button>
   )
 }

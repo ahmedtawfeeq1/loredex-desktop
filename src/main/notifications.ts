@@ -29,7 +29,15 @@ export function handleCoreMessage(msg: unknown, win?: BrowserWindow): void {
     return
   }
   if (!Notification.isSupported()) return
-  const notification = new Notification({ title: msg.title, body: msg.body })
+  // Sound + banner on arrival (handoffs from other teams land while you work).
+  // silent:false so the OS plays a sound even if the user muted app defaults;
+  // `sound` is a macOS system-sound name (ignored on other platforms).
+  const notification = new Notification({
+    title: msg.title,
+    body: msg.body,
+    silent: false,
+    sound: 'Glass',
+  })
   notification.on('click', () => {
     // focus + deep-navigate: '' (batched summary) opens the board
     focusWindow(win)?.webContents.send('open-handoff', msg.relPath)

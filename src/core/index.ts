@@ -138,12 +138,20 @@ if (config) {
     // boot evidence for packaged/dev smokes (story 15.1)
     console.log(`[loredex-core] vault watcher armed — ${vaultPath}`)
   }).catch((e: unknown) => {
+    // Watcher caveat: if FSEvents refuses to arm, local edits would otherwise
+    // never surface (a purely-local vault has no poller to catch them). Fall
+    // back to a slow safety-net reconcile so live refresh degrades to a poll,
+    // not to nothing. Warn loudly so the failure isn't silent.
     ipc.emit({
       kind: 'git.warning',
-      text: `vault watcher failed to start — live refresh degraded to manual (${
+      text: `vault watcher failed to start — live refresh degraded to a 15s poll (${
         e instanceof Error ? e.message : String(e)
       })`,
     })
+    setInterval(() => {
+      reconcileState()
+      ipc.emit({ kind: 'vault.changed', paths: [] }) // unknown scope → full refetch
+    }, 15_000).unref?.()
   })
 }
 

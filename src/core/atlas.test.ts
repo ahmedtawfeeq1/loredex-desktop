@@ -15,8 +15,11 @@ import {
   NODE_H,
   NODE_W,
   nodeRect,
+  NOTE_ROW_PITCH,
   orthoRoute,
+  PANEL_ASPECT,
   rectsOverlap,
+  TOPIC_COL_PITCH,
 } from '../shared/atlas-layout'
 import { createIpcClient } from '../shared/ipc-client'
 import type { PortLike } from '../shared/ipc-contract'
@@ -917,6 +920,54 @@ describe.skipIf(!existsSync(NIMBUS_VAULT))('atlas model (nimbus simulation vault
     expect(columns.size).toBeGreaterThanOrEqual(3)
     for (const x of columns) {
       expect(memberNodes.filter((n) => n.x === x).length).toBeLessThanOrEqual(6)
+    }
+  })
+
+  it('WP4 dominant-topic balance: the 14-note handoffs topic wraps WIDE, never a tall strip', () => {
+    // nimbus-backend's handoffs topic dwarfs the others (14 vs 1/1/3). At both
+    // drilled levels its sub-card must read as a wide grid, not the tall narrow
+    // strip the dominant block used to pack into (2 cols × 7-deep, aspect ≈0.46).
+    for (const level of ['learn', 'deep'] as const) {
+      const g = projectAtlas(model, level, { project: 'nimbus-backend' })
+      const cluster = g.clusters.find((c) => c.project === 'nimbus-backend') as AtlasCluster
+      const handoffTopic = cluster.topics.find((t) => t.name === 'handoffs') as AtlasCluster['topics'][number]
+      const handoffs = g.nodes.filter((n) => handoffTopic.nodeIds.includes(n.id))
+      expect(handoffs.length, `${level} handoffs count`).toBeGreaterThanOrEqual(10)
+      // per-column depth: no column packs deeper than the cap → not a tall strip
+      const colDepth = new Map<number, number>()
+      for (const n of handoffs) colDepth.set(n.x, (colDepth.get(n.x) ?? 0) + 1)
+      const cols = colDepth.size
+      const deepest = Math.max(...colDepth.values())
+      expect(deepest, `${level} deepest handoffs column`).toBeLessThanOrEqual(6)
+      // it genuinely spreads: a dominant topic is a grid of ≥ 2 columns
+      expect(cols, `${level} handoffs columns`).toBeGreaterThanOrEqual(2)
+      // and the sub-card bbox is no longer a tall strip (aspect used to be ≈0.46)
+      const w = (cols - 1) * TOPIC_COL_PITCH + NODE_W
+      const h = (deepest - 1) * NOTE_ROW_PITCH + NODE_H
+      expect(w / h, `${level} handoffs sub-card aspect`).toBeGreaterThan(0.7)
+    }
+  })
+
+  it('WP4 panel bbox aspect stays in a browsable band on the nimbus-backend fixture', () => {
+    // the whole focused panel reads as a browsable rectangle near PANEL_ASPECT,
+    // never a thin canvas-wide line nor a tall column stack (WP4 balance + fit)
+    for (const level of ['learn', 'deep'] as const) {
+      const g = projectAtlas(model, level, { project: 'nimbus-backend' })
+      const cluster = g.clusters.find((c) => c.project === 'nimbus-backend') as AtlasCluster
+      const ids = new Set(cluster.topics.flatMap((t) => t.nodeIds))
+      const members = g.nodes.filter(
+        (n) =>
+          ids.has(n.id) ||
+          ((n.type === 'source' || n.type === 'commit' || n.type === 'contract') &&
+            n.project === cluster.project),
+      )
+      const w =
+        Math.max(...members.map((n) => n.x + NODE_W)) - Math.min(...members.map((n) => n.x))
+      const h =
+        Math.max(...members.map((n) => n.y + NODE_H)) - Math.min(...members.map((n) => n.y))
+      const aspect = w / h
+      expect(aspect, `${level} panel aspect`).toBeGreaterThan(0.7)
+      expect(aspect, `${level} panel aspect`).toBeLessThan(PANEL_ASPECT * 2)
     }
   })
 

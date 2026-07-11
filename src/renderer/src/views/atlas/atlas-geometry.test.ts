@@ -12,10 +12,12 @@ import {
   CLUSTER_W,
   FIT_PAD,
   GUTTER,
+  MAX_FILL,
   NODE_H,
   NODE_W,
   NOTE_ROW_PITCH,
   PANEL_ASPECT,
+  PANEL_MAX_COL_DEPTH,
   READABLE_CARD_MIN,
   panelWrapRows,
   PILL_H,
@@ -94,10 +96,27 @@ describe('fitViewBox', () => {
     expect(vb.x + vb.w).toBeLessThan(2000)
   })
 
-  it('never zooms past 1:1 — small graphs sit centered at natural size', () => {
+  it('scales a tiny graph UP to fill, centered, capped at MAX_FILL× (WP4)', () => {
+    // a lone card no longer floats at natural size in a dead full-pane box —
+    // it magnifies to fill, but never past MAX_FILL× (WP4 zoom-in-to-fill)
     const vb = fitViewBox([rect(0, 0)], 1200, 800)
-    expect(vb.w).toBe(1200) // scale clamped to 1, not blown up to fill
+    const cardPx = (NODE_W * 1200) / vb.w
+    expect(cardPx).toBeCloseTo(NODE_W * MAX_FILL, 5) // magnified to the fill cap
+    expect(vb.w).toBeLessThan(1200) // viewBox smaller than the pane ⇒ zoomed IN
+    expect(vb.w / vb.h).toBeCloseTo(1200 / 800, 5) // aspect preserved
     expect(vb.x + vb.w / 2).toBeCloseTo(NODE_W / 2, 5) // still centered
+    expect(vb.y + vb.h / 2).toBeCloseTo(NODE_H / 2, 5)
+  })
+
+  it('an under-filled graph zooms in to its exact fit (below the cap), centered', () => {
+    // content spans ~640px in an 800px pane → zooms IN to fill exactly, not to
+    // the cap, and stays centered (WP4 4-node Overview / thin panel case)
+    const vb = fitViewBox([rect(0, 0), rect(440, 0)], 800, 600)
+    expect(vb.w).toBeCloseTo(440 + NODE_W + FIT_PAD * 2, 5) // exact fit width
+    const cardPx = (NODE_W * 800) / vb.w
+    expect(cardPx).toBeGreaterThan(NODE_W) // zoomed IN past natural size
+    expect(cardPx).toBeLessThan(NODE_W * MAX_FILL) // but below the fill cap
+    expect(vb.x + vb.w / 2).toBeCloseTo((440 + NODE_W) / 2, 5) // centered
   })
 
   it('degrades to the pane box when the graph is empty', () => {
@@ -321,6 +340,18 @@ describe('panelWrapRows (story 16.5 drilled density)', () => {
   it('is deterministic for identical runs', () => {
     expect(panelWrapRows([5, 13])).toBe(panelWrapRows([5, 13]))
     expect(panelWrapRows([2, 5, 1, 2])).toBe(panelWrapRows([2, 5, 1, 2]))
+  })
+
+  it('caps a dominant topic to PANEL_MAX_COL_DEPTH so it wraps wide (WP4)', () => {
+    // a lone huge block (the 14-note handoffs case, and larger) never packs a
+    // column deeper than the cap — it wraps into MORE, shorter columns instead
+    // of one tall narrow strip
+    for (const n of [14, 20, 40, 100]) {
+      const rows = panelWrapRows([n])
+      expect(rows, `${n} members`).toBeLessThanOrEqual(PANEL_MAX_COL_DEPTH)
+      // and it genuinely spreads: more than one column
+      expect(Math.ceil(n / rows), `${n} members cols`).toBeGreaterThan(1)
+    }
   })
 })
 

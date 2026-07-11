@@ -8,6 +8,7 @@
  */
 import {
   FIT_PAD,
+  MAX_FILL,
   NODE_W,
   READABLE_CARD_MIN,
   type Rect,
@@ -40,12 +41,12 @@ export interface ViewBox {
 }
 
 /** ViewBox fitted to the content bounding box: FIT_PAD padding, pane aspect
- *  preserved, never zoomed past 1:1. When the whole graph fits at a readable
- *  card size it sits CENTERED at natural size (small/medium graphs). When it
- *  does NOT — a large graph would need cards below READABLE_CARD_MIN to fit —
- *  the fit stops at that readable floor and frames the TOP-LEFT starting region
- *  (newest-activity topic), leaving the rest to pan/scroll rather than shrinking
- *  the whole map to an unreadable line. */
+ *  preserved. A SMALL graph (a 4-node Overview, a thin panel) now scales UP to
+ *  fill the pane, centered — magnified up to MAX_FILL× so it never floats tiny
+ *  in a dead full-pane box (WP4). A medium graph fits exactly, centered. A LARGE
+ *  graph that would need cards below READABLE_CARD_MIN stops at that readable
+ *  floor and frames the TOP-LEFT starting region (newest-activity topic),
+ *  leaving the rest to pan rather than shrinking the map to an unreadable line. */
 export function fitViewBox(rects: Rect[], paneW: number, paneH: number): ViewBox {
   const w0 = Math.max(paneW, 1)
   const h0 = Math.max(paneH, 1)
@@ -62,14 +63,18 @@ export function fitViewBox(rects: Rect[], paneW: number, paneH: number): ViewBox
   }
   const needW = maxX - minX + FIT_PAD * 2
   const needH = maxY - minY + FIT_PAD * 2
-  const fitScale = Math.max(needW / w0, needH / h0, 1) // never above 100%
-  // the widest zoom-out that still renders a card ≥ READABLE_CARD_MIN
+  // scale = viewBox ÷ pane. Smaller scale ⇒ larger on-screen cards (zoom IN).
+  // No 1.0 floor now — a small graph zooms in to fill (WP4).
+  const fitScale = Math.max(needW / w0, needH / h0)
+  // most zoomed OUT: the widest viewBox that still renders a card ≥ READABLE_CARD_MIN
   const floorScale = Math.max(NODE_W / READABLE_CARD_MIN, 1)
-  const scale = Math.min(fitScale, floorScale)
+  // most zoomed IN: never magnify a card past MAX_FILL× its natural width
+  const fillScale = 1 / MAX_FILL
+  const scale = Math.min(Math.max(fitScale, fillScale), floorScale)
   const w = w0 * scale
   const h = h0 * scale
   if (fitScale <= floorScale + 1e-9) {
-    // fits at a readable size → center (no dead top-left corner)
+    // fits at a readable size (small & medium graphs) → center in the pane
     return { x: (minX + maxX) / 2 - w / 2, y: (minY + maxY) / 2 - h / 2, w, h }
   }
   // clamped at the readable floor → frame the top-left starting region and pan

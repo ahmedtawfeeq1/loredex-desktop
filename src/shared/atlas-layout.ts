@@ -57,6 +57,16 @@ export const PANEL_ASPECT = 1.6
  *  (fitViewBox frames the top-left starting region). Matches the ≥140px density
  *  floor. (epic17.2 layout-fix) */
 export const READABLE_CARD_MIN = 140
+/** fit zoom-IN cap (WP4): a small graph (4-node Overview, thin panel) scales UP
+ *  to fill the pane, but never magnifies a card past MAX_FILL× its natural width
+ *  — so a lone node fills the pane without ballooning into a wall of one card.
+ *  The most-zoomed-in viewBox scale is therefore 1 / MAX_FILL. */
+export const MAX_FILL = 1.8
+/** WP4 dominant-topic balance: the deepest a single topic block's column may
+ *  pack. A dominant topic (the nimbus-backend 14-note handoffs case) wraps into
+ *  MORE, shorter columns instead of one tall narrow strip — the panel reads as a
+ *  wide browsable grid. Caps the wrap depth panelWrapRows may choose. */
+export const PANEL_MAX_COL_DEPTH = 6
 /** interactive zoom band (D1 amendment 5 — trackpad-native navigation): pinch /
  *  ⌘=/⌘− zoom is clamped between these scales RELATIVE to the fitted view — so
  *  the smallest viewBox (most zoomed in) is fitW / ZOOM_MAX_SCALE and the widest
@@ -155,9 +165,12 @@ export function panelWrapRows(runs: number[]): number {
   const total = runs.reduce((n, r) => n + r, 0)
   if (total <= 0 || runs.length === 0) return 1
   const longest = Math.max(...runs)
+  // WP4 dominant-topic balance: cap the column depth so a dominant topic (14
+  // handoffs) wraps into more, shorter columns — a wide grid, not a tall strip
+  const maxRows = Math.min(total, PANEL_MAX_COL_DEPTH)
   let best = 1
   let bestScore = Number.POSITIVE_INFINITY
-  for (let rows = 1; rows <= total; rows++) {
+  for (let rows = 1; rows <= maxRows; rows++) {
     const cols = runs.reduce((n, r) => n + Math.ceil(r / rows), 0)
     const rowsUsed = Math.min(rows, longest)
     if (total > 6 && total / (cols * rowsUsed) <= 0.55) continue // fragmented

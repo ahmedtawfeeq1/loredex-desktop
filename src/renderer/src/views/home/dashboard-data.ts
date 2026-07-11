@@ -13,13 +13,14 @@ import type { CoreEvent, ProductDashboard } from '../../../../shared/ipc-contrac
 import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import type { ActivityEvent, ContractChange, SyncHealth } from '../../../../shared/types'
 import { invoke, onEvent, onVaultChanged } from '../../api'
-import { SPARKLINE_DAYS } from './insights'
 
 export const RECOMPUTE_DEBOUNCE_MS = 500
 
-/** Activity is pulled over the sparkline window (14d) so the 14-bar daily
- *  strip, 7-day velocity, and WoW trend all fold from one feed load. */
-export const ACTIVITY_WINDOW_DAYS = SPARKLINE_DAYS
+/** Activity is pulled over the widest range the toggle can select (30d = "This
+ *  Month"), so every window the dashboard offers — velocity, backlog, recent
+ *  activity, on-track %, WoW trend — folds from one feed load; the range toggle
+ *  just re-slices the already-loaded events, no re-fetch. */
+export const ACTIVITY_WINDOW_DAYS = 30
 
 /** Local-midnight instant `days` days before `now` — the activity.feed `since`. */
 export function activitySinceIso(now: Date, days: number): string {

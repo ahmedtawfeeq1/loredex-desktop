@@ -14,7 +14,10 @@ import type { ActivityEvent, ContractChange, HandoffCard, SyncHealth } from '../
 import {
   activityCounts,
   ageTone,
+  type AttentionItem,
+  attentionQueue,
   attentionRows,
+  backlogSeries,
   changesInWindow,
   churnByFile,
   dailyBuckets,
@@ -22,14 +25,20 @@ import {
   isDueNow,
   maxNoteCount,
   oldestOpen,
+  onTrackPct,
   openInbound,
+  projectHealth,
   pulseRows,
   rankedPulse,
+  recentActivity,
   requestsWaiting,
+  severityCounts,
   staleBriefs,
   startOfTodayIso,
   syncTile,
+  topRelations,
   velocity,
+  velocitySeries,
   wowTrend,
 } from './insights'
 
@@ -376,3 +385,164 @@ describe('project pulse rows (dashboard.build + open cards)', () => {
     expect(pulseRows([{ ...s, notesNewerThanBrief: 0 }], [])[0]!.brief).toBe('fresh')
   })
 })
+
+// ── amendment 9: modern dashboard aggregations ──────────────────────────────
+
+describe('velocity series ↔ velocity summary (amendment 9)', () => {
+  it('per-day created/consumed sums equal the scalar velocity, 7-day window', () => {
+    const series = velocitySeries(activity, TODAY, 7)
+    expect(series).toHaveLength(7)
+    const sum = series.reduce(
+      (a, d) => ({ c: a.c + d.created, x: a.x + d.consumed }),
+      { c: 0, x: 0 },
+    )
+    const vel = velocity(activity, TODAY, 10)
+    expect(sum.c).toBe(vel.created)
+    expect(sum.x).toBe(vel.consumed)
+    expect(sum).toEqual({ c: 21, x: 12 })
+  })
+
+  it('each series day matches the dailyBuckets kind counts', () => {
+    const series = velocitySeries(activity, TODAY, 14)
+    const buckets = dailyBuckets(activity, TODAY, 14)
+    series.forEach((d, i) => {
+      expect(d.day).toBe(buckets[i]!.day)
+      expect(d.created).toBe(buckets[i]!.byKind.handoff ?? 0)
+      expect(d.consumed).toBe(buckets[i]!.byKind.consume ?? 0)
+    })
+  })
+})
+
+describe('backlog series (open-handoff trend, reconstructed from the snapshot)', () => {
+  it('newest point equals the current open snapshot; reconstructs the real vault trend', () => {
+    const series = backlogSeries(activity, TODAY, 10, 7)
+    expect(series).toHaveLength(7)
+    expect(series.at(-1)!.value).toBe(10) // ends at openNow
+    expect(series.map((p) => p.value)).toEqual([1, 1, 1, 1, 1, 4, 10])
+    expect(series.every((p) => p.value >= 0)).toBe(true)
+  })
+
+  it('each step back removes that day’s net (created − consumed), clamped at 0', () => {
+    const events = activity
+    const days = 7
+    const series = backlogSeries(events, TODAY, 10, days)
+    const vel = velocitySeries(events, TODAY, days)
+    for (let i = series.length - 1; i > 0; i--) {
+      const net = vel[i]!.created - vel[i]!.consumed
+      // prior day's backlog = this day's − net (unless a clamp intervened)
+      if (series[i]!.value - net >= 0) {
+        expect(series[i - 1]!.value).toBe(series[i]!.value - net)
+      }
+    }
+  })
+
+  it('an empty feed holds the snapshot flat across the window', () => {
+    expect(backlogSeries([], TODAY, 3, 5).map((p) => p.value)).toEqual([3, 3, 3, 3, 3])
+  })
+})
+
+describe('on-track %', () => {
+  it('consumed share of the outstanding work, nothing outstanding = 100%', () => {
+    expect(onTrackPct(12, 10)).toBe(55)
+    expect(onTrackPct(0, 0)).toBe(100)
+    expect(onTrackPct(5, 0)).toBe(100)
+    expect(onTrackPct(0, 5)).toBe(0)
+  })
+})
+
+describe('attention queue (severity-ranked, the project-status insight)', () => {
+  it('the fixture has no overdue/stale rows — 4 waiting requests + a done summary, all info', () => {
+    const q = attentionQueue(cards, dash.states)
+    expect(q).toHaveLength(5)
+    expect(severityCounts(q)).toEqual({ critical: 0, warning: 0, info: 5 })
+    expect(q.filter((i) => i.reason.startsWith('request waiting'))).toHaveLength(4)
+    expect(q.at(-1)!.key).toBe('done') // the summary sorts last (ageDays -1)
+    expect(q.at(-1)!.title).toBe('9 handoffs already consumed')
+  })
+
+  it('ranks critical → warning → info, then age desc; a card appears once at its top severity', () => {
+    const overdue = card({ id: 'overdue', to: 'b', ageDays: 6, kind: 'delivery' })
+    const olderCrit = card({ id: 'older', to: 'b', ageDays: 9, kind: 'delivery' })
+    const expired = card({ id: 'snz', to: 'b', status: 'snoozed', expired: true, ageDays: 3 })
+    // a request that is ALSO overdue must land critical, not info (single row)
+    const oldReq = card({ id: 'oldreq', to: 'b', kind: 'request', ageDays: 7 })
+    const staleBriefState = { ...dash.states[0]!, briefPath: 'x.md', notesNewerThanBrief: 4 }
+    const q = attentionQueue([overdue, olderCrit, expired, oldReq], [staleBriefState])
+    const sevSeq = q.map((i) => i.severity)
+    // severities are grouped in rank order
+    expect(sevSeq).toEqual([...sevSeq].sort((a, b) => rank(a) - rank(b)))
+    // three criticals (all ≥5d), oldest first (ageDays desc: 9, 7, 6)
+    const crit = q.filter((i) => i.severity === 'critical')
+    expect(crit.map((i) => i.cardId)).toEqual(['older', 'oldreq', 'overdue'])
+    // the overdue request is NOT also an info row
+    expect(q.filter((i) => i.cardId === 'oldreq')).toHaveLength(1)
+    // warnings: the expired snooze + the stale brief
+    const warn = q.filter((i) => i.severity === 'warning')
+    expect(warn).toHaveLength(2)
+    expect(warn.map((w) => w.action.kind).sort()).toEqual(['recurate', 'reopen'])
+  })
+
+  it('expired snoozes are warnings with a Reopen action', () => {
+    const expired = card({ id: 'snz', status: 'snoozed', expired: true, ageDays: 2 })
+    const q = attentionQueue([expired], [])
+    expect(q).toHaveLength(1)
+    expect(q[0]!).toMatchObject({ severity: 'warning', action: { kind: 'reopen' } })
+  })
+})
+
+describe('per-project health (utilization = open / total handoffs)', () => {
+  it('folds the fixture: busiest-flow first, real open/total ratios', () => {
+    const rows = projectHealth(dash.states, cards)
+    expect(rows[0]!.project).toBe('nimbus-backend')
+    const backend = rows.find((r) => r.project === 'nimbus-backend')!
+    expect(backend.openTotal).toBe(10)
+    expect(backend.total).toBe(19)
+    expect(backend.utilization).toBeCloseTo(10 / 19)
+    const ai = rows.find((r) => r.project === 'nimbus-ai-engine')!
+    expect(ai.openTotal).toBe(1)
+    expect(ai.total).toBe(5)
+    expect(ai.utilization).toBeCloseTo(0.2)
+  })
+
+  it('a project with no handoffs has zero utilization, never NaN', () => {
+    const lonely = { ...dash.states[0]!, project: 'ghost' }
+    const row = projectHealth([lonely], [])[0]!
+    expect(row.total).toBe(0)
+    expect(row.utilization).toBe(0)
+  })
+})
+
+describe('relations strip (who hands off to whom)', () => {
+  it('ranks the dashboard edges busiest-first and caps the strip', () => {
+    const rel = topRelations(dash.edges)
+    expect(rel).toHaveLength(6) // 7 edges → capped at 6
+    expect(rel[0]).toEqual({ from: 'nimbus-frontend', to: 'nimbus-backend', count: 9 })
+    expect(rel[1]).toEqual({ from: 'nimbus-mobile', to: 'nimbus-backend', count: 7 })
+    const counts = rel.map((r) => r.count)
+    expect([...counts].sort((a, b) => b - a)).toEqual(counts)
+  })
+
+  it('drops zero-count edges and respects the limit', () => {
+    const edges = [
+      { from: 'a', to: 'b', count: 3 },
+      { from: 'c', to: 'd', count: 0 },
+      { from: 'e', to: 'f', count: 5 },
+    ]
+    expect(topRelations(edges, 1)).toEqual([{ from: 'e', to: 'f', count: 5 }])
+    expect(topRelations(edges).map((r) => r.count)).toEqual([5, 3])
+  })
+})
+
+describe('recent activity rail', () => {
+  it('returns newest-first, capped at the limit', () => {
+    const r = recentActivity(activity, 3)
+    expect(r).toHaveLength(3)
+    expect(r[0]!.at).toBe('2026-07-10T15:56:43+03:00')
+    // strictly non-increasing timestamps
+    for (let i = 1; i < r.length; i++) expect(r[i]!.at <= r[i - 1]!.at).toBe(true)
+  })
+})
+
+function rank(s: AttentionItem['severity']): number {
+  return s === 'critical' ? 0 : s === 'warning' ? 1 : 2
+}

@@ -177,3 +177,49 @@ The bottom-left vault identity chip becomes a **vault menu**: click (or a ▾ af
 
 #### E. Routing safety (Epic 4 — build the ready-for-dev stories)
 Complete the F4 gap using the existing epic4 story files (4-1…4-4) + lib PR-3 (route receipts/undo already partly in lib — verify): route produces a **receipt** (what filed where) with **Undo** (toast + reversible), **dedup** guard (warn/skip when the same source is already routed), **filing-scope control** (preview + untick before routing; "internal, never route" globs), and **drift badges + one-click reroute** when a routed source changed. Wire into the existing Route-a-note flow and the reader.
+
+### D1 amendment 9 — modern Vault Operations Dashboard
+
+# D1 amendment 9 — modern "Vault Operations Dashboard" (user, 2026-07-11)
+
+SUPERSEDES amendment 7 section A. Concept adapted (NOT replicated) from the Haulix "Operations Dashboard" dark reference + Panze project-dashboard: real metrics, real SVG charts, a Quick Actions section, an alert/attention queue, project-status + relations insight. Modern dark hero look (theme-aware, but the dark treatment is the reference). This sets the look-and-feel direction for the whole app.
+
+Full-width Home view rebuild. DESIGN v2 tokens; dark = navy ground #131826, cards #1C2536, hairline, gold primary, full status palette (rust/amber/ok) for severity. Live-recompute on watcher/poller. Zero new backend: dashboard.build, handoffs.list, activity.feed, contracts.timeline, sync.status, atlas blocked/edges, insights.ts (extend). SVG charts only — no chart libs.
+
+## Layout (three zones, mirroring the ops-dashboard structure)
+
+### Zone 0 — command strip (top)
+- Row of compact **stat pills** (icon + label + value), real numbers: `Open <openInbound>/<total>` · `Projects N` · `Requests waiting M` · `Contract Δ K (7d)` · `Sync ✓/ahead-behind` · `On-track P%` (P = consumed / (consumed+open) over the window, or active-vs-total). Each pill clickable to its view.
+- Title **"Vault Dashboard"** (serif or strong sans, large), subtitle `<vaultName> · <today long date> · live overview`.
+- **Range toggle** segmented control: Today | This Week | This Month (drives the trend windows + velocity + activity range). Persist last choice (localStorage).
+
+### Left column (~60%)
+1. **Quick Actions** — a titled row of icon CTA cards (rounded, hairline, hover-raise): New handoff (gold primary), Route a note, Curate product brief, Open Atlas, Sync now. Each = icon + label; keyboard-reachable; wired to the real actions (openCompose, route flow, curate, setView atlas, sync.run).
+2. **Attention Queue** — the alert-priority-queue analogue, the insight the user asked for. Ranked severity rows (card list): each row = severity chip (Critical rust / Warning amber / Info navy) + icon + title + one-line reason + right-aligned quick action button + "see" affordance. Sources, ranked:
+   - Critical: oldest open handoff older than 5d (Consume/Open); contract-ownership conflict from curate/atlas if detectable (Open).
+   - Warning: stale briefs (notesNewerThanBrief>0) → Re-curate/Open; drift-detected notes (lib drift) → Reroute; expired snoozes → Open.
+   - Info: requests waiting (kind=request, open) → Open; N done hidden (link).
+   - "See all" → relevant view. Empty = "All clear — nothing needs you." Order: critical → warning → info, then age desc.
+3. **Recent Activity** — condensed activity cards (reuse feed styling), last ~8, day-less compact, "See all" → Activity.
+
+### Right column (~40%)
+1. **Handoff Velocity** (bar chart, SVG): per-day paired bars created vs consumed over the selected window (7/14/30). Axis labels, hover tooltip (day: created X / consumed Y), legend. Title + "N created · M consumed · K still open" summary line. Kind-tinted (gold created / ok consumed).
+2. **Backlog trend** (area chart, SVG): open-handoff backlog (or routed-notes) per day over the window — smooth area, gradient fill (subtle), current-value dot + tooltip. Title "Open backlog" / "Routing throughput".
+3. **Project status & relations**:
+   - Per-project **health cards** (compact): project name + tint dot, note count, open in/out chips, brief-freshness chip (fresh/stale/none), last-activity relative date, a tiny utilization bar (open/total). Click → Atlas Learn for that project.
+   - **Relations strip**: a compact who-hands-off-to-whom summary (from dashboard edges) — e.g. `backend → frontend (2)`, `mobile → backend (1)` as small directional chips; click → Atlas overview. This is the "relation" ask.
+
+## Charts (SVG, no libs)
+- Bars: rounded-top rects, baseline axis, 5-tick y grid (faint), hover band + tooltip card (--bg-card). Deterministic layout, responsive width.
+- Area: monotone path + gradient fill under, hairline baseline, x-day labels, hover crosshair + value tooltip.
+- Empty/short data: render an honest "not enough history yet" placeholder, never a broken axis.
+- All chart geometry PURE + unit-tested (bucketing, scales, path building) — testable without a DOM.
+
+## States & quality
+- Fresh vault: command strip zeros + "Your dashboard fills as agents route notes and hand off work" + Route/Join CTAs.
+- Degraded: no remote → sync pill local-only; no contract roots → hide Contract Δ pill + any contract row.
+- Live recompute (watcher/poller), 500ms debounce, no Refresh button.
+- One gold primary (New handoff quick action). Full dark + light both wired. Focus rings, keyboard, reduced-motion. No dead space — right column fills height, charts flex.
+
+## Delivery (epic25, supersedes epic21)
+Rebuild HomeView + insights.ts (extend with velocity buckets, backlog series, on-track %, attention-queue assembly, per-project health, relations). New pure chart modules (src/renderer/src/views/home/charts/*.ts) with unit tests against nimbus-vault ground truth. Append this as "### D1 amendment 9" to docs/DESIGN.md. Story epic25.story1. Full gate green (--no-file-parallelism), commit + confirm HEAD, no push.

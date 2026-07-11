@@ -26,7 +26,9 @@ import {
   V_GAP,
 } from '../../../../shared/atlas-layout'
 import type { AtlasNode } from '../../../../shared/types'
+import type { AtlasEdge } from '../../../../shared/types'
 import {
+  edgeCallout,
   edgeWidth,
   fitViewBox,
   laneOffsets,
@@ -35,6 +37,7 @@ import {
   orthoRoute,
   panelRect,
   panViewBox,
+  projectFlowCallout,
   type Rect,
   rectsOverlap,
   routeBadge,
@@ -371,5 +374,51 @@ describe('routeBadge', () => {
   it('renders N open / M total', () => {
     expect(routeBadge(2, 5)).toBe('2 open / 5 total')
     expect(routeBadge(undefined, undefined)).toBe('0 open / 0 total')
+  })
+})
+
+describe('edgeCallout (WP-B — hover detail)', () => {
+  it('renders `from ⟶ to · N open / M total`', () => {
+    expect(edgeCallout('mobile', 'backend', 2, 5)).toBe('mobile ⟶ backend · 2 open / 5 total')
+  })
+
+  it('floors missing counts to 0 (reuses routeBadge)', () => {
+    expect(edgeCallout('a', 'b', undefined, undefined)).toBe('a ⟶ b · 0 open / 0 total')
+  })
+
+  it('keeps the routing-slip arrow glyph so it reads like the board route line', () => {
+    expect(edgeCallout('x', 'y', 0, 3)).toContain(' ⟶ ')
+  })
+})
+
+describe('projectFlowCallout (WP-B — project in/out flow)', () => {
+  const edge = (id: string, source: string, target: string, total: number): AtlasEdge => ({
+    id,
+    source,
+    target,
+    category: 'route',
+    totalCount: total,
+  })
+
+  it('sums TOTAL inbound and outbound route flow for the node', () => {
+    const edges = [
+      edge('e1', 'mobile', 'backend', 5), // out of mobile → into backend
+      edge('e2', 'ai', 'backend', 3), // into backend
+      edge('e3', 'backend', 'frontend', 2), // out of backend
+    ]
+    expect(projectFlowCallout('backend', 'backend', edges)).toBe('backend · 8 in / 2 out')
+    expect(projectFlowCallout('mobile', 'mobile', edges)).toBe('mobile · 0 in / 5 out')
+  })
+
+  it('ignores non-route edges and treats a missing totalCount as 0', () => {
+    const edges: AtlasEdge[] = [
+      { id: 't1', source: 'a', target: 'backend', category: 'thread' }, // not a route
+      { id: 'r1', source: 'a', target: 'backend', category: 'route' }, // no totalCount → 0
+    ]
+    expect(projectFlowCallout('backend', 'backend', edges)).toBe('backend · 0 in / 0 out')
+  })
+
+  it('reads 0 in / 0 out for a project with no route flow', () => {
+    expect(projectFlowCallout('lonely', 'lonely', [])).toBe('lonely · 0 in / 0 out')
   })
 })

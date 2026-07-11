@@ -273,8 +273,10 @@ export function AtlasNodeCard({
   /** Enter / click: the §3 resolution for this node type */
   onActivate: (node: AtlasNode) => void
   onSelect: (node: AtlasNode) => void
-  /** hover emphasis (layout-v2): connected edges light up, others fade */
-  onHover?: (id: string | null) => void
+  /** hover emphasis (layout-v2): connected edges light up, others fade. The
+   *  pointer event rides along so a project card can raise its flow callout at
+   *  the cursor (WP-B). */
+  onHover?: (id: string | null, e?: React.PointerEvent) => void
   nodeRef?: (el: SVGGElement | null) => void
   /** accessible label ("project nimbus-backend, 3 open handoffs") */
   describe: string
@@ -305,7 +307,7 @@ export function AtlasNodeCard({
         onActivate(node)
       }}
       onFocus={() => onSelect(node)}
-      onPointerEnter={() => onHover?.(node.id)}
+      onPointerEnter={(e) => onHover?.(node.id, e)}
       onPointerLeave={() => onHover?.(null)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target === e.currentTarget) {

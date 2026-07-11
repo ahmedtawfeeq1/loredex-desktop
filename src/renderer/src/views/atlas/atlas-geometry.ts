@@ -15,6 +15,7 @@ import {
   ZOOM_MAX_SCALE,
   ZOOM_MIN_SCALE,
 } from '../../../../shared/atlas-layout'
+import type { AtlasEdge } from '../../../../shared/types'
 
 // the geometry both sides of the seam must agree on (card boxes, overlap
 // test, orthogonal routing, chips, lanes, the panel card box) lives in
@@ -178,6 +179,38 @@ export function nextFocus(
 /** `N open / M total` text for an aggregated route edge (hover detail). */
 export function routeBadge(openCount: number | undefined, totalCount: number | undefined): string {
   return `${openCount ?? 0} open / ${totalCount ?? 0} total`
+}
+
+/** WP-B hover callout for an aggregated route edge: the routing-slip route line
+ *  plus the count badge — `from ⟶ to · N open / M total`. Pure; the canvas
+ *  resolves the endpoint labels and positions the HTML overlay, this only
+ *  formats the one line (Tom Sawyer progressive disclosure — detail on hover). */
+export function edgeCallout(
+  from: string,
+  to: string,
+  openCount: number | undefined,
+  totalCount: number | undefined,
+): string {
+  return `${from} ⟶ ${to} · ${routeBadge(openCount, totalCount)}`
+}
+
+/** WP-B hover callout for a PROJECT node: its aggregated inbound/outbound route
+ *  flow — `label · N in / M out` — summed over the aggregated route edges that
+ *  touch the node (TOTAL handoff counts). Pure over the edge list; a project
+ *  with no route flow reads `label · 0 in / 0 out`. */
+export function projectFlowCallout(
+  id: string,
+  label: string,
+  edges: ReadonlyArray<Pick<AtlasEdge, 'source' | 'target' | 'category' | 'totalCount'>>,
+): string {
+  let inFlow = 0
+  let outFlow = 0
+  for (const e of edges) {
+    if (e.category !== 'route') continue
+    if (e.target === id) inFlow += e.totalCount ?? 0
+    if (e.source === id) outFlow += e.totalCount ?? 0
+  }
+  return `${label} · ${inFlow} in / ${outFlow} out`
 }
 
 /** WP-A magnitude-on-the-edge: stroke width for an aggregated route edge scaled

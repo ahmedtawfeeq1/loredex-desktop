@@ -148,6 +148,29 @@
   margin: 0 16px 16px;
 }
 
+/* WP-B hover detail callout: a small floating card that follows the cursor over
+   an aggregated edge (from ⟶ to · N open / M total) or a project (in/out flow).
+   --bg-card, hairline, shadow-sm, mono (DESIGN v2). Floats just above the cursor
+   and never eats pointer events (so hover doesn't flicker); the SVG <title> is
+   still the accessible fallback. */
+.atlas-callout {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, calc(-100% - 12px));
+  max-width: 320px;
+  padding: 5px 9px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(19, 24, 38, 0.06);
+  color: var(--text-1);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* floating zoom pill stack: bottom-right, --bg-card / hairline / shadow-sm */
 .atlas-zoom-controls {
   position: absolute;

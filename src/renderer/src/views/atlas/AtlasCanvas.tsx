@@ -35,6 +35,7 @@ import { type TopicAtom, visiblePanels } from './atlas-visibility'
 import { type AtlasDecor, edgeDecorClass, nodeDecorClass } from './decor'
 import { TopicGroup } from './TopicGroup'
 import {
+  edgeCallout,
   edgeWidth,
   fitViewBox,
   fitViewBoxAround,
@@ -44,6 +45,7 @@ import {
   nodeRect,
   orthoRoute,
   panViewBox,
+  projectFlowCallout,
   type Rect,
   traversalOrder,
   type ViewBox,
@@ -107,7 +109,11 @@ function OrthoEdge({
   a,
   b,
   off,
+  fromLabel,
+  toLabel,
   onActivateEdge,
+  onShowCallout,
+  onHideCallout,
   decorClass = '',
   hot,
   openThread,
@@ -117,7 +123,13 @@ function OrthoEdge({
   b: Rect
   /** parallel-lane offset (±LANE_STEP per lane between the same pair) */
   off: number
+  /** aggregated-edge hover callout: the source/target project names (WP-B) */
+  fromLabel: string
+  toLabel: string
   onActivateEdge: (edge: AtlasEdge, nearerEnd: 'source' | 'target') => void
+  /** WP-B: reveal the `from ⟶ to · N open / M total` callout at the cursor */
+  onShowCallout: (text: string, clientX: number, clientY: number) => void
+  onHideCallout: () => void
   /** path gold / focus fade (views/atlas/decor.ts, story 10.6) */
   decorClass?: string
   /** hover emphasis: this edge touches the hovered node */
@@ -157,7 +169,9 @@ function OrthoEdge({
         style={lineStyle}
         markerEnd={gold ? 'url(#atlas-arrow-gold)' : 'url(#atlas-arrow)'}
       />
-      {/* wide invisible hit path: edge click = the handoff/diff it stands for */}
+      {/* wide invisible hit path: edge click = the handoff/diff it stands for.
+          WP-B: on an aggregated route it also drives the hover detail callout
+          (from ⟶ to · N open / M total) — the <title> stays as the a11y fallback. */}
       {/* biome-ignore lint: pointer affordance for edges; nodes carry keyboard access */}
       <path
         className="atlas-edge-hit"
@@ -166,6 +180,27 @@ function OrthoEdge({
           e.stopPropagation()
           onActivateEdge(edge, nearerEndOf(e, start, end))
         }}
+        onMouseEnter={
+          aggregated
+            ? (e) =>
+                onShowCallout(
+                  edgeCallout(fromLabel, toLabel, edge.openCount, edge.totalCount),
+                  e.clientX,
+                  e.clientY,
+                )
+            : undefined
+        }
+        onMouseMove={
+          aggregated
+            ? (e) =>
+                onShowCallout(
+                  edgeCallout(fromLabel, toLabel, edge.openCount, edge.totalCount),
+                  e.clientX,
+                  e.clientY,
+                )
+            : undefined
+        }
+        onMouseLeave={aggregated ? onHideCallout : undefined}
       >
         <title>
           {edge.category === 'route'
@@ -232,6 +267,10 @@ export function AtlasCanvas({
   const nodeEls = useRef(new Map<string, SVGGElement>())
   const [viewBox, setViewBox] = useState<ViewBox | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
+  // WP-B: the floating hover-detail callout (pane-relative px + one text line).
+  // An aggregated edge or a project card feeds it; the <title> stays the a11y
+  // fallback. Positioned over the SVG like the comment popover overlay pattern.
+  const [callout, setCallout] = useState<{ x: number; y: number; text: string } | null>(null)
   const drag = useRef<{ x: number; y: number } | null>(null)
   // the live viewBox, mirrored so the native (non-passive) wheel listener and
   // the zoom command bus read the current frame without re-subscribing
@@ -410,6 +449,31 @@ export function AtlasCanvas({
     () => (hoverId ? focusNeighborhood(hoverId, graph.edges) : null),
     [hoverId, graph.edges],
   )
+
+  // WP-B: convert a cursor's client coords to pane-relative px and raise the
+  // callout there (the pane is position:relative — it anchors the overlay).
+  const showCallout = (text: string, clientX: number, clientY: number): void => {
+    const rect = paneRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setCallout({ x: clientX - rect.left, y: clientY - rect.top, text })
+  }
+  const hideCallout = (): void => setCallout(null)
+
+  // WP-B: node hover reuses the existing hover-neighborhood state (setHoverId)
+  // and, for a PROJECT card, also surfaces its in/out route flow in the callout.
+  const onNodeHover = (id: string | null, e?: React.PointerEvent): void => {
+    setHoverId(id)
+    if (!id) {
+      hideCallout()
+      return
+    }
+    const node = byId.get(id)
+    if (node?.type === 'project' && e) {
+      showCallout(projectFlowCallout(node.id, node.label, graph.edges), e.clientX, e.clientY)
+    } else {
+      hideCallout()
+    }
+  }
 
   // parallel edges between the same pair fan out ±LANE_STEP per lane
   const lanes = useMemo(() => laneOffsets(graph.edges), [graph.edges])
@@ -593,7 +657,11 @@ export function AtlasCanvas({
                 a={nodeRect(a, level)}
                 b={nodeRect(b, level)}
                 off={lanes.get(edge.id) ?? 0}
+                fromLabel={a.label}
+                toLabel={b.label}
                 onActivateEdge={onActivateEdge}
+                onShowCallout={showCallout}
+                onHideCallout={hideCallout}
                 openThread={openThreadEdges.has(edge.id)}
                 decorClass={`${edgeDecorClass(edge, decor)}${
                   hoverHood && !(hoverHood.has(edge.source) && hoverHood.has(edge.target))
@@ -623,7 +691,7 @@ export function AtlasCanvas({
               describe={describeNode(node)}
               onSelect={(n) => onSelect(n)}
               onActivate={onActivate}
-              onHover={setHoverId}
+              onHover={onNodeHover}
               nodeRef={refFor(node.id)}
               decorClass={`${nodeDecorClass(node.id, decor)}${
                 hoverHood && !hoverHood.has(node.id) ? ' atlas-dim' : ''
@@ -636,6 +704,19 @@ export function AtlasCanvas({
           ))}
         </g>
       </svg>
+      {/* WP-B — hover detail callout: a small floating HTML overlay near the
+          cursor showing `from ⟶ to · N open / M total` (edge) or the project's
+          in/out flow. --bg-card, hairline, shadow-sm, mono (DESIGN v2). The SVG
+          <title> remains the accessible fallback; this is pointer-only detail. */}
+      {callout && (
+        <div
+          className="atlas-callout"
+          style={{ left: callout.x, top: callout.y }}
+          aria-hidden
+        >
+          {callout.text}
+        </div>
+      )}
       {/* D1 amendment 5 — floating on-canvas zoom pill stack (bottom-right):
           28px mono-glyph buttons, each with a tooltip + keyboard equivalent */}
       <div className="atlas-zoom-controls" role="group" aria-label="Zoom controls">

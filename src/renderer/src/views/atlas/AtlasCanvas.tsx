@@ -94,14 +94,28 @@ const pathOf = (points: Array<{ x: number; y: number }>): string =>
  *  the target card) along the incoming segment, so the gold badge lands just
  *  clear of the arrowhead rather than on top of it. Pure, no de-collision. */
 const OPEN_DOT_R = 8
-function openDotAt(points: Array<{ x: number; y: number }>): { x: number; y: number } {
+/** Place the open-count dot near the target end but CLEAR of the arrowhead.
+ *  The arrowhead marker scales with stroke width (up to ~7×w long), so a fixed
+ *  along-line pullback isn't enough on thick edges — the head overruns the dot
+ *  (the number hides under the arrow). Fix: back off along the line by the
+ *  arrowhead length, AND lift the dot perpendicular to the segment so it floats
+ *  just off the line, above the arrowhead. Pure, no de-collision. */
+function openDotAt(
+  points: Array<{ x: number; y: number }>,
+  strokeW: number,
+): { x: number; y: number } {
   const end = points[points.length - 1] as { x: number; y: number }
   const prev = (points[points.length - 2] ?? end) as { x: number; y: number }
   const vx = prev.x - end.x
   const vy = prev.y - end.y
   const len = Math.hypot(vx, vy) || 1
-  const off = Math.min(OPEN_DOT_R + 6, len)
-  return { x: end.x + (vx / len) * off, y: end.y + (vy / len) * off }
+  const ux = vx / len
+  const uy = vy / len
+  // along-line: clear the scaled arrowhead (~7×strokeW) + the dot radius
+  const along = Math.min(7 * strokeW + OPEN_DOT_R + 4, len)
+  // perpendicular lift so a wide arrowhead never covers the dot
+  const lift = OPEN_DOT_R + strokeW / 2 + 3
+  return { x: end.x + ux * along + -uy * lift, y: end.y + uy * along + ux * lift }
 }
 
 function OrthoEdge({
@@ -166,7 +180,8 @@ function OrthoEdge({
   // width stays. Non-aggregated relationship edges keep their CSS hairline. WP-D:
   // a quiet drilled route drops the width encoding + open dot + hover callout.
   const lineStyle = aggregated && !quiet ? { strokeWidth: edgeWidth(edge.totalCount) } : undefined
-  const dot = aggregated && !quiet && openCount > 0 ? openDotAt(points) : null
+  const dot =
+    aggregated && !quiet && openCount > 0 ? openDotAt(points, edgeWidth(edge.totalCount)) : null
   return (
     <g
       className={`atlas-edge atlas-edge-${edge.category}${inPanel ? ' atlas-edge-inpanel' : ''}${threadGold ? ' atlas-edge-open-thread' : ''}${decorClass}${hot ? ' atlas-edge-hot' : ''}`}

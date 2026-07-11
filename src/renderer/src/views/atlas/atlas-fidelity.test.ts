@@ -133,8 +133,9 @@ describe('WP-A: magnitude on the edge, no aggregated pill', () => {
   })
 
   it('draws the gold open-count dot ONLY when open > 0, near the target end', () => {
-    // the dot is gated on openCount > 0 and reuses the routed end point
-    expect(canvas).toMatch(/openCount\s*>\s*0\s*\?\s*openDotAt\(points\)/)
+    // the dot is gated on openCount > 0 and is placed clear of the arrowhead
+    // (openDotAt takes the stroke width so it can back off the scaled head)
+    expect(canvas).toMatch(/openCount\s*>\s*0\s*\?\s*openDotAt\(points,\s*edgeWidth/)
     expect(canvas).toContain('atlas-edge-opendot')
     // and it is styled gold with gold-ink text
     expect(blockIn(styles, '.atlas-edge-opendot circle')).toContain('fill: var(--gold);')

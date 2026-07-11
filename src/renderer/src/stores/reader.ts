@@ -23,13 +23,19 @@ interface ReaderState {
    *  brief is opened from the board (story 3.2, F5 reading order) */
   readingOrder: string[]
   loadTree(): Promise<void>
-  open(path: string, readingOrder?: string[]): Promise<void>
+  open(path: string, readingOrder?: string[], retriedStale?: boolean): Promise<void>
   /** manual refresh action: re-walk the tree and re-read the open note */
   refresh(): Promise<void>
   reset(): void
 }
 
 const errText = (e: unknown): string => (isErrEnvelope(e) ? `${e.code}: ${e.message}` : String(e))
+
+/** A note the tree still lists but disk no longer has (e.g. a remote pull moved
+ *  or removed it after the tree was walked) — the lib rejects it as outside the
+ *  vault or unreadable. We recover by re-walking, not by showing the raw code. */
+const isStalePathError = (e: unknown): boolean =>
+  isErrEnvelope(e) && e.code === 'VAULT_OUTSIDE_PATH'
 
 export const useReader = create<ReaderState>((set, get) => ({
   tree: null,
@@ -48,7 +54,7 @@ export const useReader = create<ReaderState>((set, get) => ({
     }
   },
 
-  async open(path, readingOrder = []) {
+  async open(path, readingOrder = [], retriedStale = false) {
     set({ selected: path, docError: null, readingOrder })
     useDiagnostics.getState().clearNote(path) // re-fed as the note re-renders
     try {
@@ -56,7 +62,19 @@ export const useReader = create<ReaderState>((set, get) => ({
       // keep the tree responsive while a large note (≤1 MB) renders
       startTransition(() => set({ doc }))
     } catch (e) {
-      set({ doc: null, docError: errText(e) })
+      // stale tree (a pull moved/removed the note after it was walked): re-walk
+      // once so disk truth returns, then show a plain message instead of the
+      // raw VAULT_OUTSIDE_PATH. Guard against a loop — only self-heal once.
+      if (isStalePathError(e) && !retriedStale) {
+        await get().loadTree()
+        return get().open(path, readingOrder, true)
+      }
+      set({
+        doc: null,
+        docError: isStalePathError(e)
+          ? 'This note has moved or was removed since the list was loaded. The file list has been refreshed — pick it again from the tree.'
+          : errText(e),
+      })
     }
   },
 

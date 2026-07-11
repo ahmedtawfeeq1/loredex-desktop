@@ -167,8 +167,19 @@ function assertEdgeClearance(g: AtlasGraph): void {
     const b = byId.get(e.target)
     if (!a || !b) continue
     const route = orthoRoute(nodeRect(a, g.level), nodeRect(b, g.level), 0, 20)
-    // the channel midpoint (label anchor) must sit in a card-free channel
-    const probe: Rect = { x: route.label.x - 1, y: route.label.y - 1, w: 2, h: 2 }
+    // the vertical run (constant x) is the card-free channel; its midpoint must
+    // sit clear of every card
+    const pts = route.points
+    let channel = pts[Math.floor(pts.length / 2)] as { x: number; y: number }
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i - 1] as { x: number; y: number }
+      const q = pts[i] as { x: number; y: number }
+      if (p.x === q.x && p.y !== q.y) {
+        channel = { x: p.x, y: (p.y + q.y) / 2 }
+        break
+      }
+    }
+    const probe: Rect = { x: channel.x - 1, y: channel.y - 1, w: 2, h: 2 }
     for (const r of cardRects) {
       expect(
         rectsOverlap(probe, r),

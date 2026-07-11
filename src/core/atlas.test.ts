@@ -9,14 +9,11 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
-  chipRect,
   FIT_PAD,
-  laneOffsets,
   NODE_H,
   NODE_W,
   nodeRect,
   NOTE_ROW_PITCH,
-  orthoRoute,
   PANEL_ASPECT,
   rectsOverlap,
   TOPIC_COL_PITCH,
@@ -141,22 +138,6 @@ function assertLayoutInvariants(g: AtlasGraph): void {
       expect(connected.has(n.id), `${g.level}: ${n.id} floats with no edge`).toBe(true)
     }
   }
-
-  // label clearance: aggregated `N open / M total` chips ride card-free
-  // channel segments — clipping under a card is a layout bug by definition
-  const byId = new Map(g.nodes.map((n) => [n.id, n]))
-  const lanes = laneOffsets(g.edges)
-  for (const e of g.edges) {
-    if (e.totalCount === undefined) continue
-    const a = byId.get(e.source)
-    const b = byId.get(e.target)
-    if (!a || !b) continue
-    const route = orthoRoute(nodeRect(a, g.level), nodeRect(b, g.level), lanes.get(e.id) ?? 0)
-    const chip = chipRect(route.label)
-    for (const { id, r } of rects) {
-      expect(rectsOverlap(chip, r), `${g.level}: chip of ${e.id} clips under ${id}`).toBe(false)
-    }
-  }
 }
 
 /** Per-panel column-grid fill: members ÷ (columns × deepest column). The old
@@ -179,9 +160,8 @@ function panelFill(g: AtlasGraph, cluster: AtlasCluster): { members: number; rat
   }
 }
 
-/** The story 16.5 drilled-level density invariants: min card size, aggregated
- *  label chips clear of every pill with an 8px margin ("never clipped", not
- *  merely non-overlapping), and panels > 6 members fill > half their grid. */
+/** The story 16.5 drilled-level density invariants: min card size and panels
+ *  > 6 members fill > half their grid. */
 function assertDrilledInvariants(g: AtlasGraph): void {
   // min card size: drilled content never renders below the mini routing slip
   for (const n of g.nodes) {
@@ -189,29 +169,6 @@ function assertDrilledInvariants(g: AtlasGraph): void {
     const r = nodeRect(n, g.level)
     expect(r.w, `${g.level}: ${n.id} card width`).toBeGreaterThanOrEqual(NODE_W)
     expect(r.h, `${g.level}: ${n.id} card height`).toBeGreaterThanOrEqual(NODE_H)
-  }
-
-  // no label/pill intersection with clearance: inflate every project rect
-  // (side pills AND the panel header bar) by 8px before the overlap test
-  const byId = new Map(g.nodes.map((n) => [n.id, n]))
-  const lanes = laneOffsets(g.edges)
-  const pills = g.nodes
-    .filter((n) => n.type === 'project')
-    .map((n) => ({ id: n.id, r: nodeRect(n, g.level) }))
-  for (const e of g.edges) {
-    if (e.totalCount === undefined) continue
-    const a = byId.get(e.source)
-    const b = byId.get(e.target)
-    if (!a || !b) continue
-    const route = orthoRoute(nodeRect(a, g.level), nodeRect(b, g.level), lanes.get(e.id) ?? 0)
-    const chip = chipRect(route.label)
-    for (const { id, r } of pills) {
-      const inflated = { x: r.x - 8, y: r.y - 8, w: r.w + 16, h: r.h + 16 }
-      expect(
-        rectsOverlap(chip, inflated),
-        `${g.level}: chip of ${e.id} crowds pill ${id}`,
-      ).toBe(false)
-    }
   }
 
   // panel-content fill ratio > 0.5 whenever a panel holds more than 6 members

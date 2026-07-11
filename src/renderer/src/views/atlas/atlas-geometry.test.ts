@@ -7,8 +7,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   ARROW_STANDOFF,
-  CHIP_H,
-  CHIP_W,
   CLUSTER_H,
   CLUSTER_W,
   FIT_PAD,
@@ -29,8 +27,7 @@ import {
 } from '../../../../shared/atlas-layout'
 import type { AtlasNode } from '../../../../shared/types'
 import {
-  badgeRect,
-  chipRect,
+  edgeWidth,
   fitViewBox,
   laneOffsets,
   nextFocus,
@@ -40,7 +37,6 @@ import {
   panViewBox,
   type Rect,
   rectsOverlap,
-  resolveChipCollisions,
   routeBadge,
   traversalOrder,
   zoomViewBox,
@@ -149,7 +145,7 @@ describe('orthoRoute', () => {
   it('routes forward edges H→V→H with the vertical run in the gutter', () => {
     const a = rect(0, 0, CLUSTER_W, CLUSTER_H)
     const b = rect(CLUSTER_W + GUTTER, 300, CLUSTER_W, CLUSTER_H)
-    const { points, label } = orthoRoute(a, b)
+    const { points } = orthoRoute(a, b)
     expect(points[0]).toEqual({ x: CLUSTER_W, y: CLUSTER_H / 2 }) // leaves a's right edge
     // stops ARROW_STANDOFF short of b's left edge (WP5 arrowhead standoff)
     expect(points[points.length - 1]).toEqual({
@@ -166,9 +162,6 @@ describe('orthoRoute', () => {
         expect(p.x).toBeLessThan(CLUSTER_W + GUTTER)
       }
     }
-    // the label chip rides the horizontal channel segment, clear of both cards
-    expect(rectsOverlap(chipRect(label), a)).toBe(false)
-    expect(rectsOverlap(chipRect(label), b)).toBe(false)
   })
 
   it('routes long spans through the corridor band, never across a lane card', () => {
@@ -176,7 +169,7 @@ describe('orthoRoute', () => {
     const a = rect(0, 0, CLUSTER_W, CLUSTER_H)
     const between = rect(pitch, 0, CLUSTER_W, CLUSTER_H) // same row, middle lane
     const b = rect(pitch * 2, 0, CLUSTER_W, CLUSTER_H)
-    const { points, label } = orthoRoute(a, b)
+    const { points } = orthoRoute(a, b)
     // no segment may cross the middle card
     for (let i = 1; i < points.length; i++) {
       const p = points[i - 1] as { x: number; y: number }
@@ -189,7 +182,6 @@ describe('orthoRoute', () => {
       }
       expect(rectsOverlap(seg, between)).toBe(false)
     }
-    expect(rectsOverlap(chipRect(label), between)).toBe(false)
   })
 
   it('routes backward and same-lane pairs without touching either card', () => {
@@ -207,7 +199,7 @@ describe('orthoRoute', () => {
     }
   })
 
-  it('fans parallel edges between the same pair out by ≥ CHIP_H per lane (WP1)', () => {
+  it('fans parallel edges between the same pair out by LANE_STEP per lane', () => {
     const offsets = laneOffsets([
       { id: 'e1', source: 'a', target: 'b' },
       { id: 'e2', source: 'b', target: 'a' },
@@ -215,20 +207,11 @@ describe('orthoRoute', () => {
     ])
     expect(offsets.get('e1')).toBe(-12)
     expect(offsets.get('e2')).toBe(12)
-    // the fan step must clear the chip height so two stacked lanes' pills never
-    // vertically overlap (the collision root cause: was 12 < CHIP_H=18)
+    // a reciprocal pair fans out by a full LANE_STEP so the two directional
+    // lines stay visually distinct
     const step = Math.abs((offsets.get('e1') ?? 0) - (offsets.get('e2') ?? 0))
     expect(step).toBe(24)
-    expect(step).toBeGreaterThanOrEqual(CHIP_H)
     expect(offsets.get('lone')).toBe(0)
-    // a same-pair reciprocal pair puts its labels on OPPOSITE sides of the
-    // channel (chipOff sign follows the lane direction) and never stacks
-    const a = rect(0, 0, CLUSTER_W, CLUSTER_H)
-    const b = rect(CLUSTER_W + GUTTER, 0, CLUSTER_W, CLUSTER_H)
-    const labA = orthoRoute(a, b, -12).label
-    const labB = orthoRoute(b, a, 12).label
-    expect(Math.sign(labA.y - CLUSTER_H / 2)).toBe(-Math.sign(labB.y - CLUSTER_H / 2))
-    expect(rectsOverlap(chipRect(labA), chipRect(labB))).toBe(false)
   })
 })
 
@@ -269,74 +252,22 @@ describe('text containment (WP5)', () => {
   })
 })
 
-describe('badgeRect (WP1 — text-sized pill)', () => {
-  it('never narrower than CHIP_W, widens for a long count, and centers on x', () => {
-    // a short label floors at the fixed pill width
-    const short = badgeRect({ x: 100, y: 50 }, 'x')
-    expect(short.w).toBe(CHIP_W)
-    expect(short.x + short.w / 2).toBe(100) // centered on the label
-    expect(short.h).toBe(CHIP_H)
-    // a real "N open / M total" already exceeds the old fixed 112px pill, so it
-    // MUST grow rather than spill (the overflow bug this fixes)
-    const longText = routeBadge(1200, 9999)
-    const long = badgeRect({ x: 100, y: 50 }, longText)
-    expect(long.w).toBeGreaterThan(CHIP_W)
-    expect(long.w).toBeGreaterThanOrEqual(longText.length * 6)
-    expect(long.x + long.w / 2).toBe(100)
-  })
-})
-
-describe('resolveChipCollisions (WP1 — global de-collision pass)', () => {
-  const overlaps = (rects: Rect[]): boolean => {
-    for (let i = 0; i < rects.length; i++)
-      for (let j = i + 1; j < rects.length; j++)
-        if (rectsOverlap(rects[i] as Rect, rects[j] as Rect)) return true
-    return false
-  }
-  const applied = (chips: Array<{ id: string; rect: Rect }>): Rect[] => {
-    const shifts = resolveChipCollisions(chips)
-    return chips.map(({ id, rect: r }) => {
-      const s = shifts.get(id) ?? { dx: 0, dy: 0 }
-      return { ...r, x: r.x + s.dx, y: r.y + s.dy }
-    })
-  }
-
-  it('leaves a non-colliding set untouched', () => {
-    const chips = [
-      { id: 'a', rect: chipRect({ x: 0, y: 0 }) },
-      { id: 'b', rect: chipRect({ x: 400, y: 0 }) },
-    ]
-    const shifts = resolveChipCollisions(chips)
-    expect(shifts.get('a')).toEqual({ dx: 0, dy: 0 })
-    expect(shifts.get('b')).toEqual({ dx: 0, dy: 0 })
-  })
-
-  it('separates a crafted colliding set until no two chips overlap', () => {
-    // five chips stacked on the SAME point — the worst case
-    const chips = ['e1', 'e2', 'e3', 'e4', 'e5'].map((id) => ({
-      id,
-      rect: chipRect({ x: 200, y: 120 }),
-    }))
-    expect(overlaps(chips.map((c) => c.rect))).toBe(true) // precondition
-    expect(overlaps(applied(chips))).toBe(false)
-  })
-
-  it('clears a dense 25-topic-style grid of near-coincident chips', () => {
-    // 25 chips clustered inside a single CHIP_W×CHIP_H cell (a pathological
-    // dominant-topic / nimbus fan) — the pass must fully de-collide them
-    const chips: Array<{ id: string; rect: Rect }> = []
-    for (let i = 0; i < 25; i++) {
-      chips.push({ id: `t${String(i).padStart(2, '0')}`, rect: chipRect({ x: 300 + (i % 5) * 6, y: 200 + i * 3 }) })
+describe('edgeWidth (WP-A — magnitude on the edge)', () => {
+  it('is monotonic non-decreasing in total and clamped to 1.5–5px', () => {
+    // floors at 1.5 for a missing/zero total, rises with total, caps at 5
+    expect(edgeWidth(undefined)).toBe(1.5)
+    expect(edgeWidth(0)).toBe(1.5)
+    let prev = edgeWidth(0)
+    for (let total = 1; total <= 40; total++) {
+      const w = edgeWidth(total)
+      expect(w).toBeGreaterThanOrEqual(prev) // monotonic non-decreasing
+      expect(w).toBeGreaterThanOrEqual(1.5) // clamped low
+      expect(w).toBeLessThanOrEqual(5) // clamped high
+      prev = w
     }
-    expect(overlaps(applied(chips))).toBe(false)
-  })
-
-  it('is deterministic — same input yields the same offsets', () => {
-    const build = (): Array<{ id: string; rect: Rect }> =>
-      ['e3', 'e1', 'e2'].map((id) => ({ id, rect: chipRect({ x: 100, y: 100 }) }))
-    const a = resolveChipCollisions(build())
-    const b = resolveChipCollisions(build())
-    for (const id of ['e1', 'e2', 'e3']) expect(a.get(id)).toEqual(b.get(id))
+    // strictly grows across the readable band before the cap, then pins at 5
+    expect(edgeWidth(5)).toBeGreaterThan(edgeWidth(1))
+    expect(edgeWidth(1000)).toBe(5)
   })
 })
 

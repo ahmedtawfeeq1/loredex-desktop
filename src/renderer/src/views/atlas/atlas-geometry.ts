@@ -21,8 +21,6 @@ import {
 // shared/atlas-layout — re-exported here so the canvas keeps one geometry
 // import (panelRect moved shared in story 16.5 for the drilled invariants)
 export {
-  badgeRect,
-  chipRect,
   laneOffsets,
   nodeRect,
   type OrthoRoute,
@@ -30,7 +28,6 @@ export {
   panelRect,
   type Rect,
   rectsOverlap,
-  resolveChipCollisions,
 } from '../../../../shared/atlas-layout'
 
 export interface ViewBox {
@@ -178,7 +175,15 @@ export function nextFocus(
   return best?.id ?? current.id
 }
 
-/** `N open / M total` badge text for an aggregated route edge. */
+/** `N open / M total` text for an aggregated route edge (hover detail). */
 export function routeBadge(openCount: number | undefined, totalCount: number | undefined): string {
   return `${openCount ?? 0} open / ${totalCount ?? 0} total`
+}
+
+/** WP-A magnitude-on-the-edge: stroke width for an aggregated route edge scaled
+ *  by its TOTAL handoff count, clamped to a readable 1.5–5px band (the
+ *  service-graph "thickness ∝ flow" encoding; replaces the removed count pill).
+ *  Monotonic non-decreasing in `total`; a missing/zero total floors at 1.5. */
+export function edgeWidth(total: number | undefined): number {
+  return Math.max(1.5, Math.min(5, 1.5 + (total ?? 0) * 0.4))
 }

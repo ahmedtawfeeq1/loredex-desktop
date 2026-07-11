@@ -35,7 +35,7 @@ import { type TopicAtom, visiblePanels } from './atlas-visibility'
 import { type AtlasDecor, edgeDecorClass, nodeDecorClass } from './decor'
 import { TopicGroup } from './TopicGroup'
 import {
-  badgeRect,
+  edgeWidth,
   fitViewBox,
   fitViewBoxAround,
   type FocusTarget,
@@ -45,8 +45,6 @@ import {
   orthoRoute,
   panViewBox,
   type Rect,
-  resolveChipCollisions,
-  routeBadge,
   traversalOrder,
   type ViewBox,
   zoomViewBox,
@@ -90,6 +88,20 @@ function nearerEndOf(
 const pathOf = (points: Array<{ x: number; y: number }>): string =>
   points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 
+/** Open-count dot center: back off the routed END point (which sits just off
+ *  the target card) along the incoming segment, so the gold badge lands just
+ *  clear of the arrowhead rather than on top of it. Pure, no de-collision. */
+const OPEN_DOT_R = 8
+function openDotAt(points: Array<{ x: number; y: number }>): { x: number; y: number } {
+  const end = points[points.length - 1] as { x: number; y: number }
+  const prev = (points[points.length - 2] ?? end) as { x: number; y: number }
+  const vx = prev.x - end.x
+  const vy = prev.y - end.y
+  const len = Math.hypot(vx, vy) || 1
+  const off = Math.min(OPEN_DOT_R + 6, len)
+  return { x: end.x + (vx / len) * off, y: end.y + (vy / len) * off }
+}
+
 function OrthoEdge({
   edge,
   a,
@@ -99,7 +111,6 @@ function OrthoEdge({
   decorClass = '',
   hot,
   openThread,
-  badgeShift,
 }: {
   edge: AtlasEdge
   a: Rect
@@ -113,13 +124,11 @@ function OrthoEdge({
   hot?: boolean
   /** thread edge whose thread is still open — draws gold (D1 amendment 3) */
   openThread?: boolean
-  /** global chip de-collision nudge for this edge's badge (WP1) */
-  badgeShift?: { dx: number; dy: number }
 }): React.JSX.Element {
-  // aggregated route chips need the full gutter channel; quiet in-panel
+  // aggregated route edges need the full gutter channel; quiet in-panel
   // edges (thread rails, wikilinks) stay inside the 40px column gaps
   const stub = edge.category === 'route' ? GUTTER / 2 : 20
-  const { points, label } = orthoRoute(a, b, off, stub)
+  const { points } = orthoRoute(a, b, off, stub)
   const start = points[0] as { x: number; y: number }
   const end = points[points.length - 1] as { x: number; y: number }
   const gold = edge.category === 'route' && edge.blocking
@@ -127,11 +136,17 @@ function OrthoEdge({
     edge.category === 'affinity' ||
     (edge.category === 'contract-link' && edge.confidence === 'heuristic')
   const aggregated = edge.totalCount !== undefined
+  const openCount = edge.openCount ?? 0
   // in-panel relationship connectors (everything but the aggregated project
   // routes) draw as thin, soft-cornered curves; open threads glow gold
   const inPanel = edge.category !== 'route'
   const threadGold = openThread === true
   const d = pathOf(points)
+  // WP-A: magnitude lives on the edge — stroke width ∝ total. Inline so it wins
+  // over the base .atlas-edge-line width; hover recolours (gold) but the encoded
+  // width stays. Non-aggregated relationship edges keep their CSS hairline.
+  const lineStyle = aggregated ? { strokeWidth: edgeWidth(edge.totalCount) } : undefined
+  const dot = aggregated && openCount > 0 ? openDotAt(points) : null
   return (
     <g
       className={`atlas-edge atlas-edge-${edge.category}${inPanel ? ' atlas-edge-inpanel' : ''}${threadGold ? ' atlas-edge-open-thread' : ''}${decorClass}${hot ? ' atlas-edge-hot' : ''}`}
@@ -139,6 +154,7 @@ function OrthoEdge({
       <path
         className={`atlas-edge-line${gold ? ' atlas-edge-blocking' : ''}${dashed ? ' atlas-edge-heuristic' : ''}`}
         d={d}
+        style={lineStyle}
         markerEnd={gold ? 'url(#atlas-arrow-gold)' : 'url(#atlas-arrow)'}
       />
       {/* wide invisible hit path: edge click = the handoff/diff it stands for */}
@@ -161,25 +177,16 @@ function OrthoEdge({
                 : edge.category}
         </title>
       </path>
-      {aggregated &&
-        (() => {
-          // pill sized to its text (long "N open / M total" never spills) and
-          // nudged by the global de-collision pass so chips never stack (WP1)
-          const text = routeBadge(edge.openCount, edge.totalCount)
-          const br = badgeRect(label, text)
-          const shift = badgeShift ?? { dx: 0, dy: 0 }
-          return (
-            <g
-              className={`atlas-edge-badge${(edge.openCount ?? 0) > 0 ? ' atlas-edge-badge-open' : ''}`}
-              transform={`translate(${shift.dx} ${shift.dy})`}
-            >
-              <rect x={br.x} y={br.y} width={br.w} height={br.h} rx={9} />
-              <text x={label.x} y={label.y + 3.5} textAnchor="middle">
-                {text}
-              </text>
-            </g>
-          )
-        })()}
+      {/* WP-A: small gold open-count badge near the target — only when it
+          matters (open > 0). Total/consumed live in the hover detail. */}
+      {dot && (
+        <g className="atlas-edge-opendot" aria-hidden>
+          <circle cx={dot.x} cy={dot.y} r={OPEN_DOT_R} />
+          <text x={dot.x} y={dot.y + 3} textAnchor="middle">
+            {openCount}
+          </text>
+        </g>
+      )}
     </g>
   )
 }
@@ -407,24 +414,6 @@ export function AtlasCanvas({
   // parallel edges between the same pair fan out ±LANE_STEP per lane
   const lanes = useMemo(() => laneOffsets(graph.edges), [graph.edges])
 
-  // global chip de-collision (WP1): after every aggregated edge's badge is
-  // placed by orthoRoute, sweep the (text-sized) pills and nudge any that still
-  // overlap along their channel — the per-edge {dx,dy} the renderer applies to
-  // the badge group transform, so no two "N open / M total" chips ever stack.
-  const badgeShifts = useMemo(() => {
-    const chips: Array<{ id: string; rect: Rect }> = []
-    for (const edge of graph.edges) {
-      if (edge.totalCount === undefined) continue
-      const a = byId.get(edge.source)
-      const b = byId.get(edge.target)
-      if (!a || !b) continue
-      const stub = edge.category === 'route' ? GUTTER / 2 : 20
-      const { label } = orthoRoute(nodeRect(a, level), nodeRect(b, level), lanes.get(edge.id) ?? 0, stub)
-      chips.push({ id: edge.id, rect: badgeRect(label, routeBadge(edge.openCount, edge.totalCount)) })
-    }
-    return resolveChipCollisions(chips)
-  }, [graph.edges, byId, lanes, level])
-
   // D1 amendment 5 — trackpad gestures. A NATIVE, non-passive wheel listener so
   // preventDefault actually holds (React's synthetic wheel is passive): pinch
   // (ctrlKey-wheel) zooms toward the cursor; a plain two-finger scroll pans
@@ -605,7 +594,6 @@ export function AtlasCanvas({
                 b={nodeRect(b, level)}
                 off={lanes.get(edge.id) ?? 0}
                 onActivateEdge={onActivateEdge}
-                badgeShift={badgeShifts.get(edge.id)}
                 openThread={openThreadEdges.has(edge.id)}
                 decorClass={`${edgeDecorClass(edge, decor)}${
                   hoverHood && !(hoverHood.has(edge.source) && hoverHood.has(edge.target))

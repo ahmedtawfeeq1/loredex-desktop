@@ -3366,25 +3366,20 @@ a:hover {
   fill: var(--gold);
 }
 
-/* aggregated `N open / M total` badge riding the route midpoint */
-.atlas-edge-badge rect {
-  fill: var(--bg-inset);
-  stroke: var(--hairline);
-  stroke-width: 1;
+/* WP-A: small gold open-count badge near an aggregated route's target end —
+   the one urgent number (open handoffs); shown only when open > 0. Magnitude
+   (total) lives in the edge's stroke width, detail in the hover callout. */
+.atlas-edge-opendot circle {
+  fill: var(--gold);
+  stroke: var(--bg-card);
+  stroke-width: 1.5;
 }
 
-.atlas-edge-badge text {
-  fill: var(--text-2);
+.atlas-edge-opendot text {
+  fill: var(--gold-ink);
   font-family: var(--font-mono);
   font-size: 10px;
-}
-
-.atlas-edge-badge-open text {
-  fill: var(--text-1);
-}
-
-.atlas-edge-badge-open rect {
-  stroke: var(--gold);
+  font-weight: 700;
 }
 
 /* loading: three skeleton cards where clusters will land */

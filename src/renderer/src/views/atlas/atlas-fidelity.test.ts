@@ -115,3 +115,29 @@ describe('side panels are a floating overlay, not a flex-squish (WP3)', () => {
     expect(blockIn(styles, '.atlas-side {')).toContain('overflow-wrap: anywhere;')
   })
 })
+
+describe('WP-A: magnitude on the edge, no aggregated pill', () => {
+  const canvas = readFileSync(join(import.meta.dirname, 'AtlasCanvas.tsx'), 'utf8')
+
+  it('renders no aggregated `N open / M total` pill on the canvas', () => {
+    // the whole pill mechanism is gone from the canvas and the stylesheets
+    expect(canvas).not.toContain('atlas-edge-badge')
+    expect(canvas).not.toContain('routeBadge')
+    expect(css).not.toContain('atlas-edge-badge')
+    expect(styles).not.toContain('atlas-edge-badge')
+  })
+
+  it('encodes total on the edge stroke width via the edgeWidth scale', () => {
+    expect(canvas).toContain('edgeWidth(edge.totalCount)')
+    expect(canvas).toContain('strokeWidth')
+  })
+
+  it('draws the gold open-count dot ONLY when open > 0, near the target end', () => {
+    // the dot is gated on openCount > 0 and reuses the routed end point
+    expect(canvas).toMatch(/openCount\s*>\s*0\s*\?\s*openDotAt\(points\)/)
+    expect(canvas).toContain('atlas-edge-opendot')
+    // and it is styled gold with gold-ink text
+    expect(blockIn(styles, '.atlas-edge-opendot circle')).toContain('fill: var(--gold);')
+    expect(blockIn(styles, '.atlas-edge-opendot text')).toContain('fill: var(--gold-ink);')
+  })
+})

@@ -42,9 +42,6 @@ export const PANEL_PAD = 24
 export const TOPIC_COL_PITCH = 240
 /** note row pitch inside a panel: NODE_H + 60 gap, GRID-aligned (24 × 6) */
 export const NOTE_ROW_PITCH = 144
-/** aggregated `N open / M total` label chip (white pill, mono 10px) */
-export const CHIP_W = 112
-export const CHIP_H = 18
 /** fit-to-content padding (viewport spec) */
 export const FIT_PAD = 48
 /** target width/height ratio the focused panel's grid wraps toward — near the
@@ -74,9 +71,9 @@ export const PANEL_MAX_COL_DEPTH = 6
  *  so pinch has more travel without losing the map. */
 export const ZOOM_MIN_SCALE = 0.4
 export const ZOOM_MAX_SCALE = 2.5
-/** side-pill column → panel gutter (GRID-aligned, 24 × 9): fits a CHIP_W
- *  route chip mid-channel with real clearance to the pill AND the panel card
- *  (GUTTER left it exactly chip-tight — the clipped-label defect, story 16.5) */
+/** side-pill column → panel gutter (GRID-aligned, 24 × 9): a wide edge channel
+ *  with real clearance to the side pill AND the panel card (GUTTER left it too
+ *  tight — the clipped-label defect, story 16.5) */
 export const PILL_GUTTER = 216
 
 // ── topic sub-cards + recency reading flow (story epic17.2, D1 amendment 3) ──
@@ -257,8 +254,6 @@ export function nodeRect(
 export interface OrthoRoute {
   /** polyline points, source anchor → target anchor (arrowhead at the end) */
   points: Array<{ x: number; y: number }>
-  /** label-chip center — ALWAYS on a horizontal channel segment, card-free */
-  label: { x: number; y: number }
 }
 
 const dedupePoints = (
@@ -309,13 +304,6 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
   const by = b.y + b.h / 2 + off
   const aRight = a.x + a.w
   const bRight = b.x + b.w
-  // reciprocal same-pair chips sit on OPPOSITE sides of the channel (the sign
-  // follows the lane direction) separated by CHIP_H, so the two label pills
-  // clear each other. The magnitude is HALF CHIP_H (not scaled by the wider
-  // lane fan): the long-span corridor band is only V_GAP/2 tall, so a bigger
-  // offset would drop the chip onto the target card. Any residual overlap from
-  // >2 lanes or a different pair is swept out by resolveChipCollisions (WP1).
-  const chipOff = off === 0 ? 0 : Math.sign(off) * (CHIP_H / 2)
 
   if (b.x >= aRight + 8) {
     // forward: leave a's right edge, enter b's left edge
@@ -329,7 +317,6 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
           { x: cx, y: by },
           { x: b.x, y: by },
         ])),
-        label: { x: cx, y: ay + chipOff },
       }
     }
     // long span: travel the card-free corridor band just above the target row
@@ -345,7 +332,6 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
         { x: cx2, y: by },
         { x: b.x, y: by },
       ])),
-      label: { x: (cx1 + cx2) / 2, y: corridorY + chipOff - off },
     }
   }
 
@@ -361,7 +347,6 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
           { x: cx, y: by },
           { x: bRight, y: by },
         ])),
-        label: { x: cx, y: ay + chipOff },
       }
     }
     const cx1 = a.x - Math.min(stub, gap / 2) - off
@@ -376,7 +361,6 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
         { x: cx2, y: by },
         { x: bRight, y: by },
       ])),
-      label: { x: (cx1 + cx2) / 2, y: corridorY + chipOff - off },
     }
   }
 
@@ -389,31 +373,11 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
       { x: lx, y: by },
       { x: b.x, y: by },
     ])),
-    label: { x: lx, y: ay + chipOff },
   }
 }
 
-/** The white pill chip box for an aggregated-route label. */
-export function chipRect(label: { x: number; y: number }): Rect {
-  return { x: label.x - CHIP_W / 2, y: label.y - CHIP_H / 2, w: CHIP_W, h: CHIP_H }
-}
-
-/** Approximate mono-glyph advance + horizontal padding for the 10px badge text
- *  ("N open / M total"): the pill must size to its text so a long count never
- *  spills past the fixed CHIP_W (WP1). */
-export const BADGE_CHAR_PX = 6
-export const BADGE_PAD_PX = 10
-
-/** The aggregated-route badge pill, sized to its rendered text (never narrower
- *  than CHIP_W) so long "N open / M total" strings can't overflow the fixed
- *  chip. Shared so the renderer's rect and the collision pass agree on width. */
-export function badgeRect(label: { x: number; y: number }, text: string): Rect {
-  const w = Math.max(CHIP_W, text.length * BADGE_CHAR_PX + BADGE_PAD_PX * 2)
-  return { x: label.x - w / 2, y: label.y - CHIP_H / 2, w, h: CHIP_H }
-}
-
-/** Fan step between parallel edges of the same unordered pair: ≥ CHIP_H so two
- *  stacked lanes' label pills never vertically overlap (WP1, was 12 < 18). */
+/** Fan step between parallel edges of the same unordered pair: keeps two
+ *  stacked directional lanes visually separated (24px). */
 export const LANE_STEP = 24
 
 /** Parallel edges between the same (unordered) node pair fan out ±LANE_STEP. */
@@ -433,35 +397,4 @@ export function laneOffsets(
     list.forEach((id, i) => offsets.set(id, (i - (list.length - 1) / 2) * LANE_STEP))
   }
   return offsets
-}
-
-/**
- * Global label-chip de-collision pass (WP1). Given every aggregated edge's
- * badge rect, return a per-id `{dx,dy}` offset that, applied to the rects,
- * leaves NO two overlapping. Deterministic: chips are processed in id order and
- * each is slid along its (horizontal) channel — the card-free axis a badge
- * rides — just past any already-placed chip it collides with. A pure safety net
- * over orthoRoute's per-pair placement for chips that land near each other from
- * DIFFERENT pairs. Runs after all edge labels are computed; the renderer applies
- * the offset to each `atlas-edge-badge` group transform.
- */
-export function resolveChipCollisions(
-  chips: ReadonlyArray<{ id: string; rect: Rect }>,
-): Map<string, { dx: number; dy: number }> {
-  const sorted = [...chips].sort((a, b) => a.id.localeCompare(b.id))
-  const placed: Rect[] = []
-  const out = new Map<string, { dx: number; dy: number }>()
-  for (const { id, rect } of sorted) {
-    const cur: Rect = { ...rect }
-    // slide along the channel (rightward, monotonically) until clear of every
-    // placed chip — bounded by the number of already-placed chips
-    for (let guard = 0; guard <= sorted.length; guard++) {
-      const hit = placed.find((p) => rectsOverlap(cur, p))
-      if (!hit) break
-      cur.x = hit.x + hit.w + 1
-    }
-    out.set(id, { dx: cur.x - rect.x, dy: 0 })
-    placed.push({ ...cur })
-  }
-  return out
 }

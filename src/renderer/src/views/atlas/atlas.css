@@ -103,13 +103,6 @@
   opacity: 1;
 }
 
-/* aggregated-route label chips: WHITE pill (--bg-card + hairline, mono 10px)
-   anchored on the horizontal channel segment — never under a card */
-.atlas-edge-badge rect {
-  fill: var(--bg-card);
-  stroke: var(--hairline);
-}
-
 /* hover emphasis: the gold ring (stroke, in styles.css) carries it. NO
    `filter: drop-shadow` here — a filter that toggles on per node while
    panning a large Deep-Dive graph is exactly the raster-tile-corruption

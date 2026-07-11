@@ -16,7 +16,8 @@ describe('AtlasView Learn routing', () => {
   })
 
   it("renders ProjectPage at level==='learn'", () => {
-    expect(src).toContain("showProjectPage = level === 'learn'")
+    // WP4: the level→renderer decision moved into the pure atlasRenderer()
+    expect(src).toContain("showProjectPage = renderer === 'page'")
     expect(src).toMatch(/showProjectPage\s*\?[\s\S]*<ProjectPage graph=\{graph\}/)
   })
 

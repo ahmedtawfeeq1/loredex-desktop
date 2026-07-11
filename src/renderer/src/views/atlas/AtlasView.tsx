@@ -24,6 +24,7 @@ import type { AtlasDecor } from './decor'
 import { exportAtlasView } from './export'
 import { PathTrace } from './PathTrace'
 import { activateNode, performResolution, resolveEdgeTarget } from './resolve'
+import { atlasRenderer } from './atlas-renderer'
 import { ProjectLauncher } from './ProjectLauncher'
 import { ProjectPage } from './ProjectPage'
 import { TourPanel } from './TourPanel'
@@ -138,9 +139,12 @@ export function AtlasView(): React.JSX.Element {
   // Atlas reframe: Learn is now a readable project PAGE (ProjectPage), not the
   // SVG graph. The neighbor-flow relationship strip moved onto that page's
   // flows-with section, so the header no longer renders it.
-  const showProjectPage = level === 'learn'
-  // Overview renders the launcher by default; Flow view falls back to the graph
-  const showLauncher = level === 'overview' && !flowView
+  // WP4 (spec §Navigation glue): the level→renderer routing is one pure function
+  // (atlas-renderer.ts) so nav-glue tests pin every cell — Learn → page, Overview
+  // → launcher (graph under Flow view), Deep Dive → graph.
+  const renderer = atlasRenderer(level, flowView)
+  const showProjectPage = renderer === 'page'
+  const showLauncher = renderer === 'launcher'
 
   function onActivate(node: AtlasNode): void {
     // §3 resolution table, one click per row (story 10.4): project drills

@@ -42,6 +42,7 @@ export function ProjectPage({ graph }: { graph: AtlasGraph }): React.JSX.Element
   const { header, attention, flows, topics, handoffs } = page
   const drillProject = useAtlas((s) => s.drillProject)
   const navigate = useAtlas((s) => s.navigate)
+  const setPanel = useAtlas((s) => s.setPanel)
 
   const hasFlows = flows.inbound.length > 0 || flows.outbound.length > 0
   const empty = topics.length === 0 && handoffs.length === 0
@@ -120,7 +121,7 @@ export function ProjectPage({ graph }: { graph: AtlasGraph }): React.JSX.Element
 
       {empty && (
         <div className="empty-state" style={{ border: 'none' }}>
-          <p>Nothing filed in {header.project} yet — notes and handoffs land here as work flows.</p>
+          <p>Nothing filed for {header.project} yet — notes and handoffs land here as work flows.</p>
         </div>
       )}
 
@@ -162,7 +163,12 @@ export function ProjectPage({ graph }: { graph: AtlasGraph }): React.JSX.Element
           type="button"
           className="button-secondary pp-trace"
           title="Open the Deep Dive graph scoped to this project to trace how work and knowledge connect"
-          onClick={() => void navigate('deep', { project: header.project })}
+          onClick={() => {
+            // WP4 (spec §Navigation glue): jump to Deep Dive scoped to this
+            // project AND arm Path — lineage tracing is why you come here.
+            void navigate('deep', { project: header.project })
+            setPanel('path')
+          }}
         >
           Trace connections →
         </button>

@@ -16,7 +16,8 @@ describe('AtlasView Overview routing', () => {
   })
 
   it('defaults Overview to the launcher (graph only when Flow view is on)', () => {
-    expect(src).toContain("showLauncher = level === 'overview' && !flowView")
+    // WP4: the level→renderer decision moved into the pure atlasRenderer()
+    expect(src).toContain("showLauncher = renderer === 'launcher'")
     expect(src).toMatch(/showLauncher\s*\?[\s\S]*<ProjectLauncher\s*\/>/)
   })
 

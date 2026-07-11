@@ -17,19 +17,32 @@ import { useReader } from '../../stores/reader'
 import { openContractChange } from '../contracts/ContractChips'
 import { reverseContractLinks } from '../contracts/contract-links'
 import {
+  ACTIVITY_KINDS,
+  type ActivityKind,
+  actorTallies,
   collapseChurn,
   dayLabel,
   type FeedAction,
   type FeedActionCtx,
   type FeedItem,
   feedActions,
+  filterEvents,
   flipLabel,
   groupItemsByDay,
+  kindCounts,
   middleTruncate,
   relativeTime,
   summaryQuotesObjective,
   targetOf,
 } from './feed-logic'
+
+/** Two-letter initials for the actor avatar. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  const first = parts[0]?.[0] ?? '?'
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : ''
+  return (first + last).toUpperCase()
+}
 
 /** Card-click navigation (kept from 6.2): board / reader / sync panel. */
 function open(event: ActivityEvent): void {
@@ -111,6 +124,9 @@ function CardHead({
 }): React.JSX.Element {
   return (
     <span className="feed-card-head">
+      <span className="feed-avatar" aria-hidden>
+        {initials(actor)}
+      </span>
       <span className={`feed-kind feed-kind-${kind}`}>{kind}</span>
       <span className="feed-actor">{actor}</span>
       <span className="feed-time" title={at}>
@@ -233,6 +249,85 @@ function ChurnCard({
   )
 }
 
+/** Left rail: filter the feed by kind and by person, with live counts. */
+function FilterRail({
+  counts,
+  total,
+  actors,
+  kind,
+  actorKey,
+  setKind,
+  setActorKey,
+}: {
+  counts: Record<ActivityKind, number>
+  total: number
+  actors: ReturnType<typeof actorTallies>
+  kind: ActivityKind | 'all'
+  actorKey: string | 'all'
+  setKind: (k: ActivityKind | 'all') => void
+  setActorKey: (a: string | 'all') => void
+}): React.JSX.Element {
+  const kinds = ACTIVITY_KINDS.filter((k) => counts[k] > 0)
+  return (
+    <aside className="feed-side" aria-label="Activity filters">
+      <div className="feed-filter-group">
+        <span className="feed-filter-label">Type</span>
+        <button
+          type="button"
+          className={`feed-filter${kind === 'all' ? ' is-on' : ''}`}
+          onClick={() => setKind('all')}
+        >
+          <span>All activity</span>
+          <span className="feed-filter-count">{total}</span>
+        </button>
+        {kinds.map((k) => (
+          <button
+            key={k}
+            type="button"
+            className={`feed-filter${kind === k ? ' is-on' : ''}`}
+            onClick={() => setKind(kind === k ? 'all' : k)}
+          >
+            <span className={`feed-kind feed-kind-${k}`}>{k}</span>
+            <span className="feed-filter-count">{counts[k]}</span>
+          </button>
+        ))}
+      </div>
+      {actors.length > 1 && (
+        <div className="feed-filter-group">
+          <span className="feed-filter-label">People</span>
+          <button
+            type="button"
+            className={`feed-filter${actorKey === 'all' ? ' is-on' : ''}`}
+            onClick={() => setActorKey('all')}
+          >
+            <span>Everyone</span>
+            <span className="feed-filter-count">{actors.length}</span>
+          </button>
+          {actors.map((a) => {
+            const key = a.email || a.name
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`feed-filter${actorKey === key ? ' is-on' : ''}`}
+                onClick={() => setActorKey(actorKey === key ? 'all' : key)}
+              >
+                <span className="feed-avatar" aria-hidden>
+                  {initials(a.name)}
+                </span>
+                <span className="feed-filter-name" title={a.name}>
+                  {a.name}
+                </span>
+                <span className="feed-filter-count">{a.count}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </aside>
+  )
+}
+
 export function FeedView(): React.JSX.Element {
   const events = useFeed((s) => s.events)
   const loading = useFeed((s) => s.loading)
@@ -258,8 +353,16 @@ export function FeedView(): React.JSX.Element {
     if (changes === null && !contractsLoading) void useContracts.getState().load()
   }, [changes, contractsLoading])
 
+  // Activity "manage it": filter the feed by kind and by person.
+  const [kind, setKind] = useState<ActivityKind | 'all'>('all')
+  const [actorKey, setActorKey] = useState<string | 'all'>('all')
+
   const linksByHandoff = useMemo(() => reverseContractLinks(changes ?? []), [changes])
-  const items = useMemo(() => collapseChurn(events ?? []), [events])
+  const all = events ?? []
+  const counts = useMemo(() => kindCounts(all), [all])
+  const actors = useMemo(() => actorTallies(all), [all])
+  const filtered = useMemo(() => filterEvents(all, kind, actorKey), [all, kind, actorKey])
+  const items = useMemo(() => collapseChurn(filtered), [filtered])
 
   const ctxFor = (event: ActivityEvent): FeedActionCtx => {
     const handoffId = event.subject.handoffId
@@ -299,42 +402,74 @@ export function FeedView(): React.JSX.Element {
           </button>
         </div>
       ) : (
-        <div className="feed-list">
-          {groupItemsByDay(items).map((group) => (
-            <section key={group.day} aria-label={group.day}>
-              <h2 className="feed-day">{dayLabel(group.day, today)}</h2>
-              {group.items.map((item) => {
-                // a churn card acts (and keys) as its newest flip
-                const head = item.type === 'churn' ? (item.events[0] as ActivityEvent) : item.event
-                const actions = feedActions(head, ctxFor(head))
-                return item.type === 'churn' ? (
-                  <ChurnCard
-                    key={head.sha}
-                    item={item}
-                    commitBase={commitBase}
-                    now={now}
-                    actions={actions}
-                  />
-                ) : (
-                  <EventCard
-                    key={head.sha}
-                    event={head}
-                    commitBase={commitBase}
-                    now={now}
-                    actions={actions}
-                  />
-                )
-              })}
-            </section>
-          ))}
-          <button
-            type="button"
-            className="button-quiet feed-more"
-            disabled={loading}
-            onClick={() => void loadMore()}
-          >
-            Load older activity
-          </button>
+        <div className="feed-body">
+          <FilterRail
+            counts={counts}
+            total={all.length}
+            actors={actors}
+            kind={kind}
+            actorKey={actorKey}
+            setKind={setKind}
+            setActorKey={setActorKey}
+          />
+          <div className="feed-main">
+            {items.length === 0 ? (
+              <div className="feed-none">
+                <p>No matching activity.</p>
+                <button
+                  type="button"
+                  className="button-quiet"
+                  onClick={() => {
+                    setKind('all')
+                    setActorKey('all')
+                  }}
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              <div className="feed-list">
+                {groupItemsByDay(items).map((group) => (
+                  <section key={group.day} aria-label={group.day}>
+                    <h2 className="feed-day">{dayLabel(group.day, today)}</h2>
+                    {group.items.map((item) => {
+                      // a churn card acts (and keys) as its newest flip
+                      const head =
+                        item.type === 'churn' ? (item.events[0] as ActivityEvent) : item.event
+                      const actions = feedActions(head, ctxFor(head))
+                      return item.type === 'churn' ? (
+                        <ChurnCard
+                          key={head.sha}
+                          item={item}
+                          commitBase={commitBase}
+                          now={now}
+                          actions={actions}
+                        />
+                      ) : (
+                        <EventCard
+                          key={head.sha}
+                          event={head}
+                          commitBase={commitBase}
+                          now={now}
+                          actions={actions}
+                        />
+                      )
+                    })}
+                  </section>
+                ))}
+                {kind === 'all' && actorKey === 'all' && (
+                  <button
+                    type="button"
+                    className="button-quiet feed-more"
+                    disabled={loading}
+                    onClick={() => void loadMore()}
+                  >
+                    Load older activity
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

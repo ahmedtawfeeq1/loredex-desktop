@@ -178,6 +178,50 @@ export function dedupeBySha(events: ActivityEvent[]): ActivityEvent[] {
   })
 }
 
+/* ── filtering (Activity "manage it": by kind + by person) ──────────────── */
+
+export type ActivityKind = ActivityEvent['kind']
+/** Kinds in a stable display order — the filter rail renders them in this order. */
+export const ACTIVITY_KINDS: ActivityKind[] = ['handoff', 'route', 'status', 'consume', 'sync']
+
+/** Count events per kind (unfiltered totals for the filter chips). */
+export function kindCounts(events: ActivityEvent[]): Record<ActivityKind, number> {
+  const counts = { handoff: 0, route: 0, status: 0, consume: 0, sync: 0 }
+  for (const e of events) counts[e.kind]++
+  return counts
+}
+
+export interface ActorTally {
+  name: string
+  email: string
+  count: number
+}
+
+/** Distinct actors, most-active first, then alphabetical — for the people filter. */
+export function actorTallies(events: ActivityEvent[]): ActorTally[] {
+  const by = new Map<string, ActorTally>()
+  for (const e of events) {
+    const key = e.actor.email || e.actor.name
+    const cur = by.get(key)
+    if (cur) cur.count++
+    else by.set(key, { name: e.actor.name, email: e.actor.email, count: 1 })
+  }
+  return [...by.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+}
+
+/** Filter by kind ('all' = every kind) and actor key ('all' = everyone). */
+export function filterEvents(
+  events: ActivityEvent[],
+  kind: ActivityKind | 'all',
+  actorKey: string | 'all',
+): ActivityEvent[] {
+  return events.filter(
+    (e) =>
+      (kind === 'all' || e.kind === kind) &&
+      (actorKey === 'all' || (e.actor.email || e.actor.name) === actorKey),
+  )
+}
+
 export type FeedTarget = { kind: 'board' } | { kind: 'note'; path: string } | { kind: 'sync' }
 
 /**

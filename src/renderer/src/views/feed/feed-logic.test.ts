@@ -7,13 +7,16 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { ActivityEvent } from '../../../../shared/types'
 import {
+  actorTallies,
   collapseChurn,
   dayLabel,
   dedupeBySha,
   feedActions,
+  filterEvents,
   flipLabel,
   groupItemsByDay,
   itemAt,
+  kindCounts,
   middleTruncate,
   relativeTime,
   summaryQuotesObjective,
@@ -291,5 +294,30 @@ describe('targetOf (card click)', () => {
       path: 'projects/x/note.md',
     })
     expect(targetOf(event({ subject: {} }))).toEqual({ kind: 'sync' })
+  })
+})
+
+describe('filtering (Activity manage-it)', () => {
+  const evs = [
+    event({ kind: 'handoff', actor: { name: 'Maya Chen', email: 'maya@nimbus.dev' } }),
+    event({ kind: 'route', actor: { name: 'Rae Ito', email: 'rae@nimbus.dev' } }),
+    event({ kind: 'route', actor: { name: 'Maya Chen', email: 'maya@nimbus.dev' } }),
+    event({ kind: 'sync', actor: { name: 'Maya Chen', email: 'maya@nimbus.dev' } }),
+  ]
+  it('counts per kind', () => {
+    expect(kindCounts(evs)).toEqual({ handoff: 1, route: 2, status: 0, consume: 0, sync: 1 })
+  })
+  it('tallies actors most-active first', () => {
+    const t = actorTallies(evs)
+    expect(t.map((a) => [a.name, a.count])).toEqual([
+      ['Maya Chen', 3],
+      ['Rae Ito', 1],
+    ])
+  })
+  it('filters by kind and by actor, and "all" passes everything', () => {
+    expect(filterEvents(evs, 'route', 'all')).toHaveLength(2)
+    expect(filterEvents(evs, 'all', 'maya@nimbus.dev')).toHaveLength(3)
+    expect(filterEvents(evs, 'route', 'maya@nimbus.dev')).toHaveLength(1)
+    expect(filterEvents(evs, 'all', 'all')).toHaveLength(4)
   })
 })

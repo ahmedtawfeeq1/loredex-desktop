@@ -53,6 +53,8 @@ import {
   NODE_H,
   NODE_W,
   NOTE_ROW_PITCH,
+  OVERVIEW_GUTTER,
+  OVERVIEW_V_GAP,
   PANEL_ASPECT,
   PANEL_PAD,
   panelWrapRows,
@@ -685,8 +687,10 @@ function positionProjects(model: BaseModel, included: AtlasNode[]): void {
   for (const [col, list] of byColumn) {
     list.sort((a, b) => a.label.localeCompare(b.label)) // alpha tie-break
     list.forEach((node, i) => {
-      node.x = MARGIN + col * (CLUSTER_W + GUTTER) // GUTTER = edge channel
-      node.y = MARGIN + i * (CLUSTER_H + V_GAP)
+      // WP-C: overview breathes wider than drilled levels — fatter card-free
+      // channels give the fanned bidirectional port edges room
+      node.x = MARGIN + col * (CLUSTER_W + OVERVIEW_GUTTER) // wide edge channel
+      node.y = MARGIN + i * (CLUSTER_H + OVERVIEW_V_GAP)
     })
   }
 }

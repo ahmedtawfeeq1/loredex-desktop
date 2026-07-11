@@ -10,11 +10,15 @@ import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
   FIT_PAD,
+  GUTTER,
+  laneOffsets,
   NODE_H,
   NODE_W,
   nodeRect,
   NOTE_ROW_PITCH,
+  orthoRoute,
   PANEL_ASPECT,
+  type Rect,
   rectsOverlap,
   TOPIC_COL_PITCH,
 } from '../shared/atlas-layout'
@@ -758,6 +762,41 @@ describe.skipIf(!existsSync(NIMBUS_VAULT))('atlas model (nimbus simulation vault
     )
     expect(toFrontend).toBeDefined()
     expect(toFrontend?.totalCount).toBeGreaterThanOrEqual(1)
+  })
+
+  it('WP-C port routing: no overview edge crosses a project card interior', () => {
+    // the DoD invariant on the REAL nimbus overview (4 clusters, both-direction
+    // handoff lanes + the long frontend↔ai span): every routed polyline stays
+    // in the card-free gutter/corridor channels — no segment cuts through a card
+    const rectById = new Map(graphOverview.nodes.map((n) => [n.id, nodeRect(n, 'overview')]))
+    const cards = [...rectById.values()]
+    const offs = laneOffsets(graphOverview.edges)
+    const INSET = 0.5 // ports anchor ON a border; shrink so anchoring isn't a hit
+    let checkedLong = false
+    for (const e of graphOverview.edges) {
+      const a = rectById.get(e.source) as Rect
+      const b = rectById.get(e.target) as Rect
+      const { points } = orthoRoute(a, b, offs.get(e.id) ?? 0, GUTTER / 2)
+      if (points.length > 4) checkedLong = true // a long-span corridor route
+      for (let i = 1; i < points.length; i++) {
+        const p = points[i - 1] as { x: number; y: number }
+        const q = points[i] as { x: number; y: number }
+        const seg: Rect = {
+          x: Math.min(p.x, q.x) + INSET,
+          y: Math.min(p.y, q.y) + INSET,
+          w: Math.max(Math.abs(p.x - q.x) - 2 * INSET, 0.01),
+          h: Math.max(Math.abs(p.y - q.y) - 2 * INSET, 0.01),
+        }
+        for (const card of cards) {
+          expect(
+            rectsOverlap(seg, card),
+            `${e.source}→${e.target} segment ${i} crosses a card`,
+          ).toBe(false)
+        }
+      }
+    }
+    // the fixture actually exercises the long-span corridor branch (frontend↔ai)
+    expect(checkedLong).toBe(true)
   })
 
   it('lifts thread edges from the schema-v2 request loop (replies_to + fulfills)', () => {

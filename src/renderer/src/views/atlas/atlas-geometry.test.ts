@@ -9,12 +9,16 @@ import {
   ARROW_STANDOFF,
   CLUSTER_H,
   CLUSTER_W,
+  edgePorts,
   FIT_PAD,
   GUTTER,
+  MARGIN,
   MAX_FILL,
   NODE_H,
   NODE_W,
   NOTE_ROW_PITCH,
+  OVERVIEW_GUTTER,
+  OVERVIEW_V_GAP,
   PANEL_ASPECT,
   PANEL_MAX_COL_DEPTH,
   READABLE_CARD_MIN,
@@ -215,6 +219,101 @@ describe('orthoRoute', () => {
     const step = Math.abs((offsets.get('e1') ?? 0) - (offsets.get('e2') ?? 0))
     expect(step).toBe(24)
     expect(offsets.get('lone')).toBe(0)
+  })
+})
+
+describe('edgePorts (WP-C — fixed side ports)', () => {
+  it('anchors each end on the near side facing the other card', () => {
+    const a = rect(0, 0, CLUSTER_W, CLUSTER_H)
+    // target a clear column to the right → source right port, target left port
+    const fwd = edgePorts(a, rect(CLUSTER_W + GUTTER, 0, CLUSTER_W, CLUSTER_H))
+    expect(fwd.dir).toBe('forward')
+    expect(fwd.source).toEqual({ x: CLUSTER_W, y: CLUSTER_H / 2 }) // a's RIGHT edge
+    expect(fwd.target).toEqual({ x: CLUSTER_W + GUTTER, y: CLUSTER_H / 2 }) // b's LEFT (near) edge
+    // target a clear column to the left → source left port, target right port
+    const back = edgePorts(rect(CLUSTER_W + GUTTER, 0, CLUSTER_W, CLUSTER_H), a)
+    expect(back.dir).toBe('backward')
+    expect(back.source).toEqual({ x: CLUSTER_W + GUTTER, y: CLUSTER_H / 2 }) // a's LEFT edge
+    expect(back.target).toEqual({ x: CLUSTER_W, y: CLUSTER_H / 2 }) // b's RIGHT (near) edge
+  })
+
+  it('an x-overlapping vertical pair anchors both ends on the left side', () => {
+    const same = edgePorts(rect(0, 0), rect(0, 400))
+    expect(same.dir).toBe('same')
+    expect(same.source.x).toBe(0)
+    expect(same.target.x).toBe(0)
+  })
+
+  it('shifts both ports by the parallel-lane offset (bidirectional fan)', () => {
+    const p = edgePorts(rect(0, 0, CLUSTER_W, CLUSTER_H), rect(CLUSTER_W + GUTTER, 0, CLUSTER_W, CLUSTER_H), 12)
+    expect(p.source.y).toBe(CLUSTER_H / 2 + 12)
+    expect(p.target.y).toBe(CLUSTER_H / 2 + 12)
+  })
+})
+
+describe('port routing keeps every edge outside all cards (WP-C DoD)', () => {
+  // the nimbus overview SHAPE at the widened WP-C spacing: 4 project clusters
+  // on the depth grid (frontend/mobile col 1, backend col 2, ai-engine col 3),
+  // every directed handoff lane present — including the reciprocal (fanned)
+  // pairs and the long frontend↔ai span. No routed polyline segment may cross a
+  // card interior.
+  const cell = (col: number, row: number): Rect => ({
+    x: MARGIN + col * (CLUSTER_W + OVERVIEW_GUTTER),
+    y: MARGIN + row * (CLUSTER_H + OVERVIEW_V_GAP),
+    w: CLUSTER_W,
+    h: CLUSTER_H,
+  })
+  const cards: Record<string, Rect> = {
+    frontend: cell(1, 0),
+    mobile: cell(1, 1),
+    backend: cell(2, 0),
+    ai: cell(3, 0),
+  }
+  const pairs: Array<[string, string]> = [
+    ['ai', 'backend'],
+    ['backend', 'ai'],
+    ['ai', 'frontend'], // long span crossing the backend column
+    ['frontend', 'ai'],
+    ['backend', 'frontend'],
+    ['frontend', 'backend'],
+    ['backend', 'mobile'],
+    ['mobile', 'backend'],
+  ]
+  const edges = pairs.map(([source, target], i) => ({ id: `e${i}`, source, target }))
+  const offs = laneOffsets(edges)
+  const allCards = Object.values(cards)
+
+  it('no routed segment intersects any card interior', () => {
+    const INSET = 0.5 // ports sit ON a border; shrink so anchoring isn't a hit
+    for (const e of edges) {
+      const a = cards[e.source] as Rect
+      const b = cards[e.target] as Rect
+      const { points } = orthoRoute(a, b, offs.get(e.id) ?? 0, GUTTER / 2)
+      for (let i = 1; i < points.length; i++) {
+        const p = points[i - 1] as { x: number; y: number }
+        const q = points[i] as { x: number; y: number }
+        const seg: Rect = {
+          x: Math.min(p.x, q.x) + INSET,
+          y: Math.min(p.y, q.y) + INSET,
+          w: Math.max(Math.abs(p.x - q.x) - 2 * INSET, 0.01),
+          h: Math.max(Math.abs(p.y - q.y) - 2 * INSET, 0.01),
+        }
+        for (const card of allCards) {
+          expect(
+            rectsOverlap(seg, card),
+            `${e.source}→${e.target} segment ${i} crosses a card`,
+          ).toBe(false)
+        }
+      }
+    }
+  })
+
+  it('the widened overview channels stay in the simple-elbow regime', () => {
+    // OVERVIEW_GUTTER breathes wider than GUTTER but not past the long-span
+    // threshold, so adjacent columns still route the tidy gutter elbow
+    expect(OVERVIEW_GUTTER).toBeGreaterThan(GUTTER)
+    expect(OVERVIEW_GUTTER).toBeLessThanOrEqual(GUTTER * 1.5)
+    expect(OVERVIEW_V_GAP).toBeGreaterThan(V_GAP)
   })
 })
 

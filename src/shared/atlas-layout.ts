@@ -33,6 +33,14 @@ export const PILL_H = 40
 export const V_GAP = 40
 /** horizontal gutter between lanes — reserved as an edge channel (card-free) */
 export const GUTTER = 160
+/** Overview breathes wider than the shared GUTTER/V_GAP (WP-C): the small
+ *  service graph (4 project clusters, both-direction handoffs) gets fatter
+ *  card-free channels so the fanned bidirectional port edges have room and never
+ *  crowd a card. Kept ≤ GUTTER×1.5 (=240) so adjacent columns still route
+ *  through the simple gutter elbow, not the long-span corridor band; both are
+ *  GRID-aligned (216 = 24×9, 72 = 24×3). */
+export const OVERVIEW_GUTTER = 216
+export const OVERVIEW_V_GAP = 72
 /** canvas margin around the whole layout */
 export const MARGIN = 48
 /** panel dot-grid pitch; panel card positions land on this grid */
@@ -256,6 +264,39 @@ export interface OrthoRoute {
   points: Array<{ x: number; y: number }>
 }
 
+export interface Point {
+  x: number
+  y: number
+}
+
+/** Which way an edge leaves its source relative to its target (WP-C port
+ *  selection): `forward` when the target is a clear column to the right,
+ *  `backward` when a clear column to the left, `same` when the two cards share
+ *  x-extent (a vertical pair). Drives which SIDE port each end anchors on. */
+export type EdgeDir = 'forward' | 'backward' | 'same'
+
+/**
+ * WP-C fixed SIDE PORTS: pick the anchor point on the near side of each card so
+ * an edge exits the source's side facing the target and enters the target's
+ * near side — never the far side, so the routed line runs through the gutter
+ * channel and never crosses a card interior. The vertical position is the
+ * card's mid-height plus the parallel-lane offset (bidirectional pairs fan by
+ * ±LANE_STEP). Pure; the elbow routing in orthoRoute is built between these two
+ * ports. The 8px slack matches orthoRoute's clear-column threshold.
+ */
+export function edgePorts(a: Rect, b: Rect, off = 0): { source: Point; target: Point; dir: EdgeDir } {
+  const ay = a.y + a.h / 2 + off
+  const by = b.y + b.h / 2 + off
+  const aRight = a.x + a.w
+  const bRight = b.x + b.w
+  // target a clear column to the right → source right port, target left (near) port
+  if (b.x >= aRight + 8) return { source: { x: aRight, y: ay }, target: { x: b.x, y: by }, dir: 'forward' }
+  // target a clear column to the left → source left port, target right (near) port
+  if (a.x >= bRight + 8) return { source: { x: a.x, y: ay }, target: { x: bRight, y: by }, dir: 'backward' }
+  // x-overlapping (vertical) pair → both anchor on the left side, loop the channel
+  return { source: { x: a.x, y: ay }, target: { x: b.x, y: by }, dir: 'same' }
+}
+
 const dedupePoints = (
   pts: Array<{ x: number; y: number }>,
 ): Array<{ x: number; y: number }> =>
@@ -300,78 +341,79 @@ function insetArrowEnd(
  * panels).
  */
 export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoRoute {
-  const ay = a.y + a.h / 2 + off
-  const by = b.y + b.h / 2 + off
-  const aRight = a.x + a.w
-  const bRight = b.x + b.w
+  // WP-C: anchor both ends on their near-side ports, then route the elbow
+  // between them entirely through the card-free channels.
+  const { source, target, dir } = edgePorts(a, b, off)
+  const ay = source.y
+  const by = target.y
 
-  if (b.x >= aRight + 8) {
-    // forward: leave a's right edge, enter b's left edge
-    const gap = b.x - aRight
+  if (dir === 'forward') {
+    // leave a's right port, enter b's left (near) port
+    const gap = target.x - source.x
     if (gap <= GUTTER * 1.5) {
-      const cx = aRight + gap / 2 + off
+      const cx = source.x + gap / 2 + off
       return {
         points: insetArrowEnd(dedupePoints([
-          { x: aRight, y: ay },
+          source,
           { x: cx, y: ay },
           { x: cx, y: by },
-          { x: b.x, y: by },
+          target,
         ])),
       }
     }
     // long span: travel the card-free corridor band just above the target row
-    const cx1 = aRight + Math.min(stub, gap / 2) + off
-    const cx2 = b.x - Math.min(stub, gap / 2) - off
+    const cx1 = source.x + Math.min(stub, gap / 2) + off
+    const cx2 = target.x - Math.min(stub, gap / 2) - off
     const corridorY = b.y - V_GAP / 2 + off
     return {
       points: insetArrowEnd(dedupePoints([
-        { x: aRight, y: ay },
+        source,
         { x: cx1, y: ay },
         { x: cx1, y: corridorY },
         { x: cx2, y: corridorY },
         { x: cx2, y: by },
-        { x: b.x, y: by },
+        target,
       ])),
     }
   }
 
-  if (a.x >= bRight + 8) {
-    // backward: leave a's left edge, enter b's right edge
-    const gap = a.x - bRight
+  if (dir === 'backward') {
+    // leave a's left port, enter b's right (near) port
+    const gap = source.x - target.x
     if (gap <= GUTTER * 1.5) {
-      const cx = bRight + gap / 2 - off
+      const cx = target.x + gap / 2 - off
       return {
         points: insetArrowEnd(dedupePoints([
-          { x: a.x, y: ay },
+          source,
           { x: cx, y: ay },
           { x: cx, y: by },
-          { x: bRight, y: by },
+          target,
         ])),
       }
     }
-    const cx1 = a.x - Math.min(stub, gap / 2) - off
-    const cx2 = bRight + Math.min(stub, gap / 2) + off
+    const cx1 = source.x - Math.min(stub, gap / 2) - off
+    const cx2 = target.x + Math.min(stub, gap / 2) + off
     const corridorY = b.y - V_GAP / 2 + off
     return {
       points: insetArrowEnd(dedupePoints([
-        { x: a.x, y: ay },
+        source,
         { x: cx1, y: ay },
         { x: cx1, y: corridorY },
         { x: cx2, y: corridorY },
         { x: cx2, y: by },
-        { x: bRight, y: by },
+        target,
       ])),
     }
   }
 
   // same lane (x-overlap): loop out the left side through the lane's channel
-  const lx = Math.min(a.x, b.x) - stub + off
+  const lx = Math.min(source.x, target.x) - stub + off
   return {
     points: insetArrowEnd(dedupePoints([
-      { x: a.x, y: ay },
+      source,
       { x: lx, y: ay },
       { x: lx, y: by },
-      { x: b.x, y: by },
+      target,
     ])),
   }
 }

@@ -303,6 +303,71 @@
   overflow-y: auto;
 }
 
+/* ── Atlas reframe WP3: Deep Dive self-explains ────────────────────────────────
+   The graph is the LINEAGE view — it says so on sight. A purpose header + a tiny
+   always-visible inline key sit above the canvas at Deep Dive. The graph body
+   stacks (intro on top, canvas fills the rest) instead of the plain flex row;
+   floating side panels stay position:absolute so they overlay either way. */
+.atlas-body-graph {
+  flex-direction: column;
+  gap: 8px;
+}
+
+.atlas-deep-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 8px 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  flex: none;
+}
+
+/* one-line purpose header — serif so it reads as prose, not chrome */
+.atlas-deep-purpose {
+  font-family: var(--font-serif);
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--text-1);
+  min-width: 0;
+}
+
+/* inline key — a compact legend row, always visible (not only the ? modal) */
+.atlas-deep-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: none;
+}
+
+.atlas-deep-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.atlas-deep-key-mark {
+  color: var(--navy);
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* the open-count dot rides gold on the canvas — its key mark matches */
+.atlas-deep-key-open .atlas-deep-key-mark {
+  color: var(--gold);
+}
+
 /* ── Atlas reframe WP2: the Overview project LAUNCHER ──────────────────────────
    A readable card grid (Home ops-health cards) that replaces the SVG graph as
    the Overview default; the Flow-view toggle swaps back to AtlasCanvas. */

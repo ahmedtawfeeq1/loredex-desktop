@@ -11,6 +11,7 @@ import { useAtlas } from '../../stores/atlas'
 import { useHandoffs } from '../../stores/handoffs'
 import { AtlasBreadcrumbs } from './AtlasBreadcrumbs'
 import { AtlasCanvas } from './AtlasCanvas'
+import { DeepDiveIntro } from './DeepDiveIntro'
 import { activeFilterCount, applyAtlasFilters, focusNeighborhood } from './atlas-filters'
 import { AtlasFilterPanel } from './AtlasFilterPanel'
 import { AtlasLegend } from './AtlasLegend'
@@ -261,11 +262,16 @@ export function AtlasView(): React.JSX.Element {
                     )
                   }
                   const helpPill = action.id === 'help'
+                  // WP3: Path + Blocked are the PRIMARY Deep-Dive actions — the
+                  // graph is the lineage view, and these are what you trace with.
+                  // Emphasise them (gold outline) only at deep, where they lead.
+                  const primaryPill =
+                    level === 'deep' && (action.id === 'path' || action.id === 'blocked')
                   return (
                     <button
                       key={action.id}
                       type="button"
-                      className={`atlas-tool${helpPill ? ' atlas-tool-icon-only' : ''}`}
+                      className={`atlas-tool${helpPill ? ' atlas-tool-icon-only' : ''}${primaryPill ? ' atlas-tool-primary' : ''}`}
                       aria-pressed={state.pressed}
                       aria-label={helpPill ? action.label : undefined}
                       title={action.tooltip}
@@ -355,7 +361,13 @@ export function AtlasView(): React.JSX.Element {
           <ProjectLauncher />
         </div>
       ) : (
-        <div className="atlas-body">
+        <div className="atlas-body atlas-body-graph">
+          {/* WP3 (spec §Deep Dive): the graph earns itself as the LINEAGE view,
+              so it must say so on sight — a persistent purpose header + a tiny
+              always-visible inline key, above the canvas at Deep Dive. The
+              Overview flow-view keeps the bare canvas (it has the launcher's
+              context). */}
+          {level === 'deep' && <DeepDiveIntro />}
           <AtlasCanvas
             graph={shownGraph ?? graph}
             visibleNodes={visibility.nodes}

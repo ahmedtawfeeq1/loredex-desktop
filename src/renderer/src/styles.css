@@ -3701,6 +3701,28 @@ button.atlas-crumb:hover {
   border-color: var(--navy);
 }
 
+/* WP3: Path + Blocked are the PRIMARY actions at Deep Dive — gold outline marks
+   them as what the lineage graph is for. Emphasis only (not a filled gold pill,
+   keeping the one-gold-primary budget); the gold icon draws the eye. */
+.atlas-tool-primary {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.atlas-tool-primary .atlas-tool-icon {
+  color: var(--gold);
+}
+
+.atlas-tool-primary:hover {
+  border-color: var(--gold);
+  background: var(--bg-inset);
+}
+
+.atlas-tool-primary[aria-pressed='true'] {
+  background: var(--bg-inset);
+  border-color: var(--gold);
+}
+
 /* single Export ▾ button with an SVG/PNG submenu (never two buttons) */
 .atlas-export-wrap {
   position: relative;

@@ -115,9 +115,10 @@
    panning a large Deep-Dive graph is exactly the raster-tile-corruption
    trigger; the ring alone reads as raised without a GPU layer. */
 
-/* …connected edges emphasized… */
+/* …connected edges emphasized in GOLD (WP5): stays on-brand in both themes
+   instead of flipping to near-paper-white in dark, which --navy does there */
 .atlas-edge-hot .atlas-edge-line {
-  stroke: var(--navy);
+  stroke: var(--gold);
   stroke-width: 2;
 }
 

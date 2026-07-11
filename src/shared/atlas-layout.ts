@@ -271,6 +271,30 @@ const dedupePoints = (
       p.y !== (pts[i - 1] as { y: number }).y,
   )
 
+/** WP5 arrowhead standoff: the routed edge stops this many px short of the
+ *  target card border so the arrowhead tip sits just OFF the card with a clean,
+ *  consistent gap at every level (was flush — the tip kissed the card border). */
+export const ARROW_STANDOFF = 8
+
+/** Pull the final route vertex back toward the previous one by ARROW_STANDOFF so
+ *  the arrowhead clears the target card border. Every route's last segment is a
+ *  horizontal run into the card's left/right edge, so this only shifts x; a
+ *  segment shorter than the standoff is left untouched (never reverses the
+ *  arrow). Pure + deterministic — the tip lands ARROW_STANDOFF off the border. */
+function insetArrowEnd(
+  pts: Array<{ x: number; y: number }>,
+): Array<{ x: number; y: number }> {
+  if (pts.length < 2) return pts
+  const end = pts[pts.length - 1] as { x: number; y: number }
+  const prev = pts[pts.length - 2] as { x: number; y: number }
+  const dx = end.x - prev.x
+  const dy = end.y - prev.y
+  const len = Math.hypot(dx, dy)
+  if (len <= ARROW_STANDOFF) return pts
+  const t = (len - ARROW_STANDOFF) / len
+  return [...pts.slice(0, -1), { x: prev.x + dx * t, y: prev.y + dy * t }]
+}
+
 /**
  * Route an edge between two card rects with orthogonal elbows (H→V→H). The
  * vertical run always lives in a card-free channel: the gutter between lanes
@@ -299,12 +323,12 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
     if (gap <= GUTTER * 1.5) {
       const cx = aRight + gap / 2 + off
       return {
-        points: dedupePoints([
+        points: insetArrowEnd(dedupePoints([
           { x: aRight, y: ay },
           { x: cx, y: ay },
           { x: cx, y: by },
           { x: b.x, y: by },
-        ]),
+        ])),
         label: { x: cx, y: ay + chipOff },
       }
     }
@@ -313,14 +337,14 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
     const cx2 = b.x - Math.min(stub, gap / 2) - off
     const corridorY = b.y - V_GAP / 2 + off
     return {
-      points: dedupePoints([
+      points: insetArrowEnd(dedupePoints([
         { x: aRight, y: ay },
         { x: cx1, y: ay },
         { x: cx1, y: corridorY },
         { x: cx2, y: corridorY },
         { x: cx2, y: by },
         { x: b.x, y: by },
-      ]),
+      ])),
       label: { x: (cx1 + cx2) / 2, y: corridorY + chipOff - off },
     }
   }
@@ -331,12 +355,12 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
     if (gap <= GUTTER * 1.5) {
       const cx = bRight + gap / 2 - off
       return {
-        points: dedupePoints([
+        points: insetArrowEnd(dedupePoints([
           { x: a.x, y: ay },
           { x: cx, y: ay },
           { x: cx, y: by },
           { x: bRight, y: by },
-        ]),
+        ])),
         label: { x: cx, y: ay + chipOff },
       }
     }
@@ -344,14 +368,14 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
     const cx2 = bRight + Math.min(stub, gap / 2) + off
     const corridorY = b.y - V_GAP / 2 + off
     return {
-      points: dedupePoints([
+      points: insetArrowEnd(dedupePoints([
         { x: a.x, y: ay },
         { x: cx1, y: ay },
         { x: cx1, y: corridorY },
         { x: cx2, y: corridorY },
         { x: cx2, y: by },
         { x: bRight, y: by },
-      ]),
+      ])),
       label: { x: (cx1 + cx2) / 2, y: corridorY + chipOff - off },
     }
   }
@@ -359,12 +383,12 @@ export function orthoRoute(a: Rect, b: Rect, off = 0, stub = GUTTER / 2): OrthoR
   // same lane (x-overlap): loop out the left side through the lane's channel
   const lx = Math.min(a.x, b.x) - stub + off
   return {
-    points: dedupePoints([
+    points: insetArrowEnd(dedupePoints([
       { x: a.x, y: ay },
       { x: lx, y: ay },
       { x: lx, y: by },
       { x: b.x, y: by },
-    ]),
+    ])),
     label: { x: lx, y: ay + chipOff },
   }
 }

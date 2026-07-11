@@ -15,9 +15,18 @@ import {
   ORDER_CHIP_W,
   PILL_H,
   PILL_W,
+  truncateLabel,
 } from '../../../../shared/atlas-layout'
 import type { AtlasNode } from '../../../../shared/types'
 import { humanizeTitle, noteDate } from '../../humanize'
+
+/** Unified card chrome (WP5): every mini routing-slip body shares one inner
+ *  padding and one footer baseline — type-specific content varies above it, but
+ *  the chip style, left padding and footer line up across all five types. */
+const CARD_PAD_X = 14
+const CARD_FOOTER_Y = NODE_H - 14
+/** inner width a full-bleed text line (padded both sides) may occupy on a card */
+const CARD_TEXT_W = NODE_W - CARD_PAD_X * 2
 
 /** How a node renders (layout-v2): `card` = mini routing-slip; `cluster` =
  *  wide overview project card; `pill` = collapsed neighbor at learn/deep;
@@ -106,30 +115,34 @@ function ProjectPillBody({ node, header }: { node: AtlasNode; header: boolean })
 function NoteBody({ node }: { node: AtlasNode }): React.JSX.Element {
   // story 17.1 (D1 amendment 3): the serif title humanizes; the stripped
   // date rides the EXISTING date line; native SVG tooltip keeps the filename
+  // WP5 containment: bound the type-chip width so the topic chip's x can't be
+  // pushed off the card, then clamp the topic chip to the remaining inner width
+  const typeLabel = truncateLabel(node.noteType || 'note', 70, 5.6)
+  const topicX = CARD_PAD_X + typeLabel.length * 5.6 + 18
   return (
     <>
       <title>{node.label}</title>
-      <text className="atlas-note-title" x={14} y={22}>
-        {truncate(humanizeTitle(node.label), 26)}
+      <text className="atlas-note-title" x={CARD_PAD_X} y={22}>
+        {truncateLabel(humanizeTitle(node.label), CARD_TEXT_W, 6.6)}
       </text>
-      <Chip x={14} y={30} text={node.noteType || 'note'} variant="atlas-chip-type" />
+      <Chip x={CARD_PAD_X} y={30} text={typeLabel} variant="atlas-chip-type" />
       {node.topic && (
         <Chip
-          x={14 + (node.noteType || 'note').length * 5.6 + 18}
+          x={topicX}
           y={30}
-          text={truncate(node.topic, 14)}
+          text={truncateLabel(node.topic, NODE_W - topicX - 20, 5.6)}
           variant="atlas-chip-topic"
         />
       )}
       {node.summary && (
-        <text className="atlas-node-summary" x={14} y={58}>
-          {truncate(node.summary, 34)}
+        <text className="atlas-node-summary" x={CARD_PAD_X} y={58}>
+          {truncateLabel(node.summary, CARD_TEXT_W, 5.8)}
         </text>
       )}
       <text
         className={`atlas-node-meta${node.stale ? ' atlas-meta-stale' : ''}`}
-        x={14}
-        y={NODE_H - 12}
+        x={CARD_PAD_X}
+        y={CARD_FOOTER_Y}
       >
         {node.date ?? noteDate(node.label) ?? ''}
         {node.stale ? ' · stale' : ''}
@@ -139,26 +152,31 @@ function NoteBody({ node }: { node: AtlasNode }): React.JSX.Element {
 }
 
 function HandoffBody({ node }: { node: AtlasNode }): React.JSX.Element {
-  const stampText = node.expired ? 'expired' : node.status || 'open'
+  // WP5 containment: clamp the stamp text (arbitrary frontmatter status), the
+  // date, the route line and the summary so nothing overruns NODE_W. The
+  // stamp width drives the REQUEST chip x, so a bounded stamp keeps the chip on
+  // the card too.
+  const stampText = truncateLabel(node.expired ? 'expired' : node.status || 'open', 84, 6)
+  const stampW = stampText.length * 6 + 12
   return (
     <>
       <g className={`atlas-stamp ${stampClass(node.status, node.expired)}`} aria-hidden>
-        <rect x={12} y={10} width={stampText.length * 6 + 12} height={15} rx={3} />
-        <text x={12 + (stampText.length * 6 + 12) / 2} y={21} textAnchor="middle">
+        <rect x={12} y={10} width={stampW} height={15} rx={3} />
+        <text x={12 + stampW / 2} y={21} textAnchor="middle">
           {stampText.toUpperCase()}
         </text>
       </g>
       {node.kind === 'request' && (
-        <Chip x={stampText.length * 6 + 30} y={10.5} text="request" variant="atlas-chip-request" />
+        <Chip x={stampW + 18} y={10.5} text="request" variant="atlas-chip-request" />
       )}
       <text className="atlas-node-date" x={NODE_W - 12} y={21} textAnchor="end">
-        {node.date ?? ''}
+        {truncateLabel(node.date ?? '', 78, 5.4)}
       </text>
-      <text className="atlas-route-line" x={14} y={44}>
-        {truncate(`${node.from ?? ''} ⟶ ${node.to ?? ''}`, 32)}
+      <text className="atlas-route-line" x={CARD_PAD_X} y={44}>
+        {truncateLabel(`${node.from ?? ''} ⟶ ${node.to ?? ''}`, CARD_TEXT_W, 6)}
       </text>
-      <text className="atlas-node-summary" x={14} y={NODE_H - 18}>
-        {truncate(node.summary ?? node.label, 34)}
+      <text className="atlas-node-summary" x={CARD_PAD_X} y={CARD_FOOTER_Y}>
+        {truncateLabel(node.summary ?? node.label, CARD_TEXT_W, 5.8)}
       </text>
     </>
   )
@@ -167,11 +185,11 @@ function HandoffBody({ node }: { node: AtlasNode }): React.JSX.Element {
 function ContractBody({ node }: { node: AtlasNode }): React.JSX.Element {
   return (
     <>
-      <Chip x={14} y={10} text="contract" variant="atlas-chip-type" />
-      <text className="atlas-node-mono" x={14} y={46}>
-        {truncate(node.file ?? node.label, 28)}
+      <Chip x={CARD_PAD_X} y={10} text="contract" variant="atlas-chip-type" />
+      <text className="atlas-node-mono" x={CARD_PAD_X} y={46}>
+        {truncateLabel(node.file ?? node.label, CARD_TEXT_W, 6.6)}
       </text>
-      <text className="atlas-node-meta" x={14} y={NODE_H - 14}>
+      <text className="atlas-node-meta" x={CARD_PAD_X} y={CARD_FOOTER_Y}>
         {node.changeCount === 1 ? '1 change' : `${node.changeCount ?? 0} changes`} · timeline
       </text>
     </>
@@ -182,14 +200,18 @@ function SourceBody({ node }: { node: AtlasNode }): React.JSX.Element {
   const local = node.localPath != null
   return (
     <>
-      <Chip x={14} y={10} text="source" variant="atlas-chip-type" />
-      <text className="atlas-node-mono" x={14} y={46}>
-        {truncate(node.sourceRel ?? node.label, 28)}
+      <Chip x={CARD_PAD_X} y={10} text="source" variant="atlas-chip-type" />
+      <text className="atlas-node-mono" x={CARD_PAD_X} y={46}>
+        {truncateLabel(node.sourceRel ?? node.label, CARD_TEXT_W, 6.6)}
       </text>
-      <text className="atlas-node-meta" x={14} y={NODE_H - 14}>
-        {local
-          ? `${node.sourceProject ?? 'repo'} · open in editor ↗`
-          : 'repo not on this machine · copy path'}
+      <text className="atlas-node-meta" x={CARD_PAD_X} y={CARD_FOOTER_Y}>
+        {truncateLabel(
+          local
+            ? `${node.sourceProject ?? 'repo'} · open in editor ↗`
+            : 'repo not on this machine · copy path',
+          CARD_TEXT_W,
+          5.4,
+        )}
       </text>
     </>
   )
@@ -199,11 +221,11 @@ function CommitBody({ node }: { node: AtlasNode }): React.JSX.Element {
   const linked = Boolean(node.commitBase)
   return (
     <>
-      <Chip x={14} y={10} text="commit" variant="atlas-chip-type" />
-      <text className="atlas-node-mono" x={14} y={46}>
-        {node.label}
+      <Chip x={CARD_PAD_X} y={10} text="commit" variant="atlas-chip-type" />
+      <text className="atlas-node-mono" x={CARD_PAD_X} y={46}>
+        {truncateLabel(node.label, CARD_TEXT_W, 6.6)}
       </text>
-      <text className="atlas-node-meta" x={14} y={NODE_H - 14}>
+      <text className="atlas-node-meta" x={CARD_PAD_X} y={CARD_FOOTER_Y}>
         {linked ? 'GitHub ↗' : 'non-GitHub remote · copy sha'}
       </text>
     </>

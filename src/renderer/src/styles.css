@@ -3456,10 +3456,25 @@ button.atlas-crumb:hover {
   color: var(--text-2);
 }
 
-/* collapsed topic atom: inset ground — a container, not a resolvable card */
+/* collapsed topic atom (WP5): a clear expandable affordance — solid subtle
+   inset fill + hairline (no weak dashed-empty look), a ▸ chevron and a
+   prominent count read as "open me", not a broken card */
 .atlas-topic-card {
   fill: var(--bg-inset);
-  stroke-dasharray: 3 3;
+  stroke: var(--hairline);
+}
+
+.atlas-topic-chevron {
+  fill: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.atlas-topic-count {
+  fill: var(--navy);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 700;
 }
 
 /* ── Atlas node card variants (story 10.4): all 6 types to spec ───────────── */

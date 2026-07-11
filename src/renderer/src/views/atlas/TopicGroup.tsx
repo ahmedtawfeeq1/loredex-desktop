@@ -3,7 +3,7 @@
  * card — name, note count — that expands lazily on click/Enter. Inset ground
  * distinguishes it from resolvable node cards (it navigates, never resolves).
  */
-import { NODE_H, NODE_W } from '../../../../shared/atlas-layout'
+import { NODE_H, NODE_W, truncateLabel } from '../../../../shared/atlas-layout'
 import type { TopicAtom } from './atlas-visibility'
 
 export function TopicGroup({
@@ -38,11 +38,23 @@ export function TopicGroup({
       }}
     >
       <rect className="atlas-card atlas-topic-card" width={NODE_W} height={NODE_H} rx={12} />
-      <text className="atlas-node-name" x={14} y={30}>
-        {atom.topic.length > 20 ? `${atom.topic.slice(0, 19)}…` : atom.topic}/
+      {/* ▸ chevron affordance + topic name; a prominent count on the right reads
+          as "expandable", replacing the old weak dashed-empty look (WP5) */}
+      <text className="atlas-topic-chevron" x={14} y={NODE_H / 2 + 5}>
+        ▸
       </text>
-      <text className="atlas-node-meta" x={14} y={NODE_H - 16}>
-        {atom.count === 1 ? '1 note' : `${atom.count} notes`} · click to expand
+      <text className="atlas-node-name" x={32} y={30}>
+        {truncateLabel(atom.topic, NODE_W - 80, 7.2)}/
+      </text>
+      <text className="atlas-topic-count" x={NODE_W - 14} y={32} textAnchor="end">
+        {atom.count}
+      </text>
+      <text className="atlas-node-meta" x={32} y={NODE_H - 16}>
+        {truncateLabel(
+          `${atom.count === 1 ? '1 note' : `${atom.count} notes`} · click to expand`,
+          NODE_W - 46,
+          6,
+        )}
       </text>
     </g>
   )

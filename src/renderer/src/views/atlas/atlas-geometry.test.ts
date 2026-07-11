@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
+  ARROW_STANDOFF,
   CHIP_H,
   CHIP_W,
   CLUSTER_H,
@@ -20,6 +21,7 @@ import {
   PANEL_MAX_COL_DEPTH,
   READABLE_CARD_MIN,
   panelWrapRows,
+  truncateLabel,
   PILL_H,
   PILL_W,
   TOPIC_COL_PITCH,
@@ -149,7 +151,11 @@ describe('orthoRoute', () => {
     const b = rect(CLUSTER_W + GUTTER, 300, CLUSTER_W, CLUSTER_H)
     const { points, label } = orthoRoute(a, b)
     expect(points[0]).toEqual({ x: CLUSTER_W, y: CLUSTER_H / 2 }) // leaves a's right edge
-    expect(points[points.length - 1]).toEqual({ x: CLUSTER_W + GUTTER, y: 300 + CLUSTER_H / 2 }) // enters b's left edge
+    // stops ARROW_STANDOFF short of b's left edge (WP5 arrowhead standoff)
+    expect(points[points.length - 1]).toEqual({
+      x: CLUSTER_W + GUTTER - ARROW_STANDOFF,
+      y: 300 + CLUSTER_H / 2,
+    })
     // every vertical run sits strictly inside the gutter channel
     for (let i = 1; i < points.length; i++) {
       const p = points[i - 1] as { x: number; y: number }
@@ -191,7 +197,10 @@ describe('orthoRoute', () => {
     const b = rect(0, 200, CLUSTER_W, CLUSTER_H)
     const back = orthoRoute(a, b)
     expect((back.points[0] as { x: number }).x).toBe(a.x) // leaves a's left edge
-    expect((back.points[back.points.length - 1] as { x: number }).x).toBe(b.x + b.w)
+    // stops ARROW_STANDOFF short of b's right edge (WP5 arrowhead standoff)
+    expect((back.points[back.points.length - 1] as { x: number }).x).toBe(
+      b.x + b.w + ARROW_STANDOFF,
+    )
     const sameLane = orthoRoute(rect(0, 0), rect(0, 400))
     for (const p of sameLane.points.slice(1, -1)) {
       expect(p.x).toBeLessThanOrEqual(0) // loops out the lane's left channel
@@ -220,6 +229,43 @@ describe('orthoRoute', () => {
     const labB = orthoRoute(b, a, 12).label
     expect(Math.sign(labA.y - CLUSTER_H / 2)).toBe(-Math.sign(labB.y - CLUSTER_H / 2))
     expect(rectsOverlap(chipRect(labA), chipRect(labB))).toBe(false)
+  })
+})
+
+describe('arrowhead standoff (WP5)', () => {
+  it('insets every route end ARROW_STANDOFF px short of the target border', () => {
+    // forward, long span, backward and same-lane routes all stop short of the
+    // card so the arrowhead tip sits just off the border with a clean gap
+    const a = rect(0, 0, CLUSTER_W, CLUSTER_H)
+    const fwd = rect(CLUSTER_W + GUTTER, 300, CLUSTER_W, CLUSTER_H)
+    const fEnd = orthoRoute(a, fwd).points.at(-1) as { x: number; y: number }
+    expect(fEnd.x).toBe(fwd.x - ARROW_STANDOFF) // 8px short of the left border
+    expect(fEnd.x).toBeLessThan(fwd.x) // never reaches into the card
+    expect(fEnd.y).toBe(300 + CLUSTER_H / 2) // still on the horizontal channel
+
+    const back = orthoRoute(rect(CLUSTER_W + GUTTER, 0, CLUSTER_W, CLUSTER_H), a)
+    const bEnd = back.points.at(-1) as { x: number; y: number }
+    expect(bEnd.x).toBe(a.x + a.w + ARROW_STANDOFF) // 8px off the right border
+
+    const same = orthoRoute(rect(0, 0), rect(0, 400))
+    const sEnd = same.points.at(-1) as { x: number; y: number }
+    expect(sEnd.x).toBe(-ARROW_STANDOFF) // 8px short of the left border
+  })
+})
+
+describe('text containment (WP5)', () => {
+  it('clamps a long commit sha within the card inner width', () => {
+    const out = truncateLabel('a'.repeat(80), NODE_W - 28, 6.6)
+    expect(out.endsWith('…')).toBe(true)
+    expect(out.length * 6.6).toBeLessThanOrEqual(NODE_W - 28)
+  })
+  it('clamps a long handoff date to a bounded width', () => {
+    const out = truncateLabel('2026-07-11T09:30:00Z-overlong', 78, 5.4)
+    expect(out.length * 5.4).toBeLessThanOrEqual(78)
+  })
+  it('bounds the note type width so the topic chip stays on-card', () => {
+    const out = truncateLabel('a-very-long-frontmatter-type-name', 70, 5.6)
+    expect(out.length * 5.6).toBeLessThanOrEqual(70)
   })
 })
 

@@ -66,6 +66,31 @@ describe('floating zoom pill stack (D1a5)', () => {
   })
 })
 
+describe('hover emphasis stays on-brand (WP5)', () => {
+  it('hot edges stroke gold, not navy — navy flips to paper-white in dark', () => {
+    const hot = block('.atlas-edge-hot .atlas-edge-line')
+    expect(hot).toContain('stroke: var(--gold);')
+    expect(hot).not.toContain('var(--navy)')
+  })
+  it('keeps the non-neighbor fade at 30%', () => {
+    expect(css).toContain('opacity: 0.3;')
+  })
+  it('the atlas stylesheet declares no drop-shadow filter (raster-tile corruption)', () => {
+    // strip comments (they explain the deliberate absence) then check declarations
+    const decls = css.replace(/\/\*[\s\S]*?\*\//g, '')
+    expect(decls).not.toContain('drop-shadow')
+  })
+})
+
+describe('collapsed topic card is a solid expandable affordance (WP5)', () => {
+  it('has a solid subtle fill + hairline, not the weak dashed-empty look', () => {
+    const card = blockIn(styles, '.atlas-topic-card {')
+    expect(card).toContain('fill: var(--bg-inset);')
+    expect(card).toContain('stroke: var(--hairline);')
+    expect(card).not.toContain('stroke-dasharray')
+  })
+})
+
 describe('side panels are a floating overlay, not a flex-squish (WP3)', () => {
   it('.atlas-body is a positioned container the panel can dock into', () => {
     expect(blockIn(styles, '.atlas-body')).toContain('position: relative;')

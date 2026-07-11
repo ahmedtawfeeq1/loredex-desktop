@@ -3571,21 +3571,31 @@ button.atlas-crumb:hover {
   gap: 12px;
   flex: 1;
   min-height: 0;
+  position: relative; /* WP3: anchors the floating side-panel overlay */
 }
 
-/* side panel: a card column next to the canvas (tours; filters/path ride it later) */
+/* WP3: side panels float as a right-docked overlay (like .atlas-legend-scrim,
+   but a docked panel with no full-screen scrim) so the canvas keeps FULL WIDTH
+   when Filters/Tours/Path/Blocked/Changed open — it never resizes on panel open.
+   Absolute (out of normal flow), not a flex sibling that steals 280px. */
 .atlas-side {
-  width: 280px;
-  flex: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 300px;
+  z-index: 5; /* above the canvas + its zoom pills (z-index 2) */
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 14px;
   background: var(--bg-card);
-  border: 1px solid var(--hairline);
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(19, 24, 38, 0.06);
+  border-left: 1px solid var(--hairline);
+  border-radius: 12px 0 0 12px;
+  box-shadow: -6px 0 20px rgba(19, 24, 38, 0.16);
   overflow-y: auto;
+  overflow-wrap: anywhere; /* long objectives never overflow 300px (inherited by
+                              blocked sentences, path/tour labels) */
 }
 
 .atlas-side-head {

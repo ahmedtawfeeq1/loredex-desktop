@@ -10,13 +10,20 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(join(import.meta.dirname, 'atlas.css'), 'utf8')
+// WP3 side-panel + body rules live in the global stylesheet, not atlas.css
+const styles = readFileSync(join(import.meta.dirname, '../../styles.css'), 'utf8')
+
+/** The first `{...}` block following a selector, in the given stylesheet text. */
+function blockIn(sheet: string, selector: string): string {
+  const start = sheet.indexOf(selector)
+  expect(start, `selector ${selector} present`).toBeGreaterThanOrEqual(0)
+  const open = sheet.indexOf('{', start)
+  return sheet.slice(open + 1, sheet.indexOf('}', open))
+}
 
 /** The first `{...}` block following a selector. */
 function block(selector: string): string {
-  const start = css.indexOf(selector)
-  expect(start, `selector ${selector} present`).toBeGreaterThanOrEqual(0)
-  const open = css.indexOf('{', start)
-  return css.slice(open + 1, css.indexOf('}', open))
+  return blockIn(css, selector)
 }
 
 describe('header breathing room (D1a5)', () => {
@@ -56,5 +63,30 @@ describe('floating zoom pill stack (D1a5)', () => {
   it('introduces no border wider than 1px', () => {
     const wide = css.match(/border(?!-radius)[a-z-]*:\s*[^;]*\b([2-9]|\d{2,})px[^;]*/g) ?? []
     expect(wide).toEqual([])
+  })
+})
+
+describe('side panels are a floating overlay, not a flex-squish (WP3)', () => {
+  it('.atlas-body is a positioned container the panel can dock into', () => {
+    expect(blockIn(styles, '.atlas-body')).toContain('position: relative;')
+  })
+  it('.atlas-side is absolutely positioned, right-docked, 300px — out of normal flow', () => {
+    const side = blockIn(styles, '.atlas-side {')
+    expect(side).toContain('position: absolute;')
+    expect(side).toContain('right: 0;')
+    expect(side).toContain('top: 0;')
+    expect(side).toContain('bottom: 0;')
+    expect(side).toContain('width: 300px;')
+    // NOT a normal-flow flex sibling that steals width from the canvas
+    expect(side).not.toContain('flex: none;')
+  })
+  it('.atlas-side floats above the canvas with a left hairline + shadow', () => {
+    const side = blockIn(styles, '.atlas-side {')
+    expect(side).toMatch(/z-index:\s*[1-9]/)
+    expect(side).toContain('border-left: 1px solid var(--hairline);')
+    expect(side).toContain('box-shadow:')
+  })
+  it('long objectives wrap instead of overflowing the 300px panel', () => {
+    expect(blockIn(styles, '.atlas-side {')).toContain('overflow-wrap: anywhere;')
   })
 })

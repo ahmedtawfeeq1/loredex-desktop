@@ -9,6 +9,7 @@ import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
 import { BrandMark } from './components/BrandMark'
+import { QuickActionsMenu } from './components/QuickActionsMenu'
 import { VaultMenu } from './components/VaultMenu'
 import { NavIcon, RailChevron } from './components/NavIcon'
 import { ShortcutCheatsheet } from './components/ShortcutCheatsheet'
@@ -175,6 +176,9 @@ export default function App(): React.JSX.Element {
             <RailChevron dir={sidebarCollapsed ? 'right' : 'left'} />
           </button>
         </div>
+        {/* Quick actions live below the brand (user request) — one click from
+            any view, not buried in the dashboard. */}
+        <QuickActionsMenu collapsed={sidebarCollapsed} />
         <nav aria-label="Views">
           {/* the registry's VIEW_ORDER is the nav — order, labels and ⌘1-9
               hints can never drift apart (story 15.3) */}

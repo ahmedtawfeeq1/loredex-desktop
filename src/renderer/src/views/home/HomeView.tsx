@@ -21,7 +21,6 @@ import { useHome } from '../../stores/home'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
 import { useRoute } from '../../stores/route'
-import { useSync } from '../../stores/sync'
 import { useWizard } from '../../stores/wizard'
 import { relativeTime } from '../feed/feed-logic'
 import { openBrief } from '../handoffs/Board'
@@ -236,36 +235,33 @@ export function HomeView(): React.JSX.Element {
         </div>
       )}
 
-      {/* Quick actions — full width, above everything */}
-      <QuickActions />
-
-      {/* Aligned 2-col band: attention (left) ↔ charts (right), tops flush */}
-      <div className="ops-grid">
-        <div className="ops-col ops-col-left">
-          <section className="ops-card" aria-label="Attention queue">
-            <div className="ops-card-head">
-              <div>
-                <div className="ops-card-title">Attention queue</div>
-                <div className="ops-card-desc">What needs you, most urgent first.</div>
-              </div>
-              <div className="ops-sevkeys">
-                {sev.critical > 0 && <span className="sevkey sev-critical">{sev.critical} critical</span>}
-                {sev.warning > 0 && <span className="sevkey sev-warning">{sev.warning} warning</span>}
-                {sev.info > 0 && <span className="sevkey sev-info">{sev.info} info</span>}
-              </div>
-            </div>
-            {queue.length === 0 ? (
-              <div className="ops-clear">All clear — nothing needs you.</div>
-            ) : (
-              queue.map((item) => <AttentionRow key={item.key} item={item} cards={all} />)
-            )}
-          </section>
+      {/* Attention queue — full width, the actionable hero: what needs doing.
+          Full width so a short queue never leaves a gap beside a tall chart. */}
+      <section className="ops-card" aria-label="Attention queue">
+        <div className="ops-card-head">
+          <div>
+            <div className="ops-card-title">Attention queue</div>
+            <div className="ops-card-desc">What needs you, most urgent first.</div>
+          </div>
+          <div className="ops-sevkeys">
+            {sev.critical > 0 && <span className="sevkey sev-critical">{sev.critical} critical</span>}
+            {sev.warning > 0 && <span className="sevkey sev-warning">{sev.warning} warning</span>}
+            {sev.info > 0 && <span className="sevkey sev-info">{sev.info} info</span>}
+          </div>
         </div>
+        {queue.length === 0 ? (
+          <div className="ops-clear">All clear — nothing needs you.</div>
+        ) : (
+          <div className="ops-queue-grid">
+            {queue.map((item) => <AttentionRow key={item.key} item={item} cards={all} />)}
+          </div>
+        )}
+      </section>
 
-        <div className="ops-col ops-col-right">
-          <VelocityChart series={velSeries} open={vel.open} />
-          <BacklogChart series={velSeries} openNow={inbound.open} />
-        </div>
+      {/* Trends — two equal-height charts side by side (no dead space) */}
+      <div className="ops-grid ops-grid-even">
+        <VelocityChart series={velSeries} open={vel.open} />
+        <BacklogChart series={velSeries} openNow={inbound.open} />
       </div>
 
       {/* Recent activity — full width */}
@@ -388,62 +384,7 @@ function CommandStrip({
   )
 }
 
-// ── quick actions ──────────────────────────────────────────────────────────────
-
-function QuickActions(): React.JSX.Element {
-  const setView = useApp((s) => s.setView)
-  const hasBrief = useHome((s) => s.brief?.path != null)
-  const actions: {
-    key: string
-    icon: string
-    label: string
-    primary?: boolean
-    disabled?: boolean
-    title?: string
-    run: () => void
-  }[] = [
-    {
-      key: 'handoff',
-      icon: '⇄',
-      label: 'New handoff',
-      primary: true,
-      run: () => useHandoffs.getState().openCompose(),
-    },
-    { key: 'route', icon: '⤵', label: 'Route a note', run: () => void useRoute.getState().start() },
-    {
-      key: 'curate',
-      icon: '✦',
-      label: 'Curate brief',
-      disabled: !hasBrief,
-      title: hasBrief ? 'Open the product brief' : 'No curated brief yet',
-      run: openProductBrief,
-    },
-    { key: 'atlas', icon: '◇', label: 'Open Atlas', run: goAtlas },
-    { key: 'sync', icon: '↑', label: 'Sync now', run: () => void useSync.getState().syncNow() },
-  ]
-  return (
-    <section className="ops-card ops-actions" aria-label="Quick actions">
-      <div className="ops-card-title">Quick actions</div>
-      <div className="ops-actions-row">
-        {actions.map((a) => (
-          <button
-            key={a.key}
-            type="button"
-            className={`ops-cta${a.primary ? ' ops-cta-primary' : ''}`}
-            disabled={a.disabled}
-            title={a.title ?? a.label}
-            onClick={a.run}
-          >
-            <span className="ops-cta-icon" aria-hidden="true">
-              {a.icon}
-            </span>
-            <span className="ops-cta-label">{a.label}</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  )
-}
+// (Quick actions moved to the sidebar — components/QuickActionsMenu.tsx)
 
 // ── attention queue row ─────────────────────────────────────────────────────────
 

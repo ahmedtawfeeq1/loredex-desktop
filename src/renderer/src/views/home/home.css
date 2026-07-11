@@ -151,6 +151,20 @@
   align-items: start;
 }
 
+/* two equal-height cards side by side (the trend charts) — no dead space */
+.ops-grid-even {
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+}
+
+/* full-width attention queue: rows flow into columns so a short queue uses
+   the width instead of stacking in a narrow strip */
+.ops-queue-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 8px 16px;
+}
+
 .ops-col {
   display: flex;
   flex-direction: column;

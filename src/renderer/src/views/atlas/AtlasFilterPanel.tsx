@@ -16,7 +16,6 @@ const EDGE_CATEGORIES: AtlasEdgeCategory[] = [
   'wikilink',
   'provenance',
   'contract-link',
-  'affinity',
 ]
 
 function toggle(list: string[], value: string): string[] {
@@ -116,6 +115,15 @@ export function AtlasFilterPanel(): React.JSX.Element {
             onChange={() => setFilters({ edgeCategories: toggle(filters.edgeCategories, c) })}
           />
         ))}
+        {/* affinity — the dashed cross-project topic web — is hidden by default
+            to declutter Deep Dive (WP2); this toggle reveals it */}
+        <CheckRow
+          label="affinity (cross-project topics, dashed)"
+          checked={!filters.excludedEdgeCategories.includes('affinity')}
+          onChange={() =>
+            setFilters({ excludedEdgeCategories: toggle(filters.excludedEdgeCategories, 'affinity') })
+          }
+        />
       </div>
       <div className="atlas-filter-group">
         <span className="atlas-filter-title">Contract-link confidence</span>

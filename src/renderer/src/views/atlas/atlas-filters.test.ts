@@ -8,6 +8,7 @@ import type { AtlasEdge, AtlasNode } from '../../../../shared/types'
 import {
   activeFilterCount,
   applyAtlasFilters,
+  DEFAULT_FILTERS,
   EMPTY_FILTERS,
   effectiveStatus,
   focusNeighborhood,
@@ -46,6 +47,7 @@ const EDGES: AtlasEdge[] = [
   edge('r-calm', 'project:beta', 'project:alpha', { category: 'route', blocking: false }),
   edge('c-mention', 'note:a', 'handoff:open', { category: 'contract-link', confidence: 'mentioned' }),
   edge('c-guess', 'note:b', 'handoff:open', { category: 'contract-link', confidence: 'heuristic' }),
+  edge('aff', 'note:a', 'note:b', { category: 'affinity' }),
 ]
 
 describe('applyAtlasFilters', () => {
@@ -108,6 +110,29 @@ describe('applyAtlasFilters', () => {
         blocked: true,
       }),
     ).toBe(4)
+  })
+
+  it('affinity is hidden by DEFAULT_FILTERS and returns when toggled on (WP2)', () => {
+    // the Atlas opens decluttered: the dashed cross-project affinity web is off
+    const off = applyAtlasFilters(NODES, EDGES, DEFAULT_FILTERS)
+    expect(off.edges.some((e) => e.category === 'affinity')).toBe(false)
+    // every other edge survives — only affinity is suppressed
+    expect(off.edges.map((e) => e.id).sort()).toEqual(['c-guess', 'c-mention', 'r-block', 'r-calm', 'w1'])
+
+    // enabling the Filters affinity toggle empties the exclusion → the web shows
+    const on = applyAtlasFilters(NODES, EDGES, { ...DEFAULT_FILTERS, excludedEdgeCategories: [] })
+    expect(on.edges.some((e) => e.id === 'aff')).toBe(true)
+    expect(on.edges).toHaveLength(EDGES.length)
+  })
+
+  it('EMPTY_FILTERS keeps all-pass semantics (affinity included)', () => {
+    const out = applyAtlasFilters(NODES, EDGES, EMPTY_FILTERS)
+    expect(out.edges.some((e) => e.category === 'affinity')).toBe(true)
+  })
+
+  it('the declutter exclusion is not counted as an active facet', () => {
+    // it is a default, not a user narrowing — the panel must not read "1 active"
+    expect(activeFilterCount(DEFAULT_FILTERS)).toBe(0)
   })
 
   it('effectiveStatus derives expired snoozes as open', () => {

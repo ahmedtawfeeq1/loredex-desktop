@@ -39,7 +39,11 @@ export const LEGEND_SECTIONS: ReadonlyArray<LegendSection> = [
       { term: 'wikilink', meaning: 'a [[link]] between notes' },
       { term: 'provenance', meaning: 'a note back to its source file' },
       { term: 'contract-link', meaning: 'a contract change tied to a handoff/commit' },
-      { term: 'affinity', meaning: 'the same topic shared across projects (dashed)' },
+      {
+        term: 'affinity',
+        meaning:
+          'the same topic shared across projects (dashed) — hidden by default; turn it on in Filters',
+      },
     ],
   },
   {

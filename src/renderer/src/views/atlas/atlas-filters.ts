@@ -14,6 +14,9 @@ export interface AtlasFilters {
   statuses: string[]
   topics: string[]
   edgeCategories: string[]
+  /** declutter denylist: edge categories always hidden (affinity off by
+   *  default — WP2). Composes with the edgeCategories allowlist. */
+  excludedEdgeCategories: string[]
   /** '' = both tiers */
   confidence: '' | 'mentioned' | 'heuristic'
   /** the blocked-on preset (story 10.6 AC4) */
@@ -25,8 +28,19 @@ export const EMPTY_FILTERS: AtlasFilters = {
   statuses: [],
   topics: [],
   edgeCategories: [],
+  excludedEdgeCategories: [],
   confidence: '',
   blocked: false,
+}
+
+/**
+ * The Atlas opens decluttered (WP2): affinity — the dashed cross-project topic
+ * web — is hidden until the user enables it in the Filters "affinity" toggle.
+ * Everything else keeps EMPTY_FILTERS all-pass semantics.
+ */
+export const DEFAULT_FILTERS: AtlasFilters = {
+  ...EMPTY_FILTERS,
+  excludedEdgeCategories: ['affinity'],
 }
 
 /** Active facet count for the one-click-clear chip (AC2). */
@@ -85,6 +99,9 @@ export function applyAtlasFilters(
   }
   if (f.edgeCategories.length > 0) {
     keptEdges = keptEdges.filter((e) => f.edgeCategories.includes(e.category))
+  }
+  if (f.excludedEdgeCategories.length > 0) {
+    keptEdges = keptEdges.filter((e) => !f.excludedEdgeCategories.includes(e.category))
   }
   if (f.confidence !== '') {
     keptEdges = keptEdges.filter(

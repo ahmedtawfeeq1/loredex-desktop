@@ -16,7 +16,7 @@ import type {
 } from '../../../shared/types'
 import {
   type AtlasFilters,
-  EMPTY_FILTERS,
+  DEFAULT_FILTERS,
   searchRingTiers,
 } from '../views/atlas/atlas-filters'
 import { changedNodeIds, withLiveChanges } from '../views/atlas/changed-since'
@@ -151,7 +151,7 @@ export const useAtlas = create<AtlasState>((set, get) => ({
   activeTour: null,
   tourStep: 0,
   tourHighlight: [],
-  filters: EMPTY_FILTERS,
+  filters: DEFAULT_FILTERS,
   focusId: null,
   pathFrom: null,
   pathTo: null,
@@ -209,7 +209,7 @@ export const useAtlas = create<AtlasState>((set, get) => ({
   },
 
   clearFilters() {
-    set({ filters: EMPTY_FILTERS })
+    set({ filters: DEFAULT_FILTERS })
   },
 
   // the blocked-on preset (10.6 AC4): one click isolates blocking chains and
@@ -412,7 +412,7 @@ export const useAtlas = create<AtlasState>((set, get) => ({
       activeTour: null,
       tourStep: 0,
       tourHighlight: [],
-      filters: EMPTY_FILTERS,
+      filters: DEFAULT_FILTERS,
       focusId: null,
       pathFrom: null,
       pathTo: null,

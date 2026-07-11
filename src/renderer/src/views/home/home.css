@@ -558,6 +558,12 @@
   gap: 8px;
 }
 
+/* full-width bottom section: wider columns so project names never truncate */
+.ops-health-grid-wide {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
 .ops-health {
   display: flex;
   flex-direction: column;

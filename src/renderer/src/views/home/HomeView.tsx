@@ -236,11 +236,12 @@ export function HomeView(): React.JSX.Element {
         </div>
       )}
 
-      <div className="ops-grid">
-        {/* ── LEFT: actions · attention · activity ───────────────────────── */}
-        <div className="ops-col ops-col-left">
-          <QuickActions />
+      {/* Quick actions — full width, above everything */}
+      <QuickActions />
 
+      {/* Aligned 2-col band: attention (left) ↔ charts (right), tops flush */}
+      <div className="ops-grid">
+        <div className="ops-col ops-col-left">
           <section className="ops-card" aria-label="Attention queue">
             <div className="ops-card-head">
               <div>
@@ -259,65 +260,66 @@ export function HomeView(): React.JSX.Element {
               queue.map((item) => <AttentionRow key={item.key} item={item} cards={all} />)
             )}
           </section>
-
-          <section className="ops-card" aria-label="Recent activity">
-            <div className="ops-card-head">
-              <div>
-                <div className="ops-card-title">Recent activity</div>
-                <div className="ops-card-desc">The vault's own git log, newest first.</div>
-              </div>
-              <button type="button" className="button-quiet" onClick={() => setView('feed')}>
-                See all →
-              </button>
-            </div>
-            {recent.length === 0 ? (
-              <div className="ops-clear">No activity yet.</div>
-            ) : (
-              recent.map((e, i) => (
-                <div className="ops-act" key={`${e.sha}/${i}`}>
-                  <span className={`feed-kind feed-kind-${e.kind}`}>{e.kind}</span>
-                  <span className="ops-act-sum" title={e.summary}>
-                    {e.summary}
-                  </span>
-                  <span className="ops-mini" title={e.at}>
-                    {relativeTime(e.at, nowMs)}
-                  </span>
-                </div>
-              ))
-            )}
-          </section>
         </div>
 
-        {/* ── RIGHT: velocity · backlog · health + relations ─────────────── */}
         <div className="ops-col ops-col-right">
           <VelocityChart series={velSeries} open={vel.open} />
           <BacklogChart series={velSeries} openNow={inbound.open} />
-
-          <section className="ops-card" aria-label="Project health">
-            <div className="ops-card-head">
-              <div>
-                <div className="ops-card-title">Project health</div>
-                <div className="ops-card-desc">Size, open flow, brief freshness, utilization.</div>
-              </div>
-            </div>
-            <div className="ops-health-grid">
-              {healthRows.map((row) => (
-                <HealthCard key={row.project} row={row} />
-              ))}
-            </div>
-            {relations.length > 0 && (
-              <>
-                <div className="ops-relations-label">Who hands off to whom</div>
-                <div className="ops-relations">
-                  {relations.map((r) => (
-                    <RelationChip key={`${r.from}/${r.to}`} rel={r} />
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
         </div>
       </div>
+
+      {/* Recent activity — full width */}
+      <section className="ops-card" aria-label="Recent activity">
+        <div className="ops-card-head">
+          <div>
+            <div className="ops-card-title">Recent activity</div>
+            <div className="ops-card-desc">The vault's own git log, newest first.</div>
+          </div>
+          <button type="button" className="button-quiet" onClick={() => setView('feed')}>
+            See all →
+          </button>
+        </div>
+        {recent.length === 0 ? (
+          <div className="ops-clear">No activity yet.</div>
+        ) : (
+          recent.map((e, i) => (
+            <div className="ops-act" key={`${e.sha}/${i}`}>
+              <span className={`feed-kind feed-kind-${e.kind}`}>{e.kind}</span>
+              <span className="ops-act-sum" title={e.summary}>
+                {e.summary}
+              </span>
+              <span className="ops-mini" title={e.at}>
+                {relativeTime(e.at, nowMs)}
+              </span>
+            </div>
+          ))
+        )}
+      </section>
+
+      {/* Project health + relations — full width at the bottom */}
+      <section className="ops-card" aria-label="Project health">
+        <div className="ops-card-head">
+          <div>
+            <div className="ops-card-title">Project health</div>
+            <div className="ops-card-desc">Size, open flow, brief freshness, utilization.</div>
+          </div>
+        </div>
+        <div className="ops-health-grid ops-health-grid-wide">
+          {healthRows.map((row) => (
+            <HealthCard key={row.project} row={row} />
+          ))}
+        </div>
+        {relations.length > 0 && (
+          <>
+            <div className="ops-relations-label">Who hands off to whom</div>
+            <div className="ops-relations">
+              {relations.map((r) => (
+                <RelationChip key={`${r.from}/${r.to}`} rel={r} />
+              ))}
+            </div>
+          </>
+        )}
+      </section>
     </div>
   )
 }

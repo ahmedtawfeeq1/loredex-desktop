@@ -52,4 +52,4 @@ Done
 
 ## QA Results
 
-_pending_
+- 2026-07-11 fresh-eyes (commit `6a5fcbf`): **PASS.** `parseQuery` quote-aware tokenizer parses all ten operators (`project/topic/type/status/tag/from/to/before/after/on`), last-wins, unknown `foo:bar` falls through as a bare term; `setOperator` round-trips. Operators map to the core `Facets` transport (`filtersToFacets`) and narrow PRE-rank through the same `vault.search` seam via `matchesFacets` (+tag list-or-scalar, +date bounds) — no second index. Ranked results: humanized title, project tint dot, bare-term-only highlight, group-by-project (`groupHitsByProject`, rank-preserving), result count, up/down/enter. Recents cap-8 dedup persistence (`search-recents.ts`), saved-search chips, ⌘K top-5 + "See all". Tests `query-parser.test.ts` / `search-recents.test.ts` / `facets.test.ts` green in 933/933.

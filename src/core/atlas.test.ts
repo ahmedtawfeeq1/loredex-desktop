@@ -906,7 +906,10 @@ describe.skipIf(!existsSync(NIMBUS_VAULT))('atlas model (nimbus simulation vault
     const g = projectAtlas(model, 'learn', { project: 'nimbus-backend' })
     const cluster = g.clusters.find((c) => c.project === 'nimbus-backend') as AtlasCluster
     const { members, ratio } = panelFill(g, cluster)
-    expect(members).toBe(18) // the user's exact case
+    // The user's exact case was 18; the simulation vault is living (handoff edges
+    // land into nimbus-backend over time), so pin the invariant — a large cluster
+    // fills the panel, never a thin strip — not a brittle exact count.
+    expect(members).toBeGreaterThanOrEqual(18)
     expect(ratio).toBeGreaterThan(0.5)
     // and the panel spreads: more than one column, no column deeper than 6
     const memberNodes = g.nodes.filter((n) => n.type === 'note' || n.type === 'handoff')

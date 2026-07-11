@@ -47,3 +47,7 @@ Done
 ## Dev Agent Record
 
 - 2026-07-11: implemented as specced. Gate: typecheck (node+web) clean, full vitest 873/873 sequential (`--no-file-parallelism`; 858 prior + 15 new), production build clean. New: `src/shared/properties.ts` (+test), `src/core/set-frontmatter.test.ts`, `src/renderer/src/views/reader/PropertiesPanel.tsx`. Touched: `ipc-contract.ts`, `core/handlers.ts`, `core/engine.ts`, `core/notes.ts`, `NoteView.tsx`, `styles.css`.
+
+## QA Results
+
+- 2026-07-11 fresh-eyes (commit `2b88d83`): **PASS.** Typed rows via `inferPropertyType` (date/tags/select/url/path/text). Managed keys LOCKED in the panel (lock glyph + "managed by loredex" tooltip) AND rejected server-side in `applyFrontmatterEdit` (throws) — double-guarded, agents-own-frontmatter principle intact. Edit → `note.setFrontmatter` re-serializes frontmatter via lib `serializeDoc`, body preserved, path-guarded, auto-commit `loredex: set|remove property …`. "+ Add property" + type picker, per-row × on user fields only, tags → `tag:` search (epic22 parses it). Tests `properties.test.ts` + `set-frontmatter.test.ts` green in the full 933/933 suite.

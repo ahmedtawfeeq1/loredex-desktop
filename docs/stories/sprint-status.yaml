@@ -304,7 +304,20 @@ qa:
       .settings-title serif -> 13px/600 sans (kept, still asserted)."
 
 action_items:
-  - "FRESH-EYES QA 2026-07-11 (v1-completion cycle, D1 amendment 7 — epics 20/4/22/21/23):
+  - "FRESH-EYES QA 2026-07-11 #2 (v1-completion cycle, amendments 7+9 — epics
+    20/4/22/25/23/24): FIVE landed + PASS — 20 `2b88d83`, 4 `4a30042`, 22 `6a5fcbf`,
+    25 (modern Vault Ops Dashboard, supersedes 21) `4155ddb`, 23 `0f6725f`. epic21
+    `83b07d1` present but SUPERSEDED by 25. LOUD GAP: **epic 24 (form validation) was
+    NEVER built** — no `amendment 8` in DESIGN.md (doc jumps 7→9), no epic24 story, no
+    commit in `git log --all`, and every form surface (compose/Hand back/decline/
+    wizards) still ships the disabled dead-button pattern with a generic (non-reason)
+    tooltip, no submit-time field error, no focus-on-invalid — the exact anti-pattern
+    the AC forbids. Gates green on shipped code: typecheck clean, vitest 961/961
+    (--no-file-parallelism), e2e 18/18, build clean, launch smoke boots clean. Working
+    tree still uncommitted (prior cycle's atlas de-brittle fix + story QA notes). Full
+    report: V4-STATUS.md."
+  - "FRESH-EYES QA 2026-07-11 #1 (superseded by #2 above — did NOT cover epic 24 or 25:
+    D1 amendment 7 — epics 20/4/22/21/23):
     ALL FIVE EPICS LANDED REAL COMMITS — 20 properties `2b88d83`, 4 routing-safety
     `4a30042`, 22 search `6a5fcbf`, 21 dashboard `83b07d1`, 23 vault-switcher
     `0f6725f`. Gates green: typecheck clean, vitest 933/933 (--no-file-parallelism),

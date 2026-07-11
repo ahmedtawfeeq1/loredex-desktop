@@ -84,3 +84,5 @@ Opus 4.8 (1M context) — BMAD dev agent, sequential v1-completion batch.
 ## QA Results
 
 Self-verified against the gate (typecheck + full sequential vitest 919/919 + build). Insights aggregation pinned to nimbus-vault ground truth; live-recompute event set unchanged.
+
+- 2026-07-11 fresh-eyes (commit `83b07d1`): **PASS.** All §A bands present and wired through the pure `insights.ts` module: hero (openInbound + `wowTrend` arrow, `oldestOpen`+route, `requestsWaiting`, `changesInWindow`), attention 2/3 (`attentionRows` + inline Consume/Snooze, `blockedRows` card beneath), insight 1/3 (`rankedPulse` bars, 14-day `dailyBuckets` SVG sparkline, `churnByFile`, `syncTile`), velocity strip (`velocity` 7d). Deterministic (`now` injected), zero new backend, same channels the rest of the app reads. `insights.test.ts` green in 933/933.

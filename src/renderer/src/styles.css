@@ -2326,21 +2326,44 @@ a:hover {
 }
 
 .facet {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  transition: border-color 100ms ease-out;
+}
+
+.facet:hover,
+.facet:focus-within {
+  border-color: var(--gold);
+}
+
+/* uppercase mono label, matching the app's other section labels */
+.facet > span {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--text-2);
 }
 
 .facet select {
   font: inherit;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-1);
-  background: var(--bg-inset);
-  border: 1px solid var(--hairline);
-  border-radius: 5px;
-  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.facet select:focus {
+  outline: none;
 }
 
 .search-results {

@@ -74,7 +74,7 @@ function FacetSelect({
     <label className="facet">
       <span>{label}</span>
       <select value={filters[facetKey] ?? ''} onChange={(e) => setFilter(facetKey, e.target.value)}>
-        <option value="">any</option>
+        <option value="">Any</option>
         {options.map((o) => (
           <option key={o} value={o}>
             {o}

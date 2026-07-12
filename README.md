@@ -46,8 +46,8 @@ Download the installer for your OS from the [latest release](https://github.com/
 
 | OS | Download | First launch |
 |---|---|---|
-| **macOS** (Apple Silicon, 14+) | `Loredex-<ver>-arm64.dmg` — drag to Applications | Gatekeeper says "damaged" (it's quarantine). Clear once: `xattr -dr com.apple.quarantine /Applications/Loredex.app` |
-| **Windows** (10/11, x64) | `Loredex.Setup.<ver>.exe` — run it | SmartScreen → **More info → Run anyway** |
+| **macOS** (Apple Silicon, 14+) | `Loredex-0.2.1-arm64.dmg` — drag to Applications | Gatekeeper says "damaged" (it's quarantine). Clear once: `xattr -dr com.apple.quarantine /Applications/Loredex.app` |
+| **Windows** (10/11, x64) | `Loredex.Setup.0.2.1.exe` — run it | SmartScreen → **More info → Run anyway** |
 | **Linux** (x64) | `.AppImage` (any distro) — `chmod +x` and run; or `.deb` — `sudo dpkg -i …` | AppImage may need FUSE (`sudo apt install libfuse2`) |
 
 **Git** is required (vault sync + history); on Windows install [Git for Windows](https://git-scm.com/download/win). On first launch: create a vault, join your team's vault by pasting its git URL, or open an existing loredex folder (**File → Open Vault…**, ⌘/Ctrl+O).

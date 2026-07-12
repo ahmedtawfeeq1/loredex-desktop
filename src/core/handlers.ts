@@ -2,6 +2,7 @@
  * Registers the CoreApi handlers implemented so far onto the dispatcher.
  * Unregistered channels answer NOT_IMPLEMENTED from the dispatcher itself.
  */
+import { isFontSettings } from '../shared/font-settings'
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting } from '../shared/theme'
@@ -50,12 +51,14 @@ import { getMcpStatus } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
   loadAtlasLegendSeen,
+  loadFontSettings,
   loadIdentityProfile,
   loadListPaneWidth,
   loadRailsCollapsed,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
   saveAtlasLegendSeen,
+  saveFontSettings,
   saveIdentityProfile,
   saveListPaneWidth,
   saveMcpPortOverride,
@@ -632,6 +635,12 @@ export function registerCoreHandlers(
       throw ipcError('INTERNAL', 'theme must be one of system, light, dark')
     }
     saveThemeSetting(theme)
+  })
+  // Font preferences: per-user app state, applied renderer-side (like theme).
+  ipc.register('settings.fonts.get', () => loadFontSettings())
+  ipc.register('settings.fonts.set', ({ fonts }) => {
+    if (!isFontSettings(fonts)) throw ipcError('INTERNAL', 'invalid font settings')
+    saveFontSettings(fonts)
   })
   // Collapsible rails (story 16.2, Addendum D1): per-vault UI pref, app.db
   // only (state-placement rule). No vault/db open yet → expanded defaults.

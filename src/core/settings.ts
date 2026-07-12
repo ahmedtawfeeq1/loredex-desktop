@@ -10,6 +10,7 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, renameSync } from 'node:fs'
 import { join } from 'node:path'
+import { DEFAULT_FONT_SETTINGS, isFontSettings, type FontSettings } from '../shared/font-settings'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting, type ThemeSetting } from '../shared/theme'
 import type { Identity, RailsCollapsed, TreeSectionsCollapsed } from '../shared/types'
@@ -83,6 +84,17 @@ export function loadThemeSetting(): ThemeSetting {
 
 export function saveThemeSetting(theme: ThemeSetting): void {
   writeKey('theme', JSON.stringify(theme))
+}
+
+// ── Font preferences (app + per-note-format) ────────────────────────────────
+
+export function loadFontSettings(): FontSettings {
+  const raw = readJsonKey('fonts')
+  return isFontSettings(raw) ? raw : DEFAULT_FONT_SETTINGS
+}
+
+export function saveFontSettings(fonts: FontSettings): void {
+  writeKey('fonts', JSON.stringify(fonts))
 }
 
 // ── Collapsible rails (story 16.2, Addendum D1) ─────────────────────────────

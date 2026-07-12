@@ -4,6 +4,7 @@
  * one push event channel. All payload types live here or in ./types.ts.
  */
 import type { Config, Doc, ProductDashboard, SearchHit } from 'loredex'
+import type { FontSettings } from './font-settings'
 import type { ThemeSetting } from './theme'
 import type {
   ActivityEvent,
@@ -113,6 +114,10 @@ export interface CoreApi {
    *  state, persisted core-side (settings JSON → app.db seam, story 9.2) */
   'settings.theme.get': { in: void; out: ThemeSetting }
   'settings.theme.set': { in: { theme: ThemeSetting }; out: void }
+  /** app-local: per-user font preferences (app UI + per-note-format), applied
+   *  renderer-side by stamping CSS vars — same seam as theme. */
+  'settings.fonts.get': { in: void; out: FontSettings }
+  'settings.fonts.set': { in: { fonts: FontSettings }; out: void }
   /** app-local contract evolution (story 16.2, Addendum D1): collapsible-rail
    *  state — PER-VAULT UI pref in app.db (never the vault); get degrades to
    *  expanded while no vault/db is open. */

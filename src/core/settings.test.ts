@@ -3,16 +3,19 @@ import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { appSettingSet, initAppDb, type AppDb } from './db/index'
+import { DEFAULT_FONT_SETTINGS } from '../shared/font-settings'
+import { appSettingSet, getAppDb, initAppDb, metaSet, type AppDb } from './db/index'
 import {
   initSettings,
   loadAtlasLegendSeen,
+  loadFontSettings,
   loadIdentityProfile,
   loadListPaneWidth,
   loadRailsCollapsed,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
   saveAtlasLegendSeen,
+  saveFontSettings,
   saveIdentityProfile,
   saveListPaneWidth,
   saveRailsCollapsed,
@@ -47,6 +50,33 @@ describe('theme setting persistence', () => {
     saveThemeSetting('dark')
     expect(loadThemeSetting()).toBe('dark')
     expect(loadIdentityProfile()?.name).toBe('Kai Ora')
+  })
+})
+
+describe('font settings persistence (task 4)', () => {
+  it('defaults to all-system when nothing is stored', () => {
+    freshDir()
+    expect(loadFontSettings()).toEqual(DEFAULT_FONT_SETTINGS)
+  })
+
+  it('round-trips a saved value', () => {
+    freshDir()
+    const next = {
+      app: 'dm-sans',
+      note: { title: 'unbounded', headings: 'sora', body: 'dm-sans', code: 'space-mono' },
+    }
+    saveFontSettings(next)
+    expect(loadFontSettings()).toEqual(next)
+  })
+
+  it('ignores a malformed stored value and falls back to the default', () => {
+    freshDir()
+    const db = getAppDb()
+    expect(db).not.toBeNull()
+    metaSet(db as AppDb, 'settings:fonts', 'not json {')
+    expect(loadFontSettings()).toEqual(DEFAULT_FONT_SETTINGS)
+    metaSet(db as AppDb, 'settings:fonts', JSON.stringify({ app: 'dm-sans' }))
+    expect(loadFontSettings()).toEqual(DEFAULT_FONT_SETTINGS)
   })
 })
 

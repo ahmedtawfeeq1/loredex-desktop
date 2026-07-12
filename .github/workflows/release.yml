@@ -28,10 +28,6 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      # the loredex dep is a public github git ref; npm records the ssh form —
-      # rewrite it to https so runners (which have no ssh key) can clone it
-      - name: Clone github git deps over https
-        run: git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
       - run: npm ci
       # typecheck + electron-vite build → out/**; electron-builder then rebuilds
       # the native module for this OS's Electron ABI and packages the installer.

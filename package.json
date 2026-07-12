@@ -30,7 +30,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "@parcel/watcher": "2.5.4",
     "better-sqlite3": "12.11.1",
-    "loredex": "git+https://github.com/ahmedtawfeeq1/loredex.git#0ea60d563f96b65ca467cb727c35e31c7f05f3e1",
+    "loredex": "^2.3.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "rehype-react": "8.0.0",
@@ -58,7 +58,7 @@
     "vite": "7.3.6",
     "vitest": "4.1.10"
   },
-  "author": "Ahmed Tawfeeq",
+  "author": "Ahmed Tawfeeq <loopx.tech1@gmail.com>",
   "homepage": "https://github.com/ahmedtawfeeq1/loredex-desktop",
   "repository": {
     "type": "git",

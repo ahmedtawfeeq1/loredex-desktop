@@ -8,13 +8,30 @@ import { DEFAULT_FONT_SETTINGS, type FontSettings } from '../../../shared/font-s
 import { fontById } from '../../../shared/fonts'
 import { invoke } from '../api'
 
+/**
+ * A role set to 'system' clears its inline var instead of stamping the
+ * generic Sans system stack, so the stylesheet's :root fallback wins (e.g.
+ * --note-title/--note-heading -> var(--font-serif), --note-code ->
+ * var(--font-mono)). Stamping Sans there would override those fallbacks.
+ */
+function applyRole(root: CSSStyleDeclaration, cssVar: string, fontId: string): void {
+  if (fontId === 'system') {
+    root.removeProperty(cssVar)
+  } else {
+    root.setProperty(cssVar, fontById(fontId).stack)
+  }
+}
+
 export function applyFonts(s: FontSettings): void {
   const root = document.documentElement.style
-  root.setProperty('--font-ui', fontById(s.app).stack)
-  root.setProperty('--note-title', fontById(s.note.title).stack)
-  root.setProperty('--note-heading', fontById(s.note.headings).stack)
-  root.setProperty('--note-body', fontById(s.note.body).stack)
-  root.setProperty('--note-code', fontById(s.note.code).stack)
+  const roles: Array<[string, string]> = [
+    ['--font-ui', s.app],
+    ['--note-title', s.note.title],
+    ['--note-heading', s.note.headings],
+    ['--note-body', s.note.body],
+    ['--note-code', s.note.code],
+  ]
+  for (const [cssVar, fontId] of roles) applyRole(root, cssVar, fontId)
 }
 
 interface FontState {

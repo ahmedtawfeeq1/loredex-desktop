@@ -43,6 +43,8 @@
     "zustand": "5.0.8"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
@@ -51,6 +53,7 @@
     "electron": "43.1.0",
     "electron-builder": "26.15.3",
     "electron-vite": "4.0.1",
+    "jsdom": "^27.4.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
     "vitest": "4.1.10"

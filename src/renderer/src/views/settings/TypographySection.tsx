@@ -15,6 +15,31 @@ const NOTE_ROLES: Array<{ role: FontRole; label: string }> = [
   { role: 'code', label: 'Code' },
 ]
 
+/**
+ * A single "role → current font" row. Hoisted to module scope (rather than
+ * defined inside TypographySection's render body) so React sees a stable
+ * component type across renders — an inline definition would remount all
+ * rows (and drop focus) every time any font is picked.
+ */
+function Row({
+  label,
+  currentFont,
+  onOpen,
+}: {
+  label: string
+  currentFont: { name: string; stack: string }
+  onOpen(): void
+}): React.JSX.Element {
+  return (
+    <div className="toggle-row">
+      <span>{label}</span>
+      <button type="button" className="button-secondary font-pick-btn" onClick={onOpen}>
+        <span style={{ fontFamily: currentFont.stack }}>{currentFont.name}</span>
+      </button>
+    </div>
+  )
+}
+
 export function TypographySection(): React.JSX.Element {
   const settings = useFonts((s) => s.settings)
   const loaded = useFonts((s) => s.loaded)
@@ -34,29 +59,22 @@ export function TypographySection(): React.JSX.Element {
     else void setFonts({ ...settings, note: { ...settings.note, [role]: id } })
   }
 
-  const Row = ({ role, label }: { role: FontRole; label: string }): React.JSX.Element => {
-    const font = fontById(idFor(role))
-    return (
-      <div className="toggle-row">
-        <span>{label}</span>
-        <button type="button" className="button-secondary font-pick-btn" onClick={() => setPicking(role)}>
-          <span style={{ fontFamily: font.stack }}>{font.name}</span>
-        </button>
-      </div>
-    )
-  }
-
   return (
     <>
       <div className="settings-card">
         <h2 className="settings-title">App font</h2>
-        <Row role="app" label="Interface" />
+        <Row label="Interface" currentFont={fontById(idFor('app'))} onOpen={() => setPicking('app')} />
         <p className="settings-hint">The font for menus, lists and the app chrome.</p>
       </div>
       <div className="settings-card">
         <h2 className="settings-title">Note fonts</h2>
         {NOTE_ROLES.map((r) => (
-          <Row key={r.role} role={r.role} label={r.label} />
+          <Row
+            key={r.role}
+            label={r.label}
+            currentFont={fontById(idFor(r.role))}
+            onOpen={() => setPicking(r.role)}
+          />
         ))}
         <p className="settings-hint">Applied when reading notes. Click a row to preview and choose.</p>
       </div>

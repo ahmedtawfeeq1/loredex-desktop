@@ -3,7 +3,7 @@
  * its own face; right = a live specimen rendering a mini note with the hovered
  * / selected font applied to the slot that matches `role`. Select → onPick.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fontById, fontsByCategory, type FontDef } from '../../../../shared/fonts'
 
 export type FontRole = 'app' | 'title' | 'headings' | 'body' | 'code'
@@ -18,6 +18,23 @@ interface Props {
 
 export function FontPicker({ open, role, currentId, onPick, onClose }: Props): React.JSX.Element | null {
   const [selected, setSelected] = useState(currentId)
+  const cardRef = useRef<HTMLDivElement>(null)
+
+  // Re-seed selection every time the picker opens (or the target role's
+  // current font changes) — otherwise reopening for a different role keeps
+  // the previous role's selection and "Use this font" fires the wrong id.
+  useEffect(() => {
+    if (open) setSelected(currentId)
+  }, [open, currentId])
+
+  // Move DOM focus into the dialog on open so the Escape handler below
+  // (bound to this div) actually receives the keydown when the picker is
+  // opened by clicking a row (focus otherwise stays on the trigger button,
+  // a sibling of the modal, not a descendant).
+  useEffect(() => {
+    if (open) cardRef.current?.focus()
+  }, [open])
+
   if (!open) return null
   const preview = fontById(selected).stack
 
@@ -31,6 +48,7 @@ export function FontPicker({ open, role, currentId, onPick, onClose }: Props): R
     // biome-ignore lint: backdrop click-to-dismiss; keyboard path is Escape
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div
+        ref={cardRef}
         className="modal font-picker"
         role="dialog"
         aria-modal="true"

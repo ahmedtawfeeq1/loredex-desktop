@@ -5,6 +5,30 @@ import { FontPicker } from './FontPicker'
 
 afterEach(() => cleanup())
 
+describe('FontPicker regressions', () => {
+  it('resyncs the selection to currentId whenever the picker (re)opens', () => {
+    const { rerender } = render(
+      <FontPicker open={false} role="body" currentId="sora" onPick={() => {}} onClose={() => {}} />,
+    )
+
+    // Opens showing the CURRENT font for the role preselected, not stale state.
+    rerender(<FontPicker open role="body" currentId="sora" onPick={() => {}} onClose={() => {}} />)
+    expect(screen.getByRole('button', { name: 'Sora' }).getAttribute('aria-pressed')).toBe('true')
+
+    // Reopening for a different role/currentId (without the user touching a
+    // row) must follow the new currentId — this is what the stale
+    // `useState(currentId)` seed used to get wrong.
+    rerender(<FontPicker open role="body" currentId="dm-sans" onPick={() => {}} onClose={() => {}} />)
+    expect(screen.getByRole('button', { name: 'DM Sans' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: 'Sora' }).getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('moves focus into the dialog on open so Escape can close it', () => {
+    render(<FontPicker open role="body" currentId="system" onPick={() => {}} onClose={() => {}} />)
+    expect(document.activeElement).toBe(screen.getByRole('dialog'))
+  })
+})
+
 describe('FontPicker', () => {
   it('lists catalog fonts grouped by category', () => {
     render(<FontPicker open role="body" currentId="system" onPick={() => {}} onClose={() => {}} />)

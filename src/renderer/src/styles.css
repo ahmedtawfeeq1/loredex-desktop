@@ -5737,3 +5737,48 @@ a.commit-chip-sha:hover {
   flex-direction: column;
   gap: 8px;
 }
+
+/* ── font picker ────────────────────────────────────────────────────────── */
+.font-picker {
+  width: min(760px, 92vw);
+  max-width: min(760px, 92vw);
+}
+.font-picker-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 16px;
+  max-height: 60vh;
+}
+.font-list {
+  overflow-y: auto;
+  border-right: 1px solid var(--hairline);
+  padding-right: 8px;
+}
+.font-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 15px;
+  color: var(--text-1);
+  cursor: pointer;
+}
+.font-row:hover {
+  background: var(--bg-inset);
+}
+.font-row[aria-pressed='true'] {
+  background: var(--bg-inset);
+  outline: 1px solid var(--navy);
+}
+.font-specimen {
+  overflow-y: auto;
+  padding: 8px 4px;
+}
+.font-pick-btn {
+  min-width: 140px;
+  text-align: left;
+}

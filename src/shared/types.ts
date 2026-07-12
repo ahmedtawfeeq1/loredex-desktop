@@ -539,3 +539,25 @@ export interface NoteComment {
   /** the comment prose (contract scaffolding stripped) */
   body: string
 }
+
+// ── Duplicate-note detection (multi-actor curate collision) ─────────────────
+
+/** One vault copy of a source note (see DuplicateGroup). */
+export interface DuplicateCopy {
+  /** vault-relative path of this copy */
+  path: string
+  /** the note's frontmatter date (YYYY-MM-DD) if any — newest-first sort key */
+  date: string
+  /** filesystem mtime ISO — tiebreaker + display */
+  mtime: string
+}
+
+/** A set of vault notes that share one upstream source (filed twice by
+ *  independent curate runs); copies[0] is the newest = the natural keep. */
+export interface DuplicateGroup {
+  /** the shared source identity (source_path, or source_project|source_rel) */
+  key: string
+  sourceProject: string
+  sourceRel: string
+  copies: DuplicateCopy[]
+}

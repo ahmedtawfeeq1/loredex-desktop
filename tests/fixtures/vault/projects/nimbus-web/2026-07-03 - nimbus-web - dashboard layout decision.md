@@ -2,9 +2,12 @@
 project: nimbus-web
 topic: dashboard layout
 type: decision
-date: 2026-07-03
+date: '2026-07-03'
 status: active
-tags: [frontend, layout]
+tags:
+  - frontend
+  - layout
+loredex: routed
 ---
 
 # Dashboard layout decision

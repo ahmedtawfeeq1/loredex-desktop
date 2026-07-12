@@ -2,10 +2,12 @@
 project: nimbus-api
 topic: rate limit headers
 type: handoff
-date: 2026-07-04
+date: '2026-07-04'
 status: open
 objective: Expose X-RateLimit headers so the web dashboard can render quota state
-tags: [handoff]
+tags:
+  - handoff
+loredex: routed
 ---
 
 # Handoff: rate limit headers

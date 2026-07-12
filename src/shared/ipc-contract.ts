@@ -23,6 +23,7 @@ import type {
   HandoffTransition,
   HandshakeStatus,
   HomeBrief,
+  DuplicateGroup,
   Identity,
   IdentitySettings,
   JoinVaultResult,
@@ -63,6 +64,12 @@ export interface CoreApi {
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,
    *  aggregated core-side from vault frontmatter (memoized per mtime) */
   'vault.facets': { in: void; out: FacetValues }
+  /** duplicate-note detection (multi-actor curate collision): notes filed twice
+   *  from the same upstream source. Read-only scan. */
+  'vault.duplicates': { in: void; out: DuplicateGroup[] }
+  /** delete the given vault-relative duplicate copies + commit; identity rides
+   *  the payload (F7). Guarded per-path through resolveNoteInsideVault. */
+  'vault.dedupe': { in: { paths: string[]; identity: Identity }; out: { removed: string[] } }
   'vault.resolveLink': { in: { link: string; from: string }; out: LinkResolution }
   /** app-local contract evolution (story 3.2): optional project qualifier — lib
    *  HandoffScope semantics: inbox/outbox are relative to `project`; without it

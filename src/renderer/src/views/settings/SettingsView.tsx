@@ -5,6 +5,7 @@
  * is a navy-outline secondary.
  */
 import { ContractsSection } from './ContractsSection'
+import { DuplicatesSection } from './DuplicatesSection'
 import { GitHubSection } from './GitHubSection'
 import { IdentityForm } from './IdentityForm'
 import { McpSection } from './McpSection'
@@ -20,6 +21,7 @@ export function SettingsView(): React.JSX.Element {
       <ThemeSection />
       <IdentityForm />
       <ContractsSection />
+      <DuplicatesSection />
       <ScopeSettings />
       <GitHubSection />
       <McpSection />

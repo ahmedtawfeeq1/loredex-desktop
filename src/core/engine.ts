@@ -4,7 +4,7 @@
  * core-host lifetime (F6 split-brain defense); a respawned host re-resolves.
  */
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, normalize } from 'node:path'
@@ -68,9 +68,11 @@ import {
   vaultSchemaStatus,
 } from 'loredex'
 import { abbreviatePath } from '../shared/identity'
+import { type DuplicateGroup, findDuplicates, type NoteRecord } from './duplicates'
 import { gitLog, withGitIdentity } from './git'
 import { ipcError } from '../shared/ipc-contract'
 import { applyFrontmatterEdit, spliceBody } from './notes'
+import { listMarkdownFiles } from './tree'
 import type { HomeBrief, ReplyHandoffInput, VaultIdentity } from '../shared/types'
 
 /** undefined = not yet initialized; null = initialized, no config on disk. */
@@ -381,6 +383,46 @@ export function saveNoteBody(path: string, body: string, identity: Identity): { 
     gitAutoCommit(config.vaultPath, config, `loredex: edit ${basename(resolved, '.md')} (${identity.name})`),
   )
   return { path: resolved }
+}
+
+/**
+ * Duplicate notes filed twice by independent curate runs (multi-actor
+ * collision). Read-only: walks the vault, keys each note by its provenance
+ * frontmatter, returns groups with 2+ copies (see duplicates.ts).
+ */
+export function listDuplicates(): DuplicateGroup[] {
+  const { vaultPath } = getConfig()
+  const notes: NoteRecord[] = []
+  for (const rel of listMarkdownFiles(vaultPath)) {
+    const abs = join(vaultPath, rel)
+    try {
+      notes.push({ path: rel, meta: noteMeta(abs), mtime: statSync(abs).mtime.toISOString() })
+    } catch {
+      // unreadable or removed mid-walk — skip, it can't be a live duplicate
+    }
+  }
+  return findDuplicates(notes)
+}
+
+/**
+ * Delete the given vault-relative notes and commit once. Each path is guarded
+ * through resolveNoteInsideVault (no traversal); identity rides the commit (F7).
+ * Commit only — pushing stays the poller/Sync-now's job.
+ */
+export function removeNotes(paths: string[], identity: Identity): { removed: string[] } {
+  const config = getConfig()
+  const removed: string[] = []
+  for (const p of paths) {
+    unlinkSync(resolveInVault(p))
+    removed.push(p)
+  }
+  if (removed.length > 0) {
+    const n = removed.length
+    withGitIdentity(identity, () =>
+      gitAutoCommit(config.vaultPath, config, `loredex: remove ${n} duplicate note${n === 1 ? '' : 's'}`),
+    )
+  }
+  return { removed }
 }
 
 /**

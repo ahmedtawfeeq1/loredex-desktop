@@ -169,6 +169,11 @@ export function registerCoreHandlers(
     const vaultPath = engine.getConfig().vaultPath
     return aggregateFacetValues(vaultPath, listMarkdownFiles(vaultPath), engine.noteMeta)
   })
+  // duplicate-note detection + cleanup (multi-actor curate collision)
+  ipc.register('vault.duplicates', () => engine.listDuplicates())
+  // delete + commit; the vault watcher catches the unlink and reconciles
+  // (caches, tree, badge) + emits vault.changed for the renderer to refetch.
+  ipc.register('vault.dedupe', ({ paths, identity }) => engine.removeNotes(paths, identity))
   // vault_id: computed once per vault open = once per core-host lifetime (the
   // host restarts on vault switch). Null while no config/db (picker pending).
   let cachedVaultId: string | null = null

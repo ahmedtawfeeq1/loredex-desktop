@@ -2,9 +2,12 @@
 project: nimbus-api
 topic: rate limiting
 type: research
-date: 2026-07-02
+date: '2026-07-02'
 status: active
-tags: [api, throttling]
+tags:
+  - api
+  - throttling
+loredex: routed
 ---
 
 # Rate limiting research

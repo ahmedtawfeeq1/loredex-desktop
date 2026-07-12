@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "loredex": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "loredex@latest",
+        "mcp"
+      ]
+    }
+  }
+}

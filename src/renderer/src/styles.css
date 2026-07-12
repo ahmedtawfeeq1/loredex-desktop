@@ -1883,6 +1883,105 @@ a:hover {
   color: var(--rust);
 }
 
+/* duplicate-notes maintenance ─────────────────────────────────────────────── */
+.dup-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  padding: 6px 0 2px;
+}
+
+/* two-click confirm: the armed state reads hot so a destructive action is
+   never one stray click away */
+.button-destructive.is-confirm,
+.dup-remove.is-confirm {
+  background: var(--rust);
+  color: var(--paper);
+  border-color: var(--rust);
+}
+
+.dup-groups {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.dup-group {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg-inset);
+}
+
+.dup-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.dup-source {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dup-copies {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dup-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.6; /* the copies to be removed read muted */
+}
+
+.dup-copy.is-keep {
+  opacity: 1;
+}
+
+.dup-tag {
+  flex: none;
+  width: 52px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+}
+
+.dup-copy.is-keep .dup-tag {
+  color: var(--ok);
+}
+
+.dup-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+
+.dup-date {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
 /* contract project roots (story 11.1): dense rows, mono paths */
 .settings-roots {
   list-style: none;

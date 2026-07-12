@@ -42,6 +42,12 @@
   --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
   --font-serif: ui-serif, 'New York', Georgia, serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  /* per-role note fonts (story: fonts settings) — default to today's values so
+     an unset/'system' font config renders byte-identical to before */
+  --note-title: var(--font-serif);
+  --note-heading: var(--font-serif);
+  --note-body: var(--font-ui);
+  --note-code: var(--font-mono);
 }
 
 * {
@@ -1125,14 +1131,23 @@ a:hover {
 }
 
 .note-body {
+  font-family: var(--note-body);
   font-size: 14px;
   line-height: 1.6;
+}
+
+.note-body h1 {
+  font-family: var(--note-title);
+}
+
+.note-body h2,
+.note-body h3 {
+  font-family: var(--note-heading);
 }
 
 .note-body h1,
 .note-body h2,
 .note-body h3 {
-  font-family: var(--font-serif);
   font-weight: 600;
   margin: 24px 0 8px;
 }
@@ -1160,7 +1175,7 @@ a:hover {
 }
 
 .note-body code {
-  font-family: var(--font-mono);
+  font-family: var(--note-code);
   font-size: 12px;
   background: var(--bg-inset);
   border: 1px solid var(--hairline);

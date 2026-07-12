@@ -560,6 +560,7 @@ export function registerCoreHandlers(
   // in the core host so a long build never blocks a window; story 2.6 hooks
   // its post-build snapshot here (callback point, not implemented in v0.1).
   ipc.register('dashboard.build', () => engine.dashboard(new Date().toISOString().slice(0, 10)))
+  ipc.register('dashboard.recurate', ({ project }) => engine.recurateProject(project))
   ipc.register('home.brief', () => engine.homeBrief())
   ipc.register('settings.identity.get', () => {
     // no vault yet (first run, story 13.2) → no ambient default, NOT an error:

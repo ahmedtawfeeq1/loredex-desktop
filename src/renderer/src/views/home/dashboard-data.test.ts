@@ -37,7 +37,20 @@ describe('dashboard live recompute', () => {
     expect(s.dash).toBeNull()
     expect(s.changes).toBeNull()
     expect(s.rootsCount).toBeNull()
-    s.reset() // idempotent on the empty store
+    expect(s.recuratingProject).toBeNull()
+    useDashboardData.setState({ recuratingProject: 'x' })
+    s.reset() // reset clears the busy flag too
     expect(useDashboardData.getState().dash).toBeNull()
+    expect(useDashboardData.getState().recuratingProject).toBeNull()
+  })
+
+  it('re-curate is single-flight — a second call while one runs is a no-op', async () => {
+    // a curate holds a vault lock; overlapping runs would corrupt it. With one
+    // already in flight the guard returns before touching the bridge (window is
+    // undefined under node, so reaching invoke would throw — it must not).
+    useDashboardData.setState({ recuratingProject: 'alpha' })
+    await expect(useDashboardData.getState().recurate('beta')).resolves.toBeUndefined()
+    expect(useDashboardData.getState().recuratingProject).toBe('alpha')
+    useDashboardData.setState({ recuratingProject: null })
   })
 })

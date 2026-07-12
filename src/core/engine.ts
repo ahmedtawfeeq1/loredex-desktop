@@ -3,11 +3,13 @@
  * architecture.md#coding-standards #3). Config resolves exactly once per
  * core-host lifetime (F6 split-brain defense); a respawned host re-resolves.
  */
+import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, normalize } from 'node:path'
+import { promisify } from 'node:util'
 import {
   ACTIVITY_LOG_ARGS,
   type ActivityEvent,
@@ -128,6 +130,33 @@ export function noteMeta(absPath: string): Record<string, unknown> {
 /** Product dashboard compute (story 2.5) — read-only lib aggregation. */
 export function dashboard(today: string): ProductDashboard {
   return buildDashboard(getConfig().vaultPath, today)
+}
+
+const execFileAsync = promisify(execFile)
+
+/**
+ * Re-curate a project's Start Here brief (story 2.6 — the re-curate seam made
+ * real). curate is a CLI/LLM operation the lib doesn't expose and it can run
+ * ~1min, so it must never block a window: we spawn the bundled loredex CLI in
+ * the core host. cwd is the vault so the CLI's own loadConfig() resolves the
+ * same projects map the app is showing. The CLI falls back to heuristics when
+ * no `claude`/`codex` is installed, so this works regardless of LLM presence.
+ * `-y` skips the confirm prompt; a failure throws with the CLI's stderr.
+ */
+export async function recurateProject(project: string): Promise<void> {
+  const { vaultPath } = getConfig()
+  const cliPath = join(
+    dirname(createRequire(import.meta.url).resolve('loredex/package.json')),
+    'dist',
+    'cli.js',
+  )
+  await execFileAsync(process.execPath, [cliPath, 'curate', project, '-y'], {
+    cwd: vaultPath,
+    // Electron's binary runs as plain Node with this flag set (packaged + dev).
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    maxBuffer: 32 * 1024 * 1024,
+    timeout: 180_000,
+  })
 }
 
 /**

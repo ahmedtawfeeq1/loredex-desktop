@@ -9,7 +9,7 @@ import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createIpcClient } from '../shared/ipc-client'
 import type { PortLike } from '../shared/ipc-contract'
-import { getConfig, initEngine, readNote, search } from './engine'
+import { getConfig, initEngine, readNote, recurateProject, search } from './engine'
 import { registerCoreHandlers } from './handlers'
 import { createCoreIpc } from './ipc'
 
@@ -101,4 +101,16 @@ describe('core host answers over the typed IPC contract shape', () => {
       code: 'ROUTE_RECEIPT_NOT_FOUND',
     })
   })
+})
+
+describe('recurateProject argv guard', () => {
+  // the project name is spawned as a positional arg to the loredex CLI; a value
+  // starting with '-' could smuggle a flag, '/' or '..' could escape the dir.
+  // The guard runs before getConfig/execFile, so these reject without spawning.
+  it.each(['-y', '--force', '../evil', 'a/b', '', '.', '..', '-', '.hidden'])(
+    'rejects unsafe project name %j before spawning',
+    async (bad) => {
+      await expect(recurateProject(bad)).rejects.toThrow(/invalid project name/)
+    },
+  )
 })

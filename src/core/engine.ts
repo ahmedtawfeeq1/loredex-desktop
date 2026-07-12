@@ -144,6 +144,15 @@ const execFileAsync = promisify(execFile)
  * `-y` skips the confirm prompt; a failure throws with the CLI's stderr.
  */
 export async function recurateProject(project: string): Promise<void> {
+  // trust-boundary guard: `project` arrives over IPC and is spawned as a positional
+  // arg to the loredex CLI. A value starting with '-' could smuggle a flag into the
+  // CLI's arg parser, and '/' / '..' could escape the intended projects/<name> dir —
+  // reject anything that isn't a plain path segment. First char must be
+  // alphanumeric/underscore so a leading '-' (flag) or '.'/'..' (traversal) is
+  // rejected outright.
+  if (!/^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(project)) {
+    throw new Error(`invalid project name: ${project}`)
+  }
   const { vaultPath } = getConfig()
   const cliPath = join(
     dirname(createRequire(import.meta.url).resolve('loredex/package.json')),

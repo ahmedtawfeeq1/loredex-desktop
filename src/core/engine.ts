@@ -28,6 +28,7 @@ import {
   ensureGeneratedMergeDriver,
   gitAutoCommit,
   gitPullPush,
+  groupProjects,
   type HandoffCard,
   type HandoffCreateResult,
   HandoffError,
@@ -36,6 +37,7 @@ import {
   listHandoffs,
   listReceipts,
   loadConfig,
+  loadProducts,
   LOREDEX_SCHEMA,
   matchNeverRoute,
   type Meta,
@@ -125,6 +127,16 @@ export function search(q: string, limit?: number): SearchHit[] {
 /** Parsed frontmatter of one note (facet narrowing, story 2.4) — read-only. */
 export function noteMeta(absPath: string): Record<string, unknown> {
   return parseDoc(readFileSync(absPath, 'utf8')).meta as Record<string, unknown>
+}
+
+/**
+ * Product grouping bound to this vault's manifest (`_index/products.json`) — the
+ * function the tree view uses to nest Product → Project. Read-only lib call; the
+ * loredex import stays fenced here (anti-second-engine).
+ */
+export function productGrouper(): (projects: string[]) => ReturnType<typeof groupProjects> {
+  const map = loadProducts(getConfig().vaultPath)
+  return (projects) => groupProjects(map, projects)
 }
 
 /** Product dashboard compute (story 2.5) — read-only lib aggregation. */

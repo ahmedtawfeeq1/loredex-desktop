@@ -1,6 +1,6 @@
 {
   "name": "loredex-desktop",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Loredex Desktop — macOS reader and control surface for loredex vaults",
   "type": "module",
   "private": true,
@@ -30,7 +30,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "@parcel/watcher": "2.5.4",
     "better-sqlite3": "12.11.1",
-    "loredex": "^2.3.0",
+    "loredex": "^2.4.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "rehype-react": "8.0.0",

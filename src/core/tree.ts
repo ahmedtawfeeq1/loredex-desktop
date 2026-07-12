@@ -30,6 +30,37 @@ export function walkVault(root: string, rel = ''): TreeNode[] {
   return nodes
 }
 
+/**
+ * Insert a Product level inside the `projects` node: wrap each project dir in a
+ * virtual product node so the tree drills Product → Project → Topic → Note. The
+ * `grouper` (loredex's groupProjects, bound to the vault's manifest — injected so
+ * this stays view-only, no loredex import here) returns the ordered groups. When
+ * the only group is Ungrouped (no products defined), the projects stay flat —
+ * pre-product vaults are untouched. Virtual product nodes carry a synthetic path
+ * (`projects#product=…`) so nothing resolves them as a file.
+ */
+export function groupProjectsInTree(
+  tree: TreeNode[],
+  grouper: (projects: string[]) => Array<{ product: string | null; projects: string[] }>,
+): TreeNode[] {
+  return tree.map((node) => {
+    if (node.name !== 'projects' || node.kind !== 'dir' || !node.children) return node
+    const projectDirs = node.children.filter((c) => c.kind === 'dir')
+    const byName = new Map(projectDirs.map((c) => [c.name, c]))
+    const groups = grouper(projectDirs.map((c) => c.name))
+    if (groups.length <= 1 && groups[0]?.product == null) return node // flat, no products
+    const children: TreeNode[] = groups.map((group) => ({
+      name: group.product ?? 'Ungrouped',
+      path: `${node.path}#product=${group.product ?? '_ungrouped'}`,
+      kind: 'dir' as const,
+      children: group.projects
+        .map((p) => byName.get(p))
+        .filter((c): c is TreeNode => c !== undefined),
+    }))
+    return { ...node, children }
+  })
+}
+
 /** Flatten to vault-relative file paths — the wikilink index input (story 2.2). */
 export function listMarkdownFiles(root: string): string[] {
   const out: string[] = []

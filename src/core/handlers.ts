@@ -67,7 +67,7 @@ import {
   saveTreeSectionsCollapsed,
 } from './settings'
 import { buildThread, collectComments } from './threads'
-import { listMarkdownFiles, walkVault } from './tree'
+import { groupProjectsInTree, listMarkdownFiles, walkVault } from './tree'
 import { createVault, joinVault, validateRemote, type WizardDeps } from './wizard'
 import { withWriteLock } from './write-lock'
 
@@ -150,7 +150,9 @@ export function registerCoreHandlers(
     clearFacetCache()
     invalidateAtlas()
     notifier.refresh()
-    return walkVault(engine.getConfig().vaultPath)
+    // group the projects/ subtree Product → Project → Topic → Note (flat when
+    // no products are defined) — the grouper reads the vault's product manifest
+    return groupProjectsInTree(walkVault(engine.getConfig().vaultPath), engine.productGrouper())
   })
   // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
   // same recomputed-cache tier as the link index (never authoritative).

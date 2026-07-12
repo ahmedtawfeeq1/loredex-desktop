@@ -18,11 +18,11 @@ import { appActions, VIEW_ORDER } from './registry'
 const ALL_VIEWS: AppView[] = [
   'home',
   'reader',
-  'handoffs',
-  'atlas',
-  'contracts',
   'search',
+  'handoffs',
+  'contracts',
   'feed',
+  'atlas',
   'sync',
   'settings',
 ]

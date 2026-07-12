@@ -3,7 +3,7 @@
  * identity chip), contextual list pane, reader. v0.1 nav: Reader, Handoffs
  * (open-count badge), Settings.
  */
-import { useEffect } from 'react'
+import { Fragment, useEffect } from 'react'
 import { appActions, VIEW_ORDER } from './actions/registry'
 import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
@@ -182,27 +182,35 @@ export default function App(): React.JSX.Element {
         <nav aria-label="Views">
           {/* the registry's VIEW_ORDER is the nav — order, labels and ⌘1-9
               hints can never drift apart (story 15.3) */}
-          {VIEW_ORDER.map(({ view: v, label }, i) => (
-            <button
-              key={v}
-              type="button"
-              className="nav-item"
-              aria-current={view === v}
-              title={`${label} (⌘${i + 1})`}
-              aria-label={label}
-              aria-keyshortcuts={`Meta+${i + 1}`}
-              onClick={() => setView(v)}
-            >
-              {sidebarCollapsed ? <NavIcon view={v} /> : label}
-              {v === 'handoffs' &&
-                openInbound > 0 &&
-                (sidebarCollapsed ? (
-                  <span className="nav-dot" title={`${openInbound} open`} />
-                ) : (
-                  <span className="nav-badge">{openInbound}</span>
-                ))}
-            </button>
-          ))}
+          {VIEW_ORDER.map(({ view: v, label, group }, i) => {
+            const firstOfGroup = i === 0 || VIEW_ORDER[i - 1].group !== group
+            return (
+              <Fragment key={v}>
+                {firstOfGroup &&
+                  (sidebarCollapsed
+                    ? i > 0 && <div className="nav-group-rule" role="presentation" />
+                    : <div className="nav-group-label">{group}</div>)}
+                <button
+                  type="button"
+                  className="nav-item"
+                  aria-current={view === v}
+                  title={`${label} (⌘${i + 1})`}
+                  aria-label={label}
+                  aria-keyshortcuts={`Meta+${i + 1}`}
+                  onClick={() => setView(v)}
+                >
+                  {sidebarCollapsed ? <NavIcon view={v} /> : label}
+                  {v === 'handoffs' &&
+                    openInbound > 0 &&
+                    (sidebarCollapsed ? (
+                      <span className="nav-dot" title={`${openInbound} open`} />
+                    ) : (
+                      <span className="nav-badge">{openInbound}</span>
+                    ))}
+                </button>
+              </Fragment>
+            )
+          })}
         </nav>
         {status === 'ready' && !sidebarCollapsed && (
           <button

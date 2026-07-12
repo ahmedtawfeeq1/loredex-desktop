@@ -5678,3 +5678,22 @@ a.commit-chip-sha:hover {
 .qa-item-primary .qa-item-icon {
   color: var(--gold);
 }
+
+/* ── nav groups ─────────────────────────────────────────────────────────── */
+.nav-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding: 0 8px;
+  margin: 14px 0 4px;
+}
+.nav-group-label:first-of-type {
+  margin-top: 4px;
+}
+.nav-group-rule {
+  height: 1px;
+  background: var(--hairline);
+  margin: 8px 8px;
+}

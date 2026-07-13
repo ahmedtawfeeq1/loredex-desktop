@@ -42,13 +42,28 @@ While a vault is open, the app hosts a Streamable HTTP MCP server on `127.0.0.1`
 
 ## Install
 
-Download the installer for your OS from the [latest release](https://github.com/ahmedtawfeeq1/loredex-desktop/releases/latest). Builds are **unsigned** for now (signing + notarization is on the roadmap), so each OS shows a one-time first-launch warning.
+Download the installer for your OS from the [latest release](https://github.com/ahmedtawfeeq1/loredex-desktop/releases/latest) (files are named `Loredex-<version>-…`). Builds are **unsigned / un-notarized** for now, so every OS shows a one-time first-launch warning — clear it once with the step below, then it opens normally forever after. (Removing the warning for good needs code signing — see [SIGNING.md](SIGNING.md).)
 
-| OS | Download | First launch |
+| OS | Download | First launch (one-time) |
 |---|---|---|
-| **macOS** (Apple Silicon, 14+) | `Loredex-0.2.1-arm64.dmg` — drag to Applications | Gatekeeper says "damaged" (it's quarantine). Clear once: `xattr -dr com.apple.quarantine /Applications/Loredex.app` |
-| **Windows** (10/11, x64) | `Loredex.Setup.0.2.1.exe` — run it | SmartScreen → **More info → Run anyway** |
-| **Linux** (x64) | `.AppImage` (any distro) — `chmod +x` and run; or `.deb` — `sudo dpkg -i …` | AppImage may need FUSE (`sudo apt install libfuse2`) |
+| **macOS** (Apple Silicon, 14+) | `Loredex-<version>-arm64.dmg` — open, drag **Loredex** to Applications | Gatekeeper says **"damaged"** — it isn't; it's unsigned. See the two commands below. |
+| **Windows** (10/11, x64) | `Loredex.Setup.<version>.exe` — run it | SmartScreen: **More info → Run anyway** |
+| **Linux** (x64) | `.AppImage` (any distro) or `.deb` (Debian/Ubuntu) | AppImage: `chmod +x Loredex-*.AppImage && ./Loredex-*.AppImage` (needs FUSE: `sudo apt install libfuse2`). deb: `sudo dpkg -i loredex-desktop_*_amd64.deb` |
+
+### macOS — clearing the "damaged" warning
+
+On Apple Silicon, removing the download quarantine is **not enough** — an unsigned app also needs a valid signature, so run both:
+
+```sh
+xattr -cr /Applications/Loredex.app
+codesign --force --deep --sign - /Applications/Loredex.app
+open /Applications/Loredex.app
+```
+
+- `xattr -cr` clears the download quarantine.
+- `codesign --sign -` applies an **ad-hoc signature**, which satisfies Apple Silicon's "must be signed" rule (this is the piece `xattr` alone misses).
+
+No Terminal? Right-click the app → **Open** → **Open**, or System Settings → **Privacy & Security** → **Open Anyway**.
 
 **Git** is required (vault sync + history); on Windows install [Git for Windows](https://git-scm.com/download/win). On first launch: create a vault, join your team's vault by pasting its git URL, or open an existing loredex folder (**File → Open Vault…**, ⌘/Ctrl+O).
 

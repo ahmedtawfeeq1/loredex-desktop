@@ -33,6 +33,20 @@ jobs:
       # the native module for this OS's Electron ABI and packages the installer.
       - run: npm run build
       - run: npx electron-builder ${{ matrix.platform }} --publish never
+        env:
+          # Code signing + notarization — INACTIVE until these repo secrets exist
+          # (see SIGNING.md). Empty secrets = today's unsigned build, unchanged;
+          # electron-builder signs (and, with the APPLE_* creds + mac.notarize in
+          # electron-builder.yml, notarizes) automatically once they're set.
+          # macOS Developer ID:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Windows OV/EV cert (reuses the same CSC_* vars on the windows runner):
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}

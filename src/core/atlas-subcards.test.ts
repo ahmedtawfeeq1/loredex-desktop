@@ -13,7 +13,7 @@
  */
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import {
   byRecencyDesc,
   nodeRect,
@@ -234,26 +234,34 @@ describe('drilled sub-card invariants — 25-topic project fixture', () => {
 // ── the real nimbus vault (the user's actual pain surface) ───────────────────
 
 describe.runIf(existsSync(NIMBUS_VAULT))('drilled sub-card invariants — nimbus vault', () => {
-  const model = buildAtlasModel({
-    vaultPath: NIMBUS_VAULT,
-    files: listMarkdownFiles(NIMBUS_VAULT),
-    cards: [],
-    readDoc: () => ({ meta: {}, body: '' }),
-    resolveName: (name, fromRel) => {
-      const r = resolveLink(NIMBUS_VAULT, name, fromRel)
-      return r.status === 'resolved' ? (r.target ?? null) : null
-    },
-    projectRoots: {},
-    contracts: [],
-    today: '2026-07-10',
-    fileExists: () => false,
-    readRepoRemote: () => null,
-    vaultRemote: null,
-  })
+  // Lazy: `describe.runIf(false)` skips the it()s but STILL runs this callback
+  // body at collection, so any eager listMarkdownFiles(NIMBUS_VAULT) would ENOENT
+  // on machines without the sibling nimbus vault (CI). beforeAll only runs when
+  // the block actually runs, so the read is deferred behind the runIf guard.
+  let model: ReturnType<typeof buildAtlasModel>
+  let projects: string[]
 
-  const projects = [...new Set([...model.nodes.values()].map((n) => n.project))].filter(
-    (p): p is string => Boolean(p),
-  )
+  beforeAll(() => {
+    model = buildAtlasModel({
+      vaultPath: NIMBUS_VAULT,
+      files: listMarkdownFiles(NIMBUS_VAULT),
+      cards: [],
+      readDoc: () => ({ meta: {}, body: '' }),
+      resolveName: (name, fromRel) => {
+        const r = resolveLink(NIMBUS_VAULT, name, fromRel)
+        return r.status === 'resolved' ? (r.target ?? null) : null
+      },
+      projectRoots: {},
+      contracts: [],
+      today: '2026-07-10',
+      fileExists: () => false,
+      readRepoRemote: () => null,
+      vaultRemote: null,
+    })
+    projects = [...new Set([...model.nodes.values()].map((n) => n.project))].filter(
+      (p): p is string => Boolean(p),
+    )
+  })
 
   it('every project panel holds the sub-card + chip + clearance invariants', () => {
     expect(projects.length).toBeGreaterThan(0)

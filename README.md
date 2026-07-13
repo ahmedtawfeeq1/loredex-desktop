@@ -8,7 +8,8 @@
 
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![mac · win · linux](https://img.shields.io/badge/mac%20·%20win%20·%20linux-download-2ea043)](https://github.com/ahmedtawfeeq1/loredex-desktop/releases/latest)
-[![engine: loredex](https://img.shields.io/badge/engine-loredex-cb3837)](https://github.com/ahmedtawfeeq1/loredex)
+
+**loredex ecosystem** &nbsp;·&nbsp; [📖 loredex (CLI + core)](https://github.com/ahmedtawfeeq1/loredex) &nbsp;·&nbsp; **🖥️ Desktop** (you are here) &nbsp;·&nbsp; [🔮 Obsidian plugin](https://github.com/ahmedtawfeeq1/loredex-obsidian)
 
 </div>
 

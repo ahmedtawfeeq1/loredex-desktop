@@ -54,7 +54,11 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' })
 }
 
-describe('perf pass — 1,200-note synthetic vault (story 15.2)', () => {
+// Perf budgets are timing-sensitive and the setup does real git clones in a
+// temp sandbox — both unreliable on shared CI runners (the bare clone hits a
+// /var/folders copy race). This is a local/manual regression gate, not a
+// per-push correctness gate, so skip it under CI (GitHub sets CI=true).
+describe.skipIf(!!process.env.CI)('perf pass — 1,200-note synthetic vault (story 15.2)', () => {
   let sandbox: string
   let vault: string
   let db: AppDb

@@ -35,17 +35,13 @@ jobs:
           npx electron-builder install-app-deps
           ELECTRON_RUN_AS_NODE=1 npx electron node_modules/vitest/vitest.mjs run tests/native-smoke
           npm rebuild better-sqlite3 @parcel/watcher
-      - name: Build unsigned DMG
-        # --publish never: CI validates packaging only; release.yml is the sole
-        # publisher (on tags). Without it electron-builder defaults to
-        # --publish auto and dies on the missing GH_TOKEN.
-        run: npm run dist -- --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: loredex-desktop-dmg
-          path: dist/*.dmg
+      # NOTE: no full DMG package here on purpose. release.yml is the sole
+      # packaging + publishing gate (builds mac/win/linux installers on every
+      # tag), and the native-smoke step above already validates the Electron
+      # ABI. A per-push DMG on macos-latest was redundant, 10x the runner cost,
+      # and fragile (npm run dist's postdist native-restage doesn't match the
+      # direct electron-builder call release.yml uses). Correctness lives in the
+      # tests + native smoke; packaging lives in release.yml.
 
   # E2E Nimbus suite (story 6.3) — the executable M1+M2 DoD and the release
   # gate. Module-level (no Electron, no display): a committed Nimbus-vault

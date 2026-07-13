@@ -4,17 +4,17 @@
 
 # Loredex Desktop
 
-**The macOS control surface for [loredex](https://github.com/ahmedtawfeeq1/loredex) vaults — read the team's knowledge, run the handoff lifecycle, see the whole map.**
+**The native control surface for [loredex](https://github.com/ahmedtawfeeq1/loredex) vaults — read the team's knowledge, run the handoff lifecycle, see the whole map. macOS · Windows · Linux.**
 
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![macOS 14+ · Apple Silicon](https://img.shields.io/badge/macOS-14%2B%20arm64-black)](https://github.com/ahmedtawfeeq1/loredex-desktop/releases)
+[![mac · win · linux](https://img.shields.io/badge/mac%20·%20win%20·%20linux-download-2ea043)](https://github.com/ahmedtawfeeq1/loredex-desktop/releases/latest)
 [![engine: loredex](https://img.shields.io/badge/engine-loredex-cb3837)](https://github.com/ahmedtawfeeq1/loredex)
 
 </div>
 
 ---
 
-[Loredex](https://github.com/ahmedtawfeeq1/loredex) turns scattered agent markdown into one shared vault: filed, indexed, and handed off between projects. Loredex Desktop is the native app for living in that vault. It embeds the same `loredex` npm package the CLI and agents use — **in-process, one engine** — and puts a UI on everything: a reader with working wikilinks, an inbox/outbox board for the full handoff lifecycle (accept / decline / snooze / consume, replies, threads), a zoomable atlas of the whole vault, an API-contract change timeline, live sync against the team's git remote, and an in-app MCP server so agents on your machine read the exact vault state the app shows.
+[Loredex](https://github.com/ahmedtawfeeq1/loredex) turns scattered agent markdown into one shared vault: filed, indexed, and handed off between projects. Loredex Desktop is the native app for living in that vault, on **macOS, Windows, and Linux**. It embeds the same `loredex` npm package the CLI and agents use — **in-process, one engine** — and puts a UI on everything: a reader with working wikilinks, an inbox/outbox board for the full handoff lifecycle (accept / decline / snooze / consume, replies, threads), a zoomable atlas of the whole vault, an API-contract change timeline, live sync against the team's git remote, and an in-app MCP server so agents on your machine read the exact vault state the app shows.
 
 No Obsidian required, no server, no account. The vault stays a plain markdown folder in git.
 
@@ -42,18 +42,17 @@ While a vault is open, the app hosts a Streamable HTTP MCP server on `127.0.0.1`
 
 ## Install
 
-Requires an Apple Silicon Mac (M1 or newer) on macOS 14+.
+Download the installer for your OS from the [latest release](https://github.com/ahmedtawfeeq1/loredex-desktop/releases/latest). Builds are **unsigned** for now (signing + notarization is on the roadmap), so each OS shows a one-time first-launch warning.
 
-1. Download the `.dmg` from [Releases](https://github.com/ahmedtawfeeq1/loredex-desktop/releases), open it, drag **Loredex** to Applications.
-2. **Current builds are unsigned** (signing + notarization is on the roadmap), so Gatekeeper will claim the app "is damaged and can't be opened". It isn't — that's macOS quarantining an unsigned download. Clear it once, then launch normally:
+| OS | Download | First launch |
+|---|---|---|
+| **macOS** (Apple Silicon, 14+) | `Loredex-0.2.1-arm64.dmg` — drag to Applications | Gatekeeper says "damaged" (it's quarantine). Clear once: `xattr -dr com.apple.quarantine /Applications/Loredex.app` |
+| **Windows** (10/11, x64) | `Loredex.Setup.0.2.1.exe` — run it | SmartScreen → **More info → Run anyway** |
+| **Linux** (x64) | `.AppImage` (any distro) — `chmod +x` and run; or `.deb` — `sudo dpkg -i …` | AppImage may need FUSE (`sudo apt install libfuse2`) |
 
-   ```sh
-   xattr -dr com.apple.quarantine /Applications/Loredex.app
-   ```
+**Git** is required (vault sync + history); on Windows install [Git for Windows](https://git-scm.com/download/win). On first launch: create a vault, join your team's vault by pasting its git URL, or open an existing loredex folder (**File → Open Vault…**, ⌘/Ctrl+O).
 
-3. On first launch: create a vault, join your team's vault by pasting its git URL, or open an existing loredex folder (**File → Open Vault…**, ⌘O).
-
-There is no auto-update yet — new versions are a re-download.
+No auto-update yet — new versions are a re-download; your vault and settings are untouched. Full per-OS walkthrough: [docs/USER-GUIDE.md](docs/USER-GUIDE.md) · [loredex install guide](https://github.com/ahmedtawfeeq1/loredex/blob/main/docs/DESKTOP.md).
 
 ## Build from source
 
@@ -64,10 +63,10 @@ npm run dev        # launch (a predev script stages Electron-ABI natives automat
 npm test           # vitest unit + integration suites
 npm run test:e2e   # scripted end-to-end drive over the real IPC seam — the release gate
 npm run build      # typecheck + electron-vite build
-npm run dist       # unsigned DMG/ZIP (arm64)
+npm run dist       # unsigned installer for the current OS (macOS arm64 locally)
 ```
 
-One honest caveat: `package.json` currently pins `loredex` to a local tarball (`file:../loredex/loredex-2.1.0.tgz`) that is two commits ahead of the npm release — the handoff write APIs ride the next lib version. Until that lands on npm, building from source needs the [loredex repo](https://github.com/ahmedtawfeeq1/loredex) checked out as a sibling directory with `npm pack` run in it.
+The app depends on `loredex` from npm (`^2.3.0`) — `npm install` pulls it, no sibling checkout needed. Cross-platform installers are produced by CI: tag `vX.Y.Z` and the [release workflow](.github/workflows/release.yml) builds macOS/Windows/Linux on their own runners (native `better-sqlite3` compiles per OS) and attaches every installer to the release.
 
 ## Architecture
 

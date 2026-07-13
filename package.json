@@ -1,6 +1,6 @@
 {
   "name": "loredex-desktop",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Loredex Desktop — macOS reader and control surface for loredex vaults",
   "type": "module",
   "private": true,
@@ -30,7 +30,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "@parcel/watcher": "2.5.4",
     "better-sqlite3": "12.11.1",
-    "loredex": "file:../loredex/loredex-2.3.0.tgz",
+    "loredex": "^2.4.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "rehype-react": "8.0.0",
@@ -43,6 +43,8 @@
     "zustand": "5.0.8"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "7.6.13",
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
@@ -51,11 +53,12 @@
     "electron": "43.1.0",
     "electron-builder": "26.15.3",
     "electron-vite": "4.0.1",
+    "jsdom": "^27.4.0",
     "typescript": "5.9.3",
     "vite": "7.3.6",
     "vitest": "4.1.10"
   },
-  "author": "Ahmed Tawfeeq",
+  "author": "Ahmed Tawfeeq <loopx.tech1@gmail.com>",
   "homepage": "https://github.com/ahmedtawfeeq1/loredex-desktop",
   "repository": {
     "type": "git",

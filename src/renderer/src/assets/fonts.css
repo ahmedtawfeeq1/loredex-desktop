@@ -1,0 +1,29 @@
+/**
+ * Bundled offline font faces. One block per file; family names must match
+ * `stack` in src/shared/fonts.ts exactly, or the fonts silently fall back.
+ */
+
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/dm-sans-400.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/dm-sans-700.woff2') format('woff2'); }
+@font-face { font-family: 'Sora'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/sora-400.woff2') format('woff2'); }
+@font-face { font-family: 'Sora'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/sora-700.woff2') format('woff2'); }
+@font-face { font-family: 'Saira'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/saira-400.woff2') format('woff2'); }
+@font-face { font-family: 'Saira'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/saira-700.woff2') format('woff2'); }
+@font-face { font-family: 'Noto Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/noto-sans-400.woff2') format('woff2'); }
+@font-face { font-family: 'Noto Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/noto-sans-700.woff2') format('woff2'); }
+@font-face { font-family: 'Alexandria'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/alexandria-400.woff2') format('woff2'); }
+@font-face { font-family: 'Alexandria'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/alexandria-700.woff2') format('woff2'); }
+@font-face { font-family: 'Archivo Black'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/archivo-black-400.woff2') format('woff2'); }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/unbounded-400.woff2') format('woff2'); }
+@font-face { font-family: 'Unbounded'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/unbounded-700.woff2') format('woff2'); }
+@font-face { font-family: 'Workbench'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/workbench-400.woff2') format('woff2'); }
+@font-face { font-family: 'Press Start 2P'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/press-start-2p-400.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Pixel'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/geist-pixel-400.woff2') format('woff2'); }
+@font-face { font-family: 'Roboto Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/roboto-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'Roboto Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/roboto-mono-700.woff2') format('woff2'); }
+@font-face { font-family: 'Space Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/space-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'Space Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/space-mono-700.woff2') format('woff2'); }
+@font-face { font-family: 'Tajawal'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/tajawal-400.woff2') format('woff2'); }
+@font-face { font-family: 'Tajawal'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/tajawal-700.woff2') format('woff2'); }
+@font-face { font-family: 'Amiri'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/amiri-400.woff2') format('woff2'); }
+@font-face { font-family: 'Amiri'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/amiri-700.woff2') format('woff2'); }

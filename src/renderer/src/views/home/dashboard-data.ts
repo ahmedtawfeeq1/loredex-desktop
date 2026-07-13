@@ -38,7 +38,13 @@ interface DashboardDataState {
   activity: ActivityEvent[] | null
   health: SyncHealth | null
   error: string | null
+  /** the project whose brief is being re-curated right now (busy affordance),
+   *  or null when idle — a re-curate is a ~1min CLI/LLM run in the core host */
+  recuratingProject: string | null
   load(): Promise<void>
+  /** re-run curate for a stale project's brief, then refresh so the attention
+   *  item clears (its brief is now newer than the notes that outdated it) */
+  recurate(project: string): Promise<void>
   reset(): void
 }
 
@@ -49,6 +55,7 @@ export const useDashboardData = create<DashboardDataState>((set, get) => ({
   activity: null,
   health: null,
   error: null,
+  recuratingProject: null,
 
   async load() {
     // the core payload — its failure is the view's one honest error line
@@ -75,8 +82,29 @@ export const useDashboardData = create<DashboardDataState>((set, get) => ({
     })
   },
 
+  async recurate(project) {
+    if (get().recuratingProject) return // one at a time — the CLI holds a vault lock
+    set({ recuratingProject: project })
+    try {
+      await invoke('dashboard.recurate', { project })
+      await get().load() // refetch: the brief is now fresh, the stale row drops out
+    } catch (e) {
+      set({ error: isErrEnvelope(e) ? `${e.code}: ${e.message}` : String(e) })
+    } finally {
+      set({ recuratingProject: null })
+    }
+  },
+
   reset() {
-    set({ dash: null, changes: null, rootsCount: null, activity: null, health: null, error: null })
+    set({
+      dash: null,
+      changes: null,
+      rootsCount: null,
+      activity: null,
+      health: null,
+      error: null,
+      recuratingProject: null,
+    })
   },
 }))
 

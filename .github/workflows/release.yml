@@ -1,0 +1,64 @@
+name: release
+
+# Build the desktop app on each OS (native better-sqlite3 must compile on its
+# target) and attach the installers to the GitHub release for the tag.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: --mac # dmg + zip, arm64 (electron-builder.yml drives arch)
+          - os: windows-latest
+            platform: --win # nsis .exe, x64
+          - os: ubuntu-latest
+            platform: --linux # AppImage + deb, x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # typecheck + electron-vite build → out/**; electron-builder then rebuilds
+      # the native module for this OS's Electron ABI and packages the installer.
+      - run: npm run build
+      - run: npx electron-builder ${{ matrix.platform }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: installers
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: installers/*
+          fail_on_unmatched_files: false
+          generate_release_notes: true
+          body: |
+            Desktop builds for macOS (Apple Silicon), Windows (x64), and Linux (x64).
+
+            **Unsigned** — first launch: macOS right-click → Open; Windows "More info → Run anyway"; Linux `chmod +x` the AppImage.

@@ -42,17 +42,20 @@ export interface AppAction {
   run(): void
 }
 
-/** Sidebar order IS the shortcut order: ⌘1…⌘9 (AppView type ties the two). */
-export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string }> = [
-  { view: 'home', label: 'Home' },
-  { view: 'reader', label: 'Reader' },
-  { view: 'handoffs', label: 'Handoffs' },
-  { view: 'atlas', label: 'Atlas' },
-  { view: 'contracts', label: 'Contracts' },
-  { view: 'search', label: 'Search' },
-  { view: 'feed', label: 'Activity' },
-  { view: 'sync', label: 'Sync' },
-  { view: 'settings', label: 'Settings' },
+export type NavGroup = 'Workspace' | 'Collaborate' | 'Knowledge' | 'System'
+
+/** Sidebar order IS the shortcut order: ⌘1…⌘9 (AppView type ties the two).
+ *  `group` is a visual section header only — the ⌘n number is the array index. */
+export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> = [
+  { view: 'home', label: 'Home', group: 'Workspace' },
+  { view: 'reader', label: 'Reader', group: 'Workspace' },
+  { view: 'search', label: 'Search', group: 'Workspace' },
+  { view: 'handoffs', label: 'Handoffs', group: 'Collaborate' },
+  { view: 'contracts', label: 'Contracts', group: 'Collaborate' },
+  { view: 'feed', label: 'Activity', group: 'Collaborate' },
+  { view: 'atlas', label: 'Atlas', group: 'Knowledge' },
+  { view: 'sync', label: 'Sync', group: 'System' },
+  { view: 'settings', label: 'Settings', group: 'System' },
 ]
 
 export function appActions(): AppAction[] {

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import type { TreeNode } from '../shared/types'
-import { listMarkdownFiles, walkVault } from './tree'
+import { groupProjectsInTree, listMarkdownFiles, walkVault } from './tree'
 
 const FIXTURE_VAULT = resolve(import.meta.dirname, '../../tests/fixtures/vault')
 
@@ -60,5 +60,66 @@ describe('walkVault', () => {
     expect(listMarkdownFiles(FIXTURE_VAULT)).toContain(
       'projects/nimbus-api/2026-07-02 - nimbus-api - rate limiting research.md',
     )
+  })
+})
+
+describe('groupProjectsInTree', () => {
+  // stand-in for loredex's groupProjects bound to a manifest
+  const grouper = (projects: string[]) => {
+    const map: Record<string, string[]> = {
+      genudo: ['genudo-ai-engine', 'genudo-website'],
+      loredex: ['loredex-desktop'],
+    }
+    const assigned = new Set<string>()
+    const groups: Array<{ product: string | null; projects: string[] }> = []
+    for (const [product, members] of Object.entries(map)) {
+      const present = projects.filter((p) => members.includes(p))
+      if (present.length) {
+        groups.push({ product, projects: present })
+        for (const p of present) assigned.add(p)
+      }
+    }
+    const ungrouped = projects.filter((p) => !assigned.has(p))
+    if (ungrouped.length) groups.push({ product: null, projects: ungrouped })
+    return groups
+  }
+
+  const projectsNode = (): TreeNode => ({
+    name: 'projects',
+    path: 'projects',
+    kind: 'dir',
+    children: [
+      { name: 'genudo-ai-engine', path: 'projects/genudo-ai-engine', kind: 'dir', children: [] },
+      { name: 'genudo-website', path: 'projects/genudo-website', kind: 'dir', children: [] },
+      { name: 'loredex-desktop', path: 'projects/loredex-desktop', kind: 'dir', children: [] },
+      { name: 'orphan', path: 'projects/orphan', kind: 'dir', children: [] },
+    ],
+  })
+
+  it('wraps project dirs in product nodes, Ungrouped last', () => {
+    const [projects] = groupProjectsInTree([projectsNode()], grouper)
+    const productNames = projects?.children?.map((c) => c.name)
+    expect(productNames).toEqual(['genudo', 'loredex', 'Ungrouped'])
+    const genudo = projects?.children?.find((c) => c.name === 'genudo')
+    expect(genudo?.children?.map((c) => c.name)).toEqual(['genudo-ai-engine', 'genudo-website'])
+    // virtual product node uses a synthetic, non-file path
+    expect(genudo?.path).toBe('projects#product=genudo')
+  })
+
+  it('leaves the tree flat when no products are defined', () => {
+    const flatGrouper = (projects: string[]) => [{ product: null, projects }]
+    const [projects] = groupProjectsInTree([projectsNode()], flatGrouper)
+    expect(projects?.children?.map((c) => c.name)).toEqual([
+      'genudo-ai-engine',
+      'genudo-website',
+      'loredex-desktop',
+      'orphan',
+    ])
+  })
+
+  it('leaves non-projects top-level nodes untouched', () => {
+    const index: TreeNode = { name: '_index', path: '_index', kind: 'dir', children: [] }
+    const [node] = groupProjectsInTree([index], grouper)
+    expect(node).toBe(index)
   })
 })

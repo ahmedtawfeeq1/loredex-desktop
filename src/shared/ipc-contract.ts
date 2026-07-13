@@ -4,6 +4,7 @@
  * one push event channel. All payload types live here or in ./types.ts.
  */
 import type { Config, Doc, ProductDashboard, SearchHit } from 'loredex'
+import type { FontSettings } from './font-settings'
 import type { ThemeSetting } from './theme'
 import type {
   ActivityEvent,
@@ -113,6 +114,10 @@ export interface CoreApi {
    *  state, persisted core-side (settings JSON → app.db seam, story 9.2) */
   'settings.theme.get': { in: void; out: ThemeSetting }
   'settings.theme.set': { in: { theme: ThemeSetting }; out: void }
+  /** app-local: per-user font preferences (app UI + per-note-format), applied
+   *  renderer-side by stamping CSS vars — same seam as theme. */
+  'settings.fonts.get': { in: void; out: FontSettings }
+  'settings.fonts.set': { in: { fonts: FontSettings }; out: void }
   /** app-local contract evolution (story 16.2, Addendum D1): collapsible-rail
    *  state — PER-VAULT UI pref in app.db (never the vault); get degrades to
    *  expanded while no vault/db is open. */
@@ -194,6 +199,10 @@ export interface CoreApi {
   /** app-local contract evolution (story 5.2): engine/schema handshake (NFR8) */
   'sync.handshake': { in: void; out: HandshakeStatus }
   'dashboard.build': { in: void; out: ProductDashboard }
+  /** re-curate a project's Start Here brief (story 2.6): the re-curate seam made
+   *  real. curate is a CLI/LLM op the lib doesn't expose, so it runs the CLI in
+   *  the core host (~1min) — the window drives it async and refreshes on return. */
+  'dashboard.recurate': { in: { project: string }; out: void }
   /** app-local contract evolution (story 2.5): the Start Here brief + freshness */
   'home.brief': { in: void; out: HomeBrief }
   /** Vault Atlas (story 10.1): the whole derived graph — nodes, typed edges,

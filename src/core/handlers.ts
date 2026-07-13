@@ -2,6 +2,7 @@
  * Registers the CoreApi handlers implemented so far onto the dispatcher.
  * Unregistered channels answer NOT_IMPLEMENTED from the dispatcher itself.
  */
+import { isFontSettings } from '../shared/font-settings'
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting } from '../shared/theme'
@@ -50,12 +51,14 @@ import { getMcpStatus } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
   loadAtlasLegendSeen,
+  loadFontSettings,
   loadIdentityProfile,
   loadListPaneWidth,
   loadRailsCollapsed,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
   saveAtlasLegendSeen,
+  saveFontSettings,
   saveIdentityProfile,
   saveListPaneWidth,
   saveMcpPortOverride,
@@ -64,7 +67,7 @@ import {
   saveTreeSectionsCollapsed,
 } from './settings'
 import { buildThread, collectComments } from './threads'
-import { listMarkdownFiles, walkVault } from './tree'
+import { groupProjectsInTree, listMarkdownFiles, walkVault } from './tree'
 import { createVault, joinVault, validateRemote, type WizardDeps } from './wizard'
 import { withWriteLock } from './write-lock'
 
@@ -147,7 +150,9 @@ export function registerCoreHandlers(
     clearFacetCache()
     invalidateAtlas()
     notifier.refresh()
-    return walkVault(engine.getConfig().vaultPath)
+    // group the projects/ subtree Product → Project → Topic → Note (flat when
+    // no products are defined) — the grouper reads the vault's product manifest
+    return groupProjectsInTree(walkVault(engine.getConfig().vaultPath), engine.productGrouper())
   })
   // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
   // same recomputed-cache tier as the link index (never authoritative).
@@ -560,6 +565,7 @@ export function registerCoreHandlers(
   // in the core host so a long build never blocks a window; story 2.6 hooks
   // its post-build snapshot here (callback point, not implemented in v0.1).
   ipc.register('dashboard.build', () => engine.dashboard(new Date().toISOString().slice(0, 10)))
+  ipc.register('dashboard.recurate', ({ project }) => engine.recurateProject(project))
   ipc.register('home.brief', () => engine.homeBrief())
   ipc.register('settings.identity.get', () => {
     // no vault yet (first run, story 13.2) → no ambient default, NOT an error:
@@ -631,6 +637,12 @@ export function registerCoreHandlers(
       throw ipcError('INTERNAL', 'theme must be one of system, light, dark')
     }
     saveThemeSetting(theme)
+  })
+  // Font preferences: per-user app state, applied renderer-side (like theme).
+  ipc.register('settings.fonts.get', () => loadFontSettings())
+  ipc.register('settings.fonts.set', ({ fonts }) => {
+    if (!isFontSettings(fonts)) throw ipcError('INTERNAL', 'invalid font settings')
+    saveFontSettings(fonts)
   })
   // Collapsible rails (story 16.2, Addendum D1): per-vault UI pref, app.db
   // only (state-placement rule). No vault/db open yet → expanded defaults.

@@ -83,14 +83,6 @@ function goAtlasLearn(project: string): void {
   useApp.getState().setView('atlas')
   void useAtlas.getState().drillProject(project)
 }
-/** Open the product brief in the reader (Quick Action / Re-curate affordance). */
-function openProductBrief(): void {
-  const brief = useHome.getState().brief
-  if (!brief?.path) return
-  useApp.getState().setView('reader')
-  void useReader.getState().open(brief.path)
-}
-
 /** Row-as-button keyboard contract: ⏎ activates when the row itself is focused. */
 function rowKey(run: () => void): (e: React.KeyboardEvent) => void {
   return (e) => {
@@ -404,16 +396,25 @@ function AttentionRow({
   const consume = useHandoffs((s) => s.consume)
   const setStatus = useHandoffs((s) => s.setStatus)
   const busy = useHandoffs((s) => s.consumingId !== null || s.transitioningId !== null)
+  const recurate = useDashboardData((s) => s.recurate)
+  const recuratingProject = useDashboardData((s) => s.recuratingProject)
   const hasIdentity = useIdentity((s) => effectiveIdentity(s) !== null)
   const card = findCard(cards, item)
   const disabled = !hasIdentity || busy
   const idleTitle = hasIdentity ? undefined : 'Set your identity in Settings first'
+  const recurating =
+    item.action.kind === 'recurate' && !!item.project && recuratingProject === item.project
 
-  const primary = (): void => {
-    if (card && (item.action.kind === 'open' || item.action.kind === 'consume' || item.action.kind === 'reopen')) {
+  // What clicking the row OR its button does — one intent per item kind. A
+  // stale brief re-curates for real (CLI in the core host); a done-summary
+  // jumps to the board; handoff rows open the brief / act on the card.
+  const run = (): void => {
+    if (item.action.kind === 'recurate') {
+      if (item.project) void recurate(item.project)
+    } else if (item.action.kind === 'see') {
+      goBoard()
+    } else if (card) {
       openBrief(card)
-    } else if (item.action.kind === 'recurate') {
-      openProductBrief()
     } else {
       goBoard()
     }
@@ -421,10 +422,13 @@ function AttentionRow({
 
   const act = (e: React.MouseEvent): void => {
     e.stopPropagation()
-    if (!card) return
-    if (item.action.kind === 'consume') void consume(card)
-    else if (item.action.kind === 'reopen') void setStatus(card, { to: 'open' })
-    else openBrief(card)
+    if (item.action.kind === 'consume') {
+      if (card) void consume(card)
+    } else if (item.action.kind === 'reopen') {
+      if (card) void setStatus(card, { to: 'open' })
+    } else {
+      run()
+    }
   }
 
   return (
@@ -432,8 +436,8 @@ function AttentionRow({
       className="ops-alert ops-row-link"
       role="button"
       tabIndex={0}
-      onClick={primary}
-      onKeyDown={rowKey(primary)}
+      onClick={run}
+      onKeyDown={rowKey(run)}
     >
       <span className={`sevchip sev-${item.severity}`} title={item.severity}>
         {item.glyph}
@@ -454,8 +458,14 @@ function AttentionRow({
       </div>
       <div className="ops-alert-actions">
         {item.action.kind === 'recurate' || item.action.kind === 'see' ? (
-          <button type="button" className="button-secondary button-small" onClick={act}>
-            {item.action.label}
+          <button
+            type="button"
+            className="button-secondary button-small"
+            disabled={recurating}
+            title={recurating ? 'Re-curating the brief…' : item.action.label}
+            onClick={act}
+          >
+            {recurating ? 'Re-curating…' : item.action.label}
           </button>
         ) : card ? (
           <button

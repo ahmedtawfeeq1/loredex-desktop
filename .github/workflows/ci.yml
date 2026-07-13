@@ -17,7 +17,7 @@ jobs:
           node-version: 22
       # TODO(release): loredex is a local file: dependency for v0.1. Replace the
       # sibling checkout below with the exact-pinned npm release before shipping.
-      - name: Check out and build sibling loredex (file: dependency)
+      - name: 'Check out and build sibling loredex (file: dependency)'
         run: |
           git clone --depth 1 https://github.com/ahmedtawfeeq1/loredex ../loredex
           cd ../loredex && npm ci && npm run build
@@ -57,7 +57,7 @@ jobs:
           node-version: 22
       # TODO(release): same sibling checkout as `build` until loredex 2.2.0
       # is published and the file: pin is replaced.
-      - name: Check out and build sibling loredex (file: dependency)
+      - name: 'Check out and build sibling loredex (file: dependency)'
         run: |
           git clone --depth 1 https://github.com/ahmedtawfeeq1/loredex ../loredex
           cd ../loredex && npm ci && npm run build

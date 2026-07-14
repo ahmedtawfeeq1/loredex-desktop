@@ -52,6 +52,7 @@ function CreateForm(): React.JSX.Element {
   const pickDir = useWizard((s) => s.pickDir)
   const checkRemote = useWizard((s) => s.checkRemote)
   const checking = useWizard((s) => s.checkingRemote)
+  const dexType = useWizard((s) => s.dexType)
   return (
     <>
       <div className="modal-row">
@@ -61,11 +62,35 @@ function CreateForm(): React.JSX.Element {
             {dir}
           </span>
         ) : (
-          <span className="modal-hint">Where the vault will be created (empty or new).</span>
+          <span className="modal-hint">Where the dex will be created (empty or new).</span>
         )}
         <button type="button" className="button-secondary" onClick={() => void pickDir('create')}>
           {dir ? 'Change…' : 'Choose…'}
         </button>
+      </div>
+      <div className="modal-row modal-row-block">
+        <span className="modal-label">Dex type</span>
+        <div className="tree-mode" role="group" aria-label="Dex type">
+          <button
+            type="button"
+            aria-pressed={dexType === 'research'}
+            onClick={() => useWizard.setState({ dexType: 'research' })}
+          >
+            Research
+          </button>
+          <button
+            type="button"
+            aria-pressed={dexType === 'agent-ops'}
+            onClick={() => useWizard.setState({ dexType: 'agent-ops' })}
+          >
+            Agent ops
+          </button>
+        </div>
+        <p className="modal-hint">
+          {dexType === 'agent-ops'
+            ? 'A client fleet: Manager ▸ Client ▸ Pipeline/Agent ▸ Stage, with validated scaffolds.'
+            : 'AI research notes routed by topic — the default.'}
+        </p>
       </div>
       <div className="modal-row modal-row-block">
         <span className="modal-label">Remote (optional)</span>

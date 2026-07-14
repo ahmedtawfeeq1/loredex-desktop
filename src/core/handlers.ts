@@ -151,9 +151,22 @@ export function registerCoreHandlers(
     invalidateAtlas()
     notifier.refresh()
     // group the projects/ subtree Product → Project → Topic → Note (flat when
-    // no products are defined) — the grouper reads the vault's product manifest
-    return groupProjectsInTree(walkVault(engine.getConfig().vaultPath), engine.productGrouper())
+    // no products are defined) — the grouper reads the vault's product manifest.
+    // Agent-ops dexes also list yaml/json/csv (tables, exports, action files).
+    return groupProjectsInTree(
+      walkVault(engine.getConfig().vaultPath, '', {
+        dataFiles: engine.getDexType() === 'agent-ops',
+      }),
+      engine.productGrouper(),
+    )
   })
+  // agent-ops dexes (clients view): fleet/lints are pure reads off the fs;
+  // workspace generation writes only gitignored files (never vault content)
+  ipc.register('vault.dexInfo', () => ({ type: engine.getDexType() }))
+  ipc.register('vault.readRaw', ({ path }) => engine.readRawFile(path))
+  ipc.register('clients.fleet', () => engine.fleet())
+  ipc.register('clients.lints', () => engine.agentOpsLints())
+  ipc.register('clients.workspace', ({ client, check }) => engine.generateWorkspace(client, check))
   // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
   // same recomputed-cache tier as the link index (never authoritative).
   ipc.register('atlas.graph', ({ level, scope }) => atlasGraph(level, scope ?? {}))
@@ -168,7 +181,7 @@ export function registerCoreHandlers(
   // full-text ranking is the lib's searchVault; facets narrow by frontmatter
   // app-side (story 2.4). Wider limit so narrowing has material to work on.
   ipc.register('vault.search', ({ q, facets }) =>
-    filterHits(engine.search(q, 50), facets, engine.noteMeta),
+    filterHits(engine.search(q, 50), facets, engine.noteMeta, engine.managerOf),
   )
   ipc.register('vault.facets', () => {
     const vaultPath = engine.getConfig().vaultPath
@@ -700,7 +713,7 @@ export function registerCoreHandlers(
     git: (cwd, args) => gitAsync(cwd, args, { env: NON_INTERACTIVE_GIT_ENV }),
     clone: gitCloneStreaming,
     identity: () => loadIdentityProfile(),
-    scaffold: (path) => engine.scaffoldNewVault(path),
+    scaffold: (path, dexType) => engine.scaffoldNewVault(path, dexType),
     readConfig: () => engine.readConfigFile(),
     writeConfig: (config) => engine.writeConfigFile(config),
     ensureMergeDriver: (path) => engine.ensureMergeDriverAt(path),
@@ -718,8 +731,12 @@ export function registerCoreHandlers(
     lock: withWriteLock,
   }
   ipc.register('wizard.validateRemote', ({ url }) => validateRemote(wizardDeps, url))
-  ipc.register('wizard.createVault', ({ dir, remoteUrl }) =>
-    createVault(wizardDeps, { dir, ...(remoteUrl ? { remoteUrl } : {}) }),
+  ipc.register('wizard.createVault', ({ dir, remoteUrl, dexType }) =>
+    createVault(wizardDeps, {
+      dir,
+      ...(remoteUrl ? { remoteUrl } : {}),
+      ...(dexType ? { dexType } : {}),
+    }),
   )
   ipc.register('wizard.joinVault', ({ url, dest, branch }) =>
     joinVault(wizardDeps, { url, dest, ...(branch ? { branch } : {}) }),

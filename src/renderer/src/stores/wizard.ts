@@ -24,6 +24,8 @@ interface WizardState {
   // create form
   dir: string | null
   remoteUrl: string
+  /** agent-ops dexes get the fixed client schema; research is today's default */
+  dexType: 'research' | 'agent-ops'
   remoteCheck: RemoteCheck | null
   checkingRemote: boolean
   // join form (story 13.2)
@@ -70,6 +72,7 @@ export const useWizard = create<WizardState>((set, get) => ({
   ...formReset,
   dir: null,
   remoteUrl: '',
+  dexType: 'research',
   remoteCheck: null,
   checkingRemote: false,
   joinUrl: '',
@@ -79,7 +82,7 @@ export const useWizard = create<WizardState>((set, get) => ({
   roots: [],
 
   openCreate() {
-    set({ flow: 'create', ...formReset, dir: null, remoteUrl: '', remoteCheck: null })
+    set({ flow: 'create', ...formReset, dir: null, remoteUrl: '', dexType: 'research', remoteCheck: null })
   },
 
   openJoin(prefill) {
@@ -134,7 +137,7 @@ export const useWizard = create<WizardState>((set, get) => ({
   },
 
   async runCreate() {
-    const { dir, remoteUrl } = get()
+    const { dir, remoteUrl, dexType } = get()
     if (!dir) return
     set({ phase: 'running', steps: [], failure: null, result: null })
     try {
@@ -142,6 +145,7 @@ export const useWizard = create<WizardState>((set, get) => ({
       const result = await invoke('wizard.createVault', {
         dir,
         ...(url ? { remoteUrl: url } : {}),
+        ...(dexType !== 'research' ? { dexType } : {}),
       })
       set({ phase: 'done', result: { vaultPath: result.vaultPath } })
     } catch (e) {

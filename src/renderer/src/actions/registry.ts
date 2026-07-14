@@ -10,6 +10,7 @@
  */
 import { dispatchZoom } from '../views/atlas/atlas-zoom'
 import { useApp, type AppView } from '../stores/app'
+import { useDex } from '../stores/dex'
 import { useEditor } from '../stores/editor'
 import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
@@ -49,6 +50,7 @@ export type NavGroup = 'Workspace' | 'Collaborate' | 'Knowledge' | 'System'
 export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> = [
   { view: 'home', label: 'Home', group: 'Workspace' },
   { view: 'reader', label: 'Reader', group: 'Workspace' },
+  { view: 'clients', label: 'Clients', group: 'Workspace' },
   { view: 'search', label: 'Search', group: 'Workspace' },
   { view: 'handoffs', label: 'Handoffs', group: 'Collaborate' },
   { view: 'contracts', label: 'Contracts', group: 'Collaborate' },
@@ -58,12 +60,20 @@ export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: Na
   { view: 'settings', label: 'Settings', group: 'System' },
 ]
 
+/** Nav/shortcut views for the OPEN dex: Clients exists only on agent-ops dexes,
+ *  and its removal renumbers ⌘1…⌘9 so research dexes keep their muscle memory. */
+export function visibleViews(): ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> {
+  const agentOps = useDex.getState().type === 'agent-ops'
+  return agentOps ? VIEW_ORDER : VIEW_ORDER.filter((entry) => entry.view !== 'clients')
+}
+
 export function appActions(): AppAction[] {
-  const actions: AppAction[] = VIEW_ORDER.map(({ view, label }, i) => ({
+  // ⌘1-9 binds the first nine visible views; a tenth (agent-ops adds Clients)
+  // stays palette/nav reachable without a number
+  const actions: AppAction[] = visibleViews().map(({ view, label }, i) => ({
     id: `view:${view}`,
     title: `Go to ${label}`,
-    shortcut: `⌘${i + 1}`,
-    combo: { key: String(i + 1), meta: true },
+    ...(i < 9 ? { shortcut: `⌘${i + 1}`, combo: { key: String(i + 1), meta: true } } : {}),
     run: () => useApp.getState().setView(view),
   }))
   actions.push(

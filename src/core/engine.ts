@@ -5,10 +5,10 @@
  */
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { basename, dirname, isAbsolute, join, normalize } from 'node:path'
+import { basename, dirname, isAbsolute, join, normalize, sep } from 'node:path'
 import { promisify } from 'node:util'
 import {
   ACTIVITY_LOG_ARGS,
@@ -16,8 +16,17 @@ import {
   ambientGitIdentity,
   annotateHandoff,
   buildDashboard,
+  type ClientInfo,
   parseActivity,
   type Config,
+  type DexType,
+  type LintFinding,
+  type WorkspaceResult,
+  lintAgentOps,
+  loadDexType,
+  materializeWorkspace,
+  productOf,
+  scanFleet,
   type HandoffTransition,
   type ConsumeReceipt,
   consumeHandoff,
@@ -137,6 +146,63 @@ export function noteMeta(absPath: string): Record<string, unknown> {
 export function productGrouper(): (projects: string[]) => ReturnType<typeof groupProjects> {
   const map = loadProducts(getConfig().vaultPath)
   return (projects) => groupProjects(map, projects)
+}
+
+// ── agent-ops dexes (epic: clients view — read fresh per call, like productGrouper) ──
+
+/** The open dex's declared type ('research' when absent — every pre-dex vault). */
+export function getDexType(): DexType {
+  return loadDexType(getConfig().vaultPath)
+}
+
+/** The manager (product) a project/client is filed under — `manager:` search facet. */
+export function managerOf(project: string): string | null {
+  return productOf(loadProducts(getConfig().vaultPath), project)
+}
+
+/** Fleet read model: every client with pipelines/agents/stages/tables/inbox. */
+export function fleet(): ClientInfo[] {
+  return scanFleet(getConfig().vaultPath)
+}
+
+/** Agent-ops lint findings (schema violations, drift, secrets) — read-only. */
+export function agentOpsLints(): LintFinding[] {
+  return lintAgentOps(getConfig().vaultPath).findings
+}
+
+/** Generate (or check) a client's workspace files from workspace.yml. */
+export function generateWorkspace(client: string, check: boolean): WorkspaceResult {
+  return materializeWorkspace(getConfig().vaultPath, client, { check })
+}
+
+const RAW_EXTS = ['.yaml', '.yml', '.json', '.csv'] as const
+
+/**
+ * Raw read of a data file strictly inside the dex (yaml/json/csv allowlist).
+ * resolveNoteInsideVault is md-only by design, so containment is enforced here:
+ * realpath both sides, prefix check, extension allowlist. 2 MB cap — these are
+ * settings exports and tables, not databases.
+ */
+export function readRawFile(path: string): { raw: string; fileType: 'yaml' | 'json' | 'csv' } {
+  const vault = getConfig().vaultPath
+  const requested = isAbsolute(path) ? path : join(vault, path)
+  let vaultRoot: string
+  let resolved: string
+  try {
+    vaultRoot = realpathSync(vault)
+    resolved = realpathSync(requested)
+  } catch {
+    throw ipcError('VAULT_OUTSIDE_PATH', `not a readable file inside the dex: ${path}`)
+  }
+  const ext = RAW_EXTS.find((e) => resolved.endsWith(e))
+  if (!ext || !resolved.startsWith(vaultRoot + sep)) {
+    throw ipcError('VAULT_OUTSIDE_PATH', `not a data file inside the dex: ${path}`)
+  }
+  if (statSync(resolved).size > 2 * 1024 * 1024) {
+    throw ipcError('INTERNAL', 'data file too large to preview (2 MB cap)')
+  }
+  const fileType = ext === '.csv' ? 'csv' : ext === '.json' ? 'json' : 'yaml'
+  return { raw: readFileSync(resolved, 'utf8'), fileType }
 }
 
 /** Product dashboard compute (story 2.5) — read-only lib aggregation. */
@@ -607,9 +673,9 @@ export function writeConfigFile(next: Config): void {
   saveConfig(next)
 }
 
-/** Scaffold the vault skeleton + `.loredex/engine.json` stamp (lib export). */
-export function scaffoldNewVault(path: string): void {
-  scaffoldVault(path)
+/** Scaffold the dex skeleton + `.loredex/engine.json` stamp (lib export). */
+export function scaffoldNewVault(path: string, dexType: DexType = 'research'): void {
+  scaffoldVault(path, dexType)
 }
 
 /** Wire the generated-index merge driver into a repo at an explicit path. */

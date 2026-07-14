@@ -7,7 +7,31 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-14
+
+### Added
+- **Agent-ops dex support** (loredex 2.5.0 dex types): a dex declaring
+  `_index/dex.json` `{"type": "agent-ops"}` gets a **Clients** view — the fleet
+  grouped by Manager with category tag chips and pending-inbox badges, and a
+  per-client page: pipelines with their ordered `01 → NN` stage rail, agents,
+  knowledge tables, automation workflows, inbox attention, and schema problems
+  from the doctor's lint engine.
+- **Workspace panel**: generate or check a client's agent tooling
+  (`.mcp.json` / `.claude/settings.json` / `AGENTS.md`) from its committed,
+  secret-free `workspace.yml` — generated files are gitignored; missing
+  `${ENV_VAR}` secrets are reported, never guessed.
+- **Data files in the tree and reader**: agent-ops dexes list yaml/json/csv
+  (knowledge tables, settings exports, action files, workflow exports); csv
+  opens as a table, yaml/json open read-only in the editor chrome.
+- **`manager:` search operator** — narrow hits to clients filed under one
+  manager (products manifest).
+- Create-dex wizard offers the dex type (Research | Agent ops).
+
 ### Changed
+- Research dexes are untouched: the Clients view stays out of the nav, ⌘1-9
+  keep their bindings, and the tree stays markdown-only.
+- Pinned loredex engine: **^2.5.0** (dex types, agent-ops scaffolds/lints,
+  structural data indexing).
 - CI is tests + typecheck + native-ABI smoke only; the redundant per-push DMG
   package was dropped (`release.yml` is the sole packaging/publishing gate on
   tags, and it builds all three OS installers).

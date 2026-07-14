@@ -1,24 +1,45 @@
 /**
- * Read-only markdown tree walk rooted at the vault path (story 2.1).
+ * Read-only tree walk rooted at the dex path (story 2.1).
  * App-side view logic is permitted — the anti-second-engine rule fences vault
- * WRITES only. Excludes `.git/**`, dotfiles/dotfolders and non-markdown files;
- * folders with no markdown anywhere below are dropped.
+ * WRITES only. Excludes `.git/**`, dotfiles/dotfolders; folders with nothing
+ * included anywhere below are dropped. Markdown-only by default; agent-ops
+ * dexes pass `dataFiles: true` so yaml/json/csv (knowledge tables, workflow
+ * exports, action files) appear too.
  */
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { TreeNode } from '../shared/types'
 
-export function walkVault(root: string, rel = ''): TreeNode[] {
+const DATA_EXTS = ['.yaml', '.yml', '.json', '.csv'] as const
+
+export interface WalkOptions {
+  dataFiles?: boolean
+}
+
+function dataFileType(name: string): TreeNode['fileType'] {
+  if (name.endsWith('.csv')) return 'csv'
+  if (name.endsWith('.json')) return 'json'
+  return 'yaml'
+}
+
+export function walkVault(root: string, rel = '', opts: WalkOptions = {}): TreeNode[] {
   const abs = rel ? join(root, rel) : root
   const nodes: TreeNode[] = []
   for (const entry of readdirSync(abs, { withFileTypes: true })) {
     if (entry.name.startsWith('.')) continue // .git, .obsidian, .loredex, dotfiles
     const path = rel ? `${rel}/${entry.name}` : entry.name
     if (entry.isDirectory()) {
-      const children = walkVault(root, path)
+      const children = walkVault(root, path, opts)
       if (children.length > 0) nodes.push({ name: entry.name, path, kind: 'dir', children })
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
-      nodes.push({ name: entry.name.replace(/\.md$/, ''), path, kind: 'file' })
+      nodes.push({ name: entry.name.replace(/\.md$/, ''), path, kind: 'file', fileType: 'md' })
+    } else if (
+      opts.dataFiles &&
+      entry.isFile() &&
+      DATA_EXTS.some((ext) => entry.name.endsWith(ext))
+    ) {
+      // data files keep their extension in the label — the type is the point
+      nodes.push({ name: entry.name, path, kind: 'file', fileType: dataFileType(entry.name) })
     }
   }
   // dirs first, then case-insensitive alpha — stable catalog order
@@ -31,13 +52,14 @@ export function walkVault(root: string, rel = ''): TreeNode[] {
 }
 
 /**
- * Insert a Product level inside the `projects` node: wrap each project dir in a
- * virtual product node so the tree drills Product → Project → Topic → Note. The
- * `grouper` (loredex's groupProjects, bound to the vault's manifest — injected so
- * this stays view-only, no loredex import here) returns the ordered groups. When
- * the only group is Ungrouped (no products defined), the projects stay flat —
- * pre-product vaults are untouched. Virtual product nodes carry a synthetic path
- * (`projects#product=…`) so nothing resolves them as a file.
+ * Insert a grouping level inside the `projects` node: wrap each project dir in a
+ * virtual group node so the tree drills Product → Project → Topic → Note (or, on
+ * agent-ops dexes, Manager → Client → …). The `grouper` (loredex's groupProjects,
+ * bound to the vault's manifest — injected so this stays view-only, no loredex
+ * import here) returns the ordered groups. When the only group is Ungrouped (no
+ * products defined), the projects stay flat — pre-product vaults are untouched.
+ * Virtual group nodes carry a synthetic path (`projects#product=…`) so nothing
+ * resolves them as a file.
  */
 export function groupProjectsInTree(
   tree: TreeNode[],

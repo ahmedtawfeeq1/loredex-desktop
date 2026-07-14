@@ -4,7 +4,7 @@
  * (open-count badge), Settings.
  */
 import { Fragment, useEffect } from 'react'
-import { appActions, VIEW_ORDER } from './actions/registry'
+import { appActions, visibleViews } from './actions/registry'
 import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
@@ -18,6 +18,7 @@ import { ToastStack } from './components/ToastStack'
 import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
+import { inboxPending, useDex } from './stores/dex'
 import { useFileSearch } from './stores/fileSearch'
 import { useFind } from './stores/find'
 import { useHandoffs } from './stores/handoffs'
@@ -33,6 +34,7 @@ import { useHome } from './stores/home'
 import { useSearch } from './stores/search'
 import { useSync } from './stores/sync'
 import { AtlasView } from './views/atlas/AtlasView'
+import { ClientsView } from './views/clients/ClientsView'
 import { ContractTimeline } from './views/contracts/ContractTimeline'
 import { FeedView } from './views/feed/FeedView'
 import { AnnotateModal } from './views/handoffs/AnnotateModal'
@@ -44,6 +46,7 @@ import { SnoozeUntilPicker } from './views/handoffs/SnoozeUntilPicker'
 import { HomeView } from './views/home/HomeView'
 import { RouteConfirmCard } from './views/routes/RouteConfirmCard'
 import { SyncPanel } from './views/sync/SyncPanel'
+import { DataFileView } from './views/reader/DataFileView'
 import { Diagnostics } from './views/reader/Diagnostics'
 import { ListResizeHandle } from './views/reader/ListResizeHandle'
 import { NoteView } from './views/reader/NoteView'
@@ -56,6 +59,17 @@ import { CreateVaultWizard } from './views/wizard/CreateVaultWizard'
 import { FirstRun } from './views/wizard/FirstRun'
 import { JoinVaultWizard } from './views/wizard/JoinVaultWizard'
 
+/** Reader surface: agent-ops data files (yaml/json/csv) render read-only in
+ *  DataFileView; everything else is the markdown NoteView. */
+function ReaderSurface(): React.JSX.Element {
+  const raw = useReader((s) => s.raw)
+  const selected = useReader((s) => s.selected)
+  if (raw && selected) {
+    return <DataFileView path={selected} raw={raw.raw} fileType={raw.fileType} />
+  }
+  return <NoteView />
+}
+
 export default function App(): React.JSX.Element {
   const status = useApp((s) => s.status)
   const view = useApp((s) => s.view)
@@ -63,16 +77,26 @@ export default function App(): React.JSX.Element {
   const init = useApp((s) => s.init)
   const cards = useHandoffs((s) => s.cards)
   const openInbound = openCount(cards ?? [], 'all')
+  // agent-ops dexes (clients epic): dex type gates the Clients nav; the badge
+  // is the fleet-wide pending-inbox count (fs truth via clients.fleet)
+  // subscribing to the type makes visibleViews() recompute when the dex loads
+  const dexType = useDex((s) => s.type)
+  const clientsPending = inboxPending(useDex((s) => s.fleet))
+  const nav = visibleViews()
+  void dexType
   // collapsible rails (story 16.2, Addendum D1) — per-vault, loaded with init
   const sidebarCollapsed = useRails((s) => s.sidebar)
   const listCollapsed = useRails((s) => s.list)
 
   useEffect(() => {
     void init()
+    void useDex.getState().load()
     void useRails.getState().load()
     void useTreeSections.getState().load()
     // menu-driven vault change (main) → refresh identity + reset the stores
     return onVaultChanged(() => {
+      useDex.getState().reset()
+      void useDex.getState().load()
       useReader.getState().reset()
       useFind.getState().reset()
       useFileSearch.getState().reset()
@@ -180,10 +204,11 @@ export default function App(): React.JSX.Element {
             any view, not buried in the dashboard. */}
         <QuickActionsMenu collapsed={sidebarCollapsed} />
         <nav aria-label="Views">
-          {/* the registry's VIEW_ORDER is the nav — order, labels and ⌘1-9
-              hints can never drift apart (story 15.3) */}
-          {VIEW_ORDER.map(({ view: v, label, group }, i) => {
-            const firstOfGroup = i === 0 || VIEW_ORDER[i - 1].group !== group
+          {/* the registry's view list is the nav — order, labels and ⌘1-9
+              hints can never drift apart (story 15.3). Clients appears only
+              on agent-ops dexes (visibleViews). */}
+          {nav.map(({ view: v, label, group }, i) => {
+            const firstOfGroup = i === 0 || nav[i - 1].group !== group
             return (
               <Fragment key={v}>
                 {firstOfGroup &&
@@ -194,9 +219,9 @@ export default function App(): React.JSX.Element {
                   type="button"
                   className="nav-item"
                   aria-current={view === v}
-                  title={`${label} (⌘${i + 1})`}
+                  title={i < 9 ? `${label} (⌘${i + 1})` : label}
                   aria-label={label}
-                  aria-keyshortcuts={`Meta+${i + 1}`}
+                  {...(i < 9 ? { 'aria-keyshortcuts': `Meta+${i + 1}` } : {})}
                   onClick={() => setView(v)}
                 >
                   {sidebarCollapsed ? <NavIcon view={v} /> : label}
@@ -206,6 +231,13 @@ export default function App(): React.JSX.Element {
                       <span className="nav-dot" title={`${openInbound} open`} />
                     ) : (
                       <span className="nav-badge">{openInbound}</span>
+                    ))}
+                  {v === 'clients' &&
+                    clientsPending > 0 &&
+                    (sidebarCollapsed ? (
+                      <span className="nav-dot" title={`${clientsPending} inbox item(s) pending`} />
+                    ) : (
+                      <span className="nav-badge">{clientsPending}</span>
                     ))}
                 </button>
               </Fragment>
@@ -233,6 +265,10 @@ export default function App(): React.JSX.Element {
         ) : view === 'handoffs' ? (
           <main className="pane-board">
             <Board />
+          </main>
+        ) : view === 'clients' ? (
+          <main className="pane-board">
+            <ClientsView />
           </main>
         ) : view === 'atlas' ? (
           <main className="pane-board">
@@ -278,7 +314,7 @@ export default function App(): React.JSX.Element {
                 </button>
               )}
               <RouteDropTarget>
-                <NoteView />
+                <ReaderSurface />
                 <Diagnostics />
               </RouteDropTarget>
             </main>

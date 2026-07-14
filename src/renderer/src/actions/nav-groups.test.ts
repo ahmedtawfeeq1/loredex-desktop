@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { VIEW_ORDER } from './registry'
+import { useDex } from '../stores/dex'
+import { VIEW_ORDER, visibleViews } from './registry'
 
 describe('VIEW_ORDER nav groups', () => {
   it('every entry has a group', () => {
@@ -12,8 +13,14 @@ describe('VIEW_ORDER nav groups', () => {
     expect(runs.length).toBe(new Set(runs).size)
   })
 
-  it('keeps 9 views so ⌘1-9 stays fully bound', () => {
-    expect(VIEW_ORDER).toHaveLength(9)
+  it('research dexes see 9 views (⌘1-9 fully bound); agent-ops adds Clients', () => {
+    useDex.setState({ type: 'research' })
+    expect(visibleViews()).toHaveLength(9)
+    expect(visibleViews().some((e) => e.view === 'clients')).toBe(false)
+    useDex.setState({ type: 'agent-ops' })
+    expect(visibleViews()).toHaveLength(10)
+    expect(visibleViews().some((e) => e.view === 'clients')).toBe(true)
+    useDex.setState({ type: null })
   })
 
   it('orders groups Workspace, Collaborate, Knowledge, System', () => {

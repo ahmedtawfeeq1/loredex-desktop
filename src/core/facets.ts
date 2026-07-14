@@ -55,10 +55,17 @@ function tagSet(v: unknown): Set<string> {
  * compare the hit's own filed date (YYYY-MM-DD lexical) — an undated note is
  * excluded whenever a date bound is active.
  */
-export function matchesFacets(hit: SearchHit, facets: Facets, load: MetaLoader): boolean {
+export function matchesFacets(
+  hit: SearchHit,
+  facets: Facets,
+  load: MetaLoader,
+  managerOf?: (project: string) => string | null,
+): boolean {
   if (facets.project && hit.project !== facets.project) return false
   if (facets.topic && hit.topic !== facets.topic) return false
   if (facets.status && hit.status !== facets.status) return false
+  // agent-ops: manager resolves through the products manifest (client → manager)
+  if (facets.manager && (managerOf?.(hit.project) ?? null) !== facets.manager) return false
   if (facets.before && !(hit.date && hit.date < facets.before)) return false
   if (facets.after && !(hit.date && hit.date > facets.after)) return false
   if (facets.on && hit.date !== facets.on) return false
@@ -72,9 +79,14 @@ export function matchesFacets(hit: SearchHit, facets: Facets, load: MetaLoader):
   return true
 }
 
-export function filterHits(hits: SearchHit[], facets: Facets | undefined, load: MetaLoader): SearchHit[] {
+export function filterHits(
+  hits: SearchHit[],
+  facets: Facets | undefined,
+  load: MetaLoader,
+  managerOf?: (project: string) => string | null,
+): SearchHit[] {
   if (!facets || Object.values(facets).every((v) => !v)) return hits
-  return hits.filter((hit) => matchesFacets(hit, facets, load))
+  return hits.filter((hit) => matchesFacets(hit, facets, load, managerOf))
 }
 
 /**

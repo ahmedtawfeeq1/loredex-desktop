@@ -6,6 +6,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useApp, type AppView } from '../stores/app'
+import { useDex } from '../stores/dex'
 import { useEditor } from '../stores/editor'
 import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
@@ -18,6 +19,7 @@ import { appActions, VIEW_ORDER } from './registry'
 const ALL_VIEWS: AppView[] = [
   'home',
   'reader',
+  'clients', // agent-ops only in nav; always present in VIEW_ORDER
   'search',
   'handoffs',
   'contracts',
@@ -27,19 +29,38 @@ const ALL_VIEWS: AppView[] = [
   'settings',
 ]
 
+/** the nav on a research dex (clients hidden) */
+const RESEARCH_VIEWS = ALL_VIEWS.filter((v) => v !== 'clients')
+
 beforeEach(() => {
   useApp.setState({ view: 'home', cheatsheetOpen: false })
+  useDex.setState({ type: null })
 })
 
 describe('the action registry (story 15.3)', () => {
-  it('covers every view, in sidebar order, with ⌘1-9', () => {
+  it('covers every research view, in sidebar order, with ⌘1-9', () => {
     expect(VIEW_ORDER.map((v) => v.view)).toEqual(ALL_VIEWS)
     const actions = appActions()
-    ALL_VIEWS.forEach((view, i) => {
+    RESEARCH_VIEWS.forEach((view, i) => {
       const action = actions.find((a) => a.id === `view:${view}`)
       expect(action, `view:${view}`).toBeDefined()
       expect(action?.shortcut).toBe(`⌘${i + 1}`)
       expect(action?.combo).toEqual({ key: String(i + 1), meta: true })
+    })
+    expect(actions.some((a) => a.id === 'view:clients')).toBe(false)
+  })
+
+  it('agent-ops dexes add Clients: first nine keep ⌘1-9, the tenth is unbound', () => {
+    useDex.setState({ type: 'agent-ops' })
+    const actions = appActions()
+    ALL_VIEWS.forEach((view, i) => {
+      const action = actions.find((a) => a.id === `view:${view}`)
+      expect(action, `view:${view}`).toBeDefined()
+      if (i < 9) {
+        expect(action?.shortcut).toBe(`⌘${i + 1}`)
+      } else {
+        expect(action?.combo).toBeUndefined() // no ⌘10 — nav/palette reachable
+      }
     })
   })
 

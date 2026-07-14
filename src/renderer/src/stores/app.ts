@@ -10,6 +10,7 @@ import { invoke, pickVault } from '../api'
 export type AppView =
   | 'home'
   | 'reader'
+  | 'clients'
   | 'handoffs'
   | 'atlas'
   | 'contracts'

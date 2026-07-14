@@ -63,6 +63,54 @@ describe('walkVault', () => {
   })
 })
 
+describe('walkVault dataFiles mode (agent-ops)', () => {
+  let opsVault: string
+  beforeAll(() => {
+    opsVault = mkdtempSync(join(tmpdir(), 'loredex-tree-ops-'))
+    const put = (rel: string, content = 'x\n'): void => {
+      mkdirSync(join(opsVault, rel, '..'), { recursive: true })
+      writeFileSync(join(opsVault, rel), content)
+    }
+    put('projects/brightsmile-dental/pipelines/booking/_persona.md', '# p\n')
+    put('projects/brightsmile-dental/pipelines/booking/_actions.curls.yaml', '# a\n')
+    put('projects/brightsmile-dental/knowledge_tables/patients.csv', 'a,b\n1,2\n')
+    put('projects/brightsmile-dental/automation_workflows/flow.json', '{}')
+    put('projects/brightsmile-dental/workspace.yml', '# ws\n')
+    mkdirSync(join(opsVault, 'projects/brightsmile-dental/_inbox'), { recursive: true })
+  })
+
+  it('md-only walk drops data-only dirs (research behavior unchanged)', () => {
+    const client = walkVault(opsVault)
+      .find((n) => n.name === 'projects')
+      ?.children?.find((n) => n.name === 'brightsmile-dental')
+    expect(names(client?.children ?? [])).toEqual(['pipelines'])
+  })
+
+  it('dataFiles walk includes yaml/json/csv with fileType, keeps their dirs', () => {
+    const client = walkVault(opsVault, '', { dataFiles: true })
+      .find((n) => n.name === 'projects')
+      ?.children?.find((n) => n.name === 'brightsmile-dental')
+    expect(names(client?.children ?? [])).toEqual([
+      'automation_workflows',
+      'knowledge_tables',
+      'pipelines',
+      'workspace.yml',
+    ])
+    const tables = client?.children?.find((n) => n.name === 'knowledge_tables')
+    const csv = tables?.children?.[0]
+    expect(csv?.name).toBe('patients.csv') // data files keep their extension
+    expect(csv?.fileType).toBe('csv')
+    expect(csv?.path).toBe('projects/brightsmile-dental/knowledge_tables/patients.csv')
+    const booking = client?.children
+      ?.find((n) => n.name === 'pipelines')
+      ?.children?.find((n) => n.name === 'booking')
+    expect(names(booking?.children ?? [])).toEqual(['_actions.curls.yaml', '_persona'])
+    expect(booking?.children?.find((n) => n.fileType === 'md')?.name).toBe('_persona')
+    // a truly empty dir still drops — the inbox badge reads clients.fleet, not the tree
+    expect(names(client?.children ?? [])).not.toContain('_inbox')
+  })
+})
+
 describe('groupProjectsInTree', () => {
   // stand-in for loredex's groupProjects bound to a manifest
   const grouper = (projects: string[]) => {

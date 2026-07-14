@@ -17,6 +17,7 @@ import type { SearchHit } from '../../../../shared/ipc-contract'
 import type { TreeNode } from '../../../../shared/types'
 import { RailChevron } from '../../components/NavIcon'
 import { humanizeTitle, noteDate } from '../../humanize'
+import { useDex } from '../../stores/dex'
 import { useFileSearch } from '../../stores/fileSearch'
 import { useRails } from '../../stores/rails'
 import { useReader } from '../../stores/reader'
@@ -78,6 +79,17 @@ const TREE_FILTER_CSS = `
 }
 .file-search-head { display: flex; align-items: center; gap: 6px; }
 .file-search-head .search-row-title { flex: 1; min-width: 0; }
+.tree-file-type {
+  flex: none;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0 4px;
+}
 `
 
 function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): React.JSX.Element {
@@ -86,6 +98,8 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
   // story 17.1 (D1 amendment 3): humanized title + small right-aligned date;
   // the real filename stays in the tooltip (title={node.path})
   const date = noteDate(node.name)
+  // agent-ops data files keep their raw name + show a type glyph instead of a date
+  const isData = node.fileType !== undefined && node.fileType !== 'md'
   return (
     <button
       type="button"
@@ -94,8 +108,12 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
       title={node.path}
       onClick={() => void open(node.path)}
     >
-      <span className="tree-file-name">{humanizeTitle(node.name)}</span>
-      {date && <span className="tree-file-date">{date}</span>}
+      <span className="tree-file-name">{isData ? node.name : humanizeTitle(node.name)}</span>
+      {isData ? (
+        <span className="tree-file-type">{node.fileType}</span>
+      ) : (
+        date && <span className="tree-file-date">{date}</span>
+      )}
     </button>
   )
 }
@@ -113,6 +131,9 @@ function SectionNode({
   forceOpen?: boolean
 }): React.JSX.Element {
   const collapsed = useTreeSections((s) => s.collapsed.includes(node.path)) && !forceOpen
+  // agent-ops relabel: the projects group reads "clients" (folder name unchanged)
+  const agentOps = useDex((s) => s.type === 'agent-ops')
+  const label = agentOps && node.name === 'projects' ? 'clients' : node.name
   return (
     <li
       className="tree-section-item"
@@ -122,11 +143,11 @@ function SectionNode({
         type="button"
         className="tree-section"
         aria-expanded={!collapsed}
-        title={collapsed ? `Expand ${node.name}` : `Collapse ${node.name}`}
+        title={collapsed ? `Expand ${label}` : `Collapse ${label}`}
         onClick={() => useTreeSections.getState().toggle(node.path)}
       >
         <span className="tree-section-dot" aria-hidden />
-        <span className="tree-section-label">{node.name}</span>
+        <span className="tree-section-label">{label}</span>
         <span className="tree-section-chevron" aria-hidden>
           <RailChevron dir={collapsed ? 'right' : 'down'} />
         </span>
@@ -286,7 +307,7 @@ export function VaultTree(): React.JSX.Element {
     <div className={className} style={collapsed ? undefined : { width: listWidth }}>
       <style>{TREE_FILTER_CSS}</style>
       <div className="pane-list-header">
-        <span className="pane-list-title">Vault</span>
+        <span className="pane-list-title">Dex</span>
         <span className="pane-list-actions">
           <button
             type="button"

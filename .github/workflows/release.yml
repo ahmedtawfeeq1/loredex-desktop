@@ -32,21 +32,27 @@ jobs:
       # typecheck + electron-vite build → out/**; electron-builder then rebuilds
       # the native module for this OS's Electron ABI and packages the installer.
       - run: npm run build
-      - run: npx electron-builder ${{ matrix.platform }} --publish never
+      # Code signing + notarization — INACTIVE until these repo secrets exist
+      # (see SIGNING.md). Secrets are exported ONLY when non-empty: an env var
+      # that merely EXISTS (even as "") flips electron-builder into its signing
+      # path, which fails with "… not a file" on an empty CSC_LINK — exactly
+      # what broke the first v0.5.0 macOS build.
+      - name: Enable code signing when secrets exist
+        shell: bash
         env:
-          # Code signing + notarization — INACTIVE until these repo secrets exist
-          # (see SIGNING.md). Empty secrets = today's unsigned build, unchanged;
-          # electron-builder signs (and, with the APPLE_* creds + mac.notarize in
-          # electron-builder.yml, notarizes) automatically once they're set.
-          # macOS Developer ID:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # Windows OV/EV cert (reuses the same CSC_* vars on the windows runner):
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          S_CSC_LINK: ${{ secrets.CSC_LINK }}
+          S_CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          S_APPLE_ID: ${{ secrets.APPLE_ID }}
+          S_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          S_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          S_WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          S_WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID WIN_CSC_LINK WIN_CSC_KEY_PASSWORD; do
+            eval "val=\"\$S_$name\""
+            if [ -n "$val" ]; then echo "$name=$val" >> "$GITHUB_ENV"; fi
+          done
+      - run: npx electron-builder ${{ matrix.platform }} --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}

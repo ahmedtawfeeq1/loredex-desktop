@@ -18,6 +18,8 @@ interface ReaderState {
   /** vault-relative path of the open note */
   selected: string | null
   doc: Doc | null
+  /** raw data file (agent-ops yaml/json/csv) — mutually exclusive with doc */
+  raw: { raw: string; fileType: 'yaml' | 'json' | 'csv' } | null
   docError: string | null
   /** wikilink targets to render inline beneath the note — set when a handoff
    *  brief is opened from the board (story 3.2, F5 reading order) */
@@ -42,6 +44,7 @@ export const useReader = create<ReaderState>((set, get) => ({
   treeError: null,
   selected: null,
   doc: null,
+  raw: null,
   docError: null,
   readingOrder: [],
 
@@ -58,9 +61,15 @@ export const useReader = create<ReaderState>((set, get) => ({
     set({ selected: path, docError: null, readingOrder })
     useDiagnostics.getState().clearNote(path) // re-fed as the note re-renders
     try {
+      // agent-ops data files (yaml/json/csv) render read-only via vault.readRaw
+      if (/\.(ya?ml|json|csv)$/.test(path)) {
+        const raw = await invoke('vault.readRaw', { path })
+        startTransition(() => set({ raw, doc: null }))
+        return
+      }
       const doc = await invoke('vault.readNote', { path })
       // keep the tree responsive while a large note (≤1 MB) renders
-      startTransition(() => set({ doc }))
+      startTransition(() => set({ doc, raw: null }))
     } catch (e) {
       // stale tree (a pull moved/removed the note after it was walked): re-walk
       // once so disk truth returns, then show a plain message instead of the
@@ -71,6 +80,7 @@ export const useReader = create<ReaderState>((set, get) => ({
       }
       set({
         doc: null,
+        raw: null,
         docError: isStalePathError(e)
           ? 'This note has moved or was removed since the list was loaded. The file list has been refreshed — pick it again from the tree.'
           : errText(e),
@@ -94,6 +104,7 @@ export const useReader = create<ReaderState>((set, get) => ({
       treeError: null,
       selected: null,
       doc: null,
+      raw: null,
       docError: null,
       readingOrder: [],
     })

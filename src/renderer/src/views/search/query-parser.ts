@@ -24,6 +24,7 @@ export const OPERATOR_KEYS = [
   'before',
   'after',
   'on',
+  'manager', // agent-ops: clients filed under a manager (products manifest)
 ] as const
 
 export type OperatorKey = (typeof OPERATOR_KEYS)[number]

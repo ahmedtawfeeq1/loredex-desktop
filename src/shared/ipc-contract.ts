@@ -3,7 +3,15 @@
  * architecture.md#ipc-contract. One generic request/response channel pattern,
  * one push event channel. All payload types live here or in ./types.ts.
  */
-import type { Config, Doc, ProductDashboard, SearchHit } from 'loredex'
+import type {
+  ClientInfo,
+  Config,
+  Doc,
+  LintFinding,
+  ProductDashboard,
+  SearchHit,
+  WorkspaceResult,
+} from 'loredex'
 import type { FontSettings } from './font-settings'
 import type { ThemeSetting } from './theme'
 import type {
@@ -50,7 +58,7 @@ import type {
 } from './types'
 
 // Payload types that exist in the pinned loredex are imported, never redefined.
-export type { Config, Doc, ProductDashboard, SearchHit }
+export type { ClientInfo, Config, Doc, LintFinding, ProductDashboard, SearchHit, WorkspaceResult }
 
 // ── CoreApi map: renderer → core (request/response) ─────────────────────────
 
@@ -61,6 +69,16 @@ export interface CoreApi {
   'vault.readNote': { in: { path: string }; out: Doc }
   /** app-local contract evolution (story 2.1): read-only markdown tree of the vault */
   'vault.tree': { in: void; out: TreeNode[] }
+  /** agent-ops dexes: the dex's declared type (research when absent) */
+  'vault.dexInfo': { in: void; out: { type: 'research' | 'agent-ops' } }
+  /** agent-ops: raw read of a yaml/json/csv data file (containment + allowlist core-side) */
+  'vault.readRaw': { in: { path: string }; out: { raw: string; fileType: 'yaml' | 'json' | 'csv' } }
+  /** agent-ops: fleet read model — every client with pipelines/agents/stages/tables/inbox */
+  'clients.fleet': { in: void; out: ClientInfo[] }
+  /** agent-ops: lint findings (schema violations, workspace drift, committed secrets) */
+  'clients.lints': { in: void; out: LintFinding[] }
+  /** agent-ops: generate (or check) a client's workspace files from workspace.yml */
+  'clients.workspace': { in: { client: string; check: boolean }; out: WorkspaceResult }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,
    *  aggregated core-side from vault frontmatter (memoized per mtime) */
@@ -253,7 +271,10 @@ export interface CoreApi {
   /** Create-vault sequence (story 13.1): scaffold + config + git init, then
    *  optional remote wiring + cursor seed. Steps stream as wizard.progress;
    *  every failure after scaffold leaves a valid LOCAL vault (AC4). */
-  'wizard.createVault': { in: { dir: string; remoteUrl?: string }; out: CreateVaultResult }
+  'wizard.createVault': {
+    in: { dir: string; remoteUrl?: string; dexType?: 'research' | 'agent-ops' }
+    out: CreateVaultResult
+  }
   /** Join-vault sequence (story 13.2): clone (streamed) → shape validation →
    *  schema handshake → register → merge driver + first fetch + cursor seed.
    *  `branch` rides the loredex://join deep link (app-local evolution). The

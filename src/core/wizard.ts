@@ -38,7 +38,7 @@ export interface WizardDeps {
     onProgress: (line: string) => void,
   ): Promise<void>
   identity(): Identity | null
-  scaffold(path: string): void
+  scaffold(path: string, dexType?: 'research' | 'agent-ops'): void
   readConfig(): Config | null
   writeConfig(config: Config): void
   ensureMergeDriver(vaultPath: string): void
@@ -159,9 +159,9 @@ export async function validateRemote(deps: WizardDeps, url: string): Promise<Rem
 
 export async function createVault(
   deps: WizardDeps,
-  input: { dir: string; remoteUrl?: string },
+  input: { dir: string; remoteUrl?: string; dexType?: 'research' | 'agent-ops' },
 ): Promise<CreateVaultResult> {
-  const { dir, remoteUrl } = input
+  const { dir, remoteUrl, dexType } = input
   const steps = new StepRunner('create', deps.emit)
   return deps.lock(async () => {
     // 1 — destination must be empty or nonexistent (native pick happened renderer-side)
@@ -206,7 +206,7 @@ export async function createVault(
 
     // 4 — scaffold + config + git init: from here the LOCAL vault is valid
     await steps.run('scaffold', async () => {
-      deps.scaffold(dir)
+      deps.scaffold(dir, dexType ?? 'research')
       deps.writeConfig({
         ...(deps.readConfig() ?? { projects: {} }),
         vaultPath: dir,

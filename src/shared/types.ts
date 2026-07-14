@@ -69,11 +69,13 @@ export interface VaultIdentity {
 
 /** Vault markdown tree node (story 2.1) — read-only listing, core-host walk. */
 export interface TreeNode {
-  /** display name: file basename without .md, or folder name */
+  /** display name: file basename without .md (data files keep their extension), or folder name */
   name: string
   /** vault-relative path (posix separators) */
   path: string
   kind: 'dir' | 'file'
+  /** set on files; data types only appear on agent-ops dexes */
+  fileType?: 'md' | 'yaml' | 'json' | 'csv'
   children?: TreeNode[]
 }
 
@@ -93,6 +95,8 @@ export interface Facets {
   before?: string
   after?: string
   on?: string
+  /** agent-ops: the manager a hit's client is filed under (products manifest) */
+  manager?: string
 }
 
 /** Facet vocabulary aggregated from vault frontmatter (story 2.4). */

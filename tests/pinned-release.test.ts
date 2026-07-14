@@ -34,4 +34,19 @@ describe('pinned loredex release contains the landed fixes', () => {
       expect(line).not.toContain('npx')
     }
   })
+
+  it('2.5.x: dex types + agent-ops surface the app consumes is present', async () => {
+    // the Clients view / tree / workspace panel all ride these lib exports
+    const lib = (await import('loredex')) as unknown as Record<string, unknown>
+    for (const name of [
+      'loadDexType',
+      'scanFleet',
+      'lintAgentOps',
+      'materializeWorkspace',
+      'scaffoldClient',
+      'scaffoldStage',
+    ]) {
+      expect(typeof lib[name], name).toBe('function')
+    }
+  })
 })

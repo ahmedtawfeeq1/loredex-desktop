@@ -1,6 +1,6 @@
 {
   "name": "loredex-desktop",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Loredex Desktop — macOS reader and control surface for loredex vaults",
   "type": "module",
   "private": true,
@@ -32,7 +32,7 @@
     "@modelcontextprotocol/sdk": "1.29.0",
     "@parcel/watcher": "2.5.4",
     "better-sqlite3": "12.11.1",
-    "loredex": "file:/private/tmp/claude-501/-Users-tawfeeq-Business-GenuDo-Technical-md-files-reader/ee8820b1-a8a8-427c-a2a9-e33bb7dee986/scratchpad/loredex-2.4.1.tgz",
+    "loredex": "^2.5.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "rehype-react": "8.0.0",

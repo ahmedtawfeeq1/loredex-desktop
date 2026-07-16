@@ -135,6 +135,12 @@ function SectionNode({
   // agent-ops relabel: the projects group reads "clients" (folder name unchanged)
   const agentOps = useDex((s) => s.type === 'agent-ops')
   const label = agentOps && node.name === 'projects' ? 'clients' : node.name
+  // v3 P7 (story 26.8): client rows carry their fleet facts — tag chips +
+  // the inbox pending badge (amber = attention, §1) — read-only, from the
+  // already-loaded fleet model
+  const client = useDex((s) =>
+    agentOps && isProject ? (s.fleet ?? []).find((c) => c.slug === node.name) : undefined,
+  )
   return (
     <li
       className="tree-section-item"
@@ -149,6 +155,23 @@ function SectionNode({
       >
         <span className="tree-section-dot" aria-hidden />
         <span className="tree-section-label">{label}</span>
+        {client && client.tags.length > 0 && (
+          <span className="tree-client-tags">
+            {client.tags.slice(0, 3).map((t) => (
+              <span key={t} className="tree-client-tag">
+                {t}
+              </span>
+            ))}
+          </span>
+        )}
+        {client && client.inboxCount > 0 && (
+          <span
+            className="tree-client-inbox"
+            title={`${client.inboxCount} inbox item(s) pending consumption`}
+          >
+            {client.inboxCount}
+          </span>
+        )}
         <span className="tree-section-chevron" aria-hidden>
           <RailChevron dir={collapsed ? 'right' : 'down'} />
         </span>

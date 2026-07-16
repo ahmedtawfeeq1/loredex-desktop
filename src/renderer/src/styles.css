@@ -6224,3 +6224,66 @@ a.commit-chip-sha:hover {
   font-size: 12.5px;
   color: var(--text-2);
 }
+
+/* ── v3 §9 GitHub auth + dex registry (story 26.7) ──────────────────────── */
+
+.dexreg {
+  margin-top: 10px;
+}
+
+.dexreg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+
+.dexreg-name {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dexreg-meta {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dexreg-create {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.auth-revoked {
+  color: var(--warn);
+}
+
+.settings-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 6px 8px;
+  min-height: 30px;
+}

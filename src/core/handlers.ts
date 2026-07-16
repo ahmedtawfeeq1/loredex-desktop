@@ -48,6 +48,16 @@ import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { commentView } from './notes'
 import { getMcpStatus, mcpRequestLog } from './mcp-server'
+import {
+  authStatus,
+  createDexRepo,
+  deleteToken,
+  deviceFlowPoll,
+  deviceFlowStart,
+  listDexRepos,
+  storeToken,
+  validateToken,
+} from './auth'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
   loadAtlasLegendSeen,
@@ -645,6 +655,34 @@ export function registerCoreHandlers(
   ipc.register('mcp.status', () => getMcpStatus())
   // v3 §6.5 (story 26.5): read-only session telemetry for the Agents view
   ipc.register('agents.sessions', () => ({ log: mcpRequestLog(), mcp: getMcpStatus() }))
+  // v3 §9 GitHub auth (story 26.7) — token stays core-side, status is masked
+  ipc.register('auth.status', () => authStatus())
+  ipc.register('auth.loginWithToken', async ({ token }) => {
+    const user = await validateToken(token)
+    if (!user) throw { code: 'AUTH_INVALID_TOKEN', message: 'GitHub rejected that token — nothing was stored.' }
+    const stored = await storeToken(token)
+    if (!stored)
+      throw {
+        code: 'AUTH_STORE_UNAVAILABLE',
+        message: 'No secure token store on this OS yet — use `gh auth login` instead.',
+      }
+    return authStatus()
+  })
+  ipc.register('auth.logout', async () => {
+    await deleteToken()
+    return authStatus()
+  })
+  ipc.register('auth.deviceStart', () => deviceFlowStart())
+  ipc.register('auth.devicePoll', async ({ deviceCode }) => {
+    const r = await deviceFlowPoll(deviceCode)
+    if (r.state === 'authorized') {
+      await storeToken(r.token)
+      return { state: 'authorized' as const }
+    }
+    return { state: r.state }
+  })
+  ipc.register('dex.registry', () => listDexRepos())
+  ipc.register('dex.createRepo', ({ name, isPrivate }) => createDexRepo(name, isPrivate))
   // Theme preference (story 14.1): per-user app state, applied renderer-side.
   ipc.register('settings.theme.get', () => loadThemeSetting())
   ipc.register('settings.theme.set', ({ theme }) => {

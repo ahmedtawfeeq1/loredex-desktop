@@ -15,6 +15,9 @@ import type {
 import type { FontSettings } from './font-settings'
 import type { ThemeSetting } from './theme'
 import type {
+  AuthStatus,
+  DeviceCode,
+  DexRepo,
   McpLogEntry,
   ActivityEvent,
   AtlasGraph,
@@ -131,6 +134,18 @@ export interface CoreApi {
   /** v3 §6.5 (story 26.5): the Agents view's read-only session telemetry —
    *  the in-app MCP host's request ring. Zero engine writes. */
   'agents.sessions': { in: void; out: { log: McpLogEntry[]; mcp: McpStatus } }
+  /** v3 §9 GitHub auth (story 26.7, AUTH-GITHUB.md). The token never crosses
+   *  this seam — status is masked; login stores core-side. */
+  'auth.status': { in: void; out: AuthStatus }
+  'auth.loginWithToken': { in: { token: string }; out: AuthStatus }
+  'auth.logout': { in: void; out: AuthStatus }
+  'auth.deviceStart': { in: void; out: DeviceCode }
+  'auth.devicePoll': {
+    in: { deviceCode: string }
+    out: { state: 'authorized' | 'pending' | 'slow_down' | 'expired' | 'denied' }
+  }
+  'dex.registry': { in: void; out: DexRepo[] }
+  'dex.createRepo': { in: { name: string; isPrivate: boolean }; out: DexRepo }
   'settings.mcpPort.set': { in: { port: number | null }; out: void }
   /** app-local contract evolution (story 14.1): theme preference — per-user app
    *  state, persisted core-side (settings JSON → app.db seam, story 9.2) */

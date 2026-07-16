@@ -176,6 +176,39 @@ export interface McpStatus {
   discoveryPath: string | null
 }
 
+/** GitHub auth picture (v3 §9 / AUTH-GITHUB.md, story 26.7). The token
+ *  itself NEVER crosses this seam — masked display form only. */
+export interface AuthStatus {
+  signedIn: boolean
+  account: string | null
+  /** 'stored' = our keychain entry · 'gh' = live gh CLI session ·
+   *  'revoked' = stored token no longer valid (401) · null = signed out */
+  source: 'stored' | 'gh' | 'revoked' | null
+  store: 'keychain' | 'gh' | null
+  scopes: string[]
+  tokenMask: string | null
+}
+
+/** Device-flow bootstrap (AUTH-GITHUB §1B) — what the code screen renders. */
+export interface DeviceCode {
+  deviceCode: string
+  userCode: string
+  verificationUri: string
+  intervalSeconds: number
+  expiresInSeconds: number
+}
+
+/** A repo carrying the loredex-dex topic — one dex, one product (§9). */
+export interface DexRepo {
+  fullName: string
+  owner: string
+  name: string
+  isPrivate: boolean
+  cloneUrl: string
+  sshUrl: string
+  pushedAt: string
+}
+
 /** One MCP request the in-app host served (v3 §6.5 session telemetry) —
  *  read-only ring, newest last; the Agents view renders it verbatim. */
 export interface McpLogEntry {

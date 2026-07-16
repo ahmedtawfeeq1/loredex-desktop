@@ -2,14 +2,15 @@
  * GitHub section (v3 §9 / AUTH-GITHUB.md, story 26.7) — Settings › System.
  * Sign-in state honestly: a live `gh` session is auto-detected (approach A),
  * a pasted fine-grained PAT stores in the macOS keychain (approach C, the
- * one shared entry the CLI reads), device flow (approach B) unlocks when the
- * public OAuth client id is registered. Signed in ⇒ the dex registry: every
+ * one shared entry the CLI reads), and "Sign in with GitHub" runs the OAuth
+ * device flow (approach B — registered Loredex OAuth app, public client id,
+ * no secret). Signed in ⇒ the dex registry: every
  * repo carrying the `loredex-dex` topic, Join (clone via the wizard) or
  * Create (new private repo + topic). Login stays OPTIONAL — SSH dexes never
  * need any of this.
  */
-import { useEffect, useState } from 'react'
-import type { AuthStatus, DexRepo } from '../../../../shared/types'
+import { useEffect, useRef, useState } from 'react'
+import type { AuthStatus, DeviceCode, DexRepo } from '../../../../shared/types'
 import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import { Button } from '../../components/Button'
 import { invoke } from '../../api'
@@ -33,6 +34,136 @@ function RegistryRow({ repo }: { repo: DexRepo }): React.JSX.Element {
       >
         Join
       </Button>
+    </div>
+  )
+}
+
+/** AUTH-GITHUB §4.2 device-code screen: large mono one-time code, copy,
+ *  open-GitHub link, live waiting state, §5-honest failures, anti-phishing
+ *  note. Polling honors the server interval and +5 s on slow_down. */
+function DeviceFlow({ onSignedIn }: { onSignedIn: () => void }): React.JSX.Element {
+  const [device, setDevice] = useState<DeviceCode | null>(null)
+  const [phase, setPhase] = useState<'idle' | 'waiting' | 'expired' | 'denied' | 'error'>('idle')
+  const [copied, setCopied] = useState(false)
+  const cancelled = useRef(false)
+  // phase inside the async poll loop without re-arming effects
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
+
+  useEffect(
+    () => () => {
+      cancelled.current = true
+    },
+    [],
+  )
+
+  const start = async (): Promise<void> => {
+    setPhase('waiting')
+    setCopied(false)
+    try {
+      const dc = await invoke('auth.deviceStart', undefined)
+      setDevice(dc)
+      let interval = Math.max(5, dc.intervalSeconds)
+      const deadline = Date.now() + dc.expiresInSeconds * 1000
+      const tick = async (): Promise<void> => {
+        if (cancelled.current || phaseRef.current !== 'waiting') return
+        if (Date.now() > deadline) {
+          setPhase('expired')
+          return
+        }
+        try {
+          const r = await invoke('auth.devicePoll', { deviceCode: dc.deviceCode })
+          if (cancelled.current) return
+          if (r.state === 'authorized') {
+            setPhase('idle')
+            setDevice(null)
+            onSignedIn()
+            return
+          }
+          if (r.state === 'expired') {
+            setPhase('expired')
+            return
+          }
+          if (r.state === 'denied') {
+            setPhase('denied')
+            return
+          }
+          if (r.state === 'slow_down') interval += 5
+        } catch {
+          // transient network hiccup — keep waiting on the same cadence
+        }
+        setTimeout(() => void tick(), interval * 1000)
+      }
+      setTimeout(() => void tick(), interval * 1000)
+    } catch {
+      setPhase('error')
+    }
+  }
+
+  if (phase === 'idle' || phase === 'error') {
+    return (
+      <div className="settings-actions">
+        <Button variant="primary" onClick={() => void start()}>
+          Sign in with GitHub
+        </Button>
+        {phase === 'error' && (
+          <span className="settings-hint">Couldn’t reach GitHub — check your connection.</span>
+        )}
+      </div>
+    )
+  }
+
+  if (phase === 'denied')
+    return (
+      <div className="devflow">
+        <p className="settings-hint">You declined on GitHub — nothing was stored.</p>
+        <Button onClick={() => void start()}>Try again</Button>
+      </div>
+    )
+
+  if (phase === 'expired')
+    return (
+      <div className="devflow">
+        <p className="settings-hint">That code expired.</p>
+        <Button variant="primary" onClick={() => void start()}>
+          Get a fresh code
+        </Button>
+      </div>
+    )
+
+  return (
+    <div className="devflow">
+      {device === null ? (
+        <p className="settings-hint">Requesting a device code…</p>
+      ) : (
+        <>
+          <div className="devflow-code" aria-label="One-time code">
+            {device.userCode}
+          </div>
+          <div className="settings-actions">
+            <Button
+              onClick={() => {
+                void navigator.clipboard.writeText(device.userCode)
+                setCopied(true)
+              }}
+            >
+              {copied ? 'Copied ✓' : 'Copy code'}
+            </Button>
+            <a
+              className="button-primary"
+              href={device.verificationUri}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open github.com/login/device
+            </a>
+          </div>
+          <p className="settings-hint devflow-wait">Waiting for authorization on GitHub…</p>
+          <p className="settings-hint">
+            Only enter this code on a page YOU opened — never one someone sent you.
+          </p>
+        </>
+      )}
     </div>
   )
 }
@@ -164,6 +295,7 @@ export function GitHubSection(): React.JSX.Element {
             prompts. <b>SSH dexes need no login</b> — git already handles them. A{' '}
             <span className="mono">gh auth login</span> session is picked up automatically.
           </p>
+          <DeviceFlow onSignedIn={() => void refresh()} />
           <div className="settings-actions">
             <Button disabled={busy} onClick={() => void refresh()}>
               Detect gh session
@@ -196,10 +328,6 @@ export function GitHubSection(): React.JSX.Element {
               </Button>
             </div>
           )}
-          <p className="settings-hint">
-            “Sign in with GitHub” (device flow) unlocks once the loredex OAuth app id ships — no
-            secrets ever live in this binary.
-          </p>
         </>
       )}
       {error && <div className="note-error">{error}</div>}

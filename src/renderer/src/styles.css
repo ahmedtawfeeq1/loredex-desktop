@@ -6287,3 +6287,33 @@ a.commit-chip-sha:hover {
   padding: 6px 8px;
   min-height: 30px;
 }
+
+/* AUTH-GITHUB §4.2 device-code screen (story 26.7) */
+.devflow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.devflow-code {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline-2);
+  border-radius: 10px;
+  padding: 10px 16px;
+  text-align: center;
+  user-select: text;
+}
+
+.devflow-wait {
+  color: var(--ok);
+}
+
+a.button-primary {
+  text-decoration: none;
+}

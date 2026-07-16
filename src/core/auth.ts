@@ -21,9 +21,9 @@ import type { AuthStatus, DeviceCode, DexRepo } from '../shared/types'
 
 const execFileAsync = promisify(execFile)
 
-/** The registered OAuth app's public client id. Empty = device flow gated
- *  off (AUTH-GITHUB §1B ships when the app is registered — no secret ever). */
-export const GITHUB_CLIENT_ID = ''
+/** The registered Loredex OAuth app's public client id (AUTH-GITHUB §1B) —
+ *  public by design, no secret ever ships in this binary. Device flow only. */
+export const GITHUB_CLIENT_ID = 'Ov23li2lIaJzy9DFjm1K'
 
 export const DEVICE_FLOW_SCOPES = 'repo read:org'
 

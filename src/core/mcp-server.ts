@@ -29,6 +29,8 @@ export interface McpLogEntry {
   name: string
   /** MCP clientInfo.name when the request carries one (initialize) */
   client?: string
+  /** per-agent token attribution (story 26.9); absent = the install token */
+  agent?: string
 }
 
 const MCP_LOG_MAX = 200
@@ -49,14 +51,19 @@ function push(entry: McpLogEntry): void {
 }
 
 /** Record what an authorized JSON-RPC body asks (single or batch). */
-export function recordMcpRequest(body: unknown, at = new Date().toISOString()): void {
+export function recordMcpRequest(
+  body: unknown,
+  at = new Date().toISOString(),
+  agent?: string,
+): void {
   for (const msg of Array.isArray(body) ? body : [body]) {
     const m = msg as { method?: string; params?: { name?: string; clientInfo?: { name?: string } } }
+    const tag = agent ? { agent } : {}
     if (m?.method === 'initialize') {
       const client = m.params?.clientInfo?.name
-      push({ at, kind: 'initialize', name: 'initialize', ...(client ? { client } : {}) })
+      push({ at, kind: 'initialize', name: 'initialize', ...(client ? { client } : {}), ...tag })
     } else if (m?.method === 'tools/call' && typeof m.params?.name === 'string') {
-      push({ at, kind: 'tool', name: m.params.name })
+      push({ at, kind: 'tool', name: m.params.name, ...tag })
     }
   }
 }
@@ -101,6 +108,9 @@ export function withIdentityEcho(mcp: object, line: string): void {
 interface McpHostOptions {
   port: number
   token: string
+  /** per-agent bearer tokens (story 26.9): name → token, read live so mints
+   *  apply without a restart */
+  agentTokens?: () => Record<string, string>
   /** override for tests (real runs use ~/.loredex) */
   discoveryDir?: string
 }
@@ -120,14 +130,34 @@ export function getMcpStatus(): McpStatus {
   return status
 }
 
-async function handle(req: IncomingMessage, res: ServerResponse, token: string): Promise<void> {
+/** Which agent a bearer belongs to: install token → null (unattributed),
+ *  a minted per-agent token → its name, anything else → 'reject'. */
+export function resolveBearer(
+  header: string,
+  installToken: string,
+  agentTokens: Record<string, string>,
+): { agent: string | null } | 'reject' {
+  if (header === `Bearer ${installToken}`) return { agent: null }
+  for (const [name, token] of Object.entries(agentTokens)) {
+    if (header === `Bearer ${token}`) return { agent: name }
+  }
+  return 'reject'
+}
+
+async function handle(
+  req: IncomingMessage,
+  res: ServerResponse,
+  token: string,
+  agentTokens: () => Record<string, string>,
+): Promise<void> {
   try {
     if (!originAllowed(req.headers.origin)) {
       res.writeHead(403, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'forbidden origin' }))
       return
     }
-    if ((req.headers.authorization ?? '') !== `Bearer ${token}`) {
+    const who = resolveBearer(req.headers.authorization ?? '', token, agentTokens())
+    if (who === 'reject') {
       res.writeHead(401, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'unauthorized' }))
       return
@@ -140,7 +170,9 @@ async function handle(req: IncomingMessage, res: ServerResponse, token: string):
     const chunks: Buffer[] = []
     for await (const chunk of req) chunks.push(chunk as Buffer)
     const body: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
-    recordMcpRequest(body) // §6.5 session telemetry — after auth, before dispatch
+    // §6.5 session telemetry — after auth, before dispatch; per-agent when
+    // the bearer was a minted agent token (story 26.9)
+    recordMcpRequest(body, undefined, who.agent ?? undefined)
 
     const mcp = engine.createMcpServer()
     withIdentityEcho(mcp, formatVaultIdentity(engine.identity()))
@@ -174,8 +206,9 @@ export async function bootMcpServer(
     state: 'stopped',
     message: null,
   }
+  const agentTokens = opts.agentTokens ?? (() => ({}))
   const server = createServer((req, res) => {
-    void handle(req, res, opts.token)
+    void handle(req, res, opts.token, agentTokens)
   })
   try {
     await new Promise<void>((resolve, reject) => {

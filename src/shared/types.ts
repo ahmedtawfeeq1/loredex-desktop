@@ -184,7 +184,7 @@ export interface AuthStatus {
   /** 'stored' = our keychain entry · 'gh' = live gh CLI session ·
    *  'revoked' = stored token no longer valid (401) · null = signed out */
   source: 'stored' | 'gh' | 'revoked' | null
-  store: 'keychain' | 'gh' | null
+  store: 'keychain' | 'encrypted-file' | 'gh' | null
   scopes: string[]
   tokenMask: string | null
 }
@@ -216,6 +216,8 @@ export interface McpLogEntry {
   kind: 'initialize' | 'tool'
   name: string
   client?: string
+  /** per-agent token attribution (story 26.9); absent = the install token */
+  agent?: string
 }
 
 /**

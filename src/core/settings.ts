@@ -207,6 +207,33 @@ export function loadOrCreateMcpToken(): string {
   return token
 }
 
+/** Per-agent MCP tokens (story 26.9): name → token. Minted in Settings/
+ *  Agents, checked by the MCP host alongside the install token — requests
+ *  bearing one attribute the session feed per agent. */
+export function loadAgentTokens(): Record<string, string> {
+  const v = readJsonKey('agentTokens')
+  if (typeof v !== 'object' || v === null) return {}
+  const out: Record<string, string> = {}
+  for (const [name, token] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof token === 'string') out[name] = token
+  }
+  return out
+}
+
+export function mintAgentToken(name: string): string {
+  const tokens = loadAgentTokens()
+  const token = randomBytes(24).toString('hex')
+  tokens[name] = token
+  writeKey('agentTokens', JSON.stringify(tokens))
+  return token
+}
+
+export function revokeAgentToken(name: string): void {
+  const tokens = loadAgentTokens()
+  delete tokens[name]
+  writeKey('agentTokens', JSON.stringify(tokens))
+}
+
 /** Settings override for the MCP port; null = preferred default (52017). */
 export function loadMcpPortOverride(): number | null {
   const port = readJsonKey('mcpPort')

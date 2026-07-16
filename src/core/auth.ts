@@ -16,6 +16,10 @@
  * degrades to gh reuse.
  */
 import { execFile } from 'node:child_process'
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir, hostname, userInfo } from 'node:os'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { AuthStatus, DeviceCode, DexRepo } from '../shared/types'
 
@@ -30,10 +34,48 @@ export const DEVICE_FLOW_SCOPES = 'repo read:org'
 const KEYCHAIN_SERVICE = 'loredex'
 const KEYCHAIN_ACCOUNT = 'github.com'
 
-// ── token store (macOS keychain via `security`; the CLI reads the same entry) ──
+// ── token store (AUTH-GITHUB §2) ────────────────────────────────────────────
+// macOS: the login Keychain via `security` — the one entry the CLI shares.
+// Windows/Linux (story 26.9): the spec's sanctioned fallback — an AES-256-GCM
+// file under ~/.config/loredex/credentials, keyed off a machine-local scrypt
+// (hostname + user), chmod 0600, flagged honestly in Settings. Upgrades to
+// Credential Manager / libsecret when a native module is worth its weight.
+
+const CRED_DIR = join(homedir(), '.config', 'loredex')
+const CRED_FILE = join(CRED_DIR, 'credentials')
+
+function machineKey(): Buffer {
+  return scryptSync(`loredex:${hostname()}:${userInfo().username}`, 'loredex-cred-v1', 32)
+}
+
+function readEncryptedFile(): string | null {
+  try {
+    if (!existsSync(CRED_FILE)) return null
+    const raw = readFileSync(CRED_FILE)
+    const iv = raw.subarray(0, 12)
+    const tag = raw.subarray(12, 28)
+    const data = raw.subarray(28)
+    const d = createDecipheriv('aes-256-gcm', machineKey(), iv)
+    d.setAuthTag(tag)
+    return Buffer.concat([d.update(data), d.final()]).toString('utf8') || null
+  } catch {
+    return null
+  }
+}
+
+function writeEncryptedFile(token: string): void {
+  mkdirSync(CRED_DIR, { recursive: true })
+  const iv = randomBytes(12)
+  const c = createCipheriv('aes-256-gcm', machineKey(), iv)
+  const data = Buffer.concat([c.update(token, 'utf8'), c.final()])
+  writeFileSync(CRED_FILE, Buffer.concat([iv, c.getAuthTag(), data]), { mode: 0o600 })
+  chmodSync(CRED_FILE, 0o600)
+}
+
+export type TokenStore = 'keychain' | 'encrypted-file'
 
 export async function storedToken(): Promise<string | null> {
-  if (process.platform !== 'darwin') return null
+  if (process.platform !== 'darwin') return readEncryptedFile()
   try {
     const { stdout } = await execFileAsync(
       'security',
@@ -46,8 +88,11 @@ export async function storedToken(): Promise<string | null> {
   }
 }
 
-export async function storeToken(token: string): Promise<'keychain' | null> {
-  if (process.platform !== 'darwin') return null
+export async function storeToken(token: string): Promise<TokenStore | null> {
+  if (process.platform !== 'darwin') {
+    writeEncryptedFile(token)
+    return 'encrypted-file'
+  }
   await execFileAsync(
     'security',
     ['add-generic-password', '-U', '-s', KEYCHAIN_SERVICE, '-a', KEYCHAIN_ACCOUNT, '-w', token],
@@ -57,7 +102,14 @@ export async function storeToken(token: string): Promise<'keychain' | null> {
 }
 
 export async function deleteToken(): Promise<void> {
-  if (process.platform !== 'darwin') return
+  if (process.platform !== 'darwin') {
+    try {
+      rmSync(CRED_FILE, { force: true })
+    } catch {
+      // nothing stored — logout is idempotent
+    }
+    return
+  }
   try {
     await execFileAsync(
       'security',
@@ -68,6 +120,8 @@ export async function deleteToken(): Promise<void> {
     // nothing stored — logout is idempotent
   }
 }
+
+const PLATFORM_STORE: TokenStore = process.platform === 'darwin' ? 'keychain' : 'encrypted-file'
 
 // ── approach A: live gh session (never copied into our store) ──────────────
 
@@ -118,12 +172,12 @@ export async function authStatus(fetcher: Fetcher = fetch): Promise<AuthStatus> 
         signedIn: true,
         account: user.login,
         source: 'stored',
-        store: 'keychain',
+        store: PLATFORM_STORE,
         scopes: user.scopes,
         tokenMask: maskToken(stored),
       }
     // revoked (AUTH-GITHUB §5): report honestly, keep the entry for re-auth UX
-    return { signedIn: false, account: null, source: 'revoked', store: 'keychain', scopes: [], tokenMask: maskToken(stored) }
+    return { signedIn: false, account: null, source: 'revoked', store: PLATFORM_STORE, scopes: [], tokenMask: maskToken(stored) }
   }
   const gh = await ghToken()
   if (gh) {

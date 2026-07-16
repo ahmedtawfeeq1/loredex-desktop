@@ -134,6 +134,11 @@ export interface CoreApi {
   /** v3 §6.5 (story 26.5): the Agents view's read-only session telemetry —
    *  the in-app MCP host's request ring. Zero engine writes. */
   'agents.sessions': { in: void; out: { log: McpLogEntry[]; mcp: McpStatus } }
+  /** story 26.9 per-agent MCP tokens: mint returns the token ONCE; list is
+   *  names only — tokens never re-cross the seam. */
+  'agents.tokens.list': { in: void; out: string[] }
+  'agents.tokens.mint': { in: { name: string }; out: { token: string } }
+  'agents.tokens.revoke': { in: { name: string }; out: void }
   /** v3 §9 GitHub auth (story 26.7, AUTH-GITHUB.md). The token never crosses
    *  this seam — status is masked; login stores core-side. */
   'auth.status': { in: void; out: AuthStatus }

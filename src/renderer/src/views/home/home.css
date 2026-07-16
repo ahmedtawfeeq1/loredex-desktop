@@ -1209,3 +1209,23 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* story 26.9: per-agent token card */
+.agent-tokens {
+  margin-top: 14px;
+}
+
+.agent-token-once {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 8px 0;
+}
+
+.agent-token-once .mono {
+  user-select: text;
+  word-break: break-all;
+}

@@ -224,7 +224,12 @@ export function GitHubSection(): React.JSX.Element {
         <>
           <p className="settings-hint">
             Signed in as <b>{status.account}</b> ·{' '}
-            {status.source === 'gh' ? 'via your gh CLI session' : 'token in the macOS keychain'} ·{' '}
+            {status.source === 'gh'
+              ? 'via your gh CLI session'
+              : status.store === 'encrypted-file'
+                ? 'token in ~/.config/loredex/credentials (encrypted file — no OS keychain on this platform yet)'
+                : 'token in the macOS keychain'}{' '}
+            ·{' '}
             <span className="mono">{status.tokenMask}</span>
             {status.scopes.length > 0 ? ` · scopes: ${status.scopes.join(', ')}` : ''}
           </p>

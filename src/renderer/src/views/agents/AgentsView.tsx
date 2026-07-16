@@ -10,6 +10,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { ActivityEvent, McpLogEntry, McpStatus } from '../../../../shared/types'
+import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import { AgentChip } from '../../components/AgentChip'
 import { Button } from '../../components/Button'
 import { invoke } from '../../api'
@@ -59,9 +60,91 @@ function SessionLine({ entry }: { entry: McpLogEntry }): React.JSX.Element {
     <div className="session-line">
       <span className="session-time">{TIME.format(new Date(entry.at))}</span>
       <span className="session-text">
-        ❯ {entry.kind === 'initialize' ? `session start${entry.client ? ` · ${entry.client}` : ''}` : entry.name}
+        ❯ {entry.agent ? `[${entry.agent}] ` : ''}
+        {entry.kind === 'initialize'
+          ? `session start${entry.client ? ` · ${entry.client}` : ''}`
+          : entry.name}
       </span>
     </div>
+  )
+}
+
+/** Per-agent MCP tokens (story 26.9): mint shows the token ONCE — put it in
+ *  that agent's MCP config Authorization header; its calls then attribute in
+ *  the session feed. Revoke kills the token immediately (host reads live). */
+function AgentTokensCard(): React.JSX.Element {
+  const [names, setNames] = useState<string[]>([])
+  const [name, setName] = useState('')
+  const [minted, setMinted] = useState<{ name: string; token: string } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = async (): Promise<void> => {
+    try {
+      setNames(await invoke('agents.tokens.list', undefined))
+    } catch {
+      /* core not ready */
+    }
+  }
+  useEffect(() => {
+    void load()
+  }, [])
+
+  return (
+    <section aria-label="Agent tokens" className="agent-tokens">
+      <div className="today-sect">
+        <span className="today-sect-label">per-agent tokens · mcp</span>
+      </div>
+      {names.map((n) => (
+        <div className="dexreg-row" key={n}>
+          <span className="dexreg-name">{n}</span>
+          <span className="dexreg-meta">calls attribute as [{n}]</span>
+          <Button
+            variant="danger"
+            className="button-small"
+            title="Revoke — this agent's token stops working immediately"
+            onClick={() =>
+              void invoke('agents.tokens.revoke', { name: n }).then(load)
+            }
+          >
+            Revoke
+          </Button>
+        </div>
+      ))}
+      {minted && (
+        <div className="agent-token-once">
+          <span className="mono">{minted.token}</span>
+          <span className="settings-hint">
+            {minted.name}'s token — copy it NOW into that agent's MCP config (Authorization:
+            Bearer …); it is never shown again.
+          </span>
+        </div>
+      )}
+      <div className="dexreg-create">
+        <input
+          className="settings-input"
+          placeholder="agent name (claude, codex, …)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button
+          variant="primary"
+          disabled={name.trim() === ''}
+          onClick={() =>
+            void invoke('agents.tokens.mint', { name: name.trim() })
+              .then(({ token }) => {
+                setMinted({ name: name.trim(), token })
+                setName('')
+                setError(null)
+                return load()
+              })
+              .catch((e) => setError(isErrEnvelope(e) ? e.message : String(e)))
+          }
+        >
+          Mint token
+        </Button>
+      </div>
+      {error && <div className="note-error">{error}</div>}
+    </section>
   )
 }
 
@@ -165,6 +248,7 @@ export function AgentsView(): React.JSX.Element {
               ))}
             </div>
           )}
+          <AgentTokensCard />
         </section>
       </div>
     </div>

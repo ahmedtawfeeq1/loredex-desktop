@@ -5,6 +5,7 @@
  * Apply = one ordinary attributed write through the writer channels; Dismiss
  * persists and the suggestion never re-fires. Evidence line: mono sha + PR.
  */
+import { Button } from './Button'
 import { useSuggests, suggestionKey, type Suggestion } from '../stores/suggests'
 
 function SuggestCard({ s }: { s: Suggestion }): React.JSX.Element {
@@ -32,24 +33,21 @@ function SuggestCard({ s }: { s: Suggestion }): React.JSX.Element {
         )}
       </span>
       <span className="suggest-actions">
-        <button
-          type="button"
-          className="button-primary suggest-apply"
+        <Button
+          variant="primary"
+          className="suggest-apply"
           disabled={busy}
           title="One ordinary attributed status write — nothing happens without this click"
-          onClick={() => void apply(s)}
-        >
+          onClick={() => void apply(s)}>
           {busy ? 'Applying…' : 'Apply'}
-        </button>
-        <button
-          type="button"
-          className="button-quiet"
+        </Button>
+        <Button
+          variant="quiet"
           disabled={busy}
           title="Never suggest this again for this commit"
-          onClick={() => void dismiss(s)}
-        >
+          onClick={() => void dismiss(s)}>
           Dismiss
-        </button>
+        </Button>
       </span>
     </div>
   )

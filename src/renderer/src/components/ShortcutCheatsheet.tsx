@@ -5,6 +5,7 @@
  * (palette list nav, atlas history, card ⏎, modal Esc/⌘⏎) are documented
  * verbatim here. DESIGN modal pattern; Esc closes; focus lands inside.
  */
+import { Button } from './Button'
 import { useEffect, useRef } from 'react'
 import { appActions, VIEW_ORDER } from '../actions/registry'
 import { useApp } from '../stores/app'
@@ -100,9 +101,7 @@ export function ShortcutCheatsheet(): React.JSX.Element | null {
           {CONTEXT_ROWS.map(({ group, rows }) => section(group, rows))}
         </div>
         <div className="modal-footer">
-          <button type="button" className="button-secondary" onClick={() => setOpen(false)}>
-            Close
-          </button>
+          <Button onClick={() => setOpen(false)}>Close</Button>
         </div>
       </div>
     </div>

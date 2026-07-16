@@ -4,6 +4,7 @@
  * at note end (rust chip — the quote is no longer in the note). Comments are
  * plain vault notes; no deletion in-app v1 (files are the API).
  */
+import { Button } from '../../components/Button'
 import { useState } from 'react'
 import type { NoteComment } from '../../../../shared/types'
 import { useComments } from '../../stores/comments'
@@ -67,21 +68,18 @@ function CommentComposer({ anchor }: { anchor: string }): React.JSX.Element {
         }}
       />
       <div className="comment-actions">
-        <button
-          type="button"
-          className="button-quiet"
-          onClick={() => useComments.getState().closeComposer()}
-        >
+        <Button
+          variant="quiet"
+          onClick={() => useComments.getState().closeComposer()}>
           Cancel
-        </button>
-        <button
-          type="button"
-          className="button-primary button-small"
+        </Button>
+        <Button
+          variant="primary"
+          className="button-small"
           disabled={!identity || busy || !body.trim()}
-          onClick={() => void submit()}
-        >
+          onClick={() => void submit()}>
           {busy ? 'Adding…' : 'Comment'}
-        </button>
+        </Button>
       </div>
       {!identity && <p className="modal-error">Commenting needs an identity — set it in Settings.</p>}
       {error && <p className="modal-error">{error}</p>}

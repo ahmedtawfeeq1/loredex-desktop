@@ -3,6 +3,7 @@
  * footer = Cancel (outline) left, one gold primary right. Keyboard-complete:
  * Esc cancels, ⌘Enter submits, focus lands inside on open.
  */
+import { Button } from './Button'
 import { useEffect, useRef } from 'react'
 
 export function Modal({
@@ -70,19 +71,17 @@ export function Modal({
               {submitBlockedReason}
             </span>
           )}
-          <button type="button" className="button-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className={destructive ? 'button-destructive' : 'button-primary'}
+          <Button onClick={onClose}>Cancel</Button>
+          <Button
+            variant={destructive ? 'danger' : 'primary'}
+            kbd="⌘⏎"
             disabled={submitDisabled}
             title={blocked ? (submitBlockedReason ?? undefined) : `${submitLabel} (⌘⏎)`}
             aria-describedby={blocked ? 'modal-block-reason' : undefined}
             onClick={onSubmit}
           >
             {submitLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

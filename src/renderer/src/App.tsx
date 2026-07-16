@@ -39,6 +39,7 @@ import { ContractTimeline } from './views/contracts/ContractTimeline'
 import { FeedView } from './views/feed/FeedView'
 import { AnnotateModal } from './views/handoffs/AnnotateModal'
 import { InboxView } from './views/handoffs/InboxView'
+import { PlanView } from './views/plan/PlanView'
 import { ComposeHandoffModal } from './views/handoffs/ComposeHandoffModal'
 import { DeclineReasonModal } from './views/handoffs/DeclineReasonModal'
 import { LinkRequestModal } from './views/handoffs/FulfillsPicker'
@@ -265,6 +266,10 @@ export default function App(): React.JSX.Element {
         ) : view === 'handoffs' ? (
           <main className="pane-board">
             <InboxView />
+          </main>
+        ) : view === 'plan' ? (
+          <main className="pane-board">
+            <PlanView />
           </main>
         ) : view === 'clients' ? (
           <main className="pane-board">

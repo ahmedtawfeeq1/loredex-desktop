@@ -11,6 +11,7 @@
 import { dispatchZoom } from '../views/atlas/atlas-zoom'
 import { useApp, type AppView } from '../stores/app'
 import { useBoardFilter } from '../stores/boardFilter'
+import { usePlanFlag } from '../stores/planFlag'
 import { useDex } from '../stores/dex'
 import { useEditor } from '../stores/editor'
 import { useFind } from '../stores/find'
@@ -55,6 +56,7 @@ export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: Na
   { view: 'clients', label: 'Clients', group: 'Workspace' },
   { view: 'search', label: 'Search', group: 'Workspace' },
   { view: 'handoffs', label: 'Inbox', group: 'Collaborate' },
+  { view: 'plan', label: 'Plan', group: 'Collaborate' },
   { view: 'contracts', label: 'Contracts', group: 'Collaborate' },
   { view: 'feed', label: 'Activity', group: 'Collaborate' },
   { view: 'atlas', label: 'Atlas', group: 'Knowledge' },
@@ -66,7 +68,13 @@ export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: Na
  *  and its removal renumbers ⌘1…⌘9 so research dexes keep their muscle memory. */
 export function visibleViews(): ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> {
   const agentOps = useDex.getState().type === 'agent-ops'
-  return agentOps ? VIEW_ORDER : VIEW_ORDER.filter((entry) => entry.view !== 'clients')
+  const plan = usePlanFlag.getState().enabled
+  return VIEW_ORDER.filter(
+    (entry) =>
+      (entry.view !== 'clients' || agentOps) &&
+      // §6.4: Plan ships behind the preview flag until the work-item schema
+      (entry.view !== 'plan' || plan),
+  )
 }
 
 /** The card A/D/S/E act on: the store's selection, else the view's first
@@ -107,6 +115,13 @@ export function appActions(): AppAction[] {
         useApp.getState().setView('handoffs')
         useHandoffs.getState().openCompose()
       },
+    },
+    {
+      id: 'action:toggle-plan',
+      title: usePlanFlag.getState().enabled
+        ? 'Disable the Plan preview'
+        : 'Enable the Plan preview (handoffs only until §8)',
+      run: () => usePlanFlag.getState().toggle(),
     },
     {
       // v3 §4: the bare compose key (prototype C) — same intent as ⌘N

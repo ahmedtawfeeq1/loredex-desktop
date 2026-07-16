@@ -982,3 +982,133 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ── v3 Plan preview (story 26.4): kanban board over handoff states ─────── */
+
+.plan {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 4px 2px;
+}
+
+.plan-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.plan-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(200px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .plan-board {
+    grid-template-columns: repeat(2, minmax(200px, 1fr));
+  }
+}
+
+.plan-col {
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 8px;
+  min-height: 120px;
+}
+
+.plan-col-empty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+  text-align: center;
+  padding: 16px 0;
+}
+
+.plan-card {
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 100ms ease-out;
+}
+
+.plan-card:hover {
+  border-color: var(--hairline-2);
+}
+
+.plan-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.plan-card-kind {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+}
+
+.plan-card-id {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+
+.plan-card-title {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-1);
+  line-height: 1.3;
+  margin: 5px 0;
+}
+
+.plan-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.plan-card-proj {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plan-card-age {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.plan-card-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.plan-backlog {
+  max-width: 720px;
+}

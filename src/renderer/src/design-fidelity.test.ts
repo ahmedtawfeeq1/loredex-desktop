@@ -211,6 +211,18 @@ describe('Addendum D1: wikilinks are always visibly links (story 16.1)', () => {
   })
 })
 
+describe('Addendum D2: external links are visibly hyperlinks (2026-07-16)', () => {
+  it('link token is #0b57d0 light / #8ab4f8 dark — hyperlink blue, never system blue', () => {
+    expect(block(':root')).toContain('--link: #0b57d0;')
+    expect(block(":root[data-theme='dark']")).toContain('--link: #8ab4f8;')
+  })
+  it('note-body anchors: link blue, underlined at rest', () => {
+    const link = block('.note-body a')
+    expect(link).toContain('color: var(--link);')
+    expect(link).toContain('text-decoration: underline;')
+  })
+})
+
 describe('Addendum D1: edit mode + inline comments (story 16.4)', () => {
   it('the editor is textarea-grade mono 13px — markdown in, no WYSIWYG', () => {
     const editor = block('.note-editor')

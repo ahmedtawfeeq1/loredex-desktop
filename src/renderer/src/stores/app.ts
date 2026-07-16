@@ -13,6 +13,7 @@ export type AppView =
   | 'clients'
   | 'handoffs'
   | 'plan'
+  | 'agents'
   | 'atlas'
   | 'contracts'
   | 'search'

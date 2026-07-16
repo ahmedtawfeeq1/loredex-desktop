@@ -17,6 +17,50 @@ import * as engine from './engine'
 
 export const PREFERRED_MCP_PORT = 52017
 
+// ── MCP request log (DESIGN v3 §6.5 / §8 session telemetry) ────────────────
+// Read-only, in-memory ring: what agents asked this dex, newest last. Zero
+// engine writes — the Agents view renders it verbatim.
+
+export interface McpLogEntry {
+  /** ISO time the request arrived */
+  at: string
+  /** 'initialize' (a client connecting) or the tool name of a tools/call */
+  kind: 'initialize' | 'tool'
+  name: string
+  /** MCP clientInfo.name when the request carries one (initialize) */
+  client?: string
+}
+
+const MCP_LOG_MAX = 200
+const mcpLog: McpLogEntry[] = []
+
+export function mcpRequestLog(): McpLogEntry[] {
+  return [...mcpLog]
+}
+
+/** test seam */
+export function clearMcpRequestLog(): void {
+  mcpLog.length = 0
+}
+
+function push(entry: McpLogEntry): void {
+  mcpLog.push(entry)
+  if (mcpLog.length > MCP_LOG_MAX) mcpLog.splice(0, mcpLog.length - MCP_LOG_MAX)
+}
+
+/** Record what an authorized JSON-RPC body asks (single or batch). */
+export function recordMcpRequest(body: unknown, at = new Date().toISOString()): void {
+  for (const msg of Array.isArray(body) ? body : [body]) {
+    const m = msg as { method?: string; params?: { name?: string; clientInfo?: { name?: string } } }
+    if (m?.method === 'initialize') {
+      const client = m.params?.clientInfo?.name
+      push({ at, kind: 'initialize', name: 'initialize', ...(client ? { client } : {}) })
+    } else if (m?.method === 'tools/call' && typeof m.params?.name === 'string') {
+      push({ at, kind: 'tool', name: m.params.name })
+    }
+  }
+}
+
 /** Absent Origin (CLI/agent clients) or a localhost origin is fine; anything else is rejected. */
 export function originAllowed(origin: string | undefined): boolean {
   if (origin === undefined || origin === 'null') return true
@@ -96,6 +140,7 @@ async function handle(req: IncomingMessage, res: ServerResponse, token: string):
     const chunks: Buffer[] = []
     for await (const chunk of req) chunks.push(chunk as Buffer)
     const body: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    recordMcpRequest(body) // §6.5 session telemetry — after auth, before dispatch
 
     const mcp = engine.createMcpServer()
     withIdentityEcho(mcp, formatVaultIdentity(engine.identity()))

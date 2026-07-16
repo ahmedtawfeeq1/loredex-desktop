@@ -40,6 +40,7 @@ import { FeedView } from './views/feed/FeedView'
 import { AnnotateModal } from './views/handoffs/AnnotateModal'
 import { InboxView } from './views/handoffs/InboxView'
 import { PlanView } from './views/plan/PlanView'
+import { AgentsView } from './views/agents/AgentsView'
 import { ComposeHandoffModal } from './views/handoffs/ComposeHandoffModal'
 import { DeclineReasonModal } from './views/handoffs/DeclineReasonModal'
 import { LinkRequestModal } from './views/handoffs/FulfillsPicker'
@@ -270,6 +271,10 @@ export default function App(): React.JSX.Element {
         ) : view === 'plan' ? (
           <main className="pane-board">
             <PlanView />
+          </main>
+        ) : view === 'agents' ? (
+          <main className="pane-board">
+            <AgentsView />
           </main>
         ) : view === 'clients' ? (
           <main className="pane-board">

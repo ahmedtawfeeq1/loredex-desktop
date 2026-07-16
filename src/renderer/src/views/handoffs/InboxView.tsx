@@ -26,10 +26,14 @@ import { RowItem } from '../../components/RowItem'
 import { Segmented } from '../../components/Segmented'
 import { StatusChip, StatusGlyph } from '../../components/StatusChip'
 import { humanizeTitle } from '../../humanize'
+import { AgentChip } from '../../components/AgentChip'
 import { useBoardFilter } from '../../stores/boardFilter'
 import { useHandoffs } from '../../stores/handoffs'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { ContractChips } from '../contracts/ContractChips'
+import { relativeTime } from '../feed/feed-logic'
+import { LIVE_WINDOW_MS } from '../agents/AgentsView'
+import { useDashboardData } from '../home/dashboard-data'
 import { openBrief } from './open-brief'
 import { ThreadRail } from './ThreadRail'
 
@@ -54,6 +58,10 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
   const idleTitle = hasIdentity ? undefined : 'Set your identity in Settings first'
   const actions = actionsFor(card, true)
   const fulfilledBy = fulfilled.get(card.id)
+  // §6.5 presence: the last identity that touched this handoff (git
+  // attribution), live-dotted inside the write window — read-only
+  const activity = useDashboardData((s) => s.activity)
+  const touch = (activity ?? []).find((e) => e.subject.handoffId === card.id && e.actor.name)
 
   return (
     <div className="inbox-detail" aria-label="Handoff detail">
@@ -63,6 +71,13 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
         <span className="triage-route">
           {card.from} ⟶ {card.to}
         </span>
+        {touch && (
+          <AgentChip
+            name={touch.actor.name}
+            meta={relativeTime(touch.at, Date.now())}
+            live={Date.now() - Date.parse(touch.at) < LIVE_WINDOW_MS}
+          />
+        )}
       </div>
       <h2 className="inbox-detail-title" title={card.name}>
         {card.objective || humanizeTitle(card.name)}

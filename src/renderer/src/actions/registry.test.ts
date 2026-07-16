@@ -24,6 +24,7 @@ const ALL_VIEWS: AppView[] = [
   'search',
   'handoffs',
   'plan', // v3 §6.4 preview flag; always present in VIEW_ORDER
+  'agents', // v3 §6.5
   'contracts',
   'feed',
   'atlas',
@@ -47,8 +48,12 @@ describe('the action registry (story 15.3)', () => {
     RESEARCH_VIEWS.forEach((view, i) => {
       const action = actions.find((a) => a.id === `view:${view}`)
       expect(action, `view:${view}`).toBeDefined()
-      expect(action?.shortcut).toBe(`⌘${i + 1}`)
-      expect(action?.combo).toEqual({ key: String(i + 1), meta: true })
+      if (i < 9) {
+        expect(action?.shortcut).toBe(`⌘${i + 1}`)
+        expect(action?.combo).toEqual({ key: String(i + 1), meta: true })
+      } else {
+        expect(action?.shortcut).toBeUndefined()
+      }
     })
     expect(actions.some((a) => a.id === 'view:clients')).toBe(false)
     expect(actions.some((a) => a.id === 'view:plan')).toBe(false)

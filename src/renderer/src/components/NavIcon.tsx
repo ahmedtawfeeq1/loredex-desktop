@@ -33,6 +33,13 @@ const GLYPHS: Record<AppView, React.JSX.Element> = {
       <path d="M2.5 13c0-2 1.4-3.2 3-3.2S8.5 11 8.5 13M7.5 13c0-2 1.4-3.2 3-3.2s3 1.2 3 3.2" />
     </>
   ),
+  agents: (
+    <>
+      <circle cx="8" cy="5.5" r="2.2" />
+      <path d="M3.5 13c0-2.6 2-4.2 4.5-4.2s4.5 1.6 4.5 4.2" />
+      <circle cx="12.6" cy="3.4" r="1.4" />
+    </>
+  ),
   atlas: (
     <>
       <circle cx="8" cy="4" r="1.7" />

@@ -47,7 +47,7 @@ import {
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { commentView } from './notes'
-import { getMcpStatus } from './mcp-server'
+import { getMcpStatus, mcpRequestLog } from './mcp-server'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
   loadAtlasLegendSeen,
@@ -643,6 +643,8 @@ export function registerCoreHandlers(
   // MCP host state + port override (story 1.6). The override applies on the
   // next core-host start — no live rebind, the discovery file must stay true.
   ipc.register('mcp.status', () => getMcpStatus())
+  // v3 §6.5 (story 26.5): read-only session telemetry for the Agents view
+  ipc.register('agents.sessions', () => ({ log: mcpRequestLog(), mcp: getMcpStatus() }))
   // Theme preference (story 14.1): per-user app state, applied renderer-side.
   ipc.register('settings.theme.get', () => loadThemeSetting())
   ipc.register('settings.theme.set', ({ theme }) => {

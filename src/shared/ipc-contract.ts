@@ -15,6 +15,7 @@ import type {
 import type { FontSettings } from './font-settings'
 import type { ThemeSetting } from './theme'
 import type {
+  McpLogEntry,
   ActivityEvent,
   AtlasGraph,
   AtlasLevel,
@@ -127,6 +128,9 @@ export interface CoreApi {
   /** app-local contract evolution (story 1.6): MCP host state + port override.
    *  The override applies on the next core-host start (vault switch or relaunch). */
   'mcp.status': { in: void; out: McpStatus }
+  /** v3 §6.5 (story 26.5): the Agents view's read-only session telemetry —
+   *  the in-app MCP host's request ring. Zero engine writes. */
+  'agents.sessions': { in: void; out: { log: McpLogEntry[]; mcp: McpStatus } }
   'settings.mcpPort.set': { in: { port: number | null }; out: void }
   /** app-local contract evolution (story 14.1): theme preference — per-user app
    *  state, persisted core-side (settings JSON → app.db seam, story 9.2) */

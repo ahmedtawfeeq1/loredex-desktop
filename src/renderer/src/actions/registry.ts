@@ -57,6 +57,7 @@ export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: Na
   { view: 'search', label: 'Search', group: 'Workspace' },
   { view: 'handoffs', label: 'Inbox', group: 'Collaborate' },
   { view: 'plan', label: 'Plan', group: 'Collaborate' },
+  { view: 'agents', label: 'Agents', group: 'Collaborate' },
   { view: 'contracts', label: 'Contracts', group: 'Collaborate' },
   { view: 'feed', label: 'Activity', group: 'Collaborate' },
   { view: 'atlas', label: 'Atlas', group: 'Knowledge' },

@@ -176,6 +176,15 @@ export interface McpStatus {
   discoveryPath: string | null
 }
 
+/** One MCP request the in-app host served (v3 §6.5 session telemetry) —
+ *  read-only ring, newest last; the Agents view renders it verbatim. */
+export interface McpLogEntry {
+  at: string
+  kind: 'initialize' | 'tool'
+  name: string
+  client?: string
+}
+
 /**
  * Thread rail types (story 8.2). The m2 contract sketches HandoffCard[] here;
  * app-local evolution: comments (`type: 'comment'`) are rail members but never

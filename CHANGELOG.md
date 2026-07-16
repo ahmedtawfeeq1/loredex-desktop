@@ -7,6 +7,20 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-07-16
+
+### Added
+- **Interactive checklists**: clicking a task checkbox in the reader writes
+  `[x]`/`[ ]` straight back into the note file — same identity requirement
+  and git auto-commit as edit mode; the file stays the only truth. Stale
+  renders and code-fence lookalikes are refused, never mis-written; hover
+  previews and briefs keep inert checkboxes.
+
+### Changed
+- **External links are visibly hyperlinks** (Addendum D2): note-body web
+  links render in link blue (`#0B57D0` light / `#8AB4F8` dark), underlined
+  at rest. Wikilinks keep their gold treatment; app chrome stays navy.
+
 ## [0.5.0] - 2026-07-14
 
 ### Added

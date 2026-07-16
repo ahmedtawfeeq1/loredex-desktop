@@ -24,7 +24,7 @@ CSS custom properties on `:root` (light default) + `[data-theme="dark"]` overrid
 | `--rust` | `#A63D2F` | `#D4715F` | stale, drift, declined, sync errors |
 | `--ok` | `#2E6E5E` | `#63B3A1` | success receipts, in-sync dot (demoted from v1 accent to status-only) |
 
-Rules: gold is THE accent — one gold primary button per view maximum; secondary actions are navy outline pills. Links/wikilinks: navy, underline on hover (dark: paper). If everything is gold, nothing is.
+Rules: gold is THE accent — one gold primary button per view maximum; secondary actions are navy outline pills. Chrome links: navy, underline on hover (dark: paper). Note-body external links: see Addendum D2. If everything is gold, nothing is.
 
 ## Type
 
@@ -235,3 +235,12 @@ Pressing a submit button that does nothing (silently disabled, or no-op on empty
 - DESIGN v2: rust `--rust` for errors, 12px, respects reduced-motion (no shake unless subtle), keyboard-accessible (aria-invalid, aria-describedby on the field → error).
 
 Concrete example from the user: the "Hand back" modal Publish with an empty Objective currently gives no feedback — after this, clicking Publish highlights Objective as required, focuses it, and shows "Add an objective the other team can act on."
+
+# Addendum D2 — external links are visibly hyperlinks (user, 2026-07-16)
+
+Note-body external links (https, mailto, …) rendered navy — indistinguishable from body text. The user asked for classic clickable blue hyperlinks.
+
+- New token `--link`: `#0B57D0` light / `#8AB4F8` dark. Not system blue (#007AFF stays banned); both pass WCAG AA on their card surfaces.
+- `.note-body a`: `color: var(--link)`, underlined at rest (`text-underline-offset: 2px`) — a link must read as a link before hover.
+- Wikilinks are unchanged: gold `--wikilink` rules (Addendum D1) have higher specificity and stay underline-on-hover-only. Broken stays rust dotted.
+- App chrome links stay navy — the blue is reserved for note content, where "this leaves the app" is the signal.

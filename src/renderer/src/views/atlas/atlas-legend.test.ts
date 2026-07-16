@@ -32,7 +32,7 @@ describe('atlas legend content', () => {
 
   it('names the three zoom levels', () => {
     const terms = sectionByTitle('Zoom levels')?.rows.map((r) => r.term)
-    expect(terms).toEqual(['Overview', 'Learn', 'Deep Dive'])
+    expect(terms).toEqual(['Map', 'Project', 'Thread', 'Deep Dive'])
   })
 
   it('gives the Tours/Path/Blocked one-liners', () => {

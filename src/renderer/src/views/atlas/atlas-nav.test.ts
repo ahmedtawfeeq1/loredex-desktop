@@ -1,7 +1,7 @@
 /**
  * Atlas reframe WP4 DoD (spec §Navigation glue) — the transitions between the
  * three surfaces and the empty states. Two layers, matching this suite's house
- * style: pure assertions on breadcrumbsFor (vault › <project> at learn/deep),
+ * style: pure assertions on breadcrumbsFor (dex › <project> at learn/deep),
  * and source-level assertions that the launcher/page wire their clicks to the
  * right store navigation and that the page hides sections when there's nothing
  * to show (fresh project, no handoffs, no flows). The node-free web project has
@@ -14,22 +14,22 @@ import { breadcrumbsFor } from './atlas-visibility'
 
 const read = (f: string): string => readFileSync(join(import.meta.dirname, f), 'utf8')
 
-describe('breadcrumbs reflect vault › <project> at learn and deep', () => {
-  it('Overview is just the vault root (current, not a link)', () => {
+describe('breadcrumbs reflect dex › <project> at learn and deep', () => {
+  it('Overview is just the dex root (current, not a link)', () => {
     const crumbs = breadcrumbsFor({ level: 'overview', scope: {} })
-    expect(crumbs.map((c) => c.label)).toEqual(['vault'])
+    expect(crumbs.map((c) => c.label)).toEqual(['dex'])
     expect(crumbs[0]?.target).toBeNull()
   })
 
-  it('Learn shows vault › <project>, vault links back to Overview', () => {
+  it('Learn shows dex › <project>, dex links back to Overview', () => {
     const crumbs = breadcrumbsFor({ level: 'learn', scope: { project: 'nimbus-frontend' } })
-    expect(crumbs.map((c) => c.label)).toEqual(['vault', 'nimbus-frontend'])
+    expect(crumbs.map((c) => c.label)).toEqual(['dex', 'nimbus-frontend'])
     expect(crumbs[0]?.target).toEqual({ level: 'overview' })
   })
 
-  it('Deep Dive scoped to a project also reads vault › <project>', () => {
+  it('Deep Dive scoped to a project also reads dex › <project>', () => {
     const crumbs = breadcrumbsFor({ level: 'deep', scope: { project: 'nimbus-frontend' } })
-    expect(crumbs.map((c) => c.label)).toEqual(['vault', 'nimbus-frontend'])
+    expect(crumbs.map((c) => c.label)).toEqual(['dex', 'nimbus-frontend'])
     expect(crumbs[0]?.target).toEqual({ level: 'overview' })
   })
 })

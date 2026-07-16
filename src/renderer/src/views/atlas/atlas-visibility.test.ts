@@ -128,9 +128,9 @@ describe('visiblePanels (story 16.5)', () => {
 })
 
 describe('breadcrumbsFor', () => {
-  it('renders vault › project › topic with upward targets only', () => {
+  it('renders dex › project › topic with upward targets only', () => {
     const crumbs = breadcrumbsFor({ level: 'learn', scope: { project: 'alpha', topic: 'design' } })
-    expect(crumbs.map((c) => c.label)).toEqual(['vault', 'alpha', 'design'])
+    expect(crumbs.map((c) => c.label)).toEqual(['dex', 'alpha', 'design'])
     expect(crumbs[0]?.target).toEqual({ level: 'overview' })
     expect(crumbs[1]?.target).toEqual({ level: 'learn', project: 'alpha' })
     expect(crumbs[2]?.target).toBeNull() // current position is not a link

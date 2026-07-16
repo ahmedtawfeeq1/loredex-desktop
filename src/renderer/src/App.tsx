@@ -41,6 +41,7 @@ import { AnnotateModal } from './views/handoffs/AnnotateModal'
 import { InboxView } from './views/handoffs/InboxView'
 import { PlanView } from './views/plan/PlanView'
 import { AgentsView } from './views/agents/AgentsView'
+import { useSettingsTab } from './stores/settingsTab'
 import { ComposeHandoffModal } from './views/handoffs/ComposeHandoffModal'
 import { DeclineReasonModal } from './views/handoffs/DeclineReasonModal'
 import { LinkRequestModal } from './views/handoffs/FulfillsPicker'
@@ -72,7 +73,15 @@ function ReaderSurface(): React.JSX.Element {
   return <NoteView />
 }
 
-export default function App(): React.JSX.Element {
+export default /** v3 §5: the dissolved Sync view — deep-links land on Settings › System. */
+function SyncRedirect(): React.JSX.Element {
+  useEffect(() => {
+    useSettingsTab.getState().setTab('System')
+  }, [])
+  return <SettingsView />
+}
+
+function App(): React.JSX.Element {
   const status = useApp((s) => s.status)
   const view = useApp((s) => s.view)
   const setView = useApp((s) => s.setView)
@@ -297,8 +306,10 @@ export default function App(): React.JSX.Element {
             <FeedView />
           </main>
         ) : view === 'sync' ? (
+          // v3 §5: the Sync view dissolved into Settings › System — the old
+          // view id stays a working deep link
           <main className="pane-board">
-            <SyncPanel />
+            <SyncRedirect />
           </main>
         ) : view === 'settings' ? (
           <main className="pane-board">

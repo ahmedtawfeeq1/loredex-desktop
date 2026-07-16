@@ -28,7 +28,6 @@ const ALL_VIEWS: AppView[] = [
   'contracts',
   'feed',
   'atlas',
-  'sync',
   'settings',
 ]
 

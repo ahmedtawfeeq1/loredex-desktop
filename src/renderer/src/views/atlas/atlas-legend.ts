@@ -23,7 +23,7 @@ export const LEGEND_SECTIONS: ReadonlyArray<LegendSection> = [
   {
     title: 'Node types',
     rows: [
-      { term: 'project', meaning: 'a repo/layer cluster; its open-handoff count rides gold' },
+      { term: 'project', meaning: 'a repo/layer cluster; its open-handoff count rides amber' },
       { term: 'note', meaning: 'a filed markdown note (serif title, type + topic chips)' },
       { term: 'handoff', meaning: 'a routing slip between projects, stamped by status' },
       { term: 'contract', meaning: 'an API/schema file with a change timeline' },
@@ -35,7 +35,7 @@ export const LEGEND_SECTIONS: ReadonlyArray<LegendSection> = [
     title: 'Edge types',
     rows: [
       { term: 'route', meaning: 'a handoff from one project to another' },
-      { term: 'thread', meaning: 'a reply/fulfils link — gold while the thread is open' },
+      { term: 'thread', meaning: 'a reply/fulfils link — amber while the thread is open' },
       { term: 'wikilink', meaning: 'a [[link]] between notes' },
       { term: 'provenance', meaning: 'a note back to its source file' },
       { term: 'contract-link', meaning: 'a contract change tied to a handoff/commit' },
@@ -49,8 +49,9 @@ export const LEGEND_SECTIONS: ReadonlyArray<LegendSection> = [
   {
     title: 'Zoom levels',
     rows: [
-      { term: 'Overview', meaning: 'project clusters + aggregated handoff flow' },
-      { term: 'Learn', meaning: 'one project: topic sub-cards, newest activity first' },
+      { term: 'Map', meaning: 'project clusters + aggregated handoff flow' },
+      { term: 'Project', meaning: 'one project: topic sub-cards, newest activity first' },
+      { term: 'Thread', meaning: 'one handoff chain, start to finish (the Path tool)' },
       { term: 'Deep Dive', meaning: 'everything in scope incl. sources, commits, contracts' },
     ],
   },

@@ -1,9 +1,11 @@
 /**
- * Settings view — tabbed multi-column cards. Tabs hold cards in a responsive
- * grid (1 col narrow → 2-3 wide). Local tab state only; each section component
- * is reused unchanged inside a card. One gold primary per tab.
+ * Settings view — tabbed multi-column cards, regrouped per DESIGN v3 §5:
+ * Workspace (this dex) / Personal (you) / System (sync & git — the old Sync
+ * view dissolved here — plus GitHub + MCP hosts). Tab state lives in a store
+ * so deep links (the old 'sync' view id, sync pills) can open System
+ * directly. One cobalt primary per tab.
  */
-import { useState } from 'react'
+
 import { ContractsSection } from './ContractsSection'
 import { DuplicatesSection } from './DuplicatesSection'
 import { GitHubSection } from './GitHubSection'
@@ -11,13 +13,16 @@ import { IdentityForm } from './IdentityForm'
 import { McpSection } from './McpSection'
 import { ScopeSettings } from './ScopeSettings'
 import { ThemeSection } from './ThemeSection'
+import { useSettingsTab } from '../../stores/settingsTab'
+import { SyncPanel } from '../sync/SyncPanel'
 import { TypographySection } from './TypographySection'
 
-const TABS = ['General', 'Typography', 'Vault', 'Integrations'] as const
-type Tab = (typeof TABS)[number]
+const TABS = ['Workspace', 'Personal', 'System'] as const
+export type SettingsTab = (typeof TABS)[number]
 
 export function SettingsView(): React.JSX.Element {
-  const [tab, setTab] = useState<Tab>('General')
+  const tab = useSettingsTab((s) => s.tab)
+  const setTab = useSettingsTab((s) => s.setTab)
 
   return (
     <div className="settings">
@@ -39,22 +44,25 @@ export function SettingsView(): React.JSX.Element {
         ))}
       </div>
       <div className="settings-grid" role="tabpanel">
-        {tab === 'General' && (
-          <>
-            <ThemeSection />
-            <IdentityForm />
-          </>
-        )}
-        {tab === 'Typography' && <TypographySection />}
-        {tab === 'Vault' && (
+        {/* v3 §5 regroup: Workspace = this dex, Personal = you, System =
+            sync & git (the old Sync view, dissolved here) + hosts */}
+        {tab === 'Workspace' && (
           <>
             <ScopeSettings />
             <ContractsSection />
             <DuplicatesSection />
           </>
         )}
-        {tab === 'Integrations' && (
+        {tab === 'Personal' && (
           <>
+            <IdentityForm />
+            <ThemeSection />
+            <TypographySection />
+          </>
+        )}
+        {tab === 'System' && (
+          <>
+            <SyncPanel />
             <GitHubSection />
             <McpSection />
           </>

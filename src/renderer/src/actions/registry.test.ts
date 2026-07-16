@@ -12,6 +12,7 @@ import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
 import { useReader } from '../stores/reader'
 import { useRails } from '../stores/rails'
+import { usePlanFlag } from '../stores/planFlag'
 import { actionItems } from './palette-items'
 import { appActions, VIEW_ORDER } from './registry'
 
@@ -22,6 +23,7 @@ const ALL_VIEWS: AppView[] = [
   'clients', // agent-ops only in nav; always present in VIEW_ORDER
   'search',
   'handoffs',
+  'plan', // v3 §6.4 preview flag; always present in VIEW_ORDER
   'contracts',
   'feed',
   'atlas',
@@ -29,12 +31,13 @@ const ALL_VIEWS: AppView[] = [
   'settings',
 ]
 
-/** the nav on a research dex (clients hidden) */
-const RESEARCH_VIEWS = ALL_VIEWS.filter((v) => v !== 'clients')
+/** the nav on a research dex (clients hidden, plan flag off) */
+const RESEARCH_VIEWS = ALL_VIEWS.filter((v) => v !== 'clients' && v !== 'plan')
 
 beforeEach(() => {
   useApp.setState({ view: 'home', cheatsheetOpen: false })
   useDex.setState({ type: null })
+  usePlanFlag.setState({ enabled: false })
 })
 
 describe('the action registry (story 15.3)', () => {
@@ -48,10 +51,19 @@ describe('the action registry (story 15.3)', () => {
       expect(action?.combo).toEqual({ key: String(i + 1), meta: true })
     })
     expect(actions.some((a) => a.id === 'view:clients')).toBe(false)
+    expect(actions.some((a) => a.id === 'view:plan')).toBe(false)
+  })
+
+  it('the Plan preview flag adds the Plan view to nav + ⌘n numbering', () => {
+    usePlanFlag.setState({ enabled: true })
+    const actions = appActions()
+    expect(actions.some((a) => a.id === 'view:plan')).toBe(true)
+    usePlanFlag.setState({ enabled: false })
   })
 
   it('agent-ops dexes add Clients: first nine keep ⌘1-9, the tenth is unbound', () => {
     useDex.setState({ type: 'agent-ops' })
+    usePlanFlag.setState({ enabled: true })
     const actions = appActions()
     ALL_VIEWS.forEach((view, i) => {
       const action = actions.find((a) => a.id === `view:${view}`)

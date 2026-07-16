@@ -10,10 +10,12 @@
  */
 import { dispatchZoom } from '../views/atlas/atlas-zoom'
 import { useApp, type AppView } from '../stores/app'
+import { useBoardFilter } from '../stores/boardFilter'
 import { useDex } from '../stores/dex'
 import { useEditor } from '../stores/editor'
 import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
+import { actionsFor, filterByDisplay, laneCards } from '../../../shared/handoff-lanes'
 import { effectiveIdentity, useIdentity } from '../stores/identity'
 import { useRails } from '../stores/rails'
 import { useReader } from '../stores/reader'
@@ -48,11 +50,11 @@ export type NavGroup = 'Workspace' | 'Collaborate' | 'Knowledge' | 'System'
 /** Sidebar order IS the shortcut order: ⌘1…⌘9 (AppView type ties the two).
  *  `group` is a visual section header only — the ⌘n number is the array index. */
 export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> = [
-  { view: 'home', label: 'Home', group: 'Workspace' },
+  { view: 'home', label: 'Today', group: 'Workspace' },
   { view: 'reader', label: 'Reader', group: 'Workspace' },
   { view: 'clients', label: 'Clients', group: 'Workspace' },
   { view: 'search', label: 'Search', group: 'Workspace' },
-  { view: 'handoffs', label: 'Handoffs', group: 'Collaborate' },
+  { view: 'handoffs', label: 'Inbox', group: 'Collaborate' },
   { view: 'contracts', label: 'Contracts', group: 'Collaborate' },
   { view: 'feed', label: 'Activity', group: 'Collaborate' },
   { view: 'atlas', label: 'Atlas', group: 'Knowledge' },
@@ -65,6 +67,25 @@ export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: Na
 export function visibleViews(): ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> {
   const agentOps = useDex.getState().type === 'agent-ops'
   return agentOps ? VIEW_ORDER : VIEW_ORDER.filter((entry) => entry.view !== 'clients')
+}
+
+/** The card A/D/S/E act on: the store's selection, else the view's first
+ *  triage row (Today = oldest due-now card; Inbox = first shown row). */
+function triageTarget(): ReturnType<typeof laneCards>[number] | undefined {
+  const view = useApp.getState().view
+  if (view !== 'home' && view !== 'handoffs') return undefined
+  const { cards, selectedId, project } = useHandoffs.getState()
+  const all = cards ?? []
+  const selected = all.find((c) => c.id === selectedId)
+  if (selected) return selected
+  if (view === 'home') {
+    // due-now (open or expired-snooze), oldest first — Today's queue order
+    return [...all.filter((c) => c.status === 'open' || c.expired)].sort(
+      (a, b) => b.ageDays - a.ageDays,
+    )[0]
+  }
+  const { lane, mode } = useBoardFilter.getState()
+  return filterByDisplay(laneCards(all, lane, project), mode)[0]
 }
 
 export function appActions(): AppAction[] {
@@ -85,6 +106,65 @@ export function appActions(): AppAction[] {
       run: () => {
         useApp.getState().setView('handoffs')
         useHandoffs.getState().openCompose()
+      },
+    },
+    {
+      // v3 §4: the bare compose key (prototype C) — same intent as ⌘N
+      id: 'action:new-handoff-c',
+      title: 'New handoff (C)',
+      paletteHidden: true,
+      shortcut: 'C',
+      combo: { key: 'c' },
+      run: () => {
+        useApp.getState().setView('handoffs')
+        useHandoffs.getState().openCompose()
+      },
+    },
+    // v3 one-key triage (story 26.3): A/D/S/E act on the selected card in
+    // Today's needs-you queue or the Inbox — no-ops anywhere else. Legality
+    // is re-checked here AND lib-enforced on write.
+    {
+      id: 'triage:accept',
+      title: 'Accept selected handoff',
+      shortcut: 'A',
+      combo: { key: 'a' },
+      run: () => {
+        const card = triageTarget()
+        if (card && actionsFor(card, true).includes('accept'))
+          void useHandoffs.getState().setStatus(card, { to: 'accepted' })
+      },
+    },
+    {
+      id: 'triage:decline',
+      title: 'Decline selected handoff…',
+      shortcut: 'D',
+      combo: { key: 'd' },
+      run: () => {
+        const card = triageTarget()
+        if (card && actionsFor(card, true).includes('decline'))
+          useHandoffs.getState().openDecline(card)
+      },
+    },
+    {
+      id: 'triage:snooze',
+      title: 'Snooze selected handoff…',
+      shortcut: 'S',
+      combo: { key: 's' },
+      run: () => {
+        const card = triageTarget()
+        if (card && actionsFor(card, true).includes('snooze'))
+          useHandoffs.getState().openSnooze(card)
+      },
+    },
+    {
+      id: 'triage:consume',
+      title: 'Consume selected handoff',
+      shortcut: 'E',
+      combo: { key: 'e' },
+      run: () => {
+        const card = triageTarget()
+        if (card && (card.status === 'open' || card.status === 'accepted'))
+          void useHandoffs.getState().consume(card)
       },
     },
     {

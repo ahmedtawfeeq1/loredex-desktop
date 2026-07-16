@@ -18,6 +18,14 @@ interface Row {
 /** The documented per-context keys (implemented in their own components). */
 export const CONTEXT_ROWS: ReadonlyArray<{ group: string; rows: Row[] }> = [
   {
+    group: 'Triage (Today · Inbox)',
+    rows: [
+      { keys: 'A / D / S', label: 'Accept / Decline / Snooze the selected handoff' },
+      { keys: 'E', label: 'Consume the selected handoff' },
+      { keys: 'C', label: 'New handoff (compose)' },
+    ],
+  },
+  {
     group: 'Atlas',
     rows: [
       { keys: '⌘[ / ⌘]', label: 'History back / forward' },
@@ -37,7 +45,7 @@ export const CONTEXT_ROWS: ReadonlyArray<{ group: string; rows: Row[] }> = [
     group: 'Modals',
     rows: [
       { keys: 'esc', label: 'Cancel / close (focus returns to the page)' },
-      { keys: '⌘⏎', label: 'Submit (the one gold primary)' },
+      { keys: '⌘⏎', label: 'Submit (the one cobalt primary)' },
     ],
   },
 ]

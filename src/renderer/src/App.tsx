@@ -38,12 +38,12 @@ import { ClientsView } from './views/clients/ClientsView'
 import { ContractTimeline } from './views/contracts/ContractTimeline'
 import { FeedView } from './views/feed/FeedView'
 import { AnnotateModal } from './views/handoffs/AnnotateModal'
-import { Board } from './views/handoffs/Board'
+import { InboxView } from './views/handoffs/InboxView'
 import { ComposeHandoffModal } from './views/handoffs/ComposeHandoffModal'
 import { DeclineReasonModal } from './views/handoffs/DeclineReasonModal'
 import { LinkRequestModal } from './views/handoffs/FulfillsPicker'
 import { SnoozeUntilPicker } from './views/handoffs/SnoozeUntilPicker'
-import { HomeView } from './views/home/HomeView'
+import { TodayView } from './views/today/TodayView'
 import { RouteConfirmCard } from './views/routes/RouteConfirmCard'
 import { SyncPanel } from './views/sync/SyncPanel'
 import { DataFileView } from './views/reader/DataFileView'
@@ -260,11 +260,11 @@ export default function App(): React.JSX.Element {
       {status === 'ready' ? (
         view === 'home' ? (
           <main className="pane-board">
-            <HomeView />
+            <TodayView />
           </main>
         ) : view === 'handoffs' ? (
           <main className="pane-board">
-            <Board />
+            <InboxView />
           </main>
         ) : view === 'clients' ? (
           <main className="pane-board">

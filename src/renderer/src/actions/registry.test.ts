@@ -118,7 +118,9 @@ describe('⌘K palette coverage (AC2/AC5)', () => {
     for (const action of appActions()) {
       const item = items.find((i) => i.key === action.id)
       if (action.paletteHidden) {
-        expect(action.id).toBe('action:palette') // the only sanctioned hole
+        // sanctioned holes: the palette itself, and pure key-aliases whose
+        // visible twin already lists the intent (v3 bare-C compose = ⌘N)
+        expect(['action:palette', 'action:new-handoff-c']).toContain(action.id)
         expect(item).toBeUndefined()
         continue
       }

@@ -23,6 +23,18 @@ const STATE: Record<string, ChipSpec> = {
   snoozed: { cls: 'chip-snoozed', glyph: '–' },
 }
 
+/** Just the tinted glyph square — RowItem-sized state marker (v3 §4 rows). */
+export function StatusGlyph({ status }: { status: string }): React.JSX.Element {
+  const spec = STATE[status] ?? { cls: 'chip-consumed', glyph: '–' }
+  return (
+    <span className={`status-glyph ${spec.cls}`} title={status}>
+      <span className="chip-glyph" aria-hidden="true">
+        {spec.glyph || '•'}
+      </span>
+    </span>
+  )
+}
+
 export function StatusChip({
   status,
   pressed,

@@ -6030,3 +6030,178 @@ a.commit-chip-sha:hover {
   min-width: 140px;
   text-align: left;
 }
+
+/* ── v3 Inbox (story 26.3): two-pane triage — list + detail (screens/02) ── */
+
+.inbox {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 10px;
+}
+
+.inbox-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.inbox-open-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.inbox-list-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.inbox-project {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 4px 6px;
+  max-width: 150px;
+}
+
+.inbox-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* bare glyph square in list rows (StatusGlyph) — the chip minus its label */
+.status-glyph {
+  display: inline-flex;
+}
+
+.inbox-detail {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px 84px; /* bottom room for the floating action bar */
+  position: relative;
+}
+
+.inbox-detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inbox-detail-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.inbox-detail-title {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  margin: 0 0 6px;
+}
+
+.inbox-detail-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  margin-bottom: 10px;
+}
+
+.inbox-detail-open {
+  margin: 8px 0;
+}
+
+/* numbered reading-order rows (screens/02 right pane) */
+.ro-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: var(--bg-inset);
+  text-align: left;
+  transition: border-color 100ms ease-out;
+}
+
+.ro-row:hover {
+  border-color: var(--hairline-2);
+}
+
+.ro-num {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-3);
+  border: 1px solid var(--hairline-2);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.ro-name {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* §4 floating action bar: blur ground, radius 14, big shadow, one primary */
+.inbox-actionbar {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(24, 28, 36, 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='light'] .inbox-actionbar {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 28px rgba(19, 24, 38, 0.18);
+}
+
+.inbox-actionbar-gap {
+  flex: 1;
+}

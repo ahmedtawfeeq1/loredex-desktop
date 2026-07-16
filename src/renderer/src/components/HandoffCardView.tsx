@@ -5,6 +5,7 @@
  */
 import { formatAge } from '../../../shared/handoff-lanes'
 import type { HandoffCard } from '../../../shared/types'
+import { Button } from './Button'
 import { StatusChip } from './StatusChip'
 
 export function HandoffCardView({
@@ -88,9 +89,9 @@ export function HandoffCardView({
             {/* D1 amendment 4: Comment is the PRIMARY, first reply path — a
                 quick thread note that never mints a board handoff. */}
             {onComment && (
-              <button
-                type="button"
-                className="button-emphasis button-small"
+              <Button
+                variant="emphasis"
+                className="button-small"
                 title="Comment — a quick note in the thread. The handoff stays untouched and no new card is created."
                 onClick={(e) => {
                   e.stopPropagation()
@@ -98,14 +99,13 @@ export function HandoffCardView({
                 }}
               >
                 Comment
-              </button>
+              </Button>
             )}
             {/* Hand back is the deliberate, secondary action: it mints a NEW
                 handoff routed back that the other team must consume. */}
             {onReply && (
-              <button
-                type="button"
-                className="button-secondary button-small"
+              <Button
+                className="button-small"
                 title="Hand back — creates a new handoff the other team must consume. For a quick note, use Comment."
                 onClick={(e) => {
                   e.stopPropagation()
@@ -113,12 +113,11 @@ export function HandoffCardView({
                 }}
               >
                 Hand back
-              </button>
+              </Button>
             )}
             {onLinkRequest && (
-              <button
-                type="button"
-                className="button-secondary button-small"
+              <Button
+                className="button-small"
                 title="Link this delivery to the request it fulfills"
                 onClick={(e) => {
                   e.stopPropagation()
@@ -126,7 +125,7 @@ export function HandoffCardView({
                 }}
               >
                 Link request
-              </button>
+              </Button>
             )}
           </span>
         )}

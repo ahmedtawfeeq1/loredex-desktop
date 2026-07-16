@@ -5,6 +5,7 @@
  */
 import { useEffect } from 'react'
 import { THEME_SETTINGS, type ThemeSetting } from '../../../../shared/theme'
+import { Segmented } from '../../components/Segmented'
 import { useTheme } from '../../stores/settings'
 
 const LABELS: Record<ThemeSetting, string> = { system: 'System', light: 'Light', dark: 'Dark' }
@@ -24,19 +25,12 @@ export function ThemeSection(): React.JSX.Element {
       <h2 className="settings-title">Appearance</h2>
       <div className="toggle-row">
         <span>Theme</span>
-        <div className="seg-control" role="group" aria-label="Theme">
-          {THEME_SETTINGS.map((value) => (
-            <button
-              key={value}
-              type="button"
-              className="seg-option"
-              aria-pressed={setting === value}
-              onClick={() => void set(value)}
-            >
-              {LABELS[value]}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          ariaLabel="Theme"
+          options={THEME_SETTINGS.map((value) => ({ value, label: LABELS[value] }))}
+          value={setting}
+          onChange={(value) => void set(value)}
+        />
       </div>
       <p className="settings-hint">System follows your Mac's appearance.</p>
     </div>

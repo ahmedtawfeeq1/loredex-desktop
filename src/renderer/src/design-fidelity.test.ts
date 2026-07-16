@@ -113,9 +113,12 @@ describe("the Don't list", () => {
     expect(css).not.toMatch(/purple|#af52de|#bf5af2/i)
   })
   it('any gradient is the sanctioned cobalt button recipe (§4), nothing else', () => {
-    const grads = css.match(/linear-gradient\([^)]*\)/g) ?? []
+    const grads = css.match(/linear-gradient\((?:[^()]|\([^()]*\))*\)/g) ?? []
     for (const g of grads) {
-      expect(g).toBe('linear-gradient(180deg, var(--accent-hi), var(--accent-lo))')
+      // rest state 400→lo, hover lightens one step (400→400) — §4
+      expect(g).toMatch(
+        /^linear-gradient\(180deg, var\(--accent-hi\), var\(--accent-(hi|lo)\)\)$/,
+      )
     }
     expect(css).not.toMatch(/radial-gradient/)
   })
@@ -126,7 +129,9 @@ describe("the Don't list", () => {
     // active), the thread rail's 2px hairline connector, or the D1 project
     // rail on notes under a project (story 16.3)
     for (const decl of wide) {
-      expect(decl).toMatch(/^border-left: (4px solid|2px solid var\(--(hairline|section-color)\))/)
+      expect(decl).toMatch(
+        /^border-left: (4px solid|2px solid (transparent|var\(--(hairline|section-color|accent)\)))/,
+      )
     }
   })
   it('serif never leaks into nav or buttons', () => {
@@ -156,19 +161,72 @@ describe('v3 surfaces', () => {
       expect(b, `${sel} card`).toContain('var(--shadow-card)')
     }
   })
-  it('primary button is cobalt with cobalt ink (radius 10, 32px)', () => {
+  it('primary button is the §4 cobalt gradient pill: radius 8, bevel, accent ink', () => {
     const b = block('.button-primary')
-    expect(b).toContain('background: var(--accent);')
+    expect(b).toContain('background: linear-gradient(180deg, var(--accent-hi), var(--accent-lo));')
     expect(b).toContain('color: var(--accent-ink);')
-    expect(b).toContain('border-radius: 10px;')
-    expect(b).toContain('height: 32px;')
+    expect(b).toContain('border-radius: 8px;')
+    expect(b).toContain('font-weight: 600;')
+    expect(b).toContain('inset 0 1px 0 rgba(255, 255, 255, 0.25)')
+    expect(block('.button-primary:active:not(:disabled)')).toContain('background: var(--accent-press);')
   })
-  it('stamp chips carry the v3 palette (§1: OPEN amber, never on buttons) incl. dashed snoozed', () => {
-    expect(block('.chip-open')).toContain('var(--warn)')
-    expect(block('.chip-accepted')).toContain('var(--text-1)')
-    expect(block('.chip-declined')).toContain('var(--rust)')
-    expect(block('.chip-request')).toContain('var(--info)')
-    expect(block('.chip-snoozed')).toContain('border-style: dashed;')
+  it('secondary = overlay + hairline-2 + top-light; ghost transparent; danger rust-bordered (§4)', () => {
+    const b = block('.button-secondary')
+    expect(b).toContain('background: var(--bg-overlay);')
+    expect(b).toContain('border: 1px solid var(--hairline-2);')
+    expect(block('.button-quiet')).toContain('background: transparent;')
+    expect(block('.button-destructive')).toContain('border: 1px solid rgba(229, 72, 77, 0.35);')
+    expect(block('.button-destructive')).toContain('color: var(--rust);')
+  })
+  it('button focus ring is the §4 lifted ring: 2px card gap + 4px --focus', () => {
+    const focus = block('.button-primary:focus-visible')
+    expect(focus).toContain('box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--focus);')
+  })
+  it('kbd hints are 9px mono caps, 1px border, radius 3 (§4)', () => {
+    const kbd = block('.kbd')
+    expect(kbd).toContain('font-family: var(--font-mono);')
+    expect(kbd).toContain('font-size: 9px;')
+    expect(kbd).toContain('border: 1px solid currentColor;')
+    expect(kbd).toContain('border-radius: 3px;')
+  })
+  it('segmented control is pressed glass: inset track radius 10 pad 3, overlay active with top-light (§4)', () => {
+    const track = block('.seg-control')
+    expect(track).toContain('background: var(--bg-inset);')
+    expect(track).toContain('border-radius: 10px;')
+    expect(track).toContain('padding: 3px;')
+    const active = block(".seg-option[aria-pressed='true']")
+    expect(active).toContain('background: var(--bg-overlay);')
+    expect(active).toContain('inset 0 1px 0 rgba(255, 255, 255, 0.12)')
+  })
+  it('status chips are glyph + label, never color alone (§4)', () => {
+    expect(block('.chip-glyph')).toContain('border-radius: 4px;')
+    // OPEN: amber ring-dot chip — mono 10, amber border rgba(.4), bg rgba(.07)
+    const open = block('.chip-open')
+    expect(open).toContain('color: var(--warn);')
+    expect(open).toContain('border: 1px solid rgba(227, 167, 60, 0.4);')
+    expect(open).toContain('background: rgba(227, 167, 60, 0.07);')
+    // ✓ ready/consumable rides ok-green tint; ✕ declined rust; ! stale amber
+    expect(block('.chip-accepted .chip-glyph')).toContain('rgba(59, 203, 139, 0.14)')
+    expect(block('.chip-declined .chip-glyph')).toContain('rgba(239, 93, 85, 0.14)')
+    expect(block('.chip-stale .chip-glyph')).toContain('rgba(227, 167, 60, 0.14)')
+    // – consumed muted; REQUEST info-bordered; snoozed keeps the dash
+    expect(block('.chip-consumed .chip-glyph')).toContain('var(--bg-hover)')
+    expect(block('.chip-request')).toContain('color: var(--info);')
+    expect(block('.chip-snoozed')).toContain('dashed')
+  })
+  it('row item: 40px two-line anatomy, selected = 2px cobalt bar, hover --bg-hover (§4)', () => {
+    const row = block('.row-item')
+    expect(row).toContain('min-height: 40px;')
+    expect(block('.row-item:hover')).toContain('background: var(--bg-hover);')
+    expect(block(".row-item[aria-current='true']")).toContain('border-left: 2px solid var(--accent);')
+    expect(block('.row-title')).toContain('font-size: 12.5px;')
+    expect(block('.row-sub')).toContain('font-family: var(--font-mono);')
+  })
+  it('agent chip: sacred green live dot with the §4 glow; pulse dies under reduced motion globally', () => {
+    const dot = block('.agent-dot-live')
+    expect(dot).toContain('background: var(--ok);')
+    expect(dot).toContain('box-shadow: 0 0 7px rgba(59, 203, 139, 0.8);')
+    expect(dot).toContain('animation: agent-pulse')
   })
 })
 

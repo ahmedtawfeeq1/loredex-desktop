@@ -6,6 +6,7 @@
 import { useEffect } from 'react'
 import { isValidIdentity } from '../../../../shared/identity'
 import type { HandoffCard } from '../../../../shared/types'
+import { Button } from '../../components/Button'
 import { ConsumeReceiptView } from '../../components/ConsumeReceiptView'
 import { HandoffCardView } from '../../components/HandoffCardView'
 import { ContractChips } from '../contracts/ContractChips'
@@ -59,37 +60,39 @@ function LifecycleActions({ card }: { card: HandoffCard }): React.JSX.Element | 
   return (
     <span className="handoff-actions">
       {actions.includes('accept') && (
-        <button
-          type="button"
-          className="button-primary button-small"
+        <Button
+          variant="primary"
+          className="button-small"
+          kbd="A"
           disabled={disabled}
           title={idleTitle ?? 'Accept — you will take this up'}
           onClick={stop(() => void setStatus(card, { to: 'accepted' }))}
         >
           Accept
-        </button>
+        </Button>
       )}
       {actions.includes('decline') && (
-        <button
-          type="button"
-          className="button-destructive button-small"
+        <Button
+          variant="danger"
+          className="button-small"
+          kbd="D"
           disabled={disabled}
           title={idleTitle ?? 'Decline with a reason (reversible)'}
           onClick={stop(() => openDecline(card))}
         >
           Decline
-        </button>
+        </Button>
       )}
       {actions.includes('snooze') && (
-        <button
-          type="button"
-          className="button-secondary button-small"
+        <Button
+          className="button-small"
+          kbd="S"
           disabled={disabled}
           title={idleTitle ?? 'Snooze until a date'}
           onClick={stop(() => openSnooze(card))}
         >
           Snooze
-        </button>
+        </Button>
       )}
       {actions.includes('consume') && (
         <button
@@ -103,15 +106,14 @@ function LifecycleActions({ card }: { card: HandoffCard }): React.JSX.Element | 
         </button>
       )}
       {actions.includes('reopen') && (
-        <button
-          type="button"
-          className="button-secondary button-small"
+        <Button
+          className="button-small"
           disabled={disabled}
           title={idleTitle ?? 'Reopen — back to the open lane'}
           onClick={stop(() => void setStatus(card, { to: 'open' }))}
         >
           Reopen
-        </button>
+        </Button>
       )}
     </span>
   )
@@ -283,14 +285,14 @@ export function Board(): React.JSX.Element {
         >
           Refresh
         </button>
-        <button
-          type="button"
-          className="button-primary"
+        <Button
+          variant="primary"
+          kbd="⌘N"
           title="Compose a handoff (story 7.2)"
           onClick={() => useHandoffs.getState().openCompose()}
         >
           New handoff
-        </button>
+        </Button>
       </div>
       {error && <div className="note-error">{error}</div>}
       {receipt && <ConsumeReceiptView receipt={receipt} onDismiss={dismissReceipt} />}

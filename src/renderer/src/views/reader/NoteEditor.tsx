@@ -12,6 +12,7 @@
  * change, so ⌘E out / ⌘E back restores). 13px mono, no line numbers,
  * full-bleed pane.
  */
+import { Button } from '../../components/Button'
 import { useEffect, useRef } from 'react'
 import { defaultKeymap, history, historyKeymap, redo, undo } from '@codemirror/commands'
 import { markdown, markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown'
@@ -228,26 +229,22 @@ export function NoteEditor({
         aria-label="Note body (markdown)"
       />
       <div className="editor-foot">
-        <button
-          type="button"
-          className="button-primary"
+        <Button
+          variant="primary"
           disabled={!identity || busy || !unsaved}
           title="Save (⌘S)"
           aria-keyshortcuts="Meta+S"
-          onClick={() => identity && void useEditor.getState().save(identity)}
-        >
+          onClick={() => identity && void useEditor.getState().save(identity)}>
           {busy ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
         {!identity && (
           <p className="modal-error">
             Editing needs an identity.{' '}
-            <button
-              type="button"
-              className="button-quiet"
-              onClick={() => useApp.getState().setView('settings')}
-            >
+            <Button
+              variant="quiet"
+              onClick={() => useApp.getState().setView('settings')}>
               Set it in Settings
-            </button>
+            </Button>
           </p>
         )}
         {error && <p className="modal-error">{error}</p>}

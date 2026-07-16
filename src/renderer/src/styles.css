@@ -677,36 +677,53 @@ a:hover {
   color: var(--text-2);
 }
 
-/* ── buttons: cobalt primary / ink outline secondary / rust outline
-     destructive. One cobalt primary per view, maximum. ─────────────────────── */
+/* ── buttons (v3 §4): soft pills with inner-bevel light. Primary = the ONE
+     cobalt gradient per view; secondary = overlay + hairline-2 + top-light;
+     ghost (quiet) = transparent; danger = rust outline. Focus = 2px card gap
+     + 4px --focus ring, all variants. ─────────────────────────────────────── */
 
 .button-primary {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: 7px;
+  height: 30px;
   padding: 0 14px;
-  border-radius: 10px;
-  background: var(--accent);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent-lo));
   color: var(--accent-ink);
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.5);
   transition: filter 100ms ease-out;
 }
 
 .button-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  /* hover lightens one step: 400 over 500 */
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent-hi));
+}
+
+.button-primary:active:not(:disabled) {
+  /* active goes flat + pressed */
+  background: var(--accent-press);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .button-secondary {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: 7px;
+  height: 30px;
   padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--text-1);
+  border-radius: 8px;
+  border: 1px solid var(--hairline-2);
   color: var(--text-1);
   font-weight: 600;
-  background: transparent;
+  background: var(--bg-overlay);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: background 100ms ease-out;
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
 }
 
 /* Filled-ink emphasis: a prominent default action that is NOT the cobalt
@@ -715,9 +732,10 @@ a:hover {
 .button-emphasis {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: 7px;
+  height: 30px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid var(--text-1);
   background: var(--text-1);
   color: var(--bg-card);
@@ -729,17 +747,14 @@ a:hover {
   filter: brightness(1.08);
 }
 
-.button-secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--text-1) 8%, transparent);
-}
-
 .button-destructive {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: 7px;
+  height: 30px;
   padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--rust);
+  border-radius: 8px;
+  border: 1px solid rgba(229, 72, 77, 0.35);
   color: var(--rust);
   font-weight: 600;
   background: transparent;
@@ -751,31 +766,63 @@ a:hover {
 }
 
 .button-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 3px 8px;
   border-radius: 6px;
   color: var(--text-2);
   font-size: 11px;
+  background: transparent;
   transition: background 100ms ease-out;
 }
 
 .button-quiet:hover {
-  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+  background: var(--bg-hover);
 }
 
-/* ── segmented control (modal/settings pattern): inset track, card-white
-     active segment ────────────────────────────────────────────────────────── */
+/* §4 button focus: ring lifted off the surface, not the global outline */
+.button-primary:focus-visible,
+.button-secondary:focus-visible,
+.button-emphasis:focus-visible,
+.button-destructive:focus-visible,
+.button-quiet:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--focus);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* §4 kbd hints: 9px Geist Mono caps, hairline border, radius 3 — inside
+   buttons (Button kbd prop) and standalone in copy */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+  padding: 2px 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.75;
+}
+
+/* ── segmented control (v3 §4 "pressed glass"): inset track, active segment
+     lifts on --bg-overlay with an inner top-light ─────────────────────────── */
 
 .seg-control {
   display: inline-flex;
   gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
   background: var(--bg-inset);
 }
 
 .seg-option {
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   color: var(--text-2);
   transition: background 100ms ease-out;
@@ -783,10 +830,130 @@ a:hover {
 
 .seg-option[aria-pressed='true'],
 .seg-option[aria-selected='true'] {
-  background: var(--bg-card);
+  background: var(--bg-overlay);
   color: var(--text-1);
   font-weight: 600;
-  box-shadow: var(--shadow-card);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ── row item (v3 §4): 40px two-line list anatomy, selected = 2px cobalt bar ── */
+
+.row-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 10px 4px 8px;
+  border-left: 2px solid transparent; /* cobalt rail slot (§4 selected) */
+  text-align: left;
+  transition: background 100ms ease-out;
+}
+
+.row-item:hover {
+  background: var(--bg-hover);
+}
+
+.row-item[aria-current='true'] {
+  border-left: 2px solid var(--accent);
+  background: var(--bg-hover);
+}
+
+.row-glyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+}
+
+.row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.row-title {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-trailing {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* ── agent chip (v3 §4): the sacred green live treatment, agents only ──── */
+
+.agent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--hairline-2);
+  background: var(--bg-overlay);
+}
+
+.agent-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.agent-dot-live {
+  background: var(--ok);
+  box-shadow: 0 0 7px rgba(59, 203, 139, 0.8);
+  animation: agent-pulse 2s ease-in-out infinite;
+}
+
+@keyframes agent-pulse {
+  50% {
+    box-shadow: 0 0 3px rgba(59, 203, 139, 0.4);
+  }
+}
+
+.agent-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.agent-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .seg-option:disabled {
@@ -1614,46 +1781,96 @@ a:hover {
   color: var(--text-2);
 }
 
-/* stamp chip: 10px mono uppercase letterspaced, 1px border, transparent fill.
-   v3 palette: OPEN amber, ACCEPTED ink, DECLINED/STALE rust, CONSUMED/DONE
-   text-2, SNOOZED text-2 dashed. */
+/* status chips (v3 §4): glyph + label, never color alone. Glyph states get a
+   15px rounded-square tinted box; OPEN = amber ring-dot chip; REQUEST =
+   info-bordered mono chip; SNOOZED keeps the dashed border. */
 .status-chip {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border: 1px solid currentColor;
-  border-radius: 3px;
   padding: 1px 5px;
+  border-radius: 4px;
 }
 
+.chip-glyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+/* OPEN: amber ring-dot chip — mono 10, amber border rgba(.4), bg rgba(.07);
+   the ● glyph is the ring dot itself */
 .chip-open {
   color: var(--warn);
+  border: 1px solid rgba(227, 167, 60, 0.4);
+  background: rgba(227, 167, 60, 0.07);
+}
+
+.chip-open .chip-glyph {
+  width: auto;
+  height: auto;
+  background: none;
+  font-size: 7px;
+}
+
+/* REQUEST: info-bordered mono chip */
+.chip-request {
+  color: var(--info);
+  border: 1px solid currentColor;
 }
 
 .chip-accepted {
-  color: var(--text-1);
+  color: var(--ok);
 }
 
-.chip-declined,
-.chip-stale {
+.chip-accepted .chip-glyph {
+  background: rgba(59, 203, 139, 0.14);
+}
+
+.chip-declined {
   color: var(--rust);
+}
+
+.chip-declined .chip-glyph {
+  background: rgba(239, 93, 85, 0.14);
+}
+
+.chip-stale {
+  color: var(--warn);
+}
+
+.chip-stale .chip-glyph {
+  background: rgba(227, 167, 60, 0.14);
 }
 
 .chip-consumed,
 .chip-done {
-  color: var(--text-2);
+  color: var(--text-3);
+}
+
+.chip-consumed .chip-glyph,
+.chip-done .chip-glyph {
+  background: var(--bg-hover);
 }
 
 .chip-snoozed {
-  color: var(--text-2);
-  border-style: dashed;
+  color: var(--text-3);
+  border: 1px dashed currentColor;
 }
 
-/* request cards carry an info REQUEST chip beside the stamp (v2 thread spec) */
-.chip-request {
-  color: var(--info);
+.chip-snoozed .chip-glyph {
+  background: var(--bg-hover);
 }
 
 /* consume = stamp press: the app's ONE bespoke animation (120ms ease-out);

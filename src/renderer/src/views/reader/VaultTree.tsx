@@ -12,6 +12,7 @@
  * Content segmented toggle — Content runs vault.search full-text and replaces
  * the tree with a flat result list (fileSearch store).
  */
+import { Button } from '../../components/Button'
 import { useEffect } from 'react'
 import type { SearchHit } from '../../../../shared/ipc-contract'
 import type { TreeNode } from '../../../../shared/types'
@@ -309,14 +310,12 @@ export function VaultTree(): React.JSX.Element {
       <div className="pane-list-header">
         <span className="pane-list-title">Dex</span>
         <span className="pane-list-actions">
-          <button
-            type="button"
-            className="button-quiet"
+          <Button
+            variant="quiet"
             title="Re-read the vault from disk"
-            onClick={() => void refresh()}
-          >
+            onClick={() => void refresh()}>
             Refresh
-          </button>
+          </Button>
           <button
             type="button"
             className="rail-toggle"

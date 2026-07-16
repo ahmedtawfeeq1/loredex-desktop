@@ -8,6 +8,7 @@
  * D1 amendment (v1.1): hovering/focusing an anchored span floats the comment
  * popover above it — the fast path; the margin rail remains.
  */
+import { Button } from '../../components/Button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Doc } from '../../../../shared/ipc-contract'
 import type { NoteComment } from '../../../../shared/types'
@@ -313,20 +314,16 @@ export function NoteArticle({
         )}
         {handoffRef && (
           <div className="note-handoff-actions">
-            <button
-              type="button"
-              className="button-secondary button-small"
-              onClick={() => useHandoffs.getState().openCompose(handoffRef)}
-            >
+            <Button
+              className="button-small"
+              onClick={() => useHandoffs.getState().openCompose(handoffRef)}>
               Reply
-            </button>
-            <button
-              type="button"
-              className="button-secondary button-small"
-              onClick={() => useHandoffs.getState().openAnnotate(handoffRef)}
-            >
+            </Button>
+            <Button
+              className="button-small"
+              onClick={() => useHandoffs.getState().openAnnotate(handoffRef)}>
               Comment
-            </button>
+            </Button>
           </div>
         )}
         <PropertiesPanel

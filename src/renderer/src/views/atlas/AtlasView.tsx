@@ -29,9 +29,12 @@ import { ProjectLauncher } from './ProjectLauncher'
 import { ProjectPage } from './ProjectPage'
 import { TourPanel } from './TourPanel'
 
+/** v3 §5 lens names over the internal levels (ids stay, §8 terminology):
+ *  Map ← Overview, Project ← Learn, Deep Dive kept. Thread is the fourth
+ *  lens — the re-homed Path tool (one handoff chain as a story). */
 const LEVEL_LABEL: Record<AtlasLevel, string> = {
-  overview: 'Overview',
-  learn: 'Learn',
+  overview: 'Map',
+  learn: 'Project',
   deep: 'Deep Dive',
 }
 
@@ -192,30 +195,58 @@ export function AtlasView(): React.JSX.Element {
             row below — the toolbar no longer overlaps the breadcrumb. */}
         <div className="atlas-header-row">
         <div className="atlas-header-left">
-          <span className="atlas-eyebrow">VAULT ATLAS</span>
+          <span className="atlas-eyebrow">DEX ATLAS</span>
           <div className="seg-control" role="tablist" aria-label="Zoom level">
-            {(['overview', 'learn', 'deep'] as const).map((l) => (
+            {(['overview', 'learn'] as const).map((l) => (
               <button
                 key={l}
                 type="button"
                 className="seg-option"
                 role="tab"
-                aria-selected={level === l}
+                aria-selected={level === l && panel !== 'path'}
                 disabled={l === 'learn' && !learnTarget}
                 title={
                   l === 'learn' && !learnTarget
                     ? 'Select or open a project first'
-                    : `${LEVEL_LABEL[l]} level`
+                    : `${LEVEL_LABEL[l]} lens`
                 }
                 onClick={() => {
+                  setPanel(null)
                   if (l === 'overview') void navigate('overview', {})
                   else if (l === 'learn' && learnTarget) void navigate('learn', { project: learnTarget })
-                  else if (l === 'deep') void navigate('deep', scope)
                 }}
               >
                 {LEVEL_LABEL[l]}
               </button>
             ))}
+            {/* v3 §5 Thread lens: the Path tool re-homed — one handoff chain
+                as a story, traced on the Deep Dive canvas */}
+            <button
+              type="button"
+              className="seg-option"
+              role="tab"
+              aria-selected={panel === 'path'}
+              title="Thread lens — trace one handoff chain start to finish"
+              onClick={() => {
+                void navigate('deep', scope)
+                setPanel('path')
+              }}
+            >
+              Thread
+            </button>
+            <button
+              type="button"
+              className="seg-option"
+              role="tab"
+              aria-selected={level === 'deep' && panel !== 'path'}
+              title="Deep Dive lens"
+              onClick={() => {
+                setPanel(null)
+                void navigate('deep', scope)
+              }}
+            >
+              Deep Dive
+            </button>
           </div>
         </div>
         <div className="atlas-toolbar">

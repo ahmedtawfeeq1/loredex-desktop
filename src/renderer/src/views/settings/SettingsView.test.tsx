@@ -16,22 +16,34 @@ vi.mock('./ScopeSettings', () => ({ ScopeSettings: () => <div>Scope-card</div> }
 vi.mock('./GitHubSection', () => ({ GitHubSection: () => <div>GitHub-card</div> }))
 vi.mock('./McpSection', () => ({ McpSection: () => <div>Mcp-card</div> }))
 vi.mock('./TypographySection', () => ({ TypographySection: () => <div>Typography-card</div> }))
+vi.mock('../sync/SyncPanel', () => ({ SyncPanel: () => <div>Sync-card</div> }))
 
+import { useSettingsTab } from '../../stores/settingsTab'
 import { SettingsView } from './SettingsView'
 
-describe('SettingsView tabs', () => {
-  it('shows General cards by default and hides other tabs', () => {
-    render(<SettingsView />)
-    expect(screen.getByText('Appearance-card')).toBeTruthy()
-    expect(screen.getByText('Identity-card')).toBeTruthy()
-    expect(screen.queryByText('Scope-card')).toBeNull()
-  })
+afterEach(() => useSettingsTab.setState({ tab: 'Workspace' }))
 
-  it('switches to the Vault tab on click', () => {
+describe('SettingsView tabs (v3 §5 regroup)', () => {
+  it('shows Workspace cards by default and hides other tabs', () => {
     render(<SettingsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Vault' }))
     expect(screen.getByText('Scope-card')).toBeTruthy()
     expect(screen.getByText('Contracts-card')).toBeTruthy()
     expect(screen.queryByText('Appearance-card')).toBeNull()
+  })
+
+  it('switches to Personal on click', () => {
+    render(<SettingsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Personal' }))
+    expect(screen.getByText('Identity-card')).toBeTruthy()
+    expect(screen.getByText('Appearance-card')).toBeTruthy()
+    expect(screen.queryByText('Scope-card')).toBeNull()
+  })
+
+  it('System holds the dissolved Sync view + hosts', () => {
+    render(<SettingsView />)
+    fireEvent.click(screen.getByRole('tab', { name: 'System' }))
+    expect(screen.getByText('Sync-card')).toBeTruthy()
+    expect(screen.getByText('GitHub-card')).toBeTruthy()
+    expect(screen.getByText('Mcp-card')).toBeTruthy()
   })
 })

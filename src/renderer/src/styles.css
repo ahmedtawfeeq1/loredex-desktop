@@ -6205,3 +6205,22 @@ a.commit-chip-sha:hover {
 .inbox-actionbar-gap {
   flex: 1;
 }
+
+/* v3 §6.6 first-run checklist (story 26.6) */
+.firstrun-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+.firstrun-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.firstrun-check-text {
+  font-size: 12.5px;
+  color: var(--text-2);
+}

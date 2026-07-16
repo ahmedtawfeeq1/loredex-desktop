@@ -26,7 +26,7 @@ export interface RelationshipChip {
   nodeId: string
   /** total handoffs on this lane */
   total: number
-  /** still-open handoffs on this lane (gold emphasis when > 0) */
+  /** still-open handoffs on this lane (amber emphasis when > 0) */
   open: number
   /** any handoff on this lane is blocking (m2 lifecycle) */
   blocking: boolean

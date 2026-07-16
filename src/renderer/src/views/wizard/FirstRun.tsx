@@ -1,29 +1,16 @@
 /**
  * First-run screen (story 13.2 AC2): replaces the bare vault picker whenever
- * no vault is configured. Logo mark, one serif sentence, three cards — Create
+ * no vault is configured. Logo mark, one quiet sentence, three cards — Create
  * (13.1 wizard), Join (13.2 wizard), Open an existing folder (the old picker
  * path, kept). Renderer composition only; no new state.
  */
+import { BrandMark } from '../../components/BrandMark'
 import { useApp } from '../../stores/app'
 import { useWizard } from '../../stores/wizard'
 
-/** Inline loredex mark (build/icon.svg identity: gold dex ring, paper card). */
+/** The R1 brand mark, first-run sized (brass ring mark retired — DESIGN v3). */
 function Mark(): React.JSX.Element {
-  return (
-    <svg className="firstrun-mark" viewBox="0 0 96 96" aria-hidden="true">
-      <circle cx="48" cy="48" r="34" fill="none" stroke="var(--gold)" strokeWidth="5" />
-      <g transform="rotate(5 52 52)">
-        <path
-          d="M 34 28 H 56 L 66 38 V 66 a 4 4 0 0 1 -4 4 H 38 a 4 4 0 0 1 -4 -4 Z"
-          fill="var(--bg-card)"
-          stroke="var(--hairline)"
-        />
-        <rect x="40" y="44" width="18" height="3" rx="1.5" fill="var(--text-2)" />
-        <rect x="40" y="51" width="22" height="3" rx="1.5" fill="var(--text-2)" />
-        <rect x="40" y="58" width="14" height="3" rx="1.5" fill="var(--text-2)" />
-      </g>
-    </svg>
-  )
+  return <BrandMark size={96} className="firstrun-mark" />
 }
 
 export function FirstRun(): React.JSX.Element {

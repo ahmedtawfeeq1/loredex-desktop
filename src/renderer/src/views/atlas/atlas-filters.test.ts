@@ -193,7 +193,7 @@ describe('decor classes (ring taxonomy stays distinct)', () => {
     expect(nodeDecorClass('n1', undefined)).toBe('')
   })
 
-  it('edges go gold on the traced path and fade outside focus', () => {
+  it('edges go cobalt on the traced path and fade outside focus', () => {
     const decor = { pathEdges: new Set(['e1']), focus: new Set(['a', 'b']) }
     expect(edgeDecorClass({ id: 'e1', source: 'a', target: 'b' }, decor)).toBe(' atlas-edge-path')
     expect(edgeDecorClass({ id: 'e2', source: 'a', target: 'z' }, decor)).toBe(' atlas-edge-faded')

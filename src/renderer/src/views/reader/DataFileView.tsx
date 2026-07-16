@@ -17,7 +17,7 @@ import { editorChrome, markdownHighlight } from './editorTheme'
 const DATA_VIEW_CSS = `
 .data-view { padding: 24px 32px; max-width: 980px; }
 .data-view-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
-.data-view-title { font-family: var(--font-serif, serif); font-size: 22px; color: var(--text-1); }
+.data-view-title { font-family: var(--font-ui); font-size: 22px; color: var(--text-1); }
 .data-view-type {
   font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
   color: var(--text-2); border: 1px solid var(--hairline); border-radius: 5px; padding: 1px 6px;

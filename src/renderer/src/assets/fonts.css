@@ -3,6 +3,15 @@
  * `stack` in src/shared/fonts.ts exactly, or the fonts silently fall back.
  */
 
+/* v3 defaults (DESIGN v3 §3): Geist = UI voice, Geist Mono = machine facts */
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/geist-400.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/geist-500.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 600; font-display: swap; src: url('./fonts/geist-600.woff2') format('woff2'); }
+@font-face { font-family: 'Geist'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/geist-700.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/geist-mono-400.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('./fonts/geist-mono-500.woff2') format('woff2'); }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url('./fonts/geist-mono-600.woff2') format('woff2'); }
+
 @font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/dm-sans-400.woff2') format('woff2'); }
 @font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('./fonts/dm-sans-700.woff2') format('woff2'); }
 @font-face { font-family: 'Sora'; font-style: normal; font-weight: 400; font-display: swap; src: url('./fonts/sora-400.woff2') format('woff2'); }

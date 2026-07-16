@@ -267,7 +267,7 @@ export interface AtlasNode {
   from?: string
   to?: string
   expired?: boolean
-  /** project cluster: open inbound count (gold badge) + contained note volume */
+  /** project cluster: open inbound count (amber badge) + contained note volume */
   openCount?: number
   noteCount?: number
   /** source: recorded provenance; localPath = this-machine re-resolution via the
@@ -343,7 +343,7 @@ export interface AtlasGraph {
   cyclic: boolean
 }
 
-/** BFS shortest-path result (story 10.6, ATLAS-6) — rendered gold as a
+/** BFS shortest-path result (story 10.6, ATLAS-6) — rendered cobalt as a
  *  clickable routing-slip chain; null crosses the seam when disconnected. */
 export interface AtlasPathResult {
   nodeIds: string[]

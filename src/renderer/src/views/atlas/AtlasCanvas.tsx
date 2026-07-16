@@ -91,7 +91,7 @@ const pathOf = (points: Array<{ x: number; y: number }>): string =>
   points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 
 /** Open-count dot center: back off the routed END point (which sits just off
- *  the target card) along the incoming segment, so the gold badge lands just
+ *  the target card) along the incoming segment, so the amber badge lands just
  *  clear of the arrowhead rather than on top of it. Pure, no de-collision. */
 const OPEN_DOT_R = 8
 /** Place the open-count dot near the target end but CLEAR of the arrowhead.
@@ -145,11 +145,11 @@ function OrthoEdge({
   /** WP-B: reveal the `from ⟶ to · N open / M total` callout at the cursor */
   onShowCallout: (text: string, clientX: number, clientY: number) => void
   onHideCallout: () => void
-  /** path gold / focus fade (views/atlas/decor.ts, story 10.6) */
+  /** path accent / focus fade (views/atlas/decor.ts, story 10.6) */
   decorClass?: string
   /** hover emphasis: this edge touches the hovered node */
   hot?: boolean
-  /** thread edge whose thread is still open — draws gold (D1 amendment 3) */
+  /** thread edge whose thread is still open — draws amber (D1 amendment 3) */
   openThread?: boolean
   /** WP-D: a drilled-level route connector, now redundant with the Learn
    *  relationship strip — drawn thin + label-less, no width/dot/callout, just
@@ -162,21 +162,21 @@ function OrthoEdge({
   const { points } = orthoRoute(a, b, off, stub)
   const start = points[0] as { x: number; y: number }
   const end = points[points.length - 1] as { x: number; y: number }
-  const gold = edge.category === 'route' && edge.blocking
+  const warn = edge.category === 'route' && edge.blocking
   const dashed =
     edge.category === 'affinity' ||
     (edge.category === 'contract-link' && edge.confidence === 'heuristic')
   const aggregated = edge.totalCount !== undefined
   const openCount = edge.openCount ?? 0
   // in-panel relationship connectors (everything but the aggregated project
-  // routes) draw as thin, soft-cornered curves; open threads glow gold. WP-D: a
+  // routes) draw as thin, soft-cornered curves; open threads glow amber. WP-D: a
   // quiet drilled-level route joins them — thin + hover-only, the strip carries
   // the counts now.
   const inPanel = edge.category !== 'route' || quiet === true
   const threadGold = openThread === true
   const d = pathOf(points)
   // WP-A: magnitude lives on the edge — stroke width ∝ total. Inline so it wins
-  // over the base .atlas-edge-line width; hover recolours (gold) but the encoded
+  // over the base .atlas-edge-line width; hover recolours (amber) but the encoded
   // width stays. Non-aggregated relationship edges keep their CSS hairline. WP-D:
   // a quiet drilled route drops the width encoding + open dot + hover callout.
   const lineStyle = aggregated && !quiet ? { strokeWidth: edgeWidth(edge.totalCount) } : undefined
@@ -187,10 +187,10 @@ function OrthoEdge({
       className={`atlas-edge atlas-edge-${edge.category}${inPanel ? ' atlas-edge-inpanel' : ''}${threadGold ? ' atlas-edge-open-thread' : ''}${decorClass}${hot ? ' atlas-edge-hot' : ''}`}
     >
       <path
-        className={`atlas-edge-line${gold ? ' atlas-edge-blocking' : ''}${dashed ? ' atlas-edge-heuristic' : ''}`}
+        className={`atlas-edge-line${warn ? ' atlas-edge-blocking' : ''}${dashed ? ' atlas-edge-heuristic' : ''}`}
         d={d}
         style={lineStyle}
-        markerEnd={gold ? 'url(#atlas-arrow-gold)' : 'url(#atlas-arrow)'}
+        markerEnd={warn ? 'url(#atlas-arrow-warn)' : 'url(#atlas-arrow)'}
       />
       {/* wide invisible hit path: edge click = the handoff/diff it stands for.
           WP-B: on an aggregated route it also drives the hover detail callout
@@ -235,7 +235,7 @@ function OrthoEdge({
                 : edge.category}
         </title>
       </path>
-      {/* WP-A: small gold open-count badge near the target — only when it
+      {/* WP-A: small amber open-count badge near the target — only when it
           matters (open > 0). Total/consumed live in the hover detail. */}
       {dot && (
         <g className="atlas-edge-opendot" aria-hidden>
@@ -364,8 +364,8 @@ export function AtlasCanvas({
     return map
   }, [graph.clusters, byId, level])
 
-  // in-panel thread edges glow gold while their thread is still open (an
-  // endpoint handoff is open/accepted/expired) — D1a3 "gold for open threads"
+  // in-panel thread edges glow amber while their thread is still open (an
+  // endpoint handoff is open/accepted/expired) — D1a3 "amber for open threads"
   const openThreadEdges = useMemo(() => {
     const openish = (n: AtlasNode | undefined): boolean =>
       n?.type === 'handoff' &&
@@ -608,7 +608,7 @@ export function AtlasCanvas({
             <path d="M 0 0 L 10 5 L 0 10 z" className="atlas-arrowhead" />
           </marker>
           <marker
-            id="atlas-arrow-gold"
+            id="atlas-arrow-warn"
             viewBox="0 0 10 10"
             refX="9"
             refY="5"
@@ -616,7 +616,7 @@ export function AtlasCanvas({
             markerHeight="7"
             orient="auto-start-reverse"
           >
-            <path d="M 0 0 L 10 5 L 0 10 z" className="atlas-arrowhead-gold" />
+            <path d="M 0 0 L 10 5 L 0 10 z" className="atlas-arrowhead-warn" />
           </marker>
         </defs>
         <rect

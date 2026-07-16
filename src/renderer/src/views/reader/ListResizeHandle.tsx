@@ -28,10 +28,10 @@ const HANDLE_CSS = `
 }
 .list-resize-handle:hover,
 .list-resize-handle.dragging {
-  background: color-mix(in srgb, var(--gold) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .list-resize-handle:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {

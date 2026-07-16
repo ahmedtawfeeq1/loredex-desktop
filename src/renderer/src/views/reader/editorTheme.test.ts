@@ -19,8 +19,8 @@ function block(selector: string): string {
   return css.slice(open + 1, css.indexOf('}', open))
 }
 
-const light = block(':root {')
-const dark = block(":root[data-theme='dark']")
+const dark = block(':root {')
+const light = block("[data-theme='light'] {")
 
 describe('highlight styles ride the app theme tokens (both themes)', () => {
   it('every syntax tint is a var(--token), nothing hard-coded', () => {

@@ -70,7 +70,7 @@
   color: var(--ok);
 }
 .ops-pill-v.pill-warn {
-  color: var(--gold);
+  color: var(--warn);
 }
 .ops-pill-v.pill-err {
   color: var(--rust);
@@ -95,7 +95,7 @@
 }
 
 .ops-title {
-  font-family: var(--font-serif, ui-serif);
+  font-family: var(--font-ui);
   font-size: 27px;
   font-weight: 650;
   letter-spacing: -0.015em;
@@ -280,13 +280,13 @@
 }
 
 .ops-cta-primary {
-  border-color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 14%, var(--bg-card));
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-card));
 }
 
 .ops-cta-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--gold) 22%, var(--bg-card));
-  border-color: var(--gold);
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-card));
+  border-color: var(--accent);
 }
 
 .ops-cta-icon {
@@ -296,7 +296,7 @@
 }
 
 .ops-cta-primary .ops-cta-icon {
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .ops-cta-label {
@@ -335,7 +335,7 @@
   color: var(--rust);
 }
 .sev-warning {
-  color: var(--gold);
+  color: var(--warn);
 }
 .sev-info {
   color: var(--text-2);
@@ -372,8 +372,8 @@
   background: color-mix(in srgb, var(--rust) 12%, transparent);
 }
 .sevchip.sev-warning {
-  color: var(--gold);
-  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
 }
 .sevchip.sev-info {
   color: var(--text-2);
@@ -462,7 +462,7 @@
   margin-left: 8px;
 }
 .lg-created {
-  background: var(--gold);
+  background: var(--accent);
 }
 .lg-consumed {
   background: var(--ok);
@@ -504,7 +504,7 @@
 }
 
 .ops-vbar.v-created {
-  fill: var(--gold);
+  fill: var(--accent);
 }
 .ops-vbar.v-consumed {
   fill: var(--ok);
@@ -514,22 +514,22 @@
   stroke: none;
 }
 .grad-top {
-  stop-color: var(--gold);
+  stop-color: var(--accent);
   stop-opacity: 0.28;
 }
 .grad-bot {
-  stop-color: var(--gold);
+  stop-color: var(--accent);
   stop-opacity: 0;
 }
 .ops-area-line {
   fill: none;
-  stroke: var(--gold);
+  stroke: var(--accent);
   stroke-width: 1.75;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 .ops-area-dot {
-  fill: var(--gold);
+  fill: var(--accent);
   stroke: var(--bg-card);
   stroke-width: 1.5;
 }
@@ -653,7 +653,7 @@
   display: block;
   height: 100%;
   border-radius: 2px;
-  background: color-mix(in srgb, var(--gold) 70%, transparent);
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
 }
 
 /* ── relations strip ───────────────────────────────────────────────────────── */
@@ -706,7 +706,7 @@
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  color: var(--gold);
+  color: var(--accent);
   margin-left: 2px;
 }
 
@@ -722,7 +722,7 @@
 }
 
 .ops-fresh-line {
-  font-family: var(--font-serif, ui-serif);
+  font-family: var(--font-ui);
   font-size: 17px;
   color: var(--text-1);
   margin: 0;

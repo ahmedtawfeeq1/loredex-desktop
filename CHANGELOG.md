@@ -7,6 +7,37 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-17
+
+### Changed
+- **DESIGN v3 "Obsidian Glass / Cobalt"** — the full approved redesign
+  (stories 26.1–26.9). Dark-first §2 token system, self-hosted Geist /
+  Geist Mono, the locked R1 brand mark; §4 primitives (cobalt-gradient
+  buttons with kbd hints, glyph status chips, pressed-glass segments);
+  Home → **Today** (ranked needs-you triage, in-flight agents, new
+  knowledge, insight rail); Handoffs → two-pane **Inbox** (For me /
+  Created / All, reading order, floating action bar); one-key triage
+  A/D/S/E + C everywhere; Atlas lenses **Map · Project · Thread · Deep
+  Dive**; Settings regrouped Workspace / Personal / System with the Sync
+  view absorbed; first-run checklist. Every v2 capability re-homed, none
+  removed.
+
+### Added
+- **Plan** (preview flag): Board · Backlog · Sprints over the handoff
+  state machine — enable via ⌘K "Enable the Plan preview".
+- **Agents view**: roster from git attribution + a read-only live MCP
+  session feed; per-agent MCP tokens (mint once, revoke live) attribute
+  each tool call.
+- **GitHub sign-in** (optional, SSH dexes need none): reuse a gh session,
+  paste a PAT, or the OAuth **device flow**; tokens in the macOS keychain
+  (encrypted-file fallback elsewhere); dex registry — list repos tagged
+  `loredex-dex`, Join (clone) or Create from the app; HTTPS remotes ride
+  the stored token via an askpass shim.
+
+### Fixed
+- Amber/gold no longer collides with warning semantics anywhere; status
+  is always glyph + label, never color alone.
+
 ## [0.6.0] - 2026-07-16
 
 ### Added

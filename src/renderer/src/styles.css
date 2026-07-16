@@ -6317,3 +6317,32 @@ a.commit-chip-sha:hover {
 a.button-primary {
   text-decoration: none;
 }
+
+/* v3 P7 (story 26.8): client fleet facts in the tree — tag chips + inbox badge */
+.tree-client-tags {
+  display: inline-flex;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tree-client-tag {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  border: 1px solid var(--hairline-2);
+  border-radius: 4px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.tree-client-inbox {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--bg-app);
+  background: var(--warn);
+  border-radius: 8px;
+  padding: 0 5px;
+}

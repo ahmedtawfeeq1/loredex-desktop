@@ -5,7 +5,7 @@
  * clients.workspace — writes only gitignored files). Every file name is a
  * reader open target (hyperlink-everything).
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ClientInfo, WorkspaceResult } from '../../../../shared/ipc-contract'
 import { invoke } from '../../api'
 import { useApp } from '../../stores/app'
@@ -19,7 +19,7 @@ const PAGE_CSS = `
 .cp-back { font-size: 12px; color: var(--text-2); margin-bottom: 10px; }
 .cp-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .cp-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--section-color); }
-.cp-title { font-family: var(--font-serif, serif); font-size: 26px; color: var(--text-1); }
+.cp-title { font-family: var(--font-ui); font-size: 26px; color: var(--text-1); }
 .cp-manager { font-size: 12px; color: var(--text-2); }
 .cp-tags { display: flex; gap: 6px; }
 .cp-tag { font-size: 11px; font-weight: 600; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 12px; padding: 1px 9px; }
@@ -27,7 +27,7 @@ const PAGE_CSS = `
 .cp-errors { color: var(--rust, #a33f2e); font-weight: 600; }
 .cp-attention {
   display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 16px;
-  border: 1px solid var(--gold, #8a6116); border-radius: 8px; font-size: 12.5px; color: var(--text-1);
+  border: 1px solid var(--warn); border-radius: 8px; font-size: 12.5px; color: var(--text-1);
 }
 .cp-section { margin-bottom: 22px; }
 .cp-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); margin-bottom: 8px; }
@@ -50,6 +50,7 @@ const PAGE_CSS = `
 .cp-row:hover { background: var(--bg-inset); }
 .cp-row-type { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 4px; padding: 0 5px; }
 .cp-ws { border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; background: var(--bg-card); }
+.cp-ws-conn { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); }
 .cp-ws-row { display: flex; align-items: center; gap: 10px; }
 .cp-ws-result { margin-top: 8px; font-size: 12px; color: var(--text-2); }
 .cp-ws-result .ok { color: var(--ok, #2e6e5e); }
@@ -121,6 +122,15 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<WorkspaceResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // v3 P7 green heartbeat (story 26.8): connected = the in-app MCP host is
+  // listening — the wiring the generated .mcp.json points agents at
+  const [mcp, setMcp] = useState<{ running: boolean; port: number | null } | null>(null)
+
+  useEffect(() => {
+    void invoke('mcp.status', undefined)
+      .then((st) => setMcp({ running: st.state === 'running', port: st.port }))
+      .catch(() => setMcp({ running: false, port: null }))
+  }, [])
 
   async function run(check: boolean): Promise<void> {
     setBusy(true)
@@ -137,6 +147,18 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   return (
     <div className="cp-ws">
       <div className="cp-ws-row">
+        <span
+          className={`agent-dot${mcp?.running ? ' agent-dot-live' : ''}`}
+          title={
+            mcp?.running
+              ? `connected — MCP host on 127.0.0.1:${mcp.port}`
+              : 'MCP host not running — agents cannot connect'
+          }
+          aria-hidden="true"
+        />
+        <span className="cp-ws-conn">
+          {mcp === null ? 'checking…' : mcp.running ? `connected · :${mcp.port}` : 'not connected'}
+        </span>
         <button type="button" className="cp-filelink" onClick={() => openNote(`${info.dir}/workspace.yml`)}>
           workspace.yml
         </button>

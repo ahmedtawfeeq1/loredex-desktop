@@ -1,53 +1,73 @@
-/* Loredex Desktop — DESIGN.md v2 tokens + shell. "Card catalog, daylight
-   edition": warm paper-grey ground, white cards, navy ink, gold spent only on
-   primary actions and open-handoff state. Tokens implemented exactly as
-   specified; dark theme is the same tokens flipped via [data-theme='dark']
-   (the theme store stamps the resolved theme on <html> — 'system' follows the
-   OS through a prefers-color-scheme listener). */
+/* Loredex Desktop — DESIGN v3 "Obsidian Glass / Cobalt" tokens + shell
+   (docs/DESIGN.md v3 amendment §2). Dark-first: :root holds the dark theme,
+   [data-theme='light'] overrides (the theme store stamps the resolved theme
+   on <html> — 'system' follows the OS through a prefers-color-scheme
+   listener). Every hex comes from §2 — never eyeballed. */
 
 :root {
-  --bg-app: #f6f5f1;
-  --bg-card: #ffffff;
-  --bg-inset: #efeee9;
-  --hairline: #e4e2db;
-  --text-1: #131826;
-  --text-2: #6e6e73;
-  --gold: #c08a2d;
-  --gold-ink: #131826;
-  --navy: #131826;
-  --rust: #a63d2f;
-  --ok: #2e6e5e;
-  --wikilink: #8a6116; /* Addendum D1: inline note references, light theme */
-  --link: #0b57d0; /* Addendum D2: external hyperlinks — blue, never system blue */
+  /* DARK (default) */
+  --bg-app: #0b0d12;
+  --bg-card: #12151c;
+  --bg-hover: #171b23;
+  --bg-inset: #0f1218;
+  --bg-overlay: #1d222c;
+  --hairline: #232936;
+  --hairline-2: #2f3646;
+  --text-1: #e8eaf0;
+  --text-2: #9aa3b2;
+  --text-3: #6b7280;
+  --accent: #5584e8; /* cobalt 500 — the ONE action color */
+  --accent-hi: #6e96ee; /* 400: gradients top, hover */
+  --accent-lo: #4a75d6; /* gradients bottom */
+  --accent-press: #3f69cc;
+  --accent-ink: #f5f8ff; /* text on cobalt */
+  --link: #8fb1f5; /* cobalt 300 */
+  --warn: #e3a73c; /* attention / open / stale — never on buttons */
+  --ok: #3bcb8b; /* live + success — sacred to agents */
+  --rust: #ef5d55;
+  --info: #93a6c9;
+  --brand: #d9a63c; /* brass — BrandMark.tsx ONLY (unused by the R1 mark) */
+  --focus: rgba(85, 132, 232, 0.55);
+  --wikilink: #8fb1f5; /* internal note links ride cobalt 300, like --link */
   --shadow-card: 0 1px 3px rgba(19, 24, 38, 0.06);
 }
 
-:root[data-theme='dark'] {
-  --bg-app: #131826;
-  --bg-card: #1c2536;
-  --bg-inset: #182032;
-  --hairline: #2a3347;
-  --text-1: #f2efe8;
-  --text-2: #98a0b0;
-  --gold: #e0a83e;
-  --gold-ink: #131826;
-  --navy: #f2efe8;
-  --rust: #d4715f;
-  --ok: #63b3a1;
-  --wikilink: #e0a83e; /* Addendum D1: gold in dark */
-  --link: #8ab4f8; /* Addendum D2: external hyperlinks in dark */
+[data-theme='light'] {
+  --bg-app: #f3f2ee;
+  --bg-card: #ffffff;
+  --bg-hover: #faf9f5;
+  --bg-inset: #eae8e1;
+  --bg-overlay: #ffffff;
+  --hairline: #e1ded4;
+  --hairline-2: #d6d3c8;
+  --text-1: #16181d;
+  --text-2: #565d68;
+  --text-3: #8a8f99;
+  --accent: #2e5fc7;
+  --accent-hi: #3d6fd6;
+  --accent-lo: #2854b2;
+  --accent-press: #234a9e;
+  --accent-ink: #ffffff;
+  --link: #2e5fc7;
+  --warn: #96700f;
+  --ok: #1e8f5f;
+  --rust: #b44439;
+  --info: #5c6b85;
+  --brand: #be8c22;
+  --focus: rgba(46, 95, 199, 0.45);
+  --wikilink: #2e5fc7;
 }
 
-/* ── type roles (unchanged from v1) ────────────────────────────────────── */
+/* ── type roles (v3 §3: Geist = UI, Geist Mono = machine facts) ────────── */
 
 :root {
-  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+  --font-ui: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-serif: ui-serif, 'New York', Georgia, serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
-  /* per-role note fonts (story: fonts settings) — default to today's values so
-     an unset/'system' font config renders byte-identical to before */
-  --note-title: var(--font-serif);
-  --note-heading: var(--font-serif);
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* per-role note fonts (story: fonts settings) — v3 defaults are Geist /
+     Geist Mono (§3: retro/serif defaults retired; the user setting stays) */
+  --note-title: var(--font-ui);
+  --note-heading: var(--font-ui);
   --note-body: var(--font-ui);
   --note-code: var(--font-mono);
 }
@@ -78,9 +98,9 @@ body {
   font-size: 11px;
 }
 
-/* quality floor: 2px gold ring offset 2px, everywhere */
+/* quality floor: 2px cobalt ring offset 2px, everywhere */
 :focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -93,9 +113,9 @@ button {
   cursor: pointer;
 }
 
-/* links: navy, underline on hover (dark: paper via the token flip) */
+/* links: cobalt (--link, §1: 300 dark / 700-class light), underline on hover */
 a {
-  color: var(--navy);
+  color: var(--link);
   text-decoration: none;
 }
 
@@ -161,7 +181,7 @@ a:hover {
   width: 100%;
   text-align: left;
   padding: 5px 8px 5px 12px;
-  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-left: 4px solid transparent; /* cobalt rail slot (sanctioned 4px rail) */
   border-radius: 0 6px 6px 0;
   transition: background 100ms ease-out;
 }
@@ -170,11 +190,11 @@ a:hover {
   background: color-mix(in srgb, var(--text-1) 7%, transparent);
 }
 
-/* active nav: gold left rail (4px) + inset fill + navy 600 text */
+/* active nav: cobalt left rail (4px) + inset fill + ink 600 text */
 .nav-item[aria-current='true'] {
-  border-left-color: var(--gold);
+  border-left-color: var(--accent);
   background: var(--bg-inset);
-  color: var(--navy);
+  color: var(--text-1);
   font-weight: 600;
 }
 
@@ -254,7 +274,7 @@ a:hover {
   min-height: 38px;
   text-align: left;
   padding: 10px 8px 10px 12px;
-  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-left: 4px solid transparent; /* cobalt rail slot (sanctioned 4px rail) */
   border-radius: 0 6px 6px 0;
   overflow: hidden;
   white-space: nowrap;
@@ -269,14 +289,14 @@ a:hover {
 }
 
 .tree-file[aria-current='true'] {
-  border-left-color: var(--gold);
+  border-left-color: var(--accent);
   background: var(--bg-inset);
-  color: var(--navy);
+  color: var(--text-1);
   font-weight: 600;
 }
 
 .tree-empty {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   color: var(--text-2);
   padding: 16px;
 }
@@ -295,7 +315,7 @@ a:hover {
   min-height: 28px;
   padding: 5px 8px 5px 10px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--section-color) 12%, transparent);
+  background: color-mix(in srgb, var(--section-color) 20%, transparent);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -304,16 +324,16 @@ a:hover {
   transition: background 100ms ease-out;
 }
 
-:root[data-theme='dark'] .tree-section {
-  background: color-mix(in srgb, var(--section-color) 20%, transparent);
+[data-theme='light'] .tree-section {
+  background: color-mix(in srgb, var(--section-color) 12%, transparent);
 }
 
 .tree-section:hover {
-  background: color-mix(in srgb, var(--section-color) 20%, transparent);
+  background: color-mix(in srgb, var(--section-color) 30%, transparent);
 }
 
-:root[data-theme='dark'] .tree-section:hover {
-  background: color-mix(in srgb, var(--section-color) 30%, transparent);
+[data-theme='light'] .tree-section:hover {
+  background: color-mix(in srgb, var(--section-color) 20%, transparent);
 }
 
 .tree-section-item {
@@ -350,9 +370,9 @@ a:hover {
   padding-left: 14px;
 }
 
-/* selection keeps the gold rail — the project rail steps aside */
+/* selection keeps the cobalt rail — the project rail steps aside */
 .tree-file-project[aria-current='true'] {
-  border-left: 4px solid var(--gold);
+  border-left: 4px solid var(--accent);
   padding-left: 12px;
 }
 
@@ -377,7 +397,7 @@ a:hover {
   margin-top: 4px;
   flex: none;
   border-radius: 50%;
-  background: var(--ok); /* ok = in sync; gold = ahead/behind; rust = error */
+  background: var(--ok); /* ok = in sync; amber = ahead/behind; rust = error */
 }
 
 .vault-chip-text {
@@ -406,7 +426,7 @@ a:hover {
 /* ── vault switcher menu (story 23.1, D1 amendment 7 §D) ───────────────────
    The identity chip becomes a menu trigger; a popover card rises above it with
    recent vaults + open/create/join. DESIGN v2: --bg-card, hairline, radius 10,
-   shadow-sm; gold reserved for the current-vault dot only. */
+   shadow-sm; the current-vault dot is the one accent. */
 .vault-switcher {
   position: relative;
   flex: none;
@@ -586,7 +606,7 @@ a:hover {
   flex: none;
 }
 
-/* the open-count badge survives collapse as a gold dot (D1) */
+/* the open-count badge survives collapse as an amber dot (D1) */
 .nav-dot {
   position: absolute;
   top: 4px;
@@ -594,7 +614,7 @@ a:hover {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--gold);
+  background: var(--warn);
 }
 
 /* collapsed vault chip: the sync dot IS the chip; tooltip keeps identity (F6) */
@@ -652,54 +672,72 @@ a:hover {
 }
 
 .empty-state p {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 17px;
   color: var(--text-2);
 }
 
-/* ── buttons: gold pill primary / navy outline secondary / rust outline
-     destructive. One gold primary per view, maximum. ─────────────────────── */
+/* ── buttons (v3 §4): soft pills with inner-bevel light. Primary = the ONE
+     cobalt gradient per view; secondary = overlay + hairline-2 + top-light;
+     ghost (quiet) = transparent; danger = rust outline. Focus = 2px card gap
+     + 4px --focus ring, all variants. ─────────────────────────────────────── */
 
 .button-primary {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: 7px;
+  height: 30px;
   padding: 0 14px;
-  border-radius: 10px;
-  background: var(--gold);
-  color: var(--gold-ink);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent-lo));
+  color: var(--accent-ink);
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.5);
   transition: filter 100ms ease-out;
 }
 
 .button-primary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  /* hover lightens one step: 400 over 500 */
+  background: linear-gradient(180deg, var(--accent-hi), var(--accent-hi));
+}
+
+.button-primary:active:not(:disabled) {
+  /* active goes flat + pressed */
+  background: var(--accent-press);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .button-secondary {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: 7px;
+  height: 30px;
   padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--navy);
-  color: var(--navy);
+  border-radius: 8px;
+  border: 1px solid var(--hairline-2);
+  color: var(--text-1);
   font-weight: 600;
-  background: transparent;
+  background: var(--bg-overlay);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   transition: background 100ms ease-out;
 }
 
-/* Filled-navy emphasis: a prominent default action that is NOT the gold
+.button-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+/* Filled-ink emphasis: a prominent default action that is NOT the cobalt
    primary (D1 amendment 4 — Comment leads on handoff cards without spending
-   the one-gold-primary-per-view budget the header's New handoff owns). */
+   the one-cobalt-primary-per-view budget the header's New handoff owns). */
 .button-emphasis {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: 7px;
+  height: 30px;
   padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--navy);
-  background: var(--navy);
+  border-radius: 8px;
+  border: 1px solid var(--text-1);
+  background: var(--text-1);
   color: var(--bg-card);
   font-weight: 600;
   transition: filter 100ms ease-out;
@@ -709,17 +747,14 @@ a:hover {
   filter: brightness(1.08);
 }
 
-.button-secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--navy) 8%, transparent);
-}
-
 .button-destructive {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  gap: 7px;
+  height: 30px;
   padding: 0 14px;
-  border-radius: 10px;
-  border: 1px solid var(--rust);
+  border-radius: 8px;
+  border: 1px solid rgba(229, 72, 77, 0.35);
   color: var(--rust);
   font-weight: 600;
   background: transparent;
@@ -731,31 +766,63 @@ a:hover {
 }
 
 .button-quiet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 3px 8px;
   border-radius: 6px;
   color: var(--text-2);
   font-size: 11px;
+  background: transparent;
   transition: background 100ms ease-out;
 }
 
 .button-quiet:hover {
-  background: color-mix(in srgb, var(--text-1) 7%, transparent);
+  background: var(--bg-hover);
 }
 
-/* ── segmented control (modal/settings pattern): inset track, card-white
-     active segment ────────────────────────────────────────────────────────── */
+/* §4 button focus: ring lifted off the surface, not the global outline */
+.button-primary:focus-visible,
+.button-secondary:focus-visible,
+.button-emphasis:focus-visible,
+.button-destructive:focus-visible,
+.button-quiet:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--focus);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* §4 kbd hints: 9px Geist Mono caps, hairline border, radius 3 — inside
+   buttons (Button kbd prop) and standalone in copy */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1;
+  padding: 2px 4px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.75;
+}
+
+/* ── segmented control (v3 §4 "pressed glass"): inset track, active segment
+     lifts on --bg-overlay with an inner top-light ─────────────────────────── */
 
 .seg-control {
   display: inline-flex;
   gap: 2px;
-  padding: 2px;
-  border-radius: 8px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
   background: var(--bg-inset);
 }
 
 .seg-option {
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13px;
   color: var(--text-2);
   transition: background 100ms ease-out;
@@ -763,10 +830,130 @@ a:hover {
 
 .seg-option[aria-pressed='true'],
 .seg-option[aria-selected='true'] {
-  background: var(--bg-card);
+  background: var(--bg-overlay);
   color: var(--text-1);
   font-weight: 600;
-  box-shadow: var(--shadow-card);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ── row item (v3 §4): 40px two-line list anatomy, selected = 2px cobalt bar ── */
+
+.row-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 10px 4px 8px;
+  border-left: 2px solid transparent; /* cobalt rail slot (§4 selected) */
+  text-align: left;
+  transition: background 100ms ease-out;
+}
+
+.row-item:hover {
+  background: var(--bg-hover);
+}
+
+.row-item[aria-current='true'] {
+  border-left: 2px solid var(--accent);
+  background: var(--bg-hover);
+}
+
+.row-glyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+}
+
+.row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.row-title {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-sub {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-trailing {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* ── agent chip (v3 §4): the sacred green live treatment, agents only ──── */
+
+.agent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--hairline-2);
+  background: var(--bg-overlay);
+}
+
+.agent-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+
+.agent-dot-live {
+  background: var(--ok);
+  box-shadow: 0 0 7px rgba(59, 203, 139, 0.8);
+  animation: agent-pulse 2s ease-in-out infinite;
+}
+
+@keyframes agent-pulse {
+  50% {
+    box-shadow: 0 0 3px rgba(59, 203, 139, 0.4);
+  }
+}
+
+.agent-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.agent-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .seg-option:disabled {
@@ -818,7 +1005,7 @@ a:hover {
 }
 
 .note-title {
-  font-family: var(--font-serif);
+  font-family: var(--note-title);
   font-size: 22px;
   font-weight: 600;
   margin-bottom: 12px;
@@ -1030,7 +1217,7 @@ a:hover {
 }
 
 .prop-tag-label:hover {
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .prop-tag-x {
@@ -1056,7 +1243,7 @@ a:hover {
 }
 
 .prop-link {
-  color: var(--gold);
+  color: var(--link);
   text-decoration: none;
 }
 
@@ -1086,7 +1273,7 @@ a:hover {
 }
 
 .prop-add:hover {
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .prop-add-row {
@@ -1110,10 +1297,10 @@ a:hover {
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 2px 10px;
-  border: 1px solid var(--gold);
+  border: 1px solid var(--accent);
   border-radius: 4px;
-  background: var(--gold);
-  color: var(--gold-ink);
+  background: var(--accent);
+  color: var(--accent-ink);
   cursor: pointer;
 }
 
@@ -1226,7 +1413,7 @@ a:hover {
 }
 
 /* Addendum D2: external links read as hyperlinks — blue, underlined at rest.
-   Wikilinks keep their gold rules below (higher specificity). */
+   Wikilinks keep their link rules below (higher specificity). */
 .note-body a {
   color: var(--link);
   text-decoration: underline;
@@ -1246,7 +1433,7 @@ a:hover {
 /* interactive checklists: clicking writes [ ]/[x] back to the note source */
 .note-body input.task-checkbox {
   cursor: pointer;
-  accent-color: var(--gold);
+  accent-color: var(--accent);
 }
 
 .note-error {
@@ -1256,8 +1443,8 @@ a:hover {
   padding: 16px 24px;
 }
 
-/* ── wikilinks (story 2.2 + Addendum D1): always visibly links — gold-family
-     token (#8a6116 light / gold dark), 500 weight, underline on hover only;
+/* ── wikilinks (story 2.2 + Addendum D1): always visibly links — cobalt link
+     token (§2 --wikilink: cobalt 300 dark / cobalt light), 500 weight, underline on hover only;
      broken = rust dotted with diagnostic tooltip — never a created file ──── */
 
 .note-body a.wikilink {
@@ -1311,13 +1498,13 @@ a:hover {
   text-align: left;
   padding: 5px 4px;
   border-radius: 5px;
-  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-left: 4px solid transparent; /* cobalt rail slot (sanctioned 4px rail) */
   transition: background 100ms ease-out;
 }
 
 .wikilink-candidate:hover {
   background: var(--bg-inset);
-  border-left-color: var(--gold);
+  border-left-color: var(--accent);
 }
 
 .wikilink-candidate-project {
@@ -1390,7 +1577,7 @@ a:hover {
 }
 
 .diag-hint {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-2);
   margin-bottom: 8px;
@@ -1471,7 +1658,7 @@ a:hover {
 }
 
 .board-tab[aria-selected='true'] {
-  color: var(--navy);
+  color: var(--text-1);
   font-weight: 600;
   background: var(--bg-inset);
 }
@@ -1514,7 +1701,7 @@ a:hover {
 }
 
 .board-lane-empty {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-2);
   padding: 8px 0;
@@ -1536,7 +1723,7 @@ a:hover {
 }
 
 .handoff-card:hover {
-  border-color: color-mix(in srgb, var(--gold) 55%, var(--hairline));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--hairline));
 }
 
 .handoff-card.skeleton {
@@ -1551,12 +1738,12 @@ a:hover {
   gap: 8px;
 }
 
-/* story 9.2: unread on this machine (app-db read-state) — gold, the open/badge color */
+/* story 9.2: unread on this machine (app-db read-state) — amber, the open/badge color */
 .unread-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--gold);
+  background: var(--warn);
   align-self: center;
   flex: none;
 }
@@ -1578,7 +1765,7 @@ a:hover {
 }
 
 .handoff-objective {
-  font-family: var(--font-serif); /* the only serif outside the reader */
+  font-family: var(--font-serif); /* quoted objectives are the one serif voice (D1a1) */
   font-size: 15px;
   line-height: 1.35;
   margin: 8px 0;
@@ -1594,46 +1781,96 @@ a:hover {
   color: var(--text-2);
 }
 
-/* stamp chip: 10px mono uppercase letterspaced, 1px border, transparent fill.
-   v2 palette: OPEN gold, ACCEPTED navy, DECLINED/STALE rust, CONSUMED/DONE
-   text-2, SNOOZED text-2 dashed. */
+/* status chips (v3 §4): glyph + label, never color alone. Glyph states get a
+   15px rounded-square tinted box; OPEN = amber ring-dot chip; REQUEST =
+   info-bordered mono chip; SNOOZED keeps the dashed border. */
 .status-chip {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--font-mono);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  border: 1px solid currentColor;
-  border-radius: 3px;
   padding: 1px 5px;
+  border-radius: 4px;
 }
 
+.chip-glyph {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+/* OPEN: amber ring-dot chip — mono 10, amber border rgba(.4), bg rgba(.07);
+   the ● glyph is the ring dot itself */
 .chip-open {
-  color: var(--gold);
+  color: var(--warn);
+  border: 1px solid rgba(227, 167, 60, 0.4);
+  background: rgba(227, 167, 60, 0.07);
+}
+
+.chip-open .chip-glyph {
+  width: auto;
+  height: auto;
+  background: none;
+  font-size: 7px;
+}
+
+/* REQUEST: info-bordered mono chip */
+.chip-request {
+  color: var(--info);
+  border: 1px solid currentColor;
 }
 
 .chip-accepted {
-  color: var(--navy);
+  color: var(--ok);
 }
 
-.chip-declined,
-.chip-stale {
+.chip-accepted .chip-glyph {
+  background: rgba(59, 203, 139, 0.14);
+}
+
+.chip-declined {
   color: var(--rust);
+}
+
+.chip-declined .chip-glyph {
+  background: rgba(239, 93, 85, 0.14);
+}
+
+.chip-stale {
+  color: var(--warn);
+}
+
+.chip-stale .chip-glyph {
+  background: rgba(227, 167, 60, 0.14);
 }
 
 .chip-consumed,
 .chip-done {
-  color: var(--text-2);
+  color: var(--text-3);
+}
+
+.chip-consumed .chip-glyph,
+.chip-done .chip-glyph {
+  background: var(--bg-hover);
 }
 
 .chip-snoozed {
-  color: var(--text-2);
-  border-style: dashed;
+  color: var(--text-3);
+  border: 1px dashed currentColor;
 }
 
-/* request cards carry a navy REQUEST chip beside the stamp (v2 thread spec) */
-.chip-request {
-  color: var(--navy);
+.chip-snoozed .chip-glyph {
+  background: var(--bg-hover);
 }
 
 /* consume = stamp press: the app's ONE bespoke animation (120ms ease-out);
@@ -1651,13 +1888,13 @@ a:hover {
   animation: stamp-press 120ms ease-out;
 }
 
-/* nav open-count badge: gold pill, --gold-ink text */
+/* nav open-count badge: amber pill, dark-ground ink text */
 .nav-badge {
   float: right;
   font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--gold-ink);
-  background: var(--gold);
+  color: var(--bg-app);
+  background: var(--warn);
   border-radius: 999px;
   padding: 1px 6px;
 }
@@ -1671,7 +1908,7 @@ a:hover {
 }
 
 .ro-heading {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 17px;
   font-weight: 600;
   margin-bottom: 8px;
@@ -1687,7 +1924,7 @@ a:hover {
 }
 
 .ro-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -1738,7 +1975,7 @@ a:hover {
   flex: none;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--navy);
+  color: var(--text-1);
   border: 1px solid var(--hairline);
   padding: 1px 6px;
   border-radius: 999px;
@@ -1747,7 +1984,7 @@ a:hover {
 
 .consume-button:hover:not(:disabled) {
   background: var(--bg-inset);
-  border-color: var(--navy);
+  border-color: var(--text-1);
 }
 
 .consume-button:disabled {
@@ -1823,7 +2060,7 @@ a:hover {
 }
 
 .receipt-push-pending {
-  color: var(--gold);
+  color: var(--warn);
 }
 
 /* ── settings (stories 3.4 + 14.1/14.2): section cards, dense rows ──────── */
@@ -2104,7 +2341,7 @@ a:hover {
 }
 
 .feed-filter.is-on .feed-filter-count {
-  color: var(--gold-ink);
+  color: var(--accent-ink);
 }
 
 .feed-filter > span:first-child {
@@ -2196,7 +2433,7 @@ a:hover {
 }
 
 .feed-card:hover {
-  border-color: color-mix(in srgb, var(--navy) 25%, var(--hairline));
+  border-color: color-mix(in srgb, var(--text-1) 25%, var(--hairline));
 }
 
 .feed-card-head {
@@ -2222,11 +2459,11 @@ a:hover {
 }
 
 .feed-kind-handoff {
-  color: var(--gold); /* an open ask travelling between teams — attention */
+  color: var(--warn); /* an open ask travelling between teams — attention */
 }
 
 .feed-kind-status {
-  color: var(--navy);
+  color: var(--info);
 }
 
 .feed-kind-consume,
@@ -2271,15 +2508,15 @@ a:hover {
   gap: 8px;
 }
 
-/* per-kind actions: navy outline pills, max 2, right-aligned */
+/* per-kind actions: ink outline pills, max 2, right-aligned */
 .feed-action {
   display: inline-flex;
   align-items: center;
   height: 24px;
   padding: 0 10px;
-  border: 1px solid var(--navy);
+  border: 1px solid var(--text-1);
   border-radius: 12px;
-  color: var(--navy);
+  color: var(--text-1);
   font-size: 11px;
   font-weight: 600;
   background: transparent;
@@ -2287,7 +2524,7 @@ a:hover {
 }
 
 .feed-action:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--navy) 8%, transparent);
+  background: color-mix(in srgb, var(--text-1) 8%, transparent);
 }
 
 .feed-actions {
@@ -2334,7 +2571,7 @@ a:hover {
   overflow-y: auto;
 }
 
-/* sync dot semantics: ok = clean, gold = ahead/behind, rust = error
+/* sync dot semantics: ok = clean, amber = ahead/behind, rust = error
    (class names kept from the story-5.2 store: ink/amber/rust tones) */
 .sync-dot {
   width: 8px;
@@ -2350,7 +2587,7 @@ a:hover {
 
 .sync-dot-amber,
 .vault-chip-dot.sync-dot-amber {
-  background: var(--gold);
+  background: var(--warn);
 }
 
 .sync-dot-rust,
@@ -2369,7 +2606,7 @@ a:hover {
 }
 
 .sync-banner-action {
-  color: var(--navy);
+  color: var(--accent);
   font-weight: 600;
   text-decoration: underline;
 }
@@ -2417,7 +2654,7 @@ a:hover {
 }
 
 .sync-warn {
-  color: var(--gold);
+  color: var(--warn);
 }
 
 .sync-bad {
@@ -2461,7 +2698,7 @@ a:hover {
 }
 
 .sync-log-empty {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-2);
 }
@@ -2476,7 +2713,7 @@ a:hover {
   overflow-y: auto;
 }
 
-/* freshness badge: quiet when fresh; gold = aging attention; rust = stale */
+/* freshness badge: quiet when fresh; amber = aging attention; rust = stale */
 .freshness {
   flex: none;
   font-family: var(--font-mono);
@@ -2493,7 +2730,7 @@ a:hover {
 }
 
 .freshness-aging {
-  color: var(--gold);
+  color: var(--warn);
 }
 
 .freshness-stale {
@@ -2501,7 +2738,7 @@ a:hover {
 }
 
 .home-generated-hint {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 15px;
   color: var(--text-2);
   border: 1px solid var(--hairline);
@@ -2559,7 +2796,7 @@ a:hover {
 
 .facet:hover,
 .facet:focus-within {
-  border-color: var(--gold);
+  border-color: var(--accent);
 }
 
 /* uppercase mono label, matching the app's other section labels */
@@ -2598,7 +2835,7 @@ a:hover {
   min-height: 38px;
   text-align: left;
   padding: 6px 12px 6px 8px;
-  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-left: 4px solid transparent; /* cobalt rail slot (sanctioned 4px rail) */
   border-radius: 0 6px 6px 0;
   transition:
     background 100ms ease-out,
@@ -2610,7 +2847,7 @@ a:hover {
 }
 
 .search-row[aria-current='true'] {
-  border-left-color: var(--gold);
+  border-left-color: var(--accent);
   background: var(--bg-inset);
 }
 
@@ -2641,7 +2878,7 @@ a:hover {
 
 .search-row mark,
 .palette-item mark {
-  background: color-mix(in srgb, var(--gold) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
   color: inherit;
   border-radius: 2px;
 }
@@ -2730,9 +2967,9 @@ a:hover {
 }
 
 .facet-toggle.is-on {
-  color: var(--gold-ink);
-  background: var(--gold);
-  border-color: var(--gold);
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .search-idle {
@@ -2779,11 +3016,11 @@ a:hover {
 }
 
 .search-example:hover {
-  /* gold border only — text stays --text-1 so it reads in both themes
-     (--gold-ink is dark ink for gold FILLS, unreadable on a dark chip) */
-  border-color: var(--gold);
+  /* accent border only — text stays --text-1 so it reads in both themes
+     (filled-accent ink is for accent FILLS, unreadable on a dark chip) */
+  border-color: var(--accent);
   color: var(--text-1);
-  background: color-mix(in srgb, var(--gold) 10%, var(--bg-inset));
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-inset));
 }
 
 .search-operators {
@@ -2808,7 +3045,7 @@ a:hover {
 .search-op code {
   font-family: var(--font-mono);
   font-size: 11px;
-  /* neutral key chip — readable on both themes (no gold-ink on dark) */
+  /* neutral key chip — readable on both themes (no filled ink on dark) */
   color: var(--text-1);
   background: var(--bg-inset);
   border: 1px solid var(--hairline);
@@ -2853,11 +3090,11 @@ a:hover {
 }
 
 .search-quick-chip:hover {
-  border-color: var(--gold);
+  border-color: var(--accent);
 }
 
 .search-quick-chip.is-saved {
-  border-color: color-mix(in srgb, var(--gold) 50%, var(--hairline));
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--hairline));
 }
 
 .search-group-head {
@@ -2911,12 +3148,12 @@ a:hover {
   min-height: 38px;
   text-align: left;
   padding: 9px 8px 9px 4px;
-  border-left: 4px solid transparent; /* gold rail slot (sanctioned 4px rail) */
+  border-left: 4px solid transparent; /* cobalt rail slot (sanctioned 4px rail) */
   border-radius: 0 6px 6px 0;
 }
 
 .palette-item[aria-current='true'] {
-  border-left-color: var(--gold);
+  border-left-color: var(--accent);
   background: var(--bg-inset);
 }
 
@@ -2952,7 +3189,7 @@ a:hover {
 }
 
 .palette-empty {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text-2);
   padding: 8px 4px;
@@ -3005,22 +3242,22 @@ a:hover {
   cursor: pointer;
 }
 
-/* epic4: inline route-receipt Undo — navy outline pill, never gold */
+/* epic4: inline route-receipt Undo — ink outline pill, never a second accent */
 .toast-action {
   flex-shrink: 0;
   height: 26px;
   padding: 0 12px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--text-1);
   background: none;
-  border: 1px solid var(--navy);
+  border: 1px solid var(--text-1);
   border-radius: 8px;
   cursor: pointer;
 }
 
 .toast-action:hover {
-  background: color-mix(in srgb, var(--navy) 8%, transparent);
+  background: color-mix(in srgb, var(--text-1) 8%, transparent);
 }
 
 .toast-detail {
@@ -3100,11 +3337,11 @@ a:hover {
 }
 
 .suggest-toast {
-  border-left: 4px solid var(--gold); /* the one sanctioned rail treatment */
+  border-left: 4px solid var(--accent); /* the one sanctioned rail treatment */
 }
 
 .suggest-evidence a {
-  color: var(--navy);
+  color: var(--link);
 }
 
 .suggest-actions {
@@ -3120,7 +3357,7 @@ a:hover {
 }
 
 /* ── modals (DESIGN v2, stories 7.2-7.4): centered card 480-560, radius 16,
-     title 17/600, footer Cancel left / one gold primary right ─────────────── */
+     title 17/600, footer Cancel left / one cobalt primary right ─────────────── */
 
 .modal-backdrop {
   position: fixed;
@@ -3370,14 +3607,14 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px dashed var(--gold); /* Don't list: no border > 1px */
+  border: 1px dashed var(--accent); /* Don't list: no border > 1px */
   border-radius: 12px;
-  background: color-mix(in srgb, var(--gold) 8%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   pointer-events: none;
 }
 
 .drop-overlay p {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 15px;
   color: var(--text-1);
 }
@@ -3388,7 +3625,7 @@ a:hover {
 }
 
 /* ── lifecycle v2 (story 8.1): expired-snooze treatment, snooze quick picks,
-   attribution history — status colors only, gold stays with actions ───────── */
+   attribution history — status colors only, cobalt stays with actions ───────── */
 
 .snooze-expired {
   flex: none;
@@ -3440,7 +3677,7 @@ a:hover {
 }
 
 .thread-card:hover {
-  border-color: var(--gold);
+  border-color: var(--accent);
 }
 
 .thread-card-top {
@@ -3501,7 +3738,7 @@ a:hover {
 }
 
 /* ── fulfills loop (story 8.3): derived FULFILLED badge — ok is status-only
-   in v2, exactly right here; gold stays with actions ──────────────────────── */
+   in v2, exactly right here; cobalt stays with actions ──────────────────────── */
 
 .chip-fulfilled {
   color: var(--ok);
@@ -3509,7 +3746,7 @@ a:hover {
 
 /* picker empty state: one serif sentence, no action noise (AC5) */
 .fulfills-empty {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 14px;
   color: var(--text-2);
 }
@@ -3613,7 +3850,7 @@ a:hover {
      filter layers inside one pan/zoom-transformed <svg>, which overruns
      Chromium's raster-tile compositor and drops tiles to blank background on
      hover repaints (the "UI is damaged" corruption). The hairline stroke +
-     gold hover ring below delineate cards without a per-element GPU layer. */
+     accent hover ring below delineate cards without a per-element GPU layer. */
   transition: stroke 120ms ease;
 }
 
@@ -3622,20 +3859,20 @@ a:hover {
   outline: none; /* the ring is drawn on the card rect instead (SVG bbox outlines mistrace) */
 }
 
-/* hover = gold ring; focus ring per quality floor, on the card itself */
+/* hover = accent ring; focus ring per quality floor, on the card itself */
 .atlas-node:hover .atlas-card,
 .atlas-node:focus-visible .atlas-card {
-  stroke: var(--gold);
+  stroke: var(--accent);
   stroke-width: 2;
 }
 
 .atlas-card-selected {
-  stroke: var(--navy);
+  stroke: var(--accent);
   stroke-width: 1.5;
 }
 
 .atlas-node-name {
-  fill: var(--navy);
+  fill: var(--text-1);
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
@@ -3647,19 +3884,19 @@ a:hover {
   font-size: 10px;
 }
 
-/* open-count badge: gold pill, gold-ink text (the view's gold budget) */
+/* open-count badge: amber pill, dark-ground ink (OPEN = amber, §1) */
 .atlas-badge-open rect {
-  fill: var(--gold);
+  fill: var(--warn);
 }
 
 .atlas-badge-open text {
-  fill: var(--gold-ink);
+  fill: var(--bg-app);
   font-family: var(--font-ui);
   font-size: 11px;
   font-weight: 600;
 }
 
-/* edges: 1.5px hairline, navy arrowheads; blocking routes gold */
+/* edges: 1.5px hairline, ink arrowheads; blocking routes amber */
 .atlas-edge-line {
   stroke: var(--hairline);
   stroke-width: 1.5;
@@ -3667,7 +3904,7 @@ a:hover {
 }
 
 .atlas-edge-blocking {
-  stroke: var(--gold);
+  stroke: var(--warn);
 }
 
 /* heuristic-tier contract links: dashed, text-2 — labeled, never louder */
@@ -3677,24 +3914,24 @@ a:hover {
 }
 
 .atlas-arrowhead {
-  fill: var(--navy);
+  fill: var(--text-1);
 }
 
-.atlas-arrowhead-gold {
-  fill: var(--gold);
+.atlas-arrowhead-warn {
+  fill: var(--warn);
 }
 
-/* WP-A: small gold open-count badge near an aggregated route's target end —
+/* WP-A: small amber open-count badge near an aggregated route's target end —
    the one urgent number (open handoffs); shown only when open > 0. Magnitude
    (total) lives in the edge's stroke width, detail in the hover callout. */
 .atlas-edge-opendot circle {
-  fill: var(--gold);
+  fill: var(--warn);
   stroke: var(--bg-card);
   stroke-width: 1.5;
 }
 
 .atlas-edge-opendot text {
-  fill: var(--gold-ink);
+  fill: var(--bg-app);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
@@ -3732,7 +3969,7 @@ a:hover {
   height: 22px;
   border: 1px solid var(--hairline);
   border-radius: 6px;
-  color: var(--navy);
+  color: var(--text-1);
   font-size: 13px;
   line-height: 1;
 }
@@ -3753,7 +3990,7 @@ a:hover {
 }
 
 .atlas-crumb {
-  color: var(--navy);
+  color: var(--text-1);
   font-family: var(--font-mono);
   font-size: 11px;
   padding: 2px 4px;
@@ -3784,7 +4021,7 @@ button.atlas-crumb:hover {
 }
 
 .atlas-topic-count {
-  fill: var(--navy);
+  fill: var(--text-1);
   font-family: var(--font-ui);
   font-size: 16px;
   font-weight: 700;
@@ -3794,7 +4031,7 @@ button.atlas-crumb:hover {
 
 .atlas-note-title {
   fill: var(--text-1);
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 12.5px;
 }
 
@@ -3844,11 +4081,11 @@ button.atlas-crumb:hover {
 
 .atlas-chip-request rect {
   fill: transparent;
-  stroke: var(--navy);
+  stroke: var(--info);
 }
 
 .atlas-chip-request text {
-  fill: var(--navy);
+  fill: var(--info);
 }
 
 /* stamp chip: 1px border + transparent fill, mono uppercase (DESIGN spec) */
@@ -3863,10 +4100,10 @@ button.atlas-crumb:hover {
   letter-spacing: 0.08em;
 }
 
-.atlas-stamp-open rect { stroke: var(--gold); }
-.atlas-stamp-open text { fill: var(--gold); }
-.atlas-stamp-accepted rect { stroke: var(--navy); }
-.atlas-stamp-accepted text { fill: var(--navy); }
+.atlas-stamp-open rect { stroke: var(--warn); }
+.atlas-stamp-open text { fill: var(--warn); }
+.atlas-stamp-accepted rect { stroke: var(--text-1); }
+.atlas-stamp-accepted text { fill: var(--text-1); }
 .atlas-stamp-declined rect { stroke: var(--rust); }
 .atlas-stamp-declined text { fill: var(--rust); }
 .atlas-stamp-consumed rect { stroke: var(--text-2); }
@@ -3951,7 +4188,7 @@ button.atlas-crumb:hover {
 }
 
 .atlas-side-empty {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 14px;
   color: var(--text-2);
 }
@@ -3988,7 +4225,7 @@ button.atlas-crumb:hover {
   border-radius: 999px;
   border: 1px solid var(--hairline);
   background: var(--bg-card);
-  color: var(--navy);
+  color: var(--text-1);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -4007,38 +4244,38 @@ button.atlas-crumb:hover {
 }
 
 .atlas-tool:hover {
-  border-color: var(--navy);
+  border-color: var(--text-1);
 }
 
 .atlas-tool:hover .atlas-tool-icon {
-  color: var(--navy);
+  color: var(--text-1);
 }
 
 .atlas-tool[aria-pressed='true'] {
   background: var(--bg-inset);
-  border-color: var(--navy);
+  border-color: var(--text-1);
 }
 
-/* WP3: Path + Blocked are the PRIMARY actions at Deep Dive — gold outline marks
-   them as what the lineage graph is for. Emphasis only (not a filled gold pill,
-   keeping the one-gold-primary budget); the gold icon draws the eye. */
+/* WP3: Path + Blocked are the PRIMARY actions at Deep Dive — cobalt outline marks
+   them as what the lineage graph is for. Emphasis only (not a filled cobalt pill,
+   keeping the one-cobalt-primary budget); the cobalt icon draws the eye. */
 .atlas-tool-primary {
-  border-color: var(--gold);
-  color: var(--gold);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .atlas-tool-primary .atlas-tool-icon {
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .atlas-tool-primary:hover {
-  border-color: var(--gold);
+  border-color: var(--accent);
   background: var(--bg-inset);
 }
 
 .atlas-tool-primary[aria-pressed='true'] {
   background: var(--bg-inset);
-  border-color: var(--gold);
+  border-color: var(--accent);
 }
 
 /* single Export ▾ button with an SVG/PNG submenu (never two buttons) */
@@ -4067,7 +4304,7 @@ button.atlas-crumb:hover {
   text-align: left;
   font-size: 12px;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--text-1);
 }
 
 .atlas-export-item:hover {
@@ -4104,7 +4341,7 @@ button.atlas-crumb:hover {
 }
 
 .atlas-legend-title {
-  font-family: var(--font-serif, var(--font-ui));
+  font-family: var(--font-ui);
   font-size: 16px;
   font-weight: 600;
   color: var(--text-1);
@@ -4136,7 +4373,7 @@ button.atlas-crumb:hover {
 .atlas-legend-term {
   flex: 0 0 84px;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--text-1);
 }
 
 .atlas-legend-meaning {
@@ -4149,7 +4386,7 @@ button.atlas-crumb:hover {
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--bg-inset);
-  border-left: 4px solid var(--gold);
+  border-left: 4px solid var(--accent);
   font-size: 12.5px;
   color: var(--text-1);
 }
@@ -4172,11 +4409,11 @@ button.atlas-crumb:hover {
 }
 
 .atlas-tour-row:hover {
-  border-color: var(--navy);
+  border-color: var(--text-1);
 }
 
 .atlas-tour-row[aria-checked='true'] {
-  border-color: var(--gold);
+  border-color: var(--accent);
   background: var(--bg-inset);
 }
 
@@ -4224,11 +4461,11 @@ button.atlas-crumb:hover {
 }
 
 .atlas-tour-step-card:hover {
-  border-color: var(--gold);
+  border-color: var(--accent);
 }
 
 .atlas-tour-step-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 15px;
   color: var(--text-1);
 }
@@ -4251,10 +4488,10 @@ button.atlas-crumb:hover {
   text-decoration: underline;
 }
 
-/* tour step highlight: gold pulse ring; the global reduced-motion rule
-   freezes the animation, leaving the static gold ring (story 10.5 AC3) */
+/* tour step highlight: cobalt pulse ring; the global reduced-motion rule
+   freezes the animation, leaving the static cobalt ring (story 10.5 AC3) */
 .atlas-node-tour .atlas-card {
-  stroke: var(--gold);
+  stroke: var(--accent);
   stroke-width: 2;
   animation: atlas-tour-pulse 1.4s ease-in-out infinite;
 }
@@ -4295,7 +4532,7 @@ button.atlas-crumb:hover {
 }
 
 .atlas-filter-check input {
-  accent-color: var(--gold);
+  accent-color: var(--accent);
 }
 
 .atlas-filter-select {
@@ -4311,7 +4548,7 @@ button.atlas-crumb:hover {
 .atlas-filter-clear {
   align-self: flex-start;
   font-size: 12px;
-  color: var(--navy);
+  color: var(--text-1);
   text-decoration: underline;
 }
 
@@ -4350,7 +4587,7 @@ button.atlas-crumb:hover {
   width: 100%;
   text-align: left;
   padding: 8px 10px;
-  border: 1px solid var(--gold);
+  border: 1px solid var(--accent);
   border-radius: 10px;
   background: var(--bg-card);
 }
@@ -4396,7 +4633,7 @@ button.atlas-crumb:hover {
 }
 
 .atlas-blocked-row:hover {
-  border-color: var(--gold);
+  border-color: var(--warn);
 }
 
 .atlas-blocked-sentence {
@@ -4416,26 +4653,26 @@ button.atlas-crumb:hover {
   color: var(--text-2);
 }
 
-/* ring taxonomy (distinct from selected/hover gold and tour pulse):
-   search = navy ring, width by tier; path = gold; focus fade for the rest */
+/* ring taxonomy (distinct from selected/hover accent and tour pulse):
+   search = cobalt ring, width by tier; path = cobalt; focus fade for the rest */
 .atlas-ring-search-1 .atlas-card {
-  stroke: var(--navy);
+  stroke: var(--accent);
   stroke-width: 3;
 }
 
 .atlas-ring-search-2 .atlas-card {
-  stroke: var(--navy);
+  stroke: var(--accent);
   stroke-width: 2;
 }
 
 .atlas-ring-search-3 .atlas-card {
-  stroke: var(--navy);
+  stroke: var(--accent);
   stroke-width: 1.25;
   stroke-dasharray: 4 3;
 }
 
 .atlas-node-path .atlas-card {
-  stroke: var(--gold);
+  stroke: var(--accent);
   stroke-width: 2.5;
 }
 
@@ -4450,13 +4687,13 @@ button.atlas-crumb:hover {
 }
 
 .atlas-edge-path .atlas-edge-line {
-  stroke: var(--gold);
+  stroke: var(--accent);
   stroke-width: 2.5;
 }
 
 /* ── Changed-since overlay + export (story 10.7) ───────────────────────────── */
 
-/* glow = --ok (never gold: gold stays path/blocked/primary). Reduced-motion
+/* glow = --ok (never the accent: cobalt stays path/blocked/primary). Reduced-motion
    freezes the pulse to the static glow ring via the global rule. */
 /* changed = solid --ok ring. NO drop-shadow filter and NO perpetual animation:
    in a large Deep-Dive graph with many changed nodes, an animated filter per
@@ -4468,7 +4705,7 @@ button.atlas-crumb:hover {
 }
 
 /* affected = 1-hop neighbor ring: dashed --ok, no glow — distinct from the
-   changed glow, from navy search tiers, and from the gold tour/path rings */
+   changed glow, from search tiers, and from the cobalt tour/path rings */
 .atlas-node-affected .atlas-card {
   stroke: var(--ok);
   stroke-width: 1.5;
@@ -4483,7 +4720,7 @@ button.atlas-crumb:hover {
   letter-spacing: 0.06em;
 }
 
-/* DESIGN toggle row: label left, switch right — gold when on */
+/* DESIGN toggle row: label left, switch right — cobalt when on */
 .atlas-overlay-row {
   display: flex;
   align-items: center;
@@ -4503,8 +4740,8 @@ button.atlas-crumb:hover {
 }
 
 .atlas-overlay-switch[aria-checked='true'] {
-  background: var(--gold);
-  border-color: var(--gold);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .atlas-overlay-knob {
@@ -4600,7 +4837,7 @@ button.atlas-crumb:hover {
 }
 
 .contract-card:hover {
-  border-color: color-mix(in srgb, var(--gold) 55%, var(--hairline));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--hairline));
 }
 
 .contract-card-top {
@@ -4668,7 +4905,7 @@ button.atlas-crumb:hover {
 }
 
 a.commit-chip-sha {
-  color: var(--navy);
+  color: var(--link);
   text-decoration: none;
 }
 
@@ -4676,16 +4913,16 @@ a.commit-chip-sha:hover {
   text-decoration: underline;
 }
 
-/* PR state chip (story 12.2 slot): navy outline pill; merged = filled navy —
-   distinct without spending gold (gold is actions, not states) */
+/* PR state chip (story 12.2 slot): ink outline pill; merged = filled ink —
+   distinct without spending the accent (cobalt is actions, not states) */
 .commit-pr {
   font-family: var(--font-mono);
   font-size: 10px;
   line-height: 1;
   padding: 2px 6px;
-  border: 1px solid var(--navy);
+  border: 1px solid var(--text-1);
   border-radius: 999px;
-  color: var(--navy);
+  color: var(--text-1);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -4695,7 +4932,7 @@ a.commit-chip-sha:hover {
 }
 
 .commit-pr-merged {
-  background: var(--navy);
+  background: var(--text-1);
   color: var(--bg-card);
 }
 
@@ -4724,8 +4961,8 @@ a.commit-chip-sha:hover {
 }
 
 .contract-link-chip.chip-mentioned {
-  color: var(--gold-ink);
-  background: var(--gold);
+  color: var(--bg-app);
+  background: var(--warn);
 }
 
 .contract-link-chip.chip-heuristic {
@@ -4780,7 +5017,7 @@ a.commit-chip-sha:hover {
 }
 
 .diff-hunk {
-  color: var(--navy);
+  color: var(--text-1);
   background: color-mix(in srgb, var(--text-1) 6%, transparent);
 }
 
@@ -4814,14 +5051,14 @@ a.commit-chip-sha:hover {
   margin: 4px 0 8px;
 }
 
-/* chip navigation target: the one gold ring vocabulary (quality floor) */
+/* chip navigation target: the one accent ring vocabulary (quality floor) */
 .contract-card-focused {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 /* ── wizards (stories 13.1/13.2): stepped modal — generous surface, decisions
-     happen here. Step chips reuse the token vocabulary: running gold, done ok,
+     happen here. Step chips reuse the token vocabulary: running amber, done ok,
      warn/failed rust. ─────────────────────────────────────────────────────── */
 
 .wizard-path {
@@ -4914,7 +5151,7 @@ a.commit-chip-sha:hover {
 }
 
 .wizard-step[data-status='running'] .wizard-step-dot {
-  background: var(--gold);
+  background: var(--warn);
 }
 
 .wizard-step[data-status='done'] .wizard-step-dot {
@@ -4984,8 +5221,8 @@ a.commit-chip-sha:hover {
 }
 
 /* ── first-run screen (story 13.2): replaces the bare picker — logo, one
-     serif sentence, three cards on --bg-app. No gold primary here: the cards
-     ARE the decision; hover ring uses the one gold vocabulary. ───────────── */
+     one quiet sentence, three cards on --bg-app. No cobalt primary here: the cards
+     ARE the decision; hover ring uses the one accent vocabulary. ───────────── */
 
 .firstrun {
   flex: 1;
@@ -5003,14 +5240,14 @@ a.commit-chip-sha:hover {
 }
 
 .firstrun-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 24px;
   font-weight: 600;
   color: var(--text-1);
 }
 
 .firstrun-line {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 17px;
   color: var(--text-2);
   margin-bottom: 16px;
@@ -5039,13 +5276,13 @@ a.commit-chip-sha:hover {
 }
 
 .firstrun-card:hover {
-  border-color: var(--gold);
+  border-color: var(--accent);
 }
 
 .firstrun-card-title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--text-1);
 }
 
 .firstrun-card-body {
@@ -5107,7 +5344,7 @@ a.commit-chip-sha:hover {
 /* ── Addendum D1: edit mode + inline comments (story 16.4) ──────────────────
    Read ⇄ Edit toggle, mono 13px editor + formatter bar (markdown insertion
    only), LOCKED frontmatter, unsaved dot; Read-mode selection → Comment chip
-   → margin rail of comment cards; anchored text = soft gold underline-
+   → margin rail of comment cards; anchored text = soft accent underline-
    highlight; orphaned anchors = rust chip at note end. ─────────────────── */
 
 .note-layout {
@@ -5152,7 +5389,7 @@ a.commit-chip-sha:hover {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--gold);
+  background: var(--warn);
   margin: 0 8px;
   flex: none;
 }
@@ -5215,18 +5452,18 @@ a.commit-chip-sha:hover {
   margin-top: 12px;
 }
 
-/* D1: anchored text gets a soft gold underline-highlight (Custom Highlight
+/* D1: anchored text gets a soft accent underline-highlight (Custom Highlight
    API — no DOM mutation of the sanctioned markdown output) */
 ::highlight(loredex-anchor) {
-  background-color: color-mix(in srgb, var(--gold) 18%, transparent);
+  background-color: color-mix(in srgb, var(--accent) 18%, transparent);
   text-decoration: underline;
-  text-decoration-color: var(--gold);
+  text-decoration-color: var(--accent);
 }
 
 /* story 17.3 (D1a3): Read-mode find bar — floats top-right of the note pane,
    scans the rendered body. All matches paint --bg-inset (with a hairline
    underline for the "ring" the Custom Highlight API can't box), the current
-   match gold — under find-only names so the anchor highlight is never touched. */
+   match accent — under find-only names so the anchor highlight is never touched. */
 ::highlight(loredex-find) {
   background-color: var(--bg-inset);
   text-decoration: underline;
@@ -5234,8 +5471,8 @@ a.commit-chip-sha:hover {
 }
 
 ::highlight(loredex-find-current) {
-  background-color: var(--gold);
-  color: var(--gold-ink);
+  background-color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .find-bar {
@@ -5297,9 +5534,9 @@ a.commit-chip-sha:hover {
 }
 
 .find-case[aria-pressed='true'] {
-  color: var(--gold-ink);
-  background: var(--gold);
-  border-color: var(--gold);
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .comment-chip {
@@ -5318,7 +5555,7 @@ a.commit-chip-sha:hover {
 }
 
 .comment-chip:hover {
-  color: var(--gold);
+  color: var(--accent);
 }
 
 .comment-rail {
@@ -5363,7 +5600,7 @@ a.commit-chip-sha:hover {
   font-size: 11px;
   font-style: italic;
   color: var(--text-2);
-  border-left: 1px solid var(--gold); /* Don't list: never wider than 1px */
+  border-left: 1px solid var(--accent); /* Don't list: never wider than 1px */
   padding-left: 8px;
   margin: 6px 0;
 }
@@ -5421,7 +5658,7 @@ a.commit-chip-sha:hover {
 }
 
 .anchor-target:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
   border-radius: 2px;
 }
@@ -5600,8 +5837,8 @@ a.commit-chip-sha:hover {
   height: 34px;
   padding: 0 10px;
   border-radius: 9px;
-  border: 1px solid var(--gold);
-  background: color-mix(in srgb, var(--gold) 12%, transparent);
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--text-1);
   font-size: 13px;
   font-weight: 600;
@@ -5609,12 +5846,12 @@ a.commit-chip-sha:hover {
 }
 
 .qa-launch:hover {
-  background: color-mix(in srgb, var(--gold) 20%, transparent);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .qa-launch-icon {
   font-size: 15px;
-  color: var(--gold);
+  color: var(--accent);
   line-height: 1;
 }
 
@@ -5674,7 +5911,7 @@ a.commit-chip-sha:hover {
 }
 
 .qa-item-primary {
-  color: var(--gold);
+  color: var(--accent);
   font-weight: 600;
 }
 
@@ -5685,7 +5922,7 @@ a.commit-chip-sha:hover {
 }
 
 .qa-item-primary .qa-item-icon {
-  color: var(--gold);
+  color: var(--accent);
 }
 
 /* ── nav groups ─────────────────────────────────────────────────────────── */
@@ -5727,7 +5964,7 @@ a.commit-chip-sha:hover {
 }
 .settings-tab[aria-selected='true'] {
   color: var(--text-1);
-  box-shadow: inset 0 -2px 0 var(--navy);
+  box-shadow: inset 0 -2px 0 var(--text-1);
   font-weight: 600;
 }
 .settings-grid {
@@ -5783,7 +6020,7 @@ a.commit-chip-sha:hover {
 }
 .font-row[aria-pressed='true'] {
   background: var(--bg-inset);
-  outline: 1px solid var(--navy);
+  outline: 1px solid var(--accent);
 }
 .font-specimen {
   overflow-y: auto;
@@ -5792,4 +6029,320 @@ a.commit-chip-sha:hover {
 .font-pick-btn {
   min-width: 140px;
   text-align: left;
+}
+
+/* ── v3 Inbox (story 26.3): two-pane triage — list + detail (screens/02) ── */
+
+.inbox {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 10px;
+}
+
+.inbox-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.inbox-open-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+.inbox-list-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.inbox-project {
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 4px 6px;
+  max-width: 150px;
+}
+
+.inbox-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* bare glyph square in list rows (StatusGlyph) — the chip minus its label */
+.status-glyph {
+  display: inline-flex;
+}
+
+.inbox-detail {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px 84px; /* bottom room for the floating action bar */
+  position: relative;
+}
+
+.inbox-detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inbox-detail-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.inbox-detail-title {
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  margin: 0 0 6px;
+}
+
+.inbox-detail-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+  margin-bottom: 10px;
+}
+
+.inbox-detail-open {
+  margin: 8px 0;
+}
+
+/* numbered reading-order rows (screens/02 right pane) */
+.ro-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: var(--bg-inset);
+  text-align: left;
+  transition: border-color 100ms ease-out;
+}
+
+.ro-row:hover {
+  border-color: var(--hairline-2);
+}
+
+.ro-num {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-3);
+  border: 1px solid var(--hairline-2);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.ro-name {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* §4 floating action bar: blur ground, radius 14, big shadow, one primary */
+.inbox-actionbar {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(24, 28, 36, 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='light'] .inbox-actionbar {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 28px rgba(19, 24, 38, 0.18);
+}
+
+.inbox-actionbar-gap {
+  flex: 1;
+}
+
+/* v3 §6.6 first-run checklist (story 26.6) */
+.firstrun-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 20px;
+}
+
+.firstrun-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.firstrun-check-text {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+/* ── v3 §9 GitHub auth + dex registry (story 26.7) ──────────────────────── */
+
+.dexreg {
+  margin-top: 10px;
+}
+
+.dexreg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+
+.dexreg-name {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dexreg-meta {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dexreg-create {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.auth-revoked {
+  color: var(--warn);
+}
+
+.settings-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 6px 8px;
+  min-height: 30px;
+}
+
+/* AUTH-GITHUB §4.2 device-code screen (story 26.7) */
+.devflow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.devflow-code {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--text-1);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline-2);
+  border-radius: 10px;
+  padding: 10px 16px;
+  text-align: center;
+  user-select: text;
+}
+
+.devflow-wait {
+  color: var(--ok);
+}
+
+a.button-primary {
+  text-decoration: none;
+}
+
+/* v3 P7 (story 26.8): client fleet facts in the tree — tag chips + inbox badge */
+.tree-client-tags {
+  display: inline-flex;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tree-client-tag {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-3);
+  border: 1px solid var(--hairline-2);
+  border-radius: 4px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.tree-client-inbox {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--bg-app);
+  background: var(--warn);
+  border-radius: 8px;
+  padding: 0 5px;
 }

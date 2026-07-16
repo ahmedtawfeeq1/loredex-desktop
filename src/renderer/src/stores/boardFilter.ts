@@ -5,9 +5,22 @@
  * in localStorage so it survives launches; degrades to session-only without it.
  */
 import { create } from 'zustand'
-import type { BoardFilter } from '../../../shared/handoff-lanes'
+import type { BoardFilter, InboxLane } from '../../../shared/handoff-lanes'
 
 const KEY = 'loredex.boardFilter'
+const LANE_KEY = 'loredex.inboxLane'
+
+export type { InboxLane } from '../../../shared/handoff-lanes'
+
+function loadLane(): InboxLane {
+  try {
+    const v = localStorage.getItem(LANE_KEY)
+    if (v === 'forme' || v === 'created' || v === 'all') return v
+  } catch {
+    // no localStorage — session default
+  }
+  return 'forme'
+}
 
 function load(): BoardFilter {
   try {
@@ -21,15 +34,26 @@ function load(): BoardFilter {
 
 interface BoardFilterState {
   mode: BoardFilter
+  lane: InboxLane
   set(mode: BoardFilter): void
+  setLane(lane: InboxLane): void
 }
 
 export const useBoardFilter = create<BoardFilterState>((set) => ({
   mode: load(),
+  lane: loadLane(),
   set(mode) {
     set({ mode })
     try {
       localStorage.setItem(KEY, mode)
+    } catch {
+      // stays applied for this session
+    }
+  },
+  setLane(lane) {
+    set({ lane })
+    try {
+      localStorage.setItem(LANE_KEY, lane)
     } catch {
       // stays applied for this session
     }

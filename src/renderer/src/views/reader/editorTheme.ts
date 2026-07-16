@@ -17,7 +17,7 @@ import { tags as t } from '@lezer/highlight'
  * (editorTheme.test.ts asserts presence in BOTH theme blocks).
  */
 export const HIGHLIGHT_TOKENS = {
-  heading: 'var(--navy)',
+  heading: 'var(--text-1)',
   strong: 'var(--text-1)',
   emphasis: 'var(--text-1)',
   strikethrough: 'var(--text-2)',
@@ -55,10 +55,10 @@ export const editorChrome = EditorView.theme({
   '&.cm-focused': { outline: 'none' },
   '.cm-activeLine': { backgroundColor: 'color-mix(in srgb, var(--bg-inset) 70%, transparent)' },
   '.cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground':
-    { backgroundColor: 'color-mix(in srgb, var(--gold) 22%, transparent)' },
+    { backgroundColor: 'color-mix(in srgb, var(--accent) 22%, transparent)' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--text-1)' },
   '&.cm-focused .cm-matchingBracket, &.cm-focused .cm-nonmatchingBracket': {
-    backgroundColor: 'color-mix(in srgb, var(--gold) 25%, transparent)',
+    backgroundColor: 'color-mix(in srgb, var(--accent) 25%, transparent)',
   },
   '.cm-panels': {
     backgroundColor: 'var(--bg-card)',
@@ -75,8 +75,8 @@ export const editorChrome = EditorView.theme({
     border: '1px solid var(--hairline)',
     borderRadius: '6px',
   },
-  '.cm-searchMatch': { backgroundColor: 'color-mix(in srgb, var(--gold) 16%, transparent)' },
-  '.cm-searchMatch-selected': { backgroundColor: 'color-mix(in srgb, var(--gold) 34%, transparent)' },
+  '.cm-searchMatch': { backgroundColor: 'color-mix(in srgb, var(--accent) 16%, transparent)' },
+  '.cm-searchMatch-selected': { backgroundColor: 'color-mix(in srgb, var(--accent) 34%, transparent)' },
 })
 
 /**

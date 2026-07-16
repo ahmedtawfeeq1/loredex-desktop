@@ -67,10 +67,10 @@ describe('floating zoom pill stack (D1a5)', () => {
 })
 
 describe('hover emphasis stays on-brand (WP5)', () => {
-  it('hot edges stroke gold, not navy — navy flips to paper-white in dark', () => {
+  it('hot edges stroke amber (open-thread emphasis), never plain ink', () => {
     const hot = block('.atlas-edge-hot .atlas-edge-line')
-    expect(hot).toContain('stroke: var(--gold);')
-    expect(hot).not.toContain('var(--navy)')
+    expect(hot).toContain('stroke: var(--warn);')
+    expect(hot).not.toContain('var(--text-1)')
   })
   it('keeps the non-neighbor fade at 30%', () => {
     expect(css).toContain('opacity: 0.3;')
@@ -132,13 +132,13 @@ describe('WP-A: magnitude on the edge, no aggregated pill', () => {
     expect(canvas).toContain('strokeWidth')
   })
 
-  it('draws the gold open-count dot ONLY when open > 0, near the target end', () => {
+  it('draws the amber open-count dot ONLY when open > 0, near the target end', () => {
     // the dot is gated on openCount > 0 and is placed clear of the arrowhead
     // (openDotAt takes the stroke width so it can back off the scaled head)
     expect(canvas).toMatch(/openCount\s*>\s*0\s*\?\s*openDotAt\(points,\s*edgeWidth/)
     expect(canvas).toContain('atlas-edge-opendot')
-    // and it is styled gold with gold-ink text
-    expect(blockIn(styles, '.atlas-edge-opendot circle')).toContain('fill: var(--gold);')
-    expect(blockIn(styles, '.atlas-edge-opendot text')).toContain('fill: var(--gold-ink);')
+    // and it is styled amber (OPEN = --warn, v3 §1) with dark-ground ink text
+    expect(blockIn(styles, '.atlas-edge-opendot circle')).toContain('fill: var(--warn);')
+    expect(blockIn(styles, '.atlas-edge-opendot text')).toContain('fill: var(--bg-app);')
   })
 })

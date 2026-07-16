@@ -62,6 +62,22 @@ export function groupByProject(cards: HandoffCard[]): Array<{ project: string; l
   return projectsOf(cards).map((project) => ({ project, lanes: lanesFor(cards, project) }))
 }
 
+/** v3 Inbox lanes (story 26.3): For me = inbound to the scoped project(s),
+ *  Created = outbound from them, All = both. Pure. */
+export type InboxLane = 'forme' | 'created' | 'all'
+
+export function laneCards(
+  cards: readonly HandoffCard[],
+  lane: InboxLane,
+  project: string | 'all',
+): HandoffCard[] {
+  const toScope = (c: HandoffCard): boolean => project === 'all' || c.to === project
+  const fromScope = (c: HandoffCard): boolean => project === 'all' || c.from === project
+  if (lane === 'forme') return cards.filter(toScope)
+  if (lane === 'created') return cards.filter(fromScope)
+  return cards.filter((c) => toScope(c) || fromScope(c))
+}
+
 /** Open-inbound count for a project ('all' = whole vault) — nav badge + lane
  *  header. Story 9.3 honesty: expired snoozes are due again and count with
  *  open; snoozed-and-current never count (matches core-side openInbound). */

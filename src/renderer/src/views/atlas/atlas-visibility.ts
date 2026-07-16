@@ -100,7 +100,7 @@ export interface Crumb {
 
 export function breadcrumbsFor(graph: Pick<AtlasGraph, 'level' | 'scope'>): Crumb[] {
   const crumbs: Crumb[] = [
-    { label: 'vault', target: graph.level === 'overview' ? null : { level: 'overview' } },
+    { label: 'dex', target: graph.level === 'overview' ? null : { level: 'overview' } },
   ]
   if (graph.scope.project) {
     crumbs.push({

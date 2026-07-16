@@ -12,6 +12,7 @@ import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
 import { useReader } from '../stores/reader'
 import { useRails } from '../stores/rails'
+import { usePlanFlag } from '../stores/planFlag'
 import { actionItems } from './palette-items'
 import { appActions, VIEW_ORDER } from './registry'
 
@@ -22,19 +23,21 @@ const ALL_VIEWS: AppView[] = [
   'clients', // agent-ops only in nav; always present in VIEW_ORDER
   'search',
   'handoffs',
+  'plan', // v3 §6.4 preview flag; always present in VIEW_ORDER
+  'agents', // v3 §6.5
   'contracts',
   'feed',
   'atlas',
-  'sync',
   'settings',
 ]
 
-/** the nav on a research dex (clients hidden) */
-const RESEARCH_VIEWS = ALL_VIEWS.filter((v) => v !== 'clients')
+/** the nav on a research dex (clients hidden, plan flag off) */
+const RESEARCH_VIEWS = ALL_VIEWS.filter((v) => v !== 'clients' && v !== 'plan')
 
 beforeEach(() => {
   useApp.setState({ view: 'home', cheatsheetOpen: false })
   useDex.setState({ type: null })
+  usePlanFlag.setState({ enabled: false })
 })
 
 describe('the action registry (story 15.3)', () => {
@@ -44,14 +47,27 @@ describe('the action registry (story 15.3)', () => {
     RESEARCH_VIEWS.forEach((view, i) => {
       const action = actions.find((a) => a.id === `view:${view}`)
       expect(action, `view:${view}`).toBeDefined()
-      expect(action?.shortcut).toBe(`⌘${i + 1}`)
-      expect(action?.combo).toEqual({ key: String(i + 1), meta: true })
+      if (i < 9) {
+        expect(action?.shortcut).toBe(`⌘${i + 1}`)
+        expect(action?.combo).toEqual({ key: String(i + 1), meta: true })
+      } else {
+        expect(action?.shortcut).toBeUndefined()
+      }
     })
     expect(actions.some((a) => a.id === 'view:clients')).toBe(false)
+    expect(actions.some((a) => a.id === 'view:plan')).toBe(false)
+  })
+
+  it('the Plan preview flag adds the Plan view to nav + ⌘n numbering', () => {
+    usePlanFlag.setState({ enabled: true })
+    const actions = appActions()
+    expect(actions.some((a) => a.id === 'view:plan')).toBe(true)
+    usePlanFlag.setState({ enabled: false })
   })
 
   it('agent-ops dexes add Clients: first nine keep ⌘1-9, the tenth is unbound', () => {
     useDex.setState({ type: 'agent-ops' })
+    usePlanFlag.setState({ enabled: true })
     const actions = appActions()
     ALL_VIEWS.forEach((view, i) => {
       const action = actions.find((a) => a.id === `view:${view}`)
@@ -118,7 +134,9 @@ describe('⌘K palette coverage (AC2/AC5)', () => {
     for (const action of appActions()) {
       const item = items.find((i) => i.key === action.id)
       if (action.paletteHidden) {
-        expect(action.id).toBe('action:palette') // the only sanctioned hole
+        // sanctioned holes: the palette itself, and pure key-aliases whose
+        // visible twin already lists the intent (v3 bare-C compose = ⌘N)
+        expect(['action:palette', 'action:new-handoff-c']).toContain(action.id)
         expect(item).toBeUndefined()
         continue
       }

@@ -138,7 +138,7 @@ describe('coexistence with the comment anchor highlight (DoD)', () => {
     // the anchor highlight is already applied over the shared text
     store.set(ANCHOR_HIGHLIGHT_NAME, new FakeHighlight(asRange('anchor')))
 
-    // apply find: all matches (minus current) + the gold current match
+    // apply find: all matches (minus current) + the accent current match
     writeFindHighlights(reg, [asRange('m0'), asRange('m2')], asRange('m1'), Ctor)
     expect(store.has(FIND_HIGHLIGHT_NAME)).toBe(true)
     expect(store.has(FIND_CURRENT_HIGHLIGHT_NAME)).toBe(true)

@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { FONTS, SYSTEM_FONT, fontById, fontsByCategory } from './fonts'
 
 describe('font catalog', () => {
-  it('has system + 14 fonts with unique ids', () => {
-    expect(FONTS).toHaveLength(15)
-    expect(new Set(FONTS.map((f) => f.id)).size).toBe(15)
+  it('has system + 16 fonts with unique ids', () => {
+    expect(FONTS).toHaveLength(17)
+    expect(new Set(FONTS.map((f) => f.id)).size).toBe(17)
   })
 
   it('every non-system font bundles at least one file and has a stack', () => {

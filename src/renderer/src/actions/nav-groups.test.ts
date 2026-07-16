@@ -13,10 +13,12 @@ describe('VIEW_ORDER nav groups', () => {
     expect(runs.length).toBe(new Set(runs).size)
   })
 
-  it('research dexes see 9 views (⌘1-9 fully bound); agent-ops adds Clients', () => {
+  it('research dexes see 9 views (v3: +Agents, −Sync); agent-ops adds Clients; Plan rides its flag', () => {
     useDex.setState({ type: 'research' })
     expect(visibleViews()).toHaveLength(9)
     expect(visibleViews().some((e) => e.view === 'clients')).toBe(false)
+    expect(visibleViews().some((e) => e.view === 'plan')).toBe(false)
+    expect(visibleViews().some((e) => e.view === 'agents')).toBe(true)
     useDex.setState({ type: 'agent-ops' })
     expect(visibleViews()).toHaveLength(10)
     expect(visibleViews().some((e) => e.view === 'clients')).toBe(true)

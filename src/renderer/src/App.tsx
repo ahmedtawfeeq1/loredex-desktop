@@ -38,12 +38,15 @@ import { ClientsView } from './views/clients/ClientsView'
 import { ContractTimeline } from './views/contracts/ContractTimeline'
 import { FeedView } from './views/feed/FeedView'
 import { AnnotateModal } from './views/handoffs/AnnotateModal'
-import { Board } from './views/handoffs/Board'
+import { InboxView } from './views/handoffs/InboxView'
+import { PlanView } from './views/plan/PlanView'
+import { AgentsView } from './views/agents/AgentsView'
+import { useSettingsTab } from './stores/settingsTab'
 import { ComposeHandoffModal } from './views/handoffs/ComposeHandoffModal'
 import { DeclineReasonModal } from './views/handoffs/DeclineReasonModal'
 import { LinkRequestModal } from './views/handoffs/FulfillsPicker'
 import { SnoozeUntilPicker } from './views/handoffs/SnoozeUntilPicker'
-import { HomeView } from './views/home/HomeView'
+import { TodayView } from './views/today/TodayView'
 import { RouteConfirmCard } from './views/routes/RouteConfirmCard'
 import { SyncPanel } from './views/sync/SyncPanel'
 import { DataFileView } from './views/reader/DataFileView'
@@ -70,7 +73,15 @@ function ReaderSurface(): React.JSX.Element {
   return <NoteView />
 }
 
-export default function App(): React.JSX.Element {
+export default /** v3 §5: the dissolved Sync view — deep-links land on Settings › System. */
+function SyncRedirect(): React.JSX.Element {
+  useEffect(() => {
+    useSettingsTab.getState().setTab('System')
+  }, [])
+  return <SettingsView />
+}
+
+function App(): React.JSX.Element {
   const status = useApp((s) => s.status)
   const view = useApp((s) => s.view)
   const setView = useApp((s) => s.setView)
@@ -260,11 +271,19 @@ export default function App(): React.JSX.Element {
       {status === 'ready' ? (
         view === 'home' ? (
           <main className="pane-board">
-            <HomeView />
+            <TodayView />
           </main>
         ) : view === 'handoffs' ? (
           <main className="pane-board">
-            <Board />
+            <InboxView />
+          </main>
+        ) : view === 'plan' ? (
+          <main className="pane-board">
+            <PlanView />
+          </main>
+        ) : view === 'agents' ? (
+          <main className="pane-board">
+            <AgentsView />
           </main>
         ) : view === 'clients' ? (
           <main className="pane-board">
@@ -287,8 +306,10 @@ export default function App(): React.JSX.Element {
             <FeedView />
           </main>
         ) : view === 'sync' ? (
+          // v3 §5: the Sync view dissolved into Settings › System — the old
+          // view id stays a working deep link
           <main className="pane-board">
-            <SyncPanel />
+            <SyncRedirect />
           </main>
         ) : view === 'settings' ? (
           <main className="pane-board">

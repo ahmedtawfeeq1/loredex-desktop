@@ -35,7 +35,7 @@
 }
 
 .atlas-panel-title {
-  fill: var(--navy);
+  fill: var(--text-1);
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
@@ -48,7 +48,7 @@
 }
 
 .atlas-pill-name {
-  fill: var(--navy);
+  fill: var(--text-1);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 600;
@@ -78,11 +78,11 @@
 
 /* 01/02/03… recency order chip on a note card's top-left corner */
 .atlas-order-chip rect {
-  fill: var(--gold);
+  fill: var(--warn);
 }
 
 .atlas-order-chip text {
-  fill: var(--gold-ink);
+  fill: var(--bg-app);
   font-family: var(--font-mono);
   font-size: 9px;
   font-weight: 700;
@@ -99,7 +99,7 @@
 
 /* …and gold while the thread they belong to is still open */
 .atlas-edge-open-thread .atlas-edge-line {
-  stroke: var(--gold);
+  stroke: var(--warn);
   opacity: 1;
 }
 
@@ -111,12 +111,12 @@
 /* …connected edges emphasized in GOLD (WP5): stays on-brand in both themes
    instead of flipping to near-paper-white in dark, which --navy does there */
 .atlas-edge-hot .atlas-edge-line {
-  stroke: var(--gold);
+  stroke: var(--warn);
   stroke-width: 2;
 }
 
 .atlas-edge-hot .atlas-edge-line.atlas-edge-blocking {
-  stroke: var(--gold);
+  stroke: var(--warn);
 }
 
 /* …and non-neighbors fade to 30% while something is hovered */
@@ -197,7 +197,7 @@
   background: transparent;
   border: none;
   border-bottom: 1px solid var(--hairline);
-  color: var(--navy);
+  color: var(--text-1);
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1;
@@ -264,7 +264,7 @@
 
 .atlas-rel-chip:hover {
   background: var(--bg-card);
-  border-color: var(--navy);
+  border-color: var(--text-1);
 }
 
 /* mono count — gold once the lane still carries open handoffs (the urgent bit) */
@@ -276,7 +276,7 @@
 }
 
 .atlas-rel-count-open {
-  color: var(--gold);
+  color: var(--warn);
 }
 
 .atlas-rel-prep {
@@ -289,7 +289,7 @@
 
 /* a blocking lane gets a gold ring (the app's blocking/open-heavy accent) */
 .atlas-rel-chip-blocking {
-  border-color: var(--gold);
+  border-color: var(--warn);
 }
 
 /* ── Atlas reframe WP1: the readable project PAGE (Learn) ──────────────────────
@@ -330,7 +330,7 @@
 
 /* one-line purpose header — serif so it reads as prose, not chrome */
 .atlas-deep-purpose {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 13.5px;
   line-height: 1.35;
   color: var(--text-1);
@@ -360,14 +360,14 @@
 }
 
 .atlas-deep-key-mark {
-  color: var(--navy);
+  color: var(--text-1);
   font-size: 12px;
   line-height: 1;
 }
 
 /* the open-count dot rides gold on the canvas — its key mark matches */
 .atlas-deep-key-open .atlas-deep-key-mark {
-  color: var(--gold);
+  color: var(--warn);
 }
 
 /* ── Atlas reframe WP2: the Overview project LAUNCHER ──────────────────────────
@@ -413,7 +413,7 @@
 }
 
 .pp-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 26px;
   font-weight: 600;
   color: var(--text-1);
@@ -482,7 +482,7 @@
   font-family: var(--font-ui);
   font-size: 13px;
   font-weight: 600;
-  color: var(--gold);
+  color: var(--warn);
 }
 .pp-attention-link:hover {
   text-decoration: underline;
@@ -530,7 +530,7 @@
 }
 
 .pp-topic-name {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 17px;
   font-weight: 600;
   color: var(--text-1);
@@ -565,10 +565,10 @@
     box-shadow 120ms ease;
 }
 .pp-note:hover {
-  border-color: var(--navy);
+  border-color: var(--text-1);
 }
 .pp-note:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 /* stale rail as an inset shadow (a 2px border would break the ≤1px rule) */
@@ -579,7 +579,7 @@
 }
 
 .pp-note-title {
-  font-family: var(--font-serif);
+  font-family: var(--font-ui);
   font-size: 15px;
   font-weight: 600;
   color: var(--text-1);
@@ -604,8 +604,8 @@
   white-space: nowrap;
 }
 .pp-chip-topic {
-  color: var(--navy);
-  border-color: color-mix(in srgb, var(--navy) 40%, transparent);
+  color: var(--text-1);
+  border-color: color-mix(in srgb, var(--text-1) 40%, transparent);
 }
 
 .pp-note-excerpt {

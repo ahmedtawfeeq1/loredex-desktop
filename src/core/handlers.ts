@@ -35,7 +35,7 @@ import { appSettingGet, appSettingSet, getAppDb, setPollCursor, vaultId } from '
 import { getReadState, markRead } from './db/read-state'
 import { reconcileSnoozeTimers } from './db/snooze'
 import { aggregateFacetValues, clearFacetCache, filterHits } from './facets'
-import { gitAsync, gitCloneStreaming, NON_INTERACTIVE_GIT_ENV, withGitIdentity } from './git'
+import { gitAsync, gitCloneStreaming, gitCredentialEnv, NON_INTERACTIVE_GIT_ENV, setGitCredentialToken, withGitIdentity } from './git'
 import {
   dismissKey,
   ghCapability,
@@ -47,7 +47,18 @@ import {
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { commentView } from './notes'
-import { getMcpStatus } from './mcp-server'
+import { getMcpStatus, mcpRequestLog } from './mcp-server'
+import {
+  authStatus,
+  createDexRepo,
+  deleteToken,
+  deviceFlowPoll,
+  deviceFlowStart,
+  listDexRepos,
+  liveToken,
+  storeToken,
+  validateToken,
+} from './auth'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import {
   loadAtlasLegendSeen,
@@ -65,6 +76,9 @@ import {
   saveRailsCollapsed,
   saveThemeSetting,
   saveTreeSectionsCollapsed,
+  loadAgentTokens,
+  mintAgentToken,
+  revokeAgentToken,
 } from './settings'
 import { buildThread, collectComments } from './threads'
 import { groupProjectsInTree, listMarkdownFiles, walkVault } from './tree'
@@ -643,6 +657,54 @@ export function registerCoreHandlers(
   // MCP host state + port override (story 1.6). The override applies on the
   // next core-host start — no live rebind, the discovery file must stay true.
   ipc.register('mcp.status', () => getMcpStatus())
+  // v3 §6.5 (story 26.5): read-only session telemetry for the Agents view
+  ipc.register('agents.sessions', () => ({ log: mcpRequestLog(), mcp: getMcpStatus() }))
+  // story 26.9: per-agent MCP tokens — mint shows the token once, list = names
+  ipc.register('agents.tokens.list', () => Object.keys(loadAgentTokens()).sort())
+  ipc.register('agents.tokens.mint', ({ name }) => {
+    const clean = name.trim()
+    if (!clean) throw { code: 'AGENT_NAME_REQUIRED', message: 'Give the agent a name first.' }
+    return { token: mintAgentToken(clean) }
+  })
+  ipc.register('agents.tokens.revoke', ({ name }) => revokeAgentToken(name))
+  // v3 §9 GitHub auth (story 26.7) — token stays core-side, status is masked.
+  // Every status/login/logout refreshes the git askpass cache (story 26.9)
+  // so HTTPS pull/push rides the stored token without prompts.
+  void liveToken().then((t) => setGitCredentialToken(t))
+  ipc.register('auth.status', async () => {
+    const status = await authStatus()
+    setGitCredentialToken(await liveToken())
+    return status
+  })
+  ipc.register('auth.loginWithToken', async ({ token }) => {
+    const user = await validateToken(token)
+    if (!user) throw { code: 'AUTH_INVALID_TOKEN', message: 'GitHub rejected that token — nothing was stored.' }
+    const stored = await storeToken(token)
+    if (!stored)
+      throw {
+        code: 'AUTH_STORE_UNAVAILABLE',
+        message: 'No secure token store on this OS — use `gh auth login` instead.',
+      }
+    setGitCredentialToken(token)
+    return authStatus()
+  })
+  ipc.register('auth.logout', async () => {
+    await deleteToken()
+    setGitCredentialToken(await liveToken()) // a gh session may still cover git
+    return authStatus()
+  })
+  ipc.register('auth.deviceStart', () => deviceFlowStart())
+  ipc.register('auth.devicePoll', async ({ deviceCode }) => {
+    const r = await deviceFlowPoll(deviceCode)
+    if (r.state === 'authorized') {
+      await storeToken(r.token)
+      setGitCredentialToken(r.token)
+      return { state: 'authorized' as const }
+    }
+    return { state: r.state }
+  })
+  ipc.register('dex.registry', () => listDexRepos())
+  ipc.register('dex.createRepo', ({ name, isPrivate }) => createDexRepo(name, isPrivate))
   // Theme preference (story 14.1): per-user app state, applied renderer-side.
   ipc.register('settings.theme.get', () => loadThemeSetting())
   ipc.register('settings.theme.set', ({ theme }) => {
@@ -710,7 +772,7 @@ export function registerCoreHandlers(
   // mutations hold the write lock; the cursor seed prevents the join storm.
   const wizardDeps: WizardDeps = {
     emit: (event) => ipc.emit(event),
-    git: (cwd, args) => gitAsync(cwd, args, { env: NON_INTERACTIVE_GIT_ENV }),
+    git: (cwd, args) => gitAsync(cwd, args, { env: { ...NON_INTERACTIVE_GIT_ENV, ...gitCredentialEnv() } }),
     clone: gitCloneStreaming,
     identity: () => loadIdentityProfile(),
     scaffold: (path, dexType) => engine.scaffoldNewVault(path, dexType),

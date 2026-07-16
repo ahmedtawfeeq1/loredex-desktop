@@ -12,7 +12,7 @@ import { ClientPage } from './ClientPage'
 const CLIENTS_CSS = `
 .clients-view { padding: 24px 32px; overflow-y: auto; width: 100%; }
 .clients-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
-.clients-title { font-family: var(--font-serif, serif); font-size: 24px; color: var(--text-1); }
+.clients-title { font-family: var(--font-ui); font-size: 24px; color: var(--text-1); }
 .clients-count { font-size: 12px; color: var(--text-2); }
 .clients-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
 .client-tag-chip {
@@ -32,8 +32,8 @@ const CLIENTS_CSS = `
 .client-card-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--section-color); }
 .client-card-name { font-weight: 600; color: var(--text-1); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .client-card-inbox {
-  font-size: 11px; font-weight: 700; color: var(--paper, #fff);
-  background: var(--gold, #8a6116); border-radius: 10px; padding: 0 7px;
+  font-size: 11px; font-weight: 700; color: var(--accent-ink);
+  background: var(--accent); border-radius: 10px; padding: 0 7px;
 }
 .client-card-meta { font-size: 12px; color: var(--text-2); }
 .client-card-tags { display: flex; flex-wrap: wrap; gap: 4px; }

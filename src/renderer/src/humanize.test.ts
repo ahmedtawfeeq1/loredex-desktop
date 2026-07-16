@@ -114,7 +114,8 @@ describe('every D1a3 surface uses the ONE util (no per-view drift)', () => {
     ['views/search/Palette.tsx', ['humanizeTitle(']],
     ['views/atlas/AtlasNodeCard.tsx', ['humanizeTitle(', 'noteDate(']],
     ['views/handoffs/ReadingOrderInline.tsx', ['humanizeTitle(', 'noteDate(', 'ro-date']],
-    ['views/home/HomeView.tsx', ['humanizeTitle(']],
+    ['views/today/TodayView.tsx', ['humanizeTitle(']],
+    ['views/handoffs/InboxView.tsx', ['humanizeTitle(']],
   ]
 
   it.each(surfaces)('%s imports and applies humanize', (file, needles) => {
@@ -131,7 +132,8 @@ describe('every D1a3 surface uses the ONE util (no per-view drift)', () => {
     expect(src('views/reader/VaultTree.tsx')).toContain('title={node.path}')
     expect(src('views/search/SearchView.tsx')).toContain('title={hit.path}')
     expect(src('views/handoffs/ReadingOrderInline.tsx')).toContain('title={target}')
-    expect(src('views/home/HomeView.tsx')).toContain('title={card.name}')
+    expect(src('views/today/TodayView.tsx')).toContain('title={card.name}')
+    expect(src('views/handoffs/InboxView.tsx')).toContain('title={card.name}')
     expect(src('views/atlas/AtlasNodeCard.tsx')).toContain('<title>{node.label}</title>')
   })
 

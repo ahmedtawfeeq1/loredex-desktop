@@ -1,42 +1,53 @@
 /**
- * Compact loredex mark — the app icon's inner composition (gold dex ring,
- * paper file, amber ctx chip) as an inline SVG for chrome use: sidebar
- * wordmark row and designed empty states. Colors ride theme tokens where
- * they must adapt; the gold ring and amber chip are brand constants.
+ * Loredex R1 brand mark (handoff/brand/loredex-mark.svg, locked 2026-07-13):
+ * cobalt gradient tile, two filed cards — the front card carries the bracket
+ * glyph and a green "live" row. Hexes are brand constants from the locked
+ * asset, not theme tokens: the mark is identical in both themes. The brass
+ * placeholder mark is retired (DESIGN v3 §8).
  */
-export function BrandMark({ size = 22 }: { size?: number }): React.JSX.Element {
+import { useId } from 'react'
+
+export function BrandMark({
+  size = 22,
+  className,
+}: {
+  size?: number
+  className?: string
+}): React.JSX.Element {
+  const gradientId = useId()
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 100 100"
+      viewBox="0 0 48 48"
       aria-hidden="true"
       focusable="false"
+      className={className}
     >
-      <circle cx="50" cy="50" r="44" fill="none" stroke="#D9A441" strokeWidth="7" />
-      <g transform="rotate(5 52 55)">
-        <path
-          d="M 34 28 H 56 L 68 40 V 74 A 5 5 0 0 1 63 79 H 39 A 5 5 0 0 1 34 74 Z"
-          fill="var(--brand-paper, #FAF8F1)"
-          stroke="var(--hairline)"
-          strokeWidth="1.5"
-        />
-        <path d="M 56 28 L 68 40 H 60 A 4 4 0 0 1 56 36 Z" fill="#D8D2C2" />
-        <rect x="41" y="48" width="17" height="4.5" rx="2.25" fill="#BFB8A6" />
-        <rect x="41" y="57" width="21" height="4.5" rx="2.25" fill="#BFB8A6" />
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#6E96EE" />
+          <stop offset="1" stopColor="#3F69CC" />
+        </linearGradient>
+      </defs>
+      <rect width="48" height="48" rx="11" fill={`url(#${gradientId})`} />
+      <g transform="rotate(-10 22 25)">
+        <rect x="15" y="15" width="13.5" height="18.5" rx="2.4" fill="#BFC8DA" />
       </g>
-      <rect x="56" y="18" width="30" height="17" rx="8" fill="#E0A83E" />
-      <text
-        x="71"
-        y="30.5"
-        textAnchor="middle"
-        fontFamily="var(--font-mono)"
-        fontSize="11"
-        fontWeight="700"
-        fill="#131826"
-      >
-        ctx
-      </text>
+      <g transform="rotate(7 25 25)">
+        <rect x="18.5" y="15" width="14.5" height="19" rx="2.6" fill="#F5F8FF" />
+        <path
+          d="M24 20 H21.4 V29.8 H24"
+          fill="none"
+          stroke="#3F69CC"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <rect x="26" y="20.4" width="4.6" height="1.9" rx=".95" fill="#93A6C9" />
+        <rect x="26" y="23.9" width="4.6" height="1.9" rx=".95" fill="#93A6C9" />
+        <rect x="26" y="27.4" width="4.6" height="1.9" rx=".95" fill="#3BCB8B" />
+      </g>
     </svg>
   )
 }

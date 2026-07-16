@@ -12,6 +12,9 @@
  *   revision threading `-c` args replaces this.
  */
 import { execFile, execFileSync, spawn } from 'node:child_process'
+import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { Identity } from '../shared/types'
 
@@ -64,6 +67,47 @@ export async function gitAsync(
 export const NON_INTERACTIVE_GIT_ENV: Record<string, string> = {
   GIT_TERMINAL_PROMPT: '0',
   GIT_SSH_COMMAND: 'ssh -oBatchMode=yes',
+}
+
+// ── GIT_ASKPASS shim (AUTH-GITHUB §3, story 26.9) ────────────────────────────
+// HTTPS remotes get credentials from the stored GitHub token via an injected
+// askpass helper: username prompts answer `x-access-token`, password prompts
+// answer $LOREDEX_GIT_TOKEN — the token rides the child env only, never disk,
+// never argv. SSH remotes bypass all of this untouched (env is additive).
+
+let askpassPath: string | null = null
+
+/** Write the tiny askpass helper once per process (0700, temp dir). */
+function ensureAskpassHelper(): string {
+  if (askpassPath) return askpassPath
+  const dir = mkdtempSync(join(tmpdir(), 'loredex-askpass-'))
+  const file = join(dir, 'askpass.sh')
+  writeFileSync(
+    file,
+    '#!/bin/sh\ncase "$1" in\n  *[Uu]sername*) echo "x-access-token" ;;\n  *) echo "$LOREDEX_GIT_TOKEN" ;;\nesac\n',
+    { mode: 0o700 },
+  )
+  chmodSync(file, 0o700)
+  askpassPath = file
+  return file
+}
+
+/** The token the shim serves — cached by the auth layer (core boot + every
+ *  login/logout). Empty = shim inert (git falls back to the user's own
+ *  credential helpers exactly as before). */
+let cachedGitToken = ''
+
+export function setGitCredentialToken(token: string | null): void {
+  cachedGitToken = token ?? ''
+}
+
+/** Env to splice into any git spawn that may hit an HTTPS GitHub remote. */
+export function gitCredentialEnv(): Record<string, string> {
+  if (!cachedGitToken) return {}
+  return {
+    GIT_ASKPASS: ensureAskpassHelper(),
+    LOREDEX_GIT_TOKEN: cachedGitToken,
+  }
 }
 
 /**

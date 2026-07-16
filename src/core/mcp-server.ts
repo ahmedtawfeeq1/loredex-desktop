@@ -17,6 +17,57 @@ import * as engine from './engine'
 
 export const PREFERRED_MCP_PORT = 52017
 
+// ── MCP request log (DESIGN v3 §6.5 / §8 session telemetry) ────────────────
+// Read-only, in-memory ring: what agents asked this dex, newest last. Zero
+// engine writes — the Agents view renders it verbatim.
+
+export interface McpLogEntry {
+  /** ISO time the request arrived */
+  at: string
+  /** 'initialize' (a client connecting) or the tool name of a tools/call */
+  kind: 'initialize' | 'tool'
+  name: string
+  /** MCP clientInfo.name when the request carries one (initialize) */
+  client?: string
+  /** per-agent token attribution (story 26.9); absent = the install token */
+  agent?: string
+}
+
+const MCP_LOG_MAX = 200
+const mcpLog: McpLogEntry[] = []
+
+export function mcpRequestLog(): McpLogEntry[] {
+  return [...mcpLog]
+}
+
+/** test seam */
+export function clearMcpRequestLog(): void {
+  mcpLog.length = 0
+}
+
+function push(entry: McpLogEntry): void {
+  mcpLog.push(entry)
+  if (mcpLog.length > MCP_LOG_MAX) mcpLog.splice(0, mcpLog.length - MCP_LOG_MAX)
+}
+
+/** Record what an authorized JSON-RPC body asks (single or batch). */
+export function recordMcpRequest(
+  body: unknown,
+  at = new Date().toISOString(),
+  agent?: string,
+): void {
+  for (const msg of Array.isArray(body) ? body : [body]) {
+    const m = msg as { method?: string; params?: { name?: string; clientInfo?: { name?: string } } }
+    const tag = agent ? { agent } : {}
+    if (m?.method === 'initialize') {
+      const client = m.params?.clientInfo?.name
+      push({ at, kind: 'initialize', name: 'initialize', ...(client ? { client } : {}), ...tag })
+    } else if (m?.method === 'tools/call' && typeof m.params?.name === 'string') {
+      push({ at, kind: 'tool', name: m.params.name, ...tag })
+    }
+  }
+}
+
 /** Absent Origin (CLI/agent clients) or a localhost origin is fine; anything else is rejected. */
 export function originAllowed(origin: string | undefined): boolean {
   if (origin === undefined || origin === 'null') return true
@@ -57,6 +108,9 @@ export function withIdentityEcho(mcp: object, line: string): void {
 interface McpHostOptions {
   port: number
   token: string
+  /** per-agent bearer tokens (story 26.9): name → token, read live so mints
+   *  apply without a restart */
+  agentTokens?: () => Record<string, string>
   /** override for tests (real runs use ~/.loredex) */
   discoveryDir?: string
 }
@@ -76,14 +130,34 @@ export function getMcpStatus(): McpStatus {
   return status
 }
 
-async function handle(req: IncomingMessage, res: ServerResponse, token: string): Promise<void> {
+/** Which agent a bearer belongs to: install token → null (unattributed),
+ *  a minted per-agent token → its name, anything else → 'reject'. */
+export function resolveBearer(
+  header: string,
+  installToken: string,
+  agentTokens: Record<string, string>,
+): { agent: string | null } | 'reject' {
+  if (header === `Bearer ${installToken}`) return { agent: null }
+  for (const [name, token] of Object.entries(agentTokens)) {
+    if (header === `Bearer ${token}`) return { agent: name }
+  }
+  return 'reject'
+}
+
+async function handle(
+  req: IncomingMessage,
+  res: ServerResponse,
+  token: string,
+  agentTokens: () => Record<string, string>,
+): Promise<void> {
   try {
     if (!originAllowed(req.headers.origin)) {
       res.writeHead(403, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'forbidden origin' }))
       return
     }
-    if ((req.headers.authorization ?? '') !== `Bearer ${token}`) {
+    const who = resolveBearer(req.headers.authorization ?? '', token, agentTokens())
+    if (who === 'reject') {
       res.writeHead(401, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'unauthorized' }))
       return
@@ -96,6 +170,9 @@ async function handle(req: IncomingMessage, res: ServerResponse, token: string):
     const chunks: Buffer[] = []
     for await (const chunk of req) chunks.push(chunk as Buffer)
     const body: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+    // §6.5 session telemetry — after auth, before dispatch; per-agent when
+    // the bearer was a minted agent token (story 26.9)
+    recordMcpRequest(body, undefined, who.agent ?? undefined)
 
     const mcp = engine.createMcpServer()
     withIdentityEcho(mcp, formatVaultIdentity(engine.identity()))
@@ -129,8 +206,9 @@ export async function bootMcpServer(
     state: 'stopped',
     message: null,
   }
+  const agentTokens = opts.agentTokens ?? (() => ({}))
   const server = createServer((req, res) => {
-    void handle(req, res, opts.token)
+    void handle(req, res, opts.token, agentTokens)
   })
   try {
     await new Promise<void>((resolve, reject) => {

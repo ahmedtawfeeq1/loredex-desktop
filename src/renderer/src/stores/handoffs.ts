@@ -25,6 +25,9 @@ export interface ComposePrefill {
 interface HandoffsState {
   /** null until first load (skeleton); company-wide, lanes derived per project */
   cards: HandoffCard[] | null
+  /** v3 (story 26.3): the card the one-key triage (A/D/S/E) acts on — shared
+   *  by Today's needs-you queue and the Inbox list */
+  selectedId: string | null
   /** story 9.2: read_at per card id from app-db read-state; null = unread dot.
    *  Absent key = read-state not loaded yet (no dot flash). */
   readAt: Record<string, string | null>
@@ -51,6 +54,7 @@ interface HandoffsState {
   linkRequestFor: HandoffCard | null
   /** comment modal target (story 7.3) */
   annotateFor: HandoffRef | null
+  select(id: string | null): void
   load(): Promise<void>
   /** story 9.2: opening a handoff marks it read (per-user, app-db via IPC) */
   markRead(card: HandoffCard): void
@@ -85,6 +89,7 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
   error: null,
   project: 'all',
   receipt: null,
+  selectedId: null,
   consumingId: null,
   pressedId: null,
   transitioningId: null,
@@ -181,11 +186,17 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
       })
       const vaultPath = useApp.getState().identity?.vaultPath ?? ''
       const rel = toVaultRelative(receipt.path, vaultPath)
+      // v3 §4 toast receipt: Undo where the reverse transition is legal —
+      // declined/snoozed reopen (the 8.1 state machine); accept/reopen don't
+      const undoable = transition.to === 'declined' || transition.to === 'snoozed'
       useToasts
         .getState()
         .push(
           TRANSITION_TITLE[transition.to],
           `${receipt.before.status ?? 'open'} → ${receipt.after.status} · ${receipt.by.name} · ${rel} · ${receipt.pushed ? 'pushed' : 'will push on next sync'}`,
+          undoable
+            ? { label: 'Undo', run: () => void get().setStatus({ ...card, status: transition.to }, { to: 'open' }) }
+            : undefined,
         )
       set({ error: null, transitioningId: null })
       // authoritative refetch — the write's vault.changed event triggers one too
@@ -200,6 +211,10 @@ export const useHandoffs = create<HandoffsState>((set, get) => ({
       // a race means our snapshot is stale — refetch the truth (AC5)
       void get().load()
     }
+  },
+
+  select(id) {
+    set({ selectedId: id })
   },
 
   openDecline(card) {

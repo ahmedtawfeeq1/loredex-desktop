@@ -12,7 +12,7 @@ import { invalidateAtlas } from './atlas'
 import { removeDiscovery } from './discovery'
 import * as engine from './engine'
 import { clearFacetCache } from './facets'
-import { gitAsync, withGitIdentity } from './git'
+import { gitCredentialEnv, gitAsync, withGitIdentity } from './git'
 import { initGhCapability } from './github'
 import { registerCoreHandlers, runSuggestionScan } from './handlers'
 import { createCoreIpc } from './ipc'
@@ -21,6 +21,7 @@ import { bootMcpServer, PREFERRED_MCP_PORT } from './mcp-server'
 import { createPoller, type Poller } from './poller'
 import {
   initSettings,
+  loadAgentTokens,
   loadIdentityProfile,
   loadMcpPortOverride,
   loadOrCreateMcpToken,
@@ -171,7 +172,7 @@ if (config && appDb && vid) {
       emit: (event) => ipc.emit(event),
       getCursor: () => getPollCursor(db, vid),
       setCursor: (cursor) => setPollCursor(db, vid, cursor),
-      git: (args) => gitAsync(vaultPath, args),
+      git: (args) => gitAsync(vaultPath, args, { env: gitCredentialEnv() }),
       readLocalMeta: (relPath) => {
         try {
           return engine.noteMeta(join(vaultPath, relPath))
@@ -208,6 +209,7 @@ if (config) {
     port: portOverride ?? PREFERRED_MCP_PORT,
     portOverride,
     token: loadOrCreateMcpToken(),
+    agentTokens: () => loadAgentTokens(), // story 26.9: mints apply live
     onWarning: (text) => ipc.emit({ kind: 'git.warning', text }),
   })
 }

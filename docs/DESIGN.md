@@ -244,3 +244,157 @@ Note-body external links (https, mailto, …) rendered navy — indistinguishabl
 - `.note-body a`: `color: var(--link)`, underlined at rest (`text-underline-offset: 2px`) — a link must read as a link before hover.
 - Wikilinks are unchanged: gold `--wikilink` rules (Addendum D1) have higher specificity and stay underline-on-hover-only. Broken stays rust dotted.
 - App chrome links stay navy — the blue is reserved for note content, where "this leaves the app" is the signal.
+
+
+---
+
+## v3 amendment — Obsidian Glass / Cobalt
+
+*(handoff/DESIGN-V3-HANDOFF.md committed verbatim per its §7.1 — the binding spec for all v3 phases. v2 history above stands; v3 supersedes v2 visual-direction sections only; the v2 quality floor is unchanged.)*
+
+Status: **approved direction** (2026-07-13). Supersedes DESIGN.md v2's *visual direction* sections ("Card catalog, daylight edition", token table, gold budget). The v2 **quality floor is unchanged and still binding**: both themes wired, `:focus-visible` rings, every action keyboard-reachable, ⌘K lists all, sentence case, empty states = one line + one action, reduced-motion respected, live data over Refresh buttons.
+
+Sources of truth (in the design workspace):
+- `Mission Control Home v2.dc.html` — Today screen, dark + light, full fidelity (pre-cobalt; repaint per §2)
+- `Loredex UX Redesign.dc.html` — Turn 3 (component system), Turn 4 (accent audit), Turn 5 (final palette), Turn 1 (UX/IA wireframes incl. Atlas lens rules, lifecycle, first-run, settings)
+- `Loredex v2 Prototype.dc.html` — cross-linked interactive prototype of the seven views in the final cobalt system
+- This file — the implementable spec. **Hex values come from here, never eyeballed from screenshots.**
+
+---
+
+### 0. What changed and why
+
+v2's warm-paper light theme is replaced by a **dev-native, dark-first** system ("Obsidian Glass"): three layered charcoal surfaces, soft-pill controls with inner-bevel light, a glyph-based status language, and **cobalt** as the single action color. Rationale: amber-as-primary collided with warning semantics and the OPEN state; the audience lives in Linear/IDE-class tools. Identity now comes from the brass brand mark, the component craft, and the green agent heartbeat — not from a novelty hue.
+
+### 1. Color law (fixed roles — never reassign)
+
+| Role | Dark | Light | Rules |
+|---|---|---|---|
+| **Action / primary** | `#5584E8` (ramp 300 `#8FB1F5` · 400 `#6E96EE` · 500 `#5584E8` · 600 `#3F69CC` · 700 `#2F52A8`) | `#2E5FC7` | ONE cobalt primary per view. Links = 300 (dark) / 700 (light). |
+| **Attention / open / warning** | `#E3A73C` | `#96700F` | OPEN stamps, stale, snoozed-expiring. Never on buttons. |
+| **Agents live / success / diff-add** | `#3BCB8B` | `#1E8F5F` | Live dots, receipts, consumed ✓, adds. Sacred to agents — never decorative. |
+| **Danger / decline / drift** | `#EF5D55` (text `#F0655C`) | `#B44439` | Destructive outline buttons, declined, drift. |
+| **Info / request / neutral meta** | `#93A6C9` | `#5C6B85` | REQUEST chips, informational. |
+| **Brand (brass)** | `#D9A63C` grad `#E3B04B→#C89328` | same | **Logo mark + marketing only.** Never a control, never a state. |
+
+Status is always **glyph + label**, never color alone (CVD-safe).
+
+### 2. Tokens — `src/renderer/src/styles.css`
+
+v3 is dark-first: `:root` holds dark; `[data-theme="light"]` overrides. Keep legacy var NAMES where roles map (less churn); add the new ones.
+
+```css
+:root {              /* DARK (default) */
+  --bg-app:      #0B0D12;  /* was #F6F5F1 light-first */
+  --bg-card:     #12151C;
+  --bg-hover:    #171B23;
+  --bg-inset:    #0F1218;
+  --bg-overlay:  #1D222C;
+  --hairline:    #232936;
+  --hairline-2:  #2F3646;
+  --text-1:      #E8EAF0;
+  --text-2:      #9AA3B2;
+  --text-3:      #6B7280;
+  --accent:      #5584E8;  /* NEW — cobalt 500 */
+  --accent-hi:   #6E96EE;  /* 400: gradients top, hover */
+  --accent-lo:   #4A75D6;  /* gradients bottom */
+  --accent-press:#3F69CC;
+  --accent-ink:  #F5F8FF;  /* text on cobalt */
+  --link:        #8FB1F5;  /* cobalt 300 */
+  --warn:        #E3A73C;  /* replaces --gold's state duties */
+  --ok:          #3BCB8B;  /* live + success (was #2E6E5E) */
+  --rust:        #EF5D55;
+  --info:        #93A6C9;
+  --brand:       #D9A63C;  /* brass — BrandMark.tsx ONLY */
+  --focus:       rgba(85,132,232,.55);
+}
+[data-theme="light"] {
+  --bg-app:#F3F2EE; --bg-card:#FFFFFF; --bg-hover:#FAF9F5; --bg-inset:#EAE8E1;
+  --bg-overlay:#FFFFFF; --hairline:#E1DED4; --hairline-2:#D6D3C8;
+  --text-1:#16181D; --text-2:#565D68; --text-3:#8A8F99;
+  --accent:#2E5FC7; --accent-hi:#3D6FD6; --accent-lo:#2854B2; --accent-press:#234A9E;
+  --accent-ink:#FFFFFF; --link:#2E5FC7;
+  --warn:#96700F; --ok:#1E8F5F; --rust:#B44439; --info:#5C6B85; --brand:#BE8C22;
+  --focus: rgba(46,95,199,.45);
+}
+```
+
+`--gold` / `--navy`: deprecate — grep usages; gold state-usages → `--warn` or `--accent` (buttons), navy text → `--text-1`. Update `design-fidelity.test.ts` assertions in the same PR (it asserts token values).
+
+### 3. Typography
+
+- UI: **Geist** (400/500/600/700) · code/meta: **Geist Mono** (400/500/600). Self-host woff2 in `src/renderer/src/assets/fonts/` + `@font-face` in `assets/fonts.css` (pattern already exists). Fallback `system-ui` / `ui-monospace`.
+- Roles: chrome 13/12.5px · titles 20/650 (`letter-spacing:-.015em`) · card titles 15/550 · **mono = machine fact**: routes (`a ⟶ b`), dates, ids (GEN-142), paths, hashes, receipts, section labels (9.5px caps, ls .1em).
+- Retro note-font defaults (Press Start 2P / Space Mono / Workbench) are **removed as defaults**; note-font user setting stays but defaults to Geist / Geist Mono.
+
+### 4. Component rules
+
+- **Buttons**: primary = cobalt gradient `linear-gradient(180deg,var(--accent-hi),var(--accent-lo))`, ink `--accent-ink`, radius 8, h 28–32, weight 600, `inset 0 1px 0 rgba(255,255,255,.25)` + `0 1px 2px rgba(0,0,0,.5)`; hover lightens one step; active flat `--accent-press` + inset shadow. Secondary = `--bg-overlay` + `--hairline-2` border + inner top-light. Ghost = transparent, hover `--bg-hover`. Danger = rust text + `rgba(229,72,77,.35)` border. Disabled explains itself (tooltip + field hints — D1a8 stands). Focus: `0 0 0 2px var(--bg-card), 0 0 0 4px var(--focus)`.
+- **Kbd hints** inside buttons: 9px Geist Mono, 1px border, radius 3. Every triage action shows one (A/D/S/E, C, ⌘K).
+- **Segmented control**: track `--bg-inset` + hairline, radius 10, pad 3; active segment `--bg-overlay`, radius 8, `inset 0 1px 0 rgba(255,255,255,.12)` + drop shadow ("pressed glass").
+- **Status glyph chips** replace text-only stamps: 15px rounded-square (r4) tinted bg (`rgba(hue,.14)`) + glyph — ✓ ready/consumable, ✕ declined, ! stale/drift, – consumed (muted `--bg-hover`/`--text-3`); OPEN = brass-free **amber ring-dot** `● OPEN` chip (mono 10, amber border rgba(.4), bg rgba(.07)); REQUEST = info-bordered mono chip. Stamp-press animation (scale .97→1, 120ms) survives from v2.
+- **List rows**: 40px, two-line anatomy (title 12.5/550 + mono sub 10px `--text-3`), glyph left, avatar/time right, hover `--bg-hover`, selected = 2px cobalt left bar. Never color-only.
+- **Agent chip**: pill, live dot `--ok` with `0 0 7px rgba(59,203,139,.8)` glow + pulse (reduced-motion: static), name 600, mono meta. Session feed lines: mono 11, `❯` prefix.
+- **Code/diff surface**: `--bg-inset` ground, file-header row (mono path + `+N −N`), del rows `rgba(229,72,77,.10)` + `inset 2px 0 0` rust bar; add rows `rgba(59,203,139,.08)` + green bar.
+- **Floating action bar** (reader/diff review): `rgba(24,28,36,.92)` + blur(12px), radius 14, big shadow, ghost/secondary/one-cobalt-primary. Reserve depth for: segmented tabs, floating decision bars, live session sheets (Turn-3c rule).
+- **Toast receipt**: bottom-right card, ✓ green glyph, mono commit line, Undo action, auto-dismiss ~4s.
+
+### 5. IA & views (old → new)
+
+| v2 view | v3 | Notes |
+|---|---|---|
+| Home | **Today** | Needs-you queue (ranked, one-key A/D/S/E) + In-flight agents + New knowledge + rail (sprint/pulse/velocity) |
+| Handoffs | **Inbox** (triage) + **Plan** (board) | Inbox = For me/Created lanes, detail pane w/ reading order. Comment vs Hand back split stands (D1a4) |
+| — | **Plan** (new) | Board · Backlog · Sprints over unified work items (task ∪ handoff). Needs lib schema — see §8 |
+| Reader + Search | **Reader** | Search absorbed (file-pane modes + ⌘K); properties panel per D1a7-C |
+| Atlas | **Atlas** | Strict zoom ladder, one question per lens — **Map** (absorbs Overview; keeps its Launcher card-list / Flow as a sub-toggle) → **Project** (renames Learn: Start-Here brief pinned first, then Receives · Topics-newest-first · Sends, numbered reading order kept) → **Thread** (NEW lens: absorbs the Path tool — one handoff chain rendered as a story) → **Deep Dive** (kept, disciplined: lanes = projects, gutter-bundled edges, focus-fade 35%, card budget ≈12, minimap). Toolbar utilities persist across lenses: Tours, Filters, Blocked overlay, Changed-since overlay, Export SVG/PNG, ? legend (auto-opens on first visit). Breadcrumb `dex ▸ project ▸ thread` IS the esc ladder |
+| — | **Agents** (new) | Roster (state/machine/doing/last-wrote) + read-only live session feed (MCP log + git attribution — zero new engine writes) |
+| Activity | Activity | Card anatomy per D1a1, recolored |
+| Sync | Settings §System + titlebar sync pill | Sync page dissolves |
+| Settings | **Settings** | Grouped: Workspace / Personal / System; status dot in nav; status+fix together |
+
+#### 5.1 Feature parity is mandatory — v3 restyles, it never removes
+
+Every v2 capability keeps a home. Checklist the agents must verify per phase (source: current `src/renderer` views + DESIGN v2 amendments): vault tree with **Name | Content** search modes, collapsible/resizable panes (⌘\, ⌘⇧\), section tinting + project dots, note dates in tree rows; Reader **Read ⇄ Edit (⌘E, CodeMirror)**, full **Properties panel** (typed rows, tags as chips, `+ Add property`, loredex-managed fields locked), wikilinks + broken-link diagnostics, humanized titles, ⌘F find bar, inline comments + hover popovers, thread rail; route-a-note drop zone + receipts/undo/dedup; contracts timeline + pinned diffs; saved/recent searches + query operators; activity card anatomy + churn collapsing; sync health details (reachable/branch/ahead-behind/merge driver) inside Settings; create/join wizards, `loredex://` deep links, vault menu + multi-window, notifications + dock badge, `?` shortcut cheatsheet. The prototype abbreviates some of these for speed; **the spec + this checklist, not the prototype's omissions, define scope.**
+
+### 6. Migration plan (each phase = one PR, gate green, DESIGN.md appended)
+
+1. **P0 — fonts + tokens**: woff2s, `fonts.css`, `styles.css` §2 swap, `design-fidelity.test.ts` update, theme default → system-dark. App recolors wholesale; no layout changes.
+2. **P1 — primitives**: `Button`, `StatusChip`(glyph), `Segmented`, `Kbd`, `AgentChip`, `RowItem` in `src/renderer/src/components/`; migrate existing views' buttons/stamps to them.
+3. **P2 — Today + Inbox**: rebuild HomeView → TodayView per prototype; Handoffs board → Inbox two-pane; global keys A/D/S/E; toast receipts w/ Undo.
+4. **P3 — Plan**: work-item board/backlog/sprints. Blocked on lib schema (§8) — build behind a flag reading `type: handoff` only until then.
+5. **P4 — Agents**: core-host channel exposing MCP request log + last git writes per identity; renderer view + presence chips on cards.
+6. **P5 — Atlas lenses + Settings regroup + first-run** (demo vault + checklist per wireframe 1j).
+
+### 7. Handover protocol (how to run this with your dev agents)
+
+1. Commit this file as `docs/DESIGN.md` → append as `## v3 amendment — Obsidian Glass / Cobalt` (their binding-spec convention; keep v2 history above).
+2. Per phase, write one story file (existing epic/story pattern) that references: this spec's section numbers + the prototype file + the relevant Turn in `Loredex UX Redesign.dc.html`.
+3. Agents implement tokens **only from §2**, components **only from §4**; any deviation goes in the Dev Agent Record with a reason (existing rule).
+4. Verification: screenshot each rebuilt view side-by-side with the prototype; `npm test` + `test:e2e` gates; fidelity test asserts the §2 hexes.
+5. **Pixel reference**: `handoff/loredex-v2-prototype.html` (standalone — open in any browser, fully interactive) plus `handoff/screens/01–10` are the canonical eye. When spec text and pixels disagree, flag it in the story — never guess.
+6. **Keep-everything rule** (§5.1): any capability in the current code that the prototype doesn't show is KEPT and re-homed per the §5 mapping. Removal requires an explicit approved story — silence means keep.
+
+### 8. Product flags surfaced by this design (not UI work — route to loredex lib)
+
+- Work-item schema: `kind: task|handoff|request`, `status: backlog|todo|doing|review|done|consumed`, `priority`, `sprint`, `owner`, `delegate` in frontmatter + MCP verbs `work_list/claim/update/done`.
+- Session telemetry: per-agent MCP request log retention (already in-process) + opt-in surfacing.
+- **Brand identity workstream (next):** the brass mark is a provisional placeholder from the old logo. A full identity (mark, brand color, type, voice) follows the prototype sign-off; §1's `--brand` token and BrandMark.tsx will be updated then. Nothing else in this spec depends on the brass hue.
+- **Terminology — LOCKED, enforce in every string, doc, and identifier the UI shows:** the workspace is a **dex**, never "vault" — *vault is Obsidian's word and we are not Obsidian*. One **dex per product**; projects live inside a dex. UI copy: "Create a dex", "Join a dex", "dex tree", `loredex dex list/join/create`. Legacy `vault*` identifiers in code may survive internally until renamed, but zero user-facing "vault" strings ship in v3. Other locks: Atlas / Curate / Consume / Handoff / Reader keep their names; Route→File.
+
+### 9. Identity & multi-product direction (decision, 2026-07-13)
+
+No login server — **GitHub IS the account**. "Sign in with GitHub" = OAuth device flow (or reuse existing `gh` auth): the app lists the account/org's dex repos (identified by a `loredex-dex` repo topic), **one dex per product**. Join = clone; create = new private repo + topic; the sidebar's product shelves map 1:1 to these dexes, and switching product = switching dex (multi-window already supports N windows × N dexes). This keeps the open-source promise intact: no server, no accounts DB, vaults remain plain git repos the user owns. Out of UI scope, route to lib: `loredex dex list/join/create` commands + device-flow auth in the app shell.
+
+### v3 amendments log
+
+- **2026-07-17 — deferred trio shipped (story 26.9)**: per-agent MCP tokens (mint-once UI on Agents, live host check, `[agent]` attribution in the session feed); GIT_ASKPASS shim (HTTPS dex remotes ride the stored GitHub token, env-only, SSH untouched); Win/Linux encrypted-file token store (AES-256-GCM, machine key, honest Settings warning). Lib companions (work-item schema §8, auth/dex CLI, init --demo) live in loredex#25.
+- **2026-07-17 — P7 (agent-ops surfaces) shipped**: client tree rows gain read-only fleet facts (mono tag chips ×3 + amber inbox-pending badge); the client workspace panel leads with the §4 green heartbeat — lit when the in-app MCP host is listening (`connected · :PORT`), honest "not connected" otherwise. Earlier agent-ops epic already carried the fleet model, ClientsView/ClientPage and the YAML/JSON/CSV viewers; per-client connection telemetry waits on per-agent tokens (lib). Story: docs/stories/epic26.story8-v3-p7-agent-ops-surfaces.md. **v3 handover complete: P0–P7 all shipped.**
+- **2026-07-17 — P6 (GitHub auth) shipped**: core auth layer per AUTH-GITHUB.md — live gh-session reuse, PAT sign-in stored in the macOS Keychain (`loredex`/`github.com`, CLI-shared), §5-honest device flow gated on the not-yet-registered OAuth client id; typed `auth.*`/`dex.*` channels (token never crosses the seam, masked display only); Settings › System › GitHub rebuilt with the dex registry (`loredex-dex` topic list · Join via wizard · Create private repo + topic). Deferred: Windows/Linux token stores, GIT_ASKPASS transport shim (lib hook), CLI verbs (lib repo). Story: docs/stories/epic26.story7-v3-p6-github-auth.md.
+- **2026-07-17 — P5 (Atlas lenses + Settings regroup + first-run) shipped**: lens switcher = Map · Project · Thread · Deep Dive (Thread = the Path tool re-homed; story-layout rendering is a follow-up); breadcrumb reads dex ▸ project ▸ topic; Settings regrouped Workspace/Personal/System with the Sync view dissolved into System (old `sync` id stays a deep link; nav back to 9 views); first-run gains the 3-step checklist + dex copy. Demo-dex generation deferred to the lib (`loredex init --demo` — anti-second-engine). Story: docs/stories/epic26.story6-v3-p5-atlas-settings-firstrun.md.
+- **2026-07-16 — P4 (Agents) shipped**: in-app MCP host gains a read-only request ring (initialize/tools-call, 200 entries) exposed as `agents.sessions`; new Agents view — roster from git attribution (green live dot inside the 10-min write window) + mono `❯` session feed (5 s poll, MCP host state line); Inbox detail gains §6.5 presence chips. Zero engine writes. Per-agent MCP attribution needs per-agent tokens (lib, §8) — feed is dex-wide until then. Story: docs/stories/epic26.story5-v3-p4-agents.md.
+- **2026-07-16 — P3 (Plan preview) shipped behind the §6.4 flag**: `plan` view (Board · Backlog · Sprints) — columns derive purely from the 8.1 handoff machine (Triage/Parked/In progress/Done), transitions ride the existing store writers, Sprints is an honest §8-blocked empty state. Enable via ⌘K "Enable the Plan preview"; flag + view retire into the real work-item schema when §8 lands in the lib. Story: docs/stories/epic26.story4-v3-p3-plan.md.
+- **2026-07-16 — P2 (Today + Inbox) shipped**: Home → Today (needs-you triage queue ranked oldest-first w/ A/D/S/E, in-flight agents from git attribution until P4's live feed, new knowledge, epic25 rail re-homed); Handoffs board → two-pane Inbox (For me/Created/All lanes, RowItem list, detail pane w/ numbered reading order + thread rail + §4 floating action bar); global bare keys A/D/S/E + C; receipt toasts gain Undo where the reverse transition is legal. Nav: Home→Today, Handoffs→Inbox (ids internal). Story: docs/stories/epic26.story3-v3-p2-today-inbox.md.
+- **2026-07-16 — P1 (§4 primitives) shipped**: Button (cobalt-gradient primary w/ bevel + pressed state, overlay secondary, ghost, rust-border danger, §4 focus ring, `kbd` hint slot), Kbd, Segmented (pressed glass), StatusChip (glyph + label: ✓/✕/!/– tinted squares, OPEN amber ring-dot, REQUEST info chip), AgentChip (sacred green live dot), RowItem (40px two-line, 2px cobalt selected bar). Surviving surfaces migrated (board triage w/ A/D/S hints, modals w/ ⌘⏎, reader, tree, theme segmented); rebuilt-next-phase views stay on the identical `button-*` classes. Story: docs/stories/epic26.story2-v3-p1-primitives.md.
+
+- **2026-07-16 — P0 (fonts + tokens + brand mark) shipped**: §2 tokens swapped verbatim (dark-first `:root`, `[data-theme='light']` override); Geist / Geist Mono self-hosted and made the UI + note-role defaults (§3 — serif/retro defaults retired, the note-font setting stays); all `--gold`/`--gold-ink`/`--navy` usages remapped (buttons/selection → `--accent`, OPEN/stale/pending states → `--warn`, REQUEST/meta chips → `--info`, ink text → `--text-1`, links → `--link`); focus ring is cobalt; R1 brand mark wired into BrandMark.tsx + build icons (brass placeholder retired per §8); design-fidelity + atlas-fidelity tests assert the §2 hexes. Story: docs/stories/epic26.story1-v3-p0-fonts-tokens-brand.md.

@@ -19,11 +19,25 @@ const GLYPHS: Record<AppView, React.JSX.Element> = {
     </>
   ),
   handoffs: <path d="M11 3.5 13 5.5m0 0L11 7.5M13 5.5H3.5M5 8.5l-2 2m0 0 2 2m-2-2h9.5" />,
+  plan: (
+    <>
+      <rect x="2.5" y="3" width="3.2" height="10" rx="0.8" />
+      <rect x="6.4" y="3" width="3.2" height="6.5" rx="0.8" />
+      <rect x="10.3" y="3" width="3.2" height="8.2" rx="0.8" />
+    </>
+  ),
   clients: (
     <>
       <circle cx="5.5" cy="5" r="2" />
       <circle cx="10.5" cy="5" r="2" />
       <path d="M2.5 13c0-2 1.4-3.2 3-3.2S8.5 11 8.5 13M7.5 13c0-2 1.4-3.2 3-3.2s3 1.2 3 3.2" />
+    </>
+  ),
+  agents: (
+    <>
+      <circle cx="8" cy="5.5" r="2.2" />
+      <path d="M3.5 13c0-2.6 2-4.2 4.5-4.2s4.5 1.6 4.5 4.2" />
+      <circle cx="12.6" cy="3.4" r="1.4" />
     </>
   ),
   atlas: (

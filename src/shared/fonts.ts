@@ -31,6 +31,7 @@ export const SYSTEM_FONT: FontDef = {
 export const FONTS: readonly FontDef[] = [
   SYSTEM_FONT,
   // Sans
+  { id: 'geist', name: 'Geist', category: 'Sans', stack: `'Geist', ${AR_SANS}, system-ui, sans-serif`, files: ['geist-400.woff2', 'geist-500.woff2', 'geist-600.woff2', 'geist-700.woff2'] },
   { id: 'dm-sans', name: 'DM Sans', category: 'Sans', stack: `'DM Sans', ${AR_SANS}, sans-serif`, files: ['dm-sans-400.woff2', 'dm-sans-700.woff2'] },
   { id: 'sora', name: 'Sora', category: 'Sans', stack: `'Sora', ${AR_SANS}, sans-serif`, files: ['sora-400.woff2', 'sora-700.woff2'] },
   { id: 'saira', name: 'Saira', category: 'Sans', stack: `'Saira', ${AR_SANS}, sans-serif`, files: ['saira-400.woff2', 'saira-700.woff2'] },
@@ -43,6 +44,7 @@ export const FONTS: readonly FontDef[] = [
   { id: 'press-start-2p', name: 'Press Start 2P', category: 'Display', stack: `'Press Start 2P', ${AR_SANS}, monospace`, files: ['press-start-2p-400.woff2'] },
   { id: 'geist-pixel', name: 'Geist Pixel', category: 'Display', stack: `'Geist Pixel', ${AR_SANS}, monospace`, files: ['geist-pixel-400.woff2'] },
   // Mono
+  { id: 'geist-mono', name: 'Geist Mono', category: 'Mono', stack: `'Geist Mono', ${AR_SANS}, ui-monospace, monospace`, files: ['geist-mono-400.woff2', 'geist-mono-500.woff2', 'geist-mono-600.woff2'] },
   { id: 'roboto-mono', name: 'Roboto Mono', category: 'Mono', stack: `'Roboto Mono', ${AR_SANS}, monospace`, files: ['roboto-mono-400.woff2', 'roboto-mono-700.woff2'] },
   { id: 'space-mono', name: 'Space Mono', category: 'Mono', stack: `'Space Mono', ${AR_SANS}, monospace`, files: ['space-mono-400.woff2', 'space-mono-700.woff2'] },
   // Arabic

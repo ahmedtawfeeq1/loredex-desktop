@@ -8,11 +8,12 @@
  * D1 amendment (v1.1): hovering/focusing an anchored span floats the comment
  * popover above it — the fast path; the margin rail remains.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Doc } from '../../../../shared/ipc-contract'
 import type { NoteComment } from '../../../../shared/types'
 import { BrandMark } from '../../components/BrandMark'
 import { DriftBadge } from '../../components/DriftBadge'
+import { TasksContext } from '../../components/TaskCheckbox'
 import { humanizeTitle, noteDate } from '../../humanize'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useComments } from '../../stores/comments'
@@ -47,6 +48,7 @@ import { CommentsRail, OrphanedComments } from './InlineComments'
 import { FindBar } from './FindBar'
 import { ModeToggle, NoteEditor } from './NoteEditor'
 import { PropertiesPanel } from './PropertiesPanel'
+import { toggleTaskInNote } from './taskToggle'
 
 /** Notes past this render length collapse the Properties panel by default (§C). */
 const LONG_NOTE_CHARS = 1500
@@ -199,6 +201,13 @@ export function NoteArticle({
   const { anchored, orphaned } = splitComments(comments, [bodyText ?? doc.body, doc.body])
   const railComments = byAnchorPosition(anchored, bodyText ?? doc.body)
 
+  // interactive checklists: clicking a task checkbox writes [ ]/[x] back to
+  // the note source (note.save path — identity, git commit, file is truth)
+  const onToggleTask = useCallback(
+    (index: number, checked: boolean) => void toggleTaskInNote(selected, index, checked),
+    [selected],
+  )
+
   useEffect(() => {
     // rendered text + the D1 soft gold underline-highlight over anchors,
     // plus (v1.1) focusable hover targets wrapped around the same anchors
@@ -348,7 +357,7 @@ export function NoteArticle({
             if (!keepsPopoverOpen(e.relatedTarget)) setPopover(null)
           }}
         >
-          {rendered}
+          <TasksContext.Provider value={onToggleTask}>{rendered}</TasksContext.Provider>
         </div>
         {/* Addendum D1: a Reading order section never renders as silence — the
             2026-07-10 defect (writers emitted the heading with zero notes) */}

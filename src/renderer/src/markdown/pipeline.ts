@@ -11,17 +11,20 @@ import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
+import { MarkdownTaskCheckbox } from '../components/TaskCheckbox'
 import { MarkdownAnchor } from '../components/WikiLink'
 import { remarkShaLinks } from './shaLinks'
+import { remarkTaskIndexes } from './tasks'
 import { remarkWikilinks } from './wikilinks'
 
-/** defaultSchema + the wikilink carrier attributes (story 2.2). */
+/** defaultSchema + the wikilink carrier attributes (story 2.2) + task indexes. */
 const schema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
     a: [...(defaultSchema.attributes?.['a'] ?? []), 'className', 'dataWikilink'],
     code: [...(defaultSchema.attributes?.['code'] ?? []), ['className', /^language-/]],
+    li: [...(defaultSchema.attributes?.['li'] ?? []), 'dataTaskIndex'],
   },
 }
 
@@ -30,8 +33,9 @@ const options: RehypeReactOptions = {
   jsx,
   jsxs,
   // wikilinks (marked by the remark plugin) render through WikiLink;
-  // plain anchors open externally via the main-process guard
-  components: { a: MarkdownAnchor },
+  // plain anchors open externally via the main-process guard;
+  // task checkboxes become interactive where a TasksContext handler exists
+  components: { a: MarkdownAnchor, input: MarkdownTaskCheckbox },
 }
 
 function buildProcessor(commitBase: string | null) {
@@ -40,6 +44,7 @@ function buildProcessor(commitBase: string | null) {
     .use(remarkWikilinks)
     .use(remarkShaLinks, { commitBase })
     .use(remarkGfm)
+    .use(remarkTaskIndexes)
     .use(remarkRehype)
     .use(rehypeSanitize, schema)
     .use(rehypeReact, options)

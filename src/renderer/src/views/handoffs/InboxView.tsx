@@ -45,6 +45,43 @@ export function rowStatus(card: HandoffCard): string {
   return card.expired ? 'expired' : card.status
 }
 
+/** Archive/Delete for the vertical panel (user request: stacked buttons). */
+function RemoveButtons({ card, disabled }: { card: HandoffCard; disabled: boolean }): React.JSX.Element | null {
+  const identity = useIdentity((s) => effectiveIdentity(s))
+  const [confirm, setConfirm] = useState(false)
+  useEffect(() => setConfirm(false), [card])
+  if (!identity) return null
+  const run = async (mode: 'delete' | 'archive'): Promise<void> => {
+    try {
+      await invoke('vault.removeNote', { path: card.path, mode, identity })
+      useToasts
+        .getState()
+        .push(
+          mode === 'archive' ? 'Handoff archived' : 'Handoff deleted',
+          `${card.id} · committed — will push on next sync`,
+        )
+      void useHandoffs.getState().load()
+    } catch (e) {
+      useToasts.getState().push('Could not remove handoff', isErrEnvelope(e) ? `${(e as { code: string }).code}: ${(e as { message: string }).message}` : String(e))
+    }
+  }
+  return (
+    <>
+      <Button variant="quiet" disabled={disabled} title="Move to _archive/ (one commit)" onClick={() => void run('archive')}>
+        Archive
+      </Button>
+      <Button
+        variant="danger"
+        disabled={disabled}
+        title="Delete this handoff note (one commit)"
+        onClick={() => (confirm ? void run('delete') : setConfirm(true))}
+      >
+        {confirm ? 'Confirm delete' : 'Delete…'}
+      </Button>
+    </>
+  )
+}
+
 /** Reference 02 sub line: open rows carry the route, later states carry the
  *  state word — the glyph never stands alone. Pure. */
 export function rowSub(card: HandoffCard): string {
@@ -95,73 +132,6 @@ function useReadingOrderKinds(card: HandoffCard): Record<string, string> {
   return kinds
 }
 
-/** ⋯ overflow (user feedback 2026-07-17: too many buttons) — the rare and
- *  destructive actions live here: Link request, Archive, Delete (two-step). */
-function MoreActions({ card, disabled }: { card: HandoffCard; disabled: boolean }): React.JSX.Element | null {
-  const identity = useIdentity((s) => effectiveIdentity(s))
-  const openLinkRequest = useHandoffs((s) => s.openLinkRequest)
-  const [open, setOpen] = useState(false)
-  const [confirm, setConfirm] = useState(false)
-  useEffect(() => {
-    setOpen(false)
-    setConfirm(false)
-  }, [card])
-  if (!identity) return null
-  const run = async (mode: 'delete' | 'archive'): Promise<void> => {
-    setOpen(false)
-    try {
-      await invoke('vault.removeNote', { path: card.path, mode, identity })
-      useToasts
-        .getState()
-        .push(
-          mode === 'archive' ? 'Handoff archived' : 'Handoff deleted',
-          `${card.id} · committed — will push on next sync`,
-        )
-      void useHandoffs.getState().load()
-    } catch (e) {
-      useToasts.getState().push('Could not remove handoff', isErrEnvelope(e) ? `${(e as { code: string }).code}: ${(e as { message: string }).message}` : String(e))
-    }
-  }
-  return (
-    <span className="bar-more">
-      <Button
-        variant="quiet"
-        disabled={disabled}
-        title="More actions"
-        onClick={() => setOpen((v) => !v)}
-      >
-        ⋯
-      </Button>
-      {open && (
-        <span className="bar-menu" role="menu">
-          {card.kind === 'delivery' && !card.fulfills && (
-            <button
-              type="button"
-              className="bar-menu-item"
-              onClick={() => {
-                setOpen(false)
-                openLinkRequest(card)
-              }}
-            >
-              Link request…
-            </button>
-          )}
-          <button type="button" className="bar-menu-item" onClick={() => void run('archive')}>
-            Archive — move to _archive/
-          </button>
-          <button
-            type="button"
-            className="bar-menu-item is-danger"
-            onClick={() => (confirm ? void run('delete') : setConfirm(true))}
-          >
-            {confirm ? 'Delete — click again to confirm' : 'Delete…'}
-          </button>
-        </span>
-      )}
-    </span>
-  )
-}
-
 function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
   const consume = useHandoffs((s) => s.consume)
   const setStatus = useHandoffs((s) => s.setStatus)
@@ -169,6 +139,7 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
   const openSnooze = useHandoffs((s) => s.openSnooze)
   const openCompose = useHandoffs((s) => s.openCompose)
   const openAnnotate = useHandoffs((s) => s.openAnnotate)
+  const openLinkRequest = useHandoffs((s) => s.openLinkRequest)
   const pressedId = useHandoffs((s) => s.pressedId)
   const busy = useHandoffs((s) => s.consumingId !== null || s.transitioningId !== null)
   const hasIdentity = useIdentity((s) => effectiveIdentity(s) !== null)
@@ -185,6 +156,7 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
 
   return (
     <div className="inbox-detail" aria-label="Handoff detail">
+      <div className="inbox-detail-main">
       <div className="inbox-detail-chips">
         <StatusChip status={rowStatus(card)} pressed={pressedId === card.id} />
         {card.kind === 'request' && <StatusChip status="request" />}
@@ -241,24 +213,22 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
       </div>
 
       <ThreadRail id={card.id} />
+      </div>
 
-      {/* §4 floating action bar: ghost/secondary + ONE cobalt primary */}
-      <div className="inbox-actionbar" role="toolbar" aria-label="Handoff actions">
-        <Button
-          variant="quiet"
-          title="Comment — a quick note in the thread. No new card is created."
-          onClick={() => openAnnotate(card)}
-        >
-          Comment
-        </Button>
-        <Button
-          variant="emphasis"
-          title="Hand back — creates a new handoff the other team must consume."
-          onClick={() => openCompose(card)}
-        >
-          Hand back
-        </Button>
-        <span className="inbox-actionbar-gap" />
+      {/* vertical action panel (user request 2026-07-17): one column of
+          stacked buttons on the right — ONE cobalt primary on top */}
+      <aside className="inbox-actions" role="toolbar" aria-label="Handoff actions">
+        {(card.status === 'open' || card.status === 'accepted') && (
+          <Button
+            variant="primary"
+            kbd="E"
+            disabled={disabled}
+            title={idleTitle ?? 'Consume — mark it done for real (⌘⏎)'}
+            onClick={() => void consume(card)}
+          >
+            ✓ Consume
+          </Button>
+        )}
         {actions.includes('accept') && (
           <Button
             kbd="A"
@@ -299,19 +269,33 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
             Reopen
           </Button>
         )}
-        {(card.status === 'open' || card.status === 'accepted') && (
+        <span className="inbox-actions-sep" aria-hidden />
+        <Button
+          variant="quiet"
+          title="Comment — a quick note in the thread. No new card is created."
+          onClick={() => openAnnotate(card)}
+        >
+          Comment
+        </Button>
+        <Button
+          variant="emphasis"
+          title="Hand back — creates a new handoff the other team must consume."
+          onClick={() => openCompose(card)}
+        >
+          Hand back
+        </Button>
+        {card.kind === 'delivery' && !card.fulfills && (
           <Button
-            variant="primary"
-            kbd="E"
-            disabled={disabled}
-            title={idleTitle ?? 'Consume — mark it done for real (⌘⏎)'}
-            onClick={() => void consume(card)}
+            variant="quiet"
+            title="Link this delivery to the request it fulfills"
+            onClick={() => openLinkRequest(card)}
           >
-            ✓ Consume
+            Link request
           </Button>
         )}
-        <MoreActions card={card} disabled={busy} />
-      </div>
+        <span className="inbox-actions-sep" aria-hidden />
+        <RemoveButtons card={card} disabled={busy} />
+      </aside>
     </div>
   )
 }

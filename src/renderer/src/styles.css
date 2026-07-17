@@ -7168,8 +7168,20 @@ a.button-primary {
 .inbox-actionbar-gap { flex: 0 0 0; width: 0; }
 .inbox-filters { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
 
-/* reference 02: detail content column caps at 640px */
-.inbox-detail > * { max-width: 640px; }
+/* two-column detail (user request 2026-07-17): content + vertical actions */
+.inbox-detail { display: flex; gap: 20px; align-items: flex-start; }
+.inbox-detail-main { flex: 1; min-width: 0; }
+.inbox-detail-main > * { max-width: 640px; }
+.inbox-actions {
+  flex: 0 0 170px; position: sticky; top: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px; border-radius: 13px;
+  border: 1px solid var(--hairline-2);
+  background: color-mix(in srgb, var(--bg-overlay) 90%, transparent);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.inbox-actions > button { width: 100%; justify-content: center; }
+.inbox-actions-sep { height: 1px; background: var(--hairline); margin: 4px 0; }
 .ro-kind { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-3); flex: 0 0 auto; }
 
 /* ── Tree hierarchy (user feedback 2026-07-17): indented project boxes ── */

@@ -23,13 +23,12 @@ import { useEditor } from '../../stores/editor'
 import { useHandoffs } from '../../stores/handoffs'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
-import { qualifiedId } from '../../../../shared/handoff-lanes'
 import { stripDuplicateH1 } from '../home/brief-title'
 import { handoffRefFromNote } from '../handoffs/compose-form'
 import { attributionLines } from '../handoffs/lifecycle'
 import { ContractChips } from '../contracts/ContractChips'
 import { ReadingOrderInline, readingOrderEmptied } from '../handoffs/ReadingOrderInline'
-import { ThreadRail } from '../handoffs/ThreadRail'
+import { MetaRail } from './MetaRail'
 import {
   ANCHOR_TARGET_CLASS,
   anchorFromEvent,
@@ -48,11 +47,9 @@ import {
 import { CommentsRail, OrphanedComments } from './InlineComments'
 import { FindBar } from './FindBar'
 import { ModeToggle, NoteEditor } from './NoteEditor'
-import { PropertiesPanel } from './PropertiesPanel'
 import { toggleTaskInNote } from './taskToggle'
 
 /** Notes past this render length collapse the Properties panel by default (§C). */
-const LONG_NOTE_CHARS = 1500
 
 export function formatValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(String).join(', ')
@@ -326,12 +323,6 @@ export function NoteArticle({
             </Button>
           </div>
         )}
-        <PropertiesPanel
-          key={selected}
-          meta={doc.meta as Record<string, unknown>}
-          path={selected}
-          defaultCollapsed={doc.body.length > LONG_NOTE_CHARS}
-        />
         <div
           className="note-body"
           ref={bodyRef}
@@ -372,7 +363,6 @@ export function NoteArticle({
         )}
         <ReadingOrderInline targets={readingOrder} from={selected} />
         <OrphanedComments comments={orphaned} />
-        {handoffRef && <ThreadRail id={qualifiedId(handoffRef)} />}
       </article>
       {chip && (
         <button
@@ -396,6 +386,7 @@ export function NoteArticle({
         />
       )}
       <CommentsRail comments={railComments} composerAnchor={composerAnchor} />
+      <MetaRail selected={selected} meta={doc.meta as Record<string, unknown>} />
     </div>
   )
 }

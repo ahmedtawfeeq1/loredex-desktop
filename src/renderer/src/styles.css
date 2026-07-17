@@ -6916,3 +6916,49 @@ a.button-primary {
   padding: 0 18px 12px; font: 10px var(--font-mono); color: var(--text-4);
   flex: 0 0 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* ── Reader meta rail (v3 slice F — reference 04) ───────────────────── */
+.meta-rail {
+  width: 224px; flex: 0 0 auto; border-left: 1px solid var(--hairline);
+  overflow-y: auto; align-self: stretch; padding: 18px 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.rail-label {
+  font: 600 9px var(--font-mono); letter-spacing: 0.1em; color: var(--text-3);
+  margin-bottom: 7px;
+}
+.rail-empty { font: 10.5px var(--font-mono); color: var(--text-4); }
+.rail-work {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: var(--bg-card); border: 1px solid var(--hairline); border-radius: var(--r-md);
+  padding: 8px 10px; cursor: pointer; white-space: nowrap; text-align: left;
+}
+.rail-work + .rail-work { margin-top: 5px; }
+.rail-work-id {
+  font: 600 9.5px var(--font-mono); color: var(--text-2);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.rail-work-status { font: 9.5px var(--font-mono); margin-left: auto; flex: 0 0 auto; }
+.rail-work-status.is-warn { color: var(--warn); }
+.rail-work-status.is-ok { color: var(--ok); }
+.rail-work-status.is-mut { color: var(--text-3); }
+.about-card {
+  background: var(--bg-card); border: 1px solid var(--hairline); border-radius: var(--r-md);
+  padding: 4px 0; font: 10.5px var(--font-mono);
+}
+.about-row { display: flex; padding: 5px 11px; white-space: nowrap; }
+.about-key { color: var(--text-3); width: 58px; flex: 0 0 auto; }
+.about-val { color: var(--text-1); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.about-raw {
+  display: block; width: 100%; text-align: left; padding: 6px 11px 5px;
+  border: 0; border-top: 1px solid var(--bg-hover); margin-top: 3px;
+  background: none; font: 10.5px var(--font-mono); color: var(--link); cursor: pointer;
+}
+.rail-links { font: 11px/2 var(--font-mono); color: var(--text-2); }
+.rail-link {
+  display: block; background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: inherit; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rail-link:hover { color: var(--link); }
+.meta-rail .thread { margin-top: 0; }

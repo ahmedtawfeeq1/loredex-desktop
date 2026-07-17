@@ -12,32 +12,33 @@ import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
 import { useReader } from '../stores/reader'
 import { useRails } from '../stores/rails'
-import { usePlanFlag } from '../stores/planFlag'
 import { actionItems } from './palette-items'
 import { appActions, VIEW_ORDER } from './registry'
 
 // compile-time: VIEW_ORDER covers exactly the AppView union
+// v3 nav order (parity slice B): the prototype's eight + gated/absorbed tail
 const ALL_VIEWS: AppView[] = [
   'home',
-  'reader',
-  'clients', // agent-ops only in nav; always present in VIEW_ORDER
-  'search',
   'handoffs',
-  'plan', // v3 §6.4 preview flag; always present in VIEW_ORDER
-  'agents', // v3 §6.5
-  'contracts',
-  'feed',
+  'plan',
+  'reader',
   'atlas',
+  'agents',
+  'feed',
   'settings',
+  'clients', // agent-ops only in nav; always present in VIEW_ORDER
+  'search', // absorbed per §5 — palette/deep-link only
+  'contracts', // absorbed per §5 — palette/deep-link only
 ]
 
-/** the nav on a research dex (clients hidden, plan flag off) */
-const RESEARCH_VIEWS = ALL_VIEWS.filter((v) => v !== 'clients' && v !== 'plan')
+/** the nav on a research dex (clients + absorbed views hidden) */
+const RESEARCH_VIEWS = ALL_VIEWS.filter(
+  (v) => v !== 'clients' && v !== 'search' && v !== 'contracts',
+)
 
 beforeEach(() => {
   useApp.setState({ view: 'home', cheatsheetOpen: false })
   useDex.setState({ type: null })
-  usePlanFlag.setState({ enabled: false })
 })
 
 describe('the action registry (story 15.3)', () => {
@@ -47,27 +48,24 @@ describe('the action registry (story 15.3)', () => {
     RESEARCH_VIEWS.forEach((view, i) => {
       const action = actions.find((a) => a.id === `view:${view}`)
       expect(action, `view:${view}`).toBeDefined()
-      if (i < 9) {
+      if (i < 8) {
         expect(action?.shortcut).toBe(`⌘${i + 1}`)
         expect(action?.combo).toEqual({ key: String(i + 1), meta: true })
-      } else {
-        expect(action?.shortcut).toBeUndefined()
       }
     })
     expect(actions.some((a) => a.id === 'view:clients')).toBe(false)
-    expect(actions.some((a) => a.id === 'view:plan')).toBe(false)
-  })
-
-  it('the Plan preview flag adds the Plan view to nav + ⌘n numbering', () => {
-    usePlanFlag.setState({ enabled: true })
-    const actions = appActions()
+    // Plan's preview flag is retired — the work-item schema shipped
     expect(actions.some((a) => a.id === 'view:plan')).toBe(true)
-    usePlanFlag.setState({ enabled: false })
+    // absorbed views stay ⌘K-complete without numbers (§5)
+    for (const v of ['search', 'contracts'] as const) {
+      const a = actions.find((x) => x.id === `view:${v}`)
+      expect(a, `view:${v}`).toBeDefined()
+      expect(a?.shortcut).toBeUndefined()
+    }
   })
 
   it('agent-ops dexes add Clients: first nine keep ⌘1-9, the tenth is unbound', () => {
     useDex.setState({ type: 'agent-ops' })
-    usePlanFlag.setState({ enabled: true })
     const actions = appActions()
     ALL_VIEWS.forEach((view, i) => {
       const action = actions.find((a) => a.id === `view:${view}`)

@@ -12,7 +12,14 @@ import { dotTone, useSync } from '../stores/sync'
 import { useVaultMenu } from '../stores/vaultMenu'
 import { useWizard } from '../stores/wizard'
 
-export function VaultMenu({ collapsed = false }: { collapsed?: boolean }): React.JSX.Element | null {
+export function VaultMenu({
+  collapsed = false,
+  compact = false,
+}: {
+  collapsed?: boolean
+  /** v3 side-head variant: just the ▾ caret; the menu popover is unchanged */
+  compact?: boolean
+}): React.JSX.Element | null {
   const identity = useApp((s) => s.identity)
   const tone = useSync((s) => dotTone(s.health))
   const open = useVaultMenu((s) => s.open)
@@ -126,13 +133,23 @@ export function VaultMenu({ collapsed = false }: { collapsed?: boolean }): React
       )}
       <button
         type="button"
-        className={collapsed ? 'vault-chip rail-collapsed vault-chip-button' : 'vault-chip vault-chip-button'}
+        className={
+          compact
+            ? 'dex-caret'
+            : collapsed
+              ? 'vault-chip rail-collapsed vault-chip-button'
+              : 'vault-chip vault-chip-button'
+        }
         title={formatVaultIdentity(identity)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={`Current vault ${vaultName(identity)} — switch vault`}
+        aria-label={`Current dex ${vaultName(identity)} — switch dex`}
         onClick={() => void useVaultMenu.getState().toggle()}
       >
+        {compact ? (
+          <span aria-hidden>▾</span>
+        ) : (
+          <>
         <span className={`vault-chip-dot sync-dot-${tone}`} aria-hidden />
         {!collapsed && (
           <div className="vault-chip-text">
@@ -144,6 +161,8 @@ export function VaultMenu({ collapsed = false }: { collapsed?: boolean }): React
           </div>
         )}
         {!collapsed && <span className="vault-chip-caret" aria-hidden>▾</span>}
+          </>
+        )}
       </button>
     </div>
   )

@@ -24,7 +24,7 @@ interface ReaderState {
   /** wikilink targets to render inline beneath the note — set when a handoff
    *  brief is opened from the board (story 3.2, F5 reading order) */
   readingOrder: string[]
-  loadTree(): Promise<void>
+  loadTree(retried?: boolean): Promise<void>
   open(path: string, readingOrder?: string[], retriedStale?: boolean): Promise<void>
   /** manual refresh action: re-walk the tree and re-read the open note */
   refresh(): Promise<void>
@@ -48,11 +48,13 @@ export const useReader = create<ReaderState>((set, get) => ({
   docError: null,
   readingOrder: [],
 
-  async loadTree() {
+  async loadTree(retried = false) {
     try {
       const tree = await invoke('vault.tree', undefined)
       set({ tree, treeError: null })
     } catch (e) {
+      // first-attach port swap drops early invokes — retry once (app.init pattern)
+      if (!retried && isErrEnvelope(e) && e.code === 'PORT_SWAPPED') return get().loadTree(true)
       set({ tree: [], treeError: errText(e) })
     }
   },

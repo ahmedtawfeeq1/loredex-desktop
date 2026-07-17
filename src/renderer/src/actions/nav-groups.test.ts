@@ -7,26 +7,27 @@ describe('VIEW_ORDER nav groups', () => {
     expect(VIEW_ORDER.every((e) => typeof e.group === 'string' && e.group.length > 0)).toBe(true)
   })
 
-  it('groups are contiguous — no group appears in two separate runs', () => {
-    const runs: string[] = []
-    for (const e of VIEW_ORDER) if (runs[runs.length - 1] !== e.group) runs.push(e.group)
-    expect(runs.length).toBe(new Set(runs).size)
+  it('v3 nav: the prototype eight in ⌘1-8 order, absorbed views navHidden', () => {
+    expect(VIEW_ORDER.slice(0, 8).map((e) => e.view)).toEqual([
+      'home', 'handoffs', 'plan', 'reader', 'atlas', 'agents', 'feed', 'settings',
+    ])
+    expect(VIEW_ORDER.filter((e) => e.navHidden).map((e) => e.view)).toEqual([
+      'search', 'contracts',
+    ])
   })
 
-  it('research dexes see 9 views (v3: +Agents, −Sync); agent-ops adds Clients; Plan rides its flag', () => {
+  it('research dexes see the eight; agent-ops adds Clients; Plan flag retired', () => {
     useDex.setState({ type: 'research' })
-    expect(visibleViews()).toHaveLength(9)
+    expect(visibleViews()).toHaveLength(8)
     expect(visibleViews().some((e) => e.view === 'clients')).toBe(false)
-    expect(visibleViews().some((e) => e.view === 'plan')).toBe(false)
-    expect(visibleViews().some((e) => e.view === 'agents')).toBe(true)
+    expect(visibleViews().some((e) => e.view === 'plan')).toBe(true)
     useDex.setState({ type: 'agent-ops' })
-    expect(visibleViews()).toHaveLength(10)
+    expect(visibleViews()).toHaveLength(9)
     expect(visibleViews().some((e) => e.view === 'clients')).toBe(true)
     useDex.setState({ type: null })
   })
 
-  it('orders groups Workspace, Collaborate, Knowledge, System', () => {
-    const seen = [...new Set(VIEW_ORDER.map((e) => e.group))]
-    expect(seen).toEqual(['Workspace', 'Collaborate', 'Knowledge', 'System'])
+  it('v3 sidebar has no group headers — group survives as metadata only', () => {
+    expect(VIEW_ORDER.every((e) => typeof e.group === 'string')).toBe(true)
   })
 })

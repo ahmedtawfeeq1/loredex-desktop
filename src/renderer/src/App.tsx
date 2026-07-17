@@ -8,7 +8,8 @@ import { appActions, visibleViews } from './actions/registry'
 import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
-import { BrandMark } from './components/BrandMark'
+import { SideNav } from './components/SideNav'
+import { TopBar } from './components/TopBar'
 import { QuickActionsMenu } from './components/QuickActionsMenu'
 import { VaultMenu } from './components/VaultMenu'
 import { NavIcon, RailChevron } from './components/NavIcon'
@@ -189,84 +190,11 @@ export default function App(): React.JSX.Element {
   )
 
   return (
-    <div className="app">
+    <div className="app-shell">
+      <TopBar />
+      <div className="app">
       <aside className={sidebarCollapsed ? 'sidebar rail-collapsed' : 'sidebar'}>
-        <div className="sidebar-drag" />
-        {/* Addendum D1 collapsible rails (story 16.2): chevron in the pane
-            header + ⌘\ — collapsed = 56px icon rail, badges become dots */}
-        <div className="sidebar-head">
-          <div className="sidebar-brand" title="Loredex">
-            <BrandMark size={22} />
-            <span className="sidebar-wordmark">Loredex</span>
-          </div>
-          <button
-            type="button"
-            className="rail-toggle"
-            title={sidebarCollapsed ? 'Expand the sidebar (⌘\\)' : 'Collapse the sidebar (⌘\\)'}
-            aria-label={sidebarCollapsed ? 'Expand the sidebar' : 'Collapse the sidebar'}
-            aria-expanded={!sidebarCollapsed}
-            aria-keyshortcuts="Meta+\"
-            onClick={() => useRails.getState().toggleSidebar()}
-          >
-            <RailChevron dir={sidebarCollapsed ? 'right' : 'left'} />
-          </button>
-        </div>
-        {/* Quick actions live below the brand (user request) — one click from
-            any view, not buried in the dashboard. */}
-        <QuickActionsMenu collapsed={sidebarCollapsed} />
-        <nav aria-label="Views">
-          {/* the registry's view list is the nav — order, labels and ⌘1-9
-              hints can never drift apart (story 15.3). Clients appears only
-              on agent-ops dexes (visibleViews). */}
-          {nav.map(({ view: v, label, group }, i) => {
-            const firstOfGroup = i === 0 || nav[i - 1].group !== group
-            return (
-              <Fragment key={v}>
-                {firstOfGroup &&
-                  (sidebarCollapsed
-                    ? i > 0 && <div className="nav-group-rule" role="presentation" />
-                    : <div className="nav-group-label">{group}</div>)}
-                <button
-                  type="button"
-                  className="nav-item"
-                  aria-current={view === v}
-                  title={i < 9 ? `${label} (⌘${i + 1})` : label}
-                  aria-label={label}
-                  {...(i < 9 ? { 'aria-keyshortcuts': `Meta+${i + 1}` } : {})}
-                  onClick={() => setView(v)}
-                >
-                  {sidebarCollapsed ? <NavIcon view={v} /> : label}
-                  {v === 'handoffs' &&
-                    openInbound > 0 &&
-                    (sidebarCollapsed ? (
-                      <span className="nav-dot" title={`${openInbound} open`} />
-                    ) : (
-                      <span className="nav-badge">{openInbound}</span>
-                    ))}
-                  {v === 'clients' &&
-                    clientsPending > 0 &&
-                    (sidebarCollapsed ? (
-                      <span className="nav-dot" title={`${clientsPending} inbox item(s) pending`} />
-                    ) : (
-                      <span className="nav-badge">{clientsPending}</span>
-                    ))}
-                </button>
-              </Fragment>
-            )
-          })}
-        </nav>
-        {status === 'ready' && !sidebarCollapsed && (
-          <button
-            type="button"
-            className="button-quiet sidebar-action"
-            title="Pick a markdown file to file into the vault (⇧⌘R)"
-            aria-keyshortcuts="Meta+Shift+R"
-            onClick={() => void useRoute.getState().start()}
-          >
-            Route a note…
-          </button>
-        )}
-        <VaultMenu collapsed={sidebarCollapsed} />
+        <SideNav collapsed={sidebarCollapsed} />
       </aside>
       {status === 'ready' ? (
         view === 'home' ? (
@@ -358,6 +286,7 @@ export default function App(): React.JSX.Element {
       <RouteConfirmCard />
       <ToastStack />
       <SuggestToastStack />
+      </div>
     </div>
   )
 }

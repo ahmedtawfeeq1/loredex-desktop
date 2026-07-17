@@ -11,7 +11,6 @@
 import { dispatchZoom } from '../views/atlas/atlas-zoom'
 import { useApp, type AppView } from '../stores/app'
 import { useBoardFilter } from '../stores/boardFilter'
-import { usePlanFlag } from '../stores/planFlag'
 import { useDex } from '../stores/dex'
 import { useEditor } from '../stores/editor'
 import { useFind } from '../stores/find'
@@ -50,30 +49,36 @@ export type NavGroup = 'Workspace' | 'Collaborate' | 'Knowledge' | 'System'
 
 /** Sidebar order IS the shortcut order: ⌘1…⌘9 (AppView type ties the two).
  *  `group` is a visual section header only — the ⌘n number is the array index. */
-export const VIEW_ORDER: ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> = [
+export const VIEW_ORDER: ReadonlyArray<{
+  view: AppView
+  label: string
+  group: NavGroup
+  /** reachable via ⌘K/palette + deep links only — absorbed per §5 */
+  navHidden?: boolean
+}> = [
+  // v3 nav (parity slice B): the prototype's exact eight, ⌘1-8 in order
   { view: 'home', label: 'Today', group: 'Workspace' },
+  { view: 'handoffs', label: 'Inbox', group: 'Workspace' },
+  { view: 'plan', label: 'Plan', group: 'Workspace' },
   { view: 'reader', label: 'Reader', group: 'Workspace' },
-  { view: 'clients', label: 'Clients', group: 'Workspace' },
-  { view: 'search', label: 'Search', group: 'Workspace' },
-  { view: 'handoffs', label: 'Inbox', group: 'Collaborate' },
-  { view: 'plan', label: 'Plan', group: 'Collaborate' },
-  { view: 'agents', label: 'Agents', group: 'Collaborate' },
-  { view: 'contracts', label: 'Contracts', group: 'Collaborate' },
-  { view: 'feed', label: 'Activity', group: 'Collaborate' },
-  { view: 'atlas', label: 'Atlas', group: 'Knowledge' },
+  { view: 'atlas', label: 'Atlas', group: 'Workspace' },
+  { view: 'agents', label: 'Agents', group: 'Workspace' },
+  { view: 'feed', label: 'Activity', group: 'Workspace' },
   { view: 'settings', label: 'Settings', group: 'System' },
+  // agent-ops only (nav row appears with the dex type)
+  { view: 'clients', label: 'Clients', group: 'Workspace' },
+  // §5 absorptions: views stay routable, nav rows retired
+  { view: 'search', label: 'Search', group: 'Workspace', navHidden: true },
+  { view: 'contracts', label: 'Contracts', group: 'Workspace', navHidden: true },
 ]
 
 /** Nav/shortcut views for the OPEN dex: Clients exists only on agent-ops dexes,
  *  and its removal renumbers ⌘1…⌘9 so research dexes keep their muscle memory. */
 export function visibleViews(): ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> {
   const agentOps = useDex.getState().type === 'agent-ops'
-  const plan = usePlanFlag.getState().enabled
+  // Plan's §6.4 preview flag retired: the work-item schema shipped (loredex ≥2.8)
   return VIEW_ORDER.filter(
-    (entry) =>
-      (entry.view !== 'clients' || agentOps) &&
-      // §6.4: Plan ships behind the preview flag until the work-item schema
-      (entry.view !== 'plan' || plan),
+    (entry) => !entry.navHidden && (entry.view !== 'clients' || agentOps),
   )
 }
 
@@ -97,14 +102,22 @@ function triageTarget(): ReturnType<typeof laneCards>[number] | undefined {
 }
 
 export function appActions(): AppAction[] {
-  // ⌘1-9 binds the first nine visible views; a tenth (agent-ops adds Clients)
-  // stays palette/nav reachable without a number
+  // ⌘1-8 binds the prototype's eight; agent-ops' Clients rides ⌘9; absorbed
+  // views (§5: Search, Contracts) stay palette-complete without numbers
   const actions: AppAction[] = visibleViews().map(({ view, label }, i) => ({
     id: `view:${view}`,
     title: `Go to ${label}`,
     ...(i < 9 ? { shortcut: `⌘${i + 1}`, combo: { key: String(i + 1), meta: true } } : {}),
     run: () => useApp.getState().setView(view),
   }))
+  for (const entry of VIEW_ORDER) {
+    if (!entry.navHidden) continue
+    actions.push({
+      id: `view:${entry.view}`,
+      title: `Go to ${entry.label}`,
+      run: () => useApp.getState().setView(entry.view),
+    })
+  }
   actions.push(
     {
       id: 'action:new-handoff',
@@ -115,13 +128,6 @@ export function appActions(): AppAction[] {
         useApp.getState().setView('handoffs')
         useHandoffs.getState().openCompose()
       },
-    },
-    {
-      id: 'action:toggle-plan',
-      title: usePlanFlag.getState().enabled
-        ? 'Disable the Plan preview'
-        : 'Enable the Plan preview (handoffs only until §8)',
-      run: () => usePlanFlag.getState().toggle(),
     },
     {
       // v3 §4: the bare compose key (prototype C) — same intent as ⌘N

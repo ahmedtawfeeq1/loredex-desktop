@@ -96,11 +96,305 @@ a:hover {
 
 /* ── three-pane skeleton on the paper ground; every content region a card ── */
 
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
 .app {
   display: flex;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── v3 top bar (slice B — reference/dom/01: 42px, hairline bottom) ─────── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  height: 42px;
+  padding: 0 14px;
   gap: 12px;
-  padding: 0 12px 12px 0;
+  border-bottom: 1px solid var(--hairline);
+  flex: none;
+  -webkit-app-region: drag; /* the bar IS the drag strip; controls opt out */
+}
+
+.topbar-drag {
+  width: 58px; /* macOS traffic-light inset */
+  flex: none;
+}
+
+.topbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.cmdk-pill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 440px;
+  height: 29px;
+  padding: 0 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  color: var(--text-3);
+  font-size: 12px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.cmdk-pill-text {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmdk-cap {
+  font: 600 9.5px var(--font-mono);
+  border: 1px solid var(--hairline-2);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1.5px 5px;
+  color: var(--text-2);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: none;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 10.5px var(--font-mono);
+  color: var(--text-3);
+}
+
+.sync-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.sync-pill-dot.tone-ink {
+  background: var(--ok);
+}
+
+.sync-pill-dot.tone-amber {
+  background: var(--warn);
+}
+
+.sync-pill-dot.tone-rust {
+  background: var(--rust);
+}
+
+.avatar {
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  background: var(--hairline-2);
+  color: var(--text-1);
+  font: 600 10px/23px var(--font-ui);
+  text-align: center;
+}
+
+/* ── v3 sidebar (slice B — 212px, border-right, pad 12 10) ──────────────── */
+
+.side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 9px 11px;
+  white-space: nowrap;
+}
+
+.side-dex {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.side-ver {
+  margin-left: auto;
+  font: 9.5px var(--font-mono);
+  color: var(--text-3);
+}
+
+.new-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 31px;
+  border-radius: 8px;
+  background: linear-gradient(var(--accent-grad-top), var(--accent-grad-bot));
+  color: var(--accent-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: var(--btn-bevel);
+  margin-bottom: 12px;
+  white-space: nowrap;
+}
+
+.new-btn-cap {
+  font: 600 9px var(--font-mono);
+  border: 1px solid rgba(245, 248, 255, 0.35);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav__item {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.nav-glyph {
+  width: 15px;
+  text-align: center;
+  font-size: 11.5px;
+  flex: none;
+  opacity: 0.85;
+}
+
+.nav-num {
+  margin-left: auto;
+  font: 600 9px var(--font-mono);
+  color: var(--text-4);
+}
+
+.nav-count-pill {
+  margin-left: auto;
+  background: linear-gradient(var(--accent-grad-top), var(--accent-grad-bot));
+  color: var(--accent-ink);
+  font: 700 9.5px var(--font-mono);
+  border-radius: 7px;
+  padding: 2.5px 6px;
+}
+
+.nav-live {
+  margin-left: auto;
+}
+
+.side-shelves {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.shelf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px 5px;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.shelf-caret {
+  font: 600 9px var(--font-mono);
+  color: var(--text-4);
+}
+
+.shelf-name {
+  font: 600 9px var(--font-mono);
+  letter-spacing: 0.1em;
+  color: var(--text-2);
+}
+
+.shelf-tag {
+  font: 8.5px var(--font-mono);
+  color: var(--text-4);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.shelf-count {
+  margin-left: auto;
+  font: 9.5px var(--font-mono);
+  color: var(--text-4);
+}
+
+.shelf-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font: 11px var(--font-mono);
+  color: var(--text-2);
+  width: 100%;
+}
+
+.shelf-row:hover {
+  background: var(--bg-hover);
+}
+
+.shelf-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.shelf-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shelf-n {
+  color: var(--text-3);
+  flex: none;
+}
+
+.shelf-attn {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rust);
+  flex: none;
+}
+
+.shelf-more {
+  color: var(--text-3);
+}
+
+.side-spring {
+  margin-top: auto;
+}
+
+.keys-footer {
+  font: 9px var(--font-mono);
+  color: var(--text-4);
+  padding: 8px 10px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* card surface recipe: --bg-card + 1px hairline + radius 12 + shadow-sm.
@@ -117,10 +411,13 @@ a:hover {
 }
 
 .sidebar {
-  width: 220px;
+  width: 212px; /* v3 slice B — prototype redline */
   flex: none;
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  border-right: 1px solid var(--hairline);
   background: transparent; /* flat on --bg-app (v2: no vibrancy dependency) */
   transition: width 160ms ease-out; /* D1 rails; reduced-motion rule kills it */
 }
@@ -6307,4 +6604,16 @@ a.button-primary {
   background: var(--warn);
   border-radius: 8px;
   padding: 0 5px;
+}
+
+.dex-caret {
+  color: var(--text-3);
+  font-size: 9px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.dex-caret:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
 }

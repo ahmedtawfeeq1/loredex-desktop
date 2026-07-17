@@ -29,6 +29,13 @@ import {
 import { handleCoreMessage } from './notifications'
 import { createMainWindow } from './windows'
 
+// Parity harness (docs/design/reference): LOREDEX_DEBUG_PORT exposes CDP so
+// the reference screenshot loop can drive the real app. Dev tooling only —
+// unset in normal runs, never set by the app itself.
+if (process.env.LOREDEX_DEBUG_PORT) {
+  app.commandLine.appendSwitch('remote-debugging-port', process.env.LOREDEX_DEBUG_PORT)
+}
+
 interface WinCore {
   /** the window's core-host process (null while respawning) */
   core: Electron.UtilityProcess | null

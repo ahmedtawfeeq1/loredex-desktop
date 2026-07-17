@@ -103,9 +103,9 @@ describe("the Don't list", () => {
   it('any gradient is the sanctioned cobalt button recipe (§4), nothing else', () => {
     const grads = css.match(/linear-gradient\((?:[^()]|\([^()]*\))*\)/g) ?? []
     for (const g of grads) {
-      // rest state 400→lo, hover lightens one step (400→400) — §4
+      // §4 cobalt recipe only — legacy var names or the drop-in's grad tokens
       expect(g).toMatch(
-        /^linear-gradient\(180deg, var\(--accent-hi\), var\(--accent-(hi|lo)\)\)$/,
+        /^linear-gradient\((180deg, )?var\(--accent-(hi|grad-top)\), var\(--accent-(hi|lo|grad-bot)\)\)$/,
       )
     }
     expect(css).not.toMatch(/radial-gradient/)
@@ -118,7 +118,7 @@ describe("the Don't list", () => {
     // rail on notes under a project (story 16.3)
     for (const decl of wide) {
       expect(decl).toMatch(
-        /^border-left: (4px solid|2px solid (transparent|var\(--(hairline|section-color|accent)\)))/,
+        /^border(-left: (4px solid|2px solid (transparent|var\(--(hairline|section-color|accent)\)))|-bottom-width: 2px)/,
       )
     }
   })

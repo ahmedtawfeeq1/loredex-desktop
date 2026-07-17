@@ -7253,3 +7253,43 @@ a.button-primary {
   color: var(--text-3); font: 600 12px var(--font-mono); cursor: pointer;
 }
 .meta-rail-reopen:hover { color: var(--text-1); }
+
+/* ⋯ overflow menu on the action bar (user feedback 2026-07-17) */
+.bar-more { position: relative; display: inline-flex; }
+.bar-menu {
+  position: absolute; bottom: calc(100% + 8px); right: 0; z-index: 30;
+  display: flex; flex-direction: column; min-width: 210px; padding: 4px;
+  background: var(--bg-overlay); border: 1px solid var(--hairline-2);
+  border-radius: 10px; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+}
+.bar-menu-item {
+  display: block; width: 100%; text-align: left; padding: 7px 10px;
+  border: 0; background: none; border-radius: 7px;
+  font-size: 12px; font-weight: 550; color: var(--text-2); cursor: pointer;
+  white-space: nowrap;
+}
+.bar-menu-item:hover { background: var(--bg-overlay-2); color: var(--text-1); }
+.bar-menu-item.is-danger { color: var(--rust-text); }
+
+/* Rail thread = quick summary rows, never full note content (user feedback
+   2026-07-17): no gutter, no route, one-line ellipsized objectives. */
+.meta-rail { overflow-x: hidden; }
+.meta-rail .thread { max-width: 100%; margin-top: 0; }
+.meta-rail .thread-step-gutter { display: none; }
+.meta-rail .thread-step-body { margin-left: 0 !important; min-width: 0; }
+.meta-rail .thread-card { padding: 6px 9px; border-radius: 8px; }
+.meta-rail .thread-card-top { gap: 6px; }
+.meta-rail .thread-card-top .handoff-route { display: none; }
+.meta-rail .thread-card-objective {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meta-rail .thread-here {
+  display: block; white-space: normal; font-size: 10px; padding: 6px 9px;
+}
+.meta-rail .thread-edge { padding-left: 0; }
+.meta-rail .thread-title { font-size: 9px; letter-spacing: 0.08em; }

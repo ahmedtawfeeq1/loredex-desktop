@@ -10,7 +10,15 @@ import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import type { HandoffThread, ThreadCard } from '../../../../shared/types'
 import { invoke, onEvent } from '../../api'
 import { StatusChip } from '../../components/StatusChip'
+import { useApp } from '../../stores/app'
 import { useReader } from '../../stores/reader'
+
+/** Thread cards open in the Reader — from the Inbox too (2026-07-17 fix:
+ *  open() alone only fed the reader store; the view never switched). */
+function openThreadNote(path: string): void {
+  useApp.getState().setView('reader')
+  void useReader.getState().open(path)
+}
 
 function ThreadCardRow({ node }: { node: ThreadCard }): React.JSX.Element {
   const comment = node.kind === 'comment'
@@ -19,10 +27,10 @@ function ThreadCardRow({ node }: { node: ThreadCard }): React.JSX.Element {
       className={`thread-card${comment ? ' thread-card-comment' : ''}`}
       role="button"
       tabIndex={0}
-      onClick={() => void useReader.getState().open(node.path)}
+      onClick={() => openThreadNote(node.path)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target === e.currentTarget) {
-          void useReader.getState().open(node.path)
+          openThreadNote(node.path)
         }
       }}
     >

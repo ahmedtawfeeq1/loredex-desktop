@@ -95,13 +95,20 @@ function useReadingOrderKinds(card: HandoffCard): Record<string, string> {
   return kinds
 }
 
-/** Archive / delete the selected handoff note (user request 2026-07-17). */
-function RemoveHandoff({ card, disabled }: { card: HandoffCard; disabled: boolean }): React.JSX.Element | null {
+/** ⋯ overflow (user feedback 2026-07-17: too many buttons) — the rare and
+ *  destructive actions live here: Link request, Archive, Delete (two-step). */
+function MoreActions({ card, disabled }: { card: HandoffCard; disabled: boolean }): React.JSX.Element | null {
   const identity = useIdentity((s) => effectiveIdentity(s))
+  const openLinkRequest = useHandoffs((s) => s.openLinkRequest)
+  const [open, setOpen] = useState(false)
   const [confirm, setConfirm] = useState(false)
-  useEffect(() => setConfirm(false), [card])
+  useEffect(() => {
+    setOpen(false)
+    setConfirm(false)
+  }, [card])
   if (!identity) return null
   const run = async (mode: 'delete' | 'archive'): Promise<void> => {
+    setOpen(false)
     try {
       await invoke('vault.removeNote', { path: card.path, mode, identity })
       useToasts
@@ -116,19 +123,42 @@ function RemoveHandoff({ card, disabled }: { card: HandoffCard; disabled: boolea
     }
   }
   return (
-    <>
-      <Button variant="quiet" disabled={disabled} title="Move to _archive/ (one commit)" onClick={() => void run('archive')}>
-        Archive
-      </Button>
+    <span className="bar-more">
       <Button
-        variant="danger"
+        variant="quiet"
         disabled={disabled}
-        title="Delete this handoff note (one commit)"
-        onClick={() => (confirm ? void run('delete') : setConfirm(true))}
+        title="More actions"
+        onClick={() => setOpen((v) => !v)}
       >
-        {confirm ? 'Sure?' : 'Delete'}
+        ⋯
       </Button>
-    </>
+      {open && (
+        <span className="bar-menu" role="menu">
+          {card.kind === 'delivery' && !card.fulfills && (
+            <button
+              type="button"
+              className="bar-menu-item"
+              onClick={() => {
+                setOpen(false)
+                openLinkRequest(card)
+              }}
+            >
+              Link request…
+            </button>
+          )}
+          <button type="button" className="bar-menu-item" onClick={() => void run('archive')}>
+            Archive — move to _archive/
+          </button>
+          <button
+            type="button"
+            className="bar-menu-item is-danger"
+            onClick={() => (confirm ? void run('delete') : setConfirm(true))}
+          >
+            {confirm ? 'Delete — click again to confirm' : 'Delete…'}
+          </button>
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -139,7 +169,6 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
   const openSnooze = useHandoffs((s) => s.openSnooze)
   const openCompose = useHandoffs((s) => s.openCompose)
   const openAnnotate = useHandoffs((s) => s.openAnnotate)
-  const openLinkRequest = useHandoffs((s) => s.openLinkRequest)
   const pressedId = useHandoffs((s) => s.pressedId)
   const busy = useHandoffs((s) => s.consumingId !== null || s.transitioningId !== null)
   const hasIdentity = useIdentity((s) => effectiveIdentity(s) !== null)
@@ -229,16 +258,6 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
         >
           Hand back
         </Button>
-        {card.kind === 'delivery' && !card.fulfills && (
-          <Button
-            variant="quiet"
-            title="Link this delivery to the request it fulfills"
-            onClick={() => openLinkRequest(card)}
-          >
-            Link request
-          </Button>
-        )}
-        <RemoveHandoff card={card} disabled={busy} />
         <span className="inbox-actionbar-gap" />
         {actions.includes('accept') && (
           <Button
@@ -291,6 +310,7 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
             ✓ Consume
           </Button>
         )}
+        <MoreActions card={card} disabled={busy} />
       </div>
     </div>
   )

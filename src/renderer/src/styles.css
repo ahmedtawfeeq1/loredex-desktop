@@ -6962,3 +6962,71 @@ a.button-primary {
 }
 .rail-link:hover { color: var(--link); }
 .meta-rail .thread { margin-top: 0; }
+
+/* ── Agents (v3 slice G — reference 06) ─────────────────────────────── */
+.agents-v3 { flex: 1; display: flex; min-width: 0; min-height: 0; }
+.agents-main { flex: 1.35; min-width: 0; overflow-y: auto; padding: 20px 24px; }
+.agents-head { display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+.agents-title { font-size: 16px; font-weight: 650; }
+.live-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: 600 9.5px var(--font-mono); color: var(--ok);
+  border: 1px solid rgba(59, 203, 139, 0.35); border-radius: 4px;
+  padding: 2px 7px; background: rgba(59, 203, 139, 0.07);
+}
+.live-chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.live-chip.is-idle { color: var(--text-3); border-color: var(--hairline-2); background: none; }
+.live-chip.is-idle .live-chip-dot { background: var(--hairline-2); }
+.agents-connect { margin-left: auto; }
+.agents-table {
+  background: var(--bg-card); border: 1px solid var(--hairline);
+  border-radius: var(--r-lg); margin-top: 14px;
+}
+.agents-thead, .agents-tr {
+  display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+  border-bottom: 1px solid var(--bg-hover);
+}
+.agents-thead {
+  padding: 8px 14px; font: 600 9px var(--font-mono); letter-spacing: 0.08em;
+  color: var(--text-3); white-space: nowrap;
+}
+.agents-tr:last-child { border-bottom: 0; }
+.agents-tr.is-idle { opacity: 0.55; }
+.at-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hairline-2); flex: 0 0 auto; }
+.at-dot.is-live { background: var(--ok); box-shadow: 0 0 7px rgba(59, 203, 139, 0.8); }
+.at-agent { width: 110px; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; }
+.at-machine { width: 92px; font: 10.5px var(--font-mono); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; }
+.at-doing { flex: 1; font: 10.5px var(--font-mono); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.agents-tr.is-idle .at-doing { color: var(--text-3); }
+.at-wrote { width: 120px; font: 10.5px var(--font-mono); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 0 auto; }
+.at-act {
+  width: 44px; font-size: 11.5px; font-weight: 550; color: var(--text-3);
+  background: none; border: 0; padding: 0; cursor: pointer; text-align: left; flex: 0 0 auto;
+}
+.at-act.is-watch { color: var(--link); }
+.agents-empty { padding: 14px; font-size: 12px; color: var(--text-3); }
+.agents-elsewhere-label { margin: 16px 0 8px; }
+.agents-elsewhere { display: flex; gap: 8px; flex-wrap: wrap; }
+.ew-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-card); border: 1px solid var(--hairline); border-radius: var(--r-md);
+  padding: 7px 10px; font: 10.5px var(--font-mono); color: var(--text-2); white-space: nowrap;
+}
+.ew-live { color: var(--ok); }
+.agents-session {
+  flex: 1; min-width: 0; border-left: 1px solid var(--hairline);
+  overflow-y: auto; padding: 20px; background: var(--bg-inset);
+}
+.session-head { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.session-head-label { font: 600 9.5px var(--font-mono); letter-spacing: 0.1em; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; }
+.session-readonly { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-4); }
+.session-log-v3 { font: 11px/2.1 var(--font-mono); color: var(--text-2); margin-top: 10px; }
+.session-line-v3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session-line-v3 .session-time { color: var(--text-3); }
+.session-src-mcp { color: var(--info); }
+.session-src-git { color: var(--ok); }
+.session-foot {
+  font: 10px/1.7 var(--font-mono); color: var(--text-4); margin-top: 12px;
+  border-top: 1px solid var(--bg-hover); padding-top: 10px;
+}
+.agents-session .tokens-card { margin-top: 14px; }

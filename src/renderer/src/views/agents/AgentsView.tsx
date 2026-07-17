@@ -11,10 +11,10 @@
 import { useEffect, useState } from 'react'
 import type { ActivityEvent, McpLogEntry, McpStatus } from '../../../../shared/types'
 import { isErrEnvelope } from '../../../../shared/ipc-contract'
-import { AgentChip } from '../../components/AgentChip'
 import { Button } from '../../components/Button'
 import { invoke } from '../../api'
 import { useApp } from '../../stores/app'
+import { useSettingsTab } from '../../stores/settingsTab'
 import { relativeTime } from '../feed/feed-logic'
 import { useDashboardData } from '../home/dashboard-data'
 
@@ -46,27 +46,6 @@ export function rosterFrom(feed: readonly ActivityEvent[], nowMs: number): Agent
     })
   }
   return [...rows.values()]
-}
-
-const TIME = new Intl.DateTimeFormat('en-US', {
-  hour12: false,
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-})
-
-function SessionLine({ entry }: { entry: McpLogEntry }): React.JSX.Element {
-  return (
-    <div className="session-line">
-      <span className="session-time">{TIME.format(new Date(entry.at))}</span>
-      <span className="session-text">
-        ❯ {entry.agent ? `[${entry.agent}] ` : ''}
-        {entry.kind === 'initialize'
-          ? `session start${entry.client ? ` · ${entry.client}` : ''}`
-          : entry.name}
-      </span>
-    </div>
-  )
 }
 
 /** Per-agent MCP tokens (story 26.9): mint shows the token ONCE — put it in
@@ -148,6 +127,49 @@ export function AgentTokensCard(): React.JSX.Element {
   )
 }
 
+/** Doing-now cell: latest MCP call attributed to this agent inside the live
+ *  window; else the last git write while live; else idle. Pure. */
+export function doingNow(
+  row: AgentRow,
+  log: readonly McpLogEntry[],
+  nowMs: number,
+): { text: string; live: boolean } {
+  if (row.live) {
+    const call = [...log]
+      .reverse()
+      .find(
+        (e) =>
+          e.kind === 'tool' &&
+          (e.agent ?? '') === row.name &&
+          nowMs - Date.parse(e.at) < LIVE_WINDOW_MS,
+      )
+    return { text: call ? call.name : row.lastSummary, live: true }
+  }
+  return { text: `idle · last seen ${relativeTime(row.lastAt, nowMs)}`, live: false }
+}
+
+/** [MCP]/[GIT] merged session feed, chronological. Pure. */
+export function sessionLines(
+  log: readonly McpLogEntry[],
+  feed: readonly ActivityEvent[],
+  agent: string | null,
+): Array<{ at: string; src: 'MCP' | 'GIT'; text: string }> {
+  const mcp = log
+    .filter((e) => !agent || (e.agent ?? '') === agent)
+    .map((e) => ({
+      at: e.at,
+      src: 'MCP' as const,
+      text:
+        e.kind === 'initialize'
+          ? `session start${e.client ? ` · ${e.client}` : ''}`
+          : `${e.agent ? `[${e.agent}] ` : ''}${e.name}`,
+    }))
+  const git = feed
+    .filter((e) => e.kind !== 'sync' && (!agent || e.actor.name === agent))
+    .map((e) => ({ at: e.at, src: 'GIT' as const, text: e.summary }))
+  return [...mcp, ...git].sort((a, b) => a.at.localeCompare(b.at)).slice(-40)
+}
+
 export function AgentsView(): React.JSX.Element {
   const activity = useDashboardData((s) => s.activity)
   const loadDash = useDashboardData((s) => s.load)
@@ -155,6 +177,7 @@ export function AgentsView(): React.JSX.Element {
   const setView = useApp((s) => s.setView)
   const [log, setLog] = useState<McpLogEntry[] | null>(null)
   const [mcp, setMcp] = useState<McpStatus | null>(null)
+  const [watch, setWatch] = useState<string | null>(null)
 
   useEffect(() => {
     if (!dash) void loadDash()
@@ -184,72 +207,139 @@ export function AgentsView(): React.JSX.Element {
 
   const nowMs = Date.now()
   const roster = rosterFrom(activity ?? [], nowMs)
-  const recent = [...(log ?? [])].reverse().slice(0, 40)
+  const liveCount = roster.filter((r) => r.live).length
+  const lines = sessionLines(log ?? [], activity ?? [], watch)
   const mcpLine =
     mcp === null
       ? 'checking…'
       : mcp.state === 'running'
-        ? `listening on 127.0.0.1:${mcp.port}`
+        ? `127.0.0.1:${mcp.port}`
         : mcp.state === 'port-conflict'
           ? 'port conflict — fix in Settings'
           : 'stopped'
 
+  // reference 06 "everywhere else" chips — live data when we have it
+  const doing = roster.find((r) => r.live)
+  const filed = (activity ?? []).find((e) => e.kind === 'route')
+  const consumed = (activity ?? []).find((e) => e.kind === 'consume')
+
   return (
-    <div className="agents">
-      <div className="plan-head">
-        <div className="ops-titlewrap">
-          <h1 className="ops-title">Agents</h1>
-          <span className="ops-subtitle">
-            roster from git attribution · session feed from the MCP host · read-only
+    <div className="agents-v3">
+      <div className="agents-main">
+        <div className="agents-head">
+          <span className="agents-title">Agents</span>
+          <span className={`live-chip${liveCount > 0 ? '' : ' is-idle'}`}>
+            <span className="live-chip-dot" />
+            {liveCount} LIVE
+          </span>
+          <Button
+            className="agents-connect"
+            onClick={() => {
+              useSettingsTab.getState().setSection('mcp-server')
+              setView('settings')
+            }}
+          >
+            ＋ Connect an agent
+          </Button>
+        </div>
+
+        <div className="agents-table" role="table" aria-label="Agent roster">
+          <div className="agents-thead" role="row">
+            <span className="at-dot" />
+            <span className="at-agent">AGENT</span>
+            <span className="at-machine">EMAIL</span>
+            <span className="at-doing">DOING NOW</span>
+            <span className="at-wrote">LAST WROTE</span>
+            <span className="at-act" />
+          </div>
+          {roster.length === 0 ? (
+            <div className="agents-empty">
+              No attributed writes yet — agents appear as they work.
+            </div>
+          ) : (
+            roster.map((row) => {
+              const now = doingNow(row, log ?? [], nowMs)
+              const wrote = `${relativeTime(row.lastAt, nowMs)} · ${
+                row.lastPath?.split('/').pop()?.replace(/\.md$/i, '') ?? row.lastSummary
+              }`
+              return (
+                <div className={`agents-tr${row.live ? '' : ' is-idle'}`} role="row" key={row.name}>
+                  <span className={`at-dot ${row.live ? 'is-live' : ''}`} />
+                  <span className="at-agent" title={row.email}>
+                    {row.name}
+                  </span>
+                  <span className="at-machine" title={row.email}>
+                    {row.email}
+                  </span>
+                  <span className="at-doing" title={now.text}>
+                    {now.text}
+                  </span>
+                  <span className="at-wrote" title={row.lastPath ?? ''}>
+                    {wrote}
+                  </span>
+                  <button
+                    type="button"
+                    className={`at-act${row.live ? ' is-watch' : ''}`}
+                    onClick={() => (row.live ? setWatch(watch === row.name ? null : row.name) : setView('feed'))}
+                  >
+                    {row.live ? (watch === row.name ? 'all' : 'watch') : 'log'}
+                  </button>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        <div className="rail-label agents-elsewhere-label">EVERYWHERE ELSE</div>
+        <div className="agents-elsewhere">
+          <span className="ew-chip">
+            work card →{' '}
+            {doing ? (
+              <span className="ew-live">● {doing.name} {relativeTime(doing.lastAt, nowMs)}</span>
+            ) : (
+              'agent chip on in-progress cards'
+            )}
+          </span>
+          <span className="ew-chip">
+            note byline →{' '}
+            {filed ? `filed by ${filed.actor.name} ${filed.at.slice(11, 16)}` : 'filed by <agent> · time'}
+          </span>
+          <span className="ew-chip">
+            activity →{' '}
+            {consumed ? `${consumed.actor.name} ${consumed.summary}`.slice(0, 34) : 'every consume · file · status'}
           </span>
         </div>
       </div>
 
-      <div className="agents-layout">
-        <section aria-label="Roster">
-          <div className="today-sect">
-            <span className="today-sect-label">roster · {roster.length}</span>
+      <div className="agents-session">
+        <div className="session-head">
+          <span className="session-head-label">
+            {watch ? `LIVE SESSION · ${watch.toUpperCase()}` : `SESSION FEED · MCP ${mcpLine}`}
+          </span>
+          <span className="session-readonly">read-only</span>
+        </div>
+        {lines.length === 0 ? (
+          <div className="agents-empty">
+            No MCP requests this session — agent tool calls stream here live.
           </div>
-          {roster.length === 0 ? (
-            <div className="ops-clear">No attributed writes yet — agents appear as they work.</div>
-          ) : (
-            roster.map((row) => (
-              <div className="agent-row" key={row.name}>
-                <AgentChip name={row.name} meta={relativeTime(row.lastAt, nowMs)} live={row.live} />
-                <span className="agent-row-doing" title={row.lastSummary}>
-                  {row.lastSummary}
-                </span>
-                {row.lastPath && (
-                  <span className="agent-row-path" title={row.lastPath}>
-                    {row.lastPath}
-                  </span>
-                )}
-                <Button variant="quiet" onClick={() => setView('feed')}>
-                  History
-                </Button>
+        ) : (
+          <div className="session-log-v3">
+            {lines.map((l, i) => (
+              <div className="session-line-v3" key={`${l.at}/${i}`}>
+                <span className="session-time">{l.at.slice(11, 16)}</span>{' '}
+                <span className={l.src === 'MCP' ? 'session-src-mcp' : 'session-src-git'}>
+                  [{l.src}]
+                </span>{' '}
+                {l.text}
               </div>
-            ))
-          )}
-        </section>
-
-        <section aria-label="Live session feed" className="session-panel">
-          <div className="today-sect">
-            <span className="today-sect-label">session feed · mcp</span>
-            <span className="today-sect-note">{mcpLine}</span>
+            ))}
           </div>
-          {recent.length === 0 ? (
-            <div className="ops-clear">
-              No MCP requests this session — agent tool calls stream here live.
-            </div>
-          ) : (
-            <div className="session-log">
-              {recent.map((entry, i) => (
-                <SessionLine key={`${entry.at}/${i}`} entry={entry} />
-              ))}
-            </div>
-          )}
-          <AgentTokensCard />
-        </section>
+        )}
+        <div className="session-foot">
+          trust = seeing what the agent read before it acted. source: in-app MCP log + git
+          attribution — zero new engine writes.
+        </div>
+        <AgentTokensCard />
       </div>
     </div>
   )

@@ -101,12 +101,24 @@ export function setGitCredentialToken(token: string | null): void {
   cachedGitToken = token ?? ''
 }
 
-/** Env to splice into any git spawn that may hit an HTTPS GitHub remote. */
+/** Env to splice into any git spawn that may hit an HTTPS GitHub remote.
+ *  An explicit in-app sign-in must WIN over whatever credential helpers the
+ *  machine carries (gh CLI installs itself as the github.com helper and
+ *  serves its ACTIVE account — the wrong-account trap): empty helper values
+ *  via env config RESET the helper list, so git falls through to our
+ *  askpass. No token cached = empty env = the user's own setup, untouched. */
 export function gitCredentialEnv(): Record<string, string> {
   if (!cachedGitToken) return {}
   return {
     GIT_ASKPASS: ensureAskpassHelper(),
     LOREDEX_GIT_TOKEN: cachedGitToken,
+    GIT_CONFIG_COUNT: '3',
+    GIT_CONFIG_KEY_0: 'credential.helper',
+    GIT_CONFIG_VALUE_0: '',
+    GIT_CONFIG_KEY_1: 'credential.https://github.com.helper',
+    GIT_CONFIG_VALUE_1: '',
+    GIT_CONFIG_KEY_2: 'credential.https://gist.github.com.helper',
+    GIT_CONFIG_VALUE_2: '',
   }
 }
 

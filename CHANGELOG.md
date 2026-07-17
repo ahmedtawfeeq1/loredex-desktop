@@ -7,6 +7,16 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-07-17
+
+### Fixed
+- **In-app GitHub sign-in now beats the machine's git credential helpers**:
+  when you sign in inside Loredex, the app's git operations (poller pull,
+  sync, wizard clone/push) reset the helper chain via env config and use
+  YOUR stored token — the gh CLI's active-account helper can no longer
+  serve the wrong account for a private dex ("repository not found").
+  Signed out = your own git setup, untouched.
+
 ## [0.7.0] - 2026-07-17
 
 ### Changed

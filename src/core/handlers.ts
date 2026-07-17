@@ -55,7 +55,7 @@ import {
   deviceFlowPoll,
   deviceFlowStart,
   listDexRepos,
-  liveToken,
+  storedToken,
   storeToken,
   validateToken,
 } from './auth'
@@ -668,12 +668,13 @@ export function registerCoreHandlers(
   })
   ipc.register('agents.tokens.revoke', ({ name }) => revokeAgentToken(name))
   // v3 §9 GitHub auth (story 26.7) — token stays core-side, status is masked.
-  // Every status/login/logout refreshes the git askpass cache (story 26.9)
-  // so HTTPS pull/push rides the stored token without prompts.
-  void liveToken().then((t) => setGitCredentialToken(t))
+  // The askpass cache (story 26.9) carries the STORED token only: an explicit
+  // in-app sign-in overrides the machine's git helpers; a mere gh session is
+  // already the user's own setup and is left alone.
+  void storedToken().then((t) => setGitCredentialToken(t))
   ipc.register('auth.status', async () => {
     const status = await authStatus()
-    setGitCredentialToken(await liveToken())
+    setGitCredentialToken(await storedToken())
     return status
   })
   ipc.register('auth.loginWithToken', async ({ token }) => {
@@ -690,7 +691,7 @@ export function registerCoreHandlers(
   })
   ipc.register('auth.logout', async () => {
     await deleteToken()
-    setGitCredentialToken(await liveToken()) // a gh session may still cover git
+    setGitCredentialToken(null) // back to the user's own git setup
     return authStatus()
   })
   ipc.register('auth.deviceStart', () => deviceFlowStart())

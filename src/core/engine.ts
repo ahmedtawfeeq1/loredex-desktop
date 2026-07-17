@@ -5,7 +5,7 @@
  */
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { homedir, tmpdir } from 'node:os'
@@ -247,23 +247,31 @@ export async function recurateProject(project: string): Promise<void> {
   // argv[1] — the script path — as the first USER arg, so the CLI reported
   // "unknown command …/cli.js" (user bug 2026-07-17). A tmp wrapper drops the
   // script entry from argv before importing the real CLI.
-  const wrapperPath = join(tmpdir(), 'loredex-cli-wrapper.mjs')
+  // security: a fixed name in the shared tmpdir is symlink/TOCTOU-attackable —
+  // mkdtemp gives a fresh 0700 dir, 'wx' refuses to follow anything pre-planted
+  const wrapperDir = mkdtempSync(join(tmpdir(), 'loredex-'))
+  const wrapperPath = join(wrapperDir, 'cli-wrapper.mjs')
   writeFileSync(
     wrapperPath,
     'if (process.versions.electron && !process.defaultApp) process.argv.splice(1, 1)\n' +
       'await import(process.env.LOREDEX_CLI_URL)\n',
+    { flag: 'wx' },
   )
-  await execFileAsync(process.execPath, [wrapperPath, 'curate', project, '-y'], {
-    cwd: vaultPath,
-    // Electron's binary runs as plain Node with this flag set (packaged + dev).
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: '1',
-      LOREDEX_CLI_URL: pathToFileURL(cliPath).href,
-    },
-    maxBuffer: 32 * 1024 * 1024,
-    timeout: 180_000,
-  })
+  try {
+    await execFileAsync(process.execPath, [wrapperPath, 'curate', project, '-y'], {
+      cwd: vaultPath,
+      // Electron's binary runs as plain Node with this flag set (packaged + dev).
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        LOREDEX_CLI_URL: pathToFileURL(cliPath).href,
+      },
+      maxBuffer: 32 * 1024 * 1024,
+      timeout: 180_000,
+    })
+  } finally {
+    rmSync(wrapperDir, { recursive: true, force: true })
+  }
 }
 
 /**

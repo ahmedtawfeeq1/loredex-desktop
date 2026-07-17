@@ -1,14 +1,18 @@
 /**
- * Activity feed (story 6.2; D1 "Activity cards" redesign, story 16.6): the
- * vault git log as cards under day headers — kind chips, actor + relative
- * time, middle-truncated mono paths, sha chips, status-churn collapse and
- * per-kind outline-pill actions.
+ * Activity (v3 parity slice H — reference 07): the vault git log as day-
+ * grouped cards of rows — bordered caps kind chips (CONSUME/FILE green,
+ * STATUS/SYNC slate, HANDOFF amber), rich sentences (bold actor + the
+ * commit's own summary), mono time, blue action links. Every 6.2/D1
+ * capability kept: kind + person filters (header segmented + everyone ▾),
+ * status-churn collapse with expandable flips, per-kind actions, commit
+ * chips, load-older. Rows navigate like the old cards did.
  */
 import { useEffect, useMemo, useState } from 'react'
 import { githubWebBase } from '../../../../shared/github'
 import { toVaultRelative } from '../../../../shared/handoff-lanes'
 import type { ActivityEvent } from '../../../../shared/types'
 import { CommitChip } from '../../components/CommitChip'
+import { Segmented } from '../../components/Segmented'
 import { useApp } from '../../stores/app'
 import { useContracts } from '../../stores/contracts'
 import { useFeed } from '../../stores/feed'
@@ -30,36 +34,45 @@ import {
   flipLabel,
   groupItemsByDay,
   kindCounts,
-  middleTruncate,
   relativeTime,
-  summaryQuotesObjective,
-  targetOf,
 } from './feed-logic'
 
-/** Two-letter initials for the actor avatar. */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/)
-  const first = parts[0]?.[0] ?? '?'
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : ''
-  return (first + last).toUpperCase()
+/** Reference 07 chip label + tone per git kind. */
+export const KIND_CHIP: Record<ActivityKind, { label: string; tone: 'ok' | 'warn' | 'info' }> = {
+  consume: { label: 'CONSUME', tone: 'ok' },
+  route: { label: 'FILE', tone: 'ok' },
+  handoff: { label: 'HANDOFF', tone: 'warn' },
+  status: { label: 'STATUS', tone: 'info' },
+  sync: { label: 'SYNC', tone: 'info' },
+}
+
+/** Row time: HH:MM today, "jul 12" otherwise. Pure. */
+export function rowTime(at: string, today: string): string {
+  if (at.slice(0, 10) === today) return at.slice(11, 16)
+  const d = new Date(at)
+  return d
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    .toLowerCase()
 }
 
 /** Card-click navigation (kept from 6.2): board / reader / sync panel. */
 function open(event: ActivityEvent): void {
-  const target = targetOf(event)
   const app = useApp.getState()
-  if (target.kind === 'note') {
+  const path = event.subject.path
+  if (event.kind === 'sync') {
+    app.setView('sync')
+  } else if (event.subject.handoffId && !path) {
+    app.setView('handoffs')
+  } else if (path) {
     app.setView('reader')
     const vaultPath = app.identity?.vaultPath ?? ''
-    void useReader.getState().open(toVaultRelative(target.path, vaultPath))
-  } else if (target.kind === 'board') {
-    app.setView('handoffs')
+    void useReader.getState().open(toVaultRelative(path, vaultPath))
   } else {
-    app.setView('sync')
+    app.setView('handoffs')
   }
 }
 
-/** D1 action wiring (AC5): each pill lands on an existing store/route. */
+/** D1 action wiring (AC5): each link lands on an existing store/route. */
 function performFeedAction(action: FeedAction): void {
   const app = useApp.getState()
   switch (action.id) {
@@ -89,242 +102,115 @@ function performFeedAction(action: FeedAction): void {
   }
 }
 
-function ActionPills({ actions }: { actions: FeedAction[] }): React.JSX.Element | null {
+function ActionLinks({ actions }: { actions: FeedAction[] }): React.JSX.Element | null {
   if (actions.length === 0) return null
   return (
-    <span className="feed-actions">
+    <>
       {actions.map((action) => (
         <button
           key={action.id}
           type="button"
-          className="feed-action"
+          className="act-link"
           onClick={(e) => {
             e.stopPropagation()
             performFeedAction(action)
           }}
         >
-          {action.label}
+          {action.label.toLowerCase()}
         </button>
       ))}
-    </span>
+    </>
   )
 }
 
-/** Shared card head: kind chip · actor · relative time (absolute on hover). */
-function CardHead({
-  kind,
-  actor,
-  at,
-  now,
-}: {
-  kind: string
-  actor: string
-  at: string
-  now: number
-}): React.JSX.Element {
-  return (
-    <span className="feed-card-head">
-      <span className="feed-avatar" aria-hidden>
-        {initials(actor)}
-      </span>
-      <span className={`feed-kind feed-kind-${kind}`}>{kind}</span>
-      <span className="feed-actor">{actor}</span>
-      <span className="feed-time" title={at}>
-        {relativeTime(at, now)}
-      </span>
-    </span>
-  )
-}
-
-function cardKeyHandler(activate: () => void) {
-  return (e: React.KeyboardEvent): void => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      activate()
-    }
-  }
-}
-
-function EventCard({
+function Row({
   event,
+  summary,
   commitBase,
-  now,
+  today,
   actions,
+  extra,
 }: {
   event: ActivityEvent
-  /** vault repo's GitHub base (story 12.1) — activity SHAs are vault commits */
+  summary: React.ReactNode
   commitBase: string | null
-  now: number
+  today: string
   actions: FeedAction[]
+  extra?: React.ReactNode
 }): React.JSX.Element {
-  const path = event.subject.path
+  const chip = KIND_CHIP[event.kind]
   return (
-    // div role=button (story 12.1): chip anchors/pills may not nest in <button>
     <div
       role="button"
       tabIndex={0}
-      className="feed-card"
+      className="act-row"
       onClick={() => open(event)}
-      onKeyDown={cardKeyHandler(() => open(event))}
-    >
-      <CardHead kind={event.kind} actor={event.actor.name} at={event.at} now={now} />
-      <span
-        className={
-          summaryQuotesObjective(event.summary) ? 'feed-summary feed-summary-objective' : 'feed-summary'
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+          e.preventDefault()
+          open(event)
         }
-      >
-        {event.summary}
+      }}
+    >
+      <span className={`act-chip is-${chip.tone}`}>{chip.label}</span>
+      <span className="act-sentence" title={event.summary}>
+        {summary}
       </span>
-      {path && (
-        <span className="feed-path" title={path}>
-          {middleTruncate(path)}
-        </span>
-      )}
-      <span className="feed-card-foot">
+      <span className="act-time" title={event.at}>
+        {rowTime(event.at, today)}
+      </span>
+      <span className="act-sha">
         <CommitChip sha={event.sha} base={commitBase} />
-        <ActionPills actions={actions} />
       </span>
+      <ActionLinks actions={actions} />
+      {extra}
     </div>
   )
 }
 
-/** D1: ≥2 consecutive same-actor flips inside 10 min — one expandable card. */
-function ChurnCard({
-  item,
-  commitBase,
-  now,
-  actions,
-}: {
+function ChurnRow(props: {
   item: Extract<FeedItem, { type: 'churn' }>
   commitBase: string | null
-  now: number
+  today: string
   actions: FeedAction[]
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState(false)
-  const newest = item.events[0] as ActivityEvent
-  const path = newest.subject.path
+  const newest = props.item.events[0] as ActivityEvent
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      className="feed-card"
-      onClick={() => open(newest)}
-      onKeyDown={cardKeyHandler(() => open(newest))}
-    >
-      <CardHead kind="status" actor={item.actor.name} at={newest.at} now={now} />
-      <span className="feed-summary">
-        status churn ×{item.events.length} on {item.handoffId}
-      </span>
-      {path && (
-        <span className="feed-path" title={path}>
-          {middleTruncate(path)}
-        </span>
-      )}
-      <button
-        type="button"
-        className="button-quiet feed-churn-toggle"
-        onClick={(e) => {
-          e.stopPropagation()
-          setExpanded((v) => !v)
-        }}
-      >
-        {expanded ? 'Hide flips' : `Show ${item.events.length} flips`}
-      </button>
-      {expanded && (
-        <span className="feed-flips">
-          {item.events.map((flip) => (
-            <span key={flip.sha} className="feed-flip">
-              <span title={flip.at}>{flip.at.slice(11, 16)}</span>
-              <span>{flipLabel(flip.summary)}</span>
-              <CommitChip sha={flip.sha} base={commitBase} />
-            </span>
-          ))}
-        </span>
-      )}
-      <span className="feed-card-foot">
-        <CommitChip sha={newest.sha} base={commitBase} />
-        <ActionPills actions={actions} />
-      </span>
-    </div>
-  )
-}
-
-/** Left rail: filter the feed by kind and by person, with live counts. */
-function FilterRail({
-  counts,
-  total,
-  actors,
-  kind,
-  actorKey,
-  setKind,
-  setActorKey,
-}: {
-  counts: Record<ActivityKind, number>
-  total: number
-  actors: ReturnType<typeof actorTallies>
-  kind: ActivityKind | 'all'
-  actorKey: string | 'all'
-  setKind: (k: ActivityKind | 'all') => void
-  setActorKey: (a: string | 'all') => void
-}): React.JSX.Element {
-  const kinds = ACTIVITY_KINDS.filter((k) => counts[k] > 0)
-  return (
-    <aside className="feed-side" aria-label="Activity filters">
-      <div className="feed-filter-group">
-        <span className="feed-filter-label">Type</span>
-        <button
-          type="button"
-          className={`feed-filter${kind === 'all' ? ' is-on' : ''}`}
-          onClick={() => setKind('all')}
-        >
-          <span>All activity</span>
-          <span className="feed-filter-count">{total}</span>
-        </button>
-        {kinds.map((k) => (
+    <>
+      <Row
+        event={newest}
+        summary={
+          <>
+            <b>{props.item.actor.name}</b> status churn ×{props.item.events.length} on{' '}
+            <span className="act-id">{props.item.handoffId}</span>
+          </>
+        }
+        commitBase={props.commitBase}
+        today={props.today}
+        actions={props.actions}
+        extra={
           <button
-            key={k}
             type="button"
-            className={`feed-filter${kind === k ? ' is-on' : ''}`}
-            onClick={() => setKind(kind === k ? 'all' : k)}
+            className="act-link"
+            onClick={(e) => {
+              e.stopPropagation()
+              setExpanded((v) => !v)
+            }}
           >
-            <span className={`feed-kind feed-kind-${k}`}>{k}</span>
-            <span className="feed-filter-count">{counts[k]}</span>
+            {expanded ? 'hide' : `${props.item.events.length} flips`}
           </button>
+        }
+      />
+      {expanded &&
+        props.item.events.map((flip) => (
+          <div className="act-flip" key={flip.sha}>
+            <span className="act-time">{flip.at.slice(11, 16)}</span>
+            <span>{flipLabel(flip.summary)}</span>
+            <CommitChip sha={flip.sha} base={props.commitBase} />
+          </div>
         ))}
-      </div>
-      {actors.length > 1 && (
-        <div className="feed-filter-group">
-          <span className="feed-filter-label">People</span>
-          <button
-            type="button"
-            className={`feed-filter${actorKey === 'all' ? ' is-on' : ''}`}
-            onClick={() => setActorKey('all')}
-          >
-            <span>Everyone</span>
-            <span className="feed-filter-count">{actors.length}</span>
-          </button>
-          {actors.map((a) => {
-            const key = a.email || a.name
-            return (
-              <button
-                key={key}
-                type="button"
-                className={`feed-filter${actorKey === key ? ' is-on' : ''}`}
-                onClick={() => setActorKey(actorKey === key ? 'all' : key)}
-              >
-                <span className="feed-avatar" aria-hidden>
-                  {initials(a.name)}
-                </span>
-                <span className="feed-filter-name" title={a.name}>
-                  {a.name}
-                </span>
-                <span className="feed-filter-count">{a.count}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </aside>
+    </>
   )
 }
 
@@ -336,9 +222,7 @@ export function FeedView(): React.JSX.Element {
   const loadMore = useFeed((s) => s.loadMore)
   // story 12.1: vault-repo SHAs link through the one GitHub derivation
   const commitBase = githubWebBase(useApp((s) => s.identity?.remote ?? null))
-  // consume gating (D1: "Consume when open inbound") reads the board cards
   const cards = useHandoffs((s) => s.cards)
-  // contract-linked detection (story 11.3 inversion) reads the timeline
   const changes = useContracts((s) => s.changes)
   const contractsLoading = useContracts((s) => s.loading)
 
@@ -349,11 +233,9 @@ export function FeedView(): React.JSX.Element {
     if (cards === null) void useHandoffs.getState().load()
   }, [cards])
   useEffect(() => {
-    // same prime as ContractChips (story 11.3 AC5) — core scan is cached
     if (changes === null && !contractsLoading) void useContracts.getState().load()
   }, [changes, contractsLoading])
 
-  // Activity "manage it": filter the feed by kind and by person.
   const [kind, setKind] = useState<ActivityKind | 'all'>('all')
   const [actorKey, setActorKey] = useState<string | 'all'>('all')
 
@@ -375,19 +257,47 @@ export function FeedView(): React.JSX.Element {
 
   const today = new Date().toISOString().slice(0, 10)
   const now = Date.now()
+  const SEG_LABEL: Record<ActivityKind, string> = {
+    handoff: 'Handoffs',
+    route: 'Files',
+    status: 'Status',
+    consume: 'Consumes',
+    sync: 'Syncs',
+  }
+  const segOptions = [
+    { value: 'all' as const, label: 'All' },
+    ...ACTIVITY_KINDS.filter((k) => counts[k] > 0).map((k) => ({ value: k, label: SEG_LABEL[k] })),
+  ]
 
   return (
     <div className="feed">
-      <div className="board-header">
-        <span className="pane-list-title">Activity</span>
-        <button
-          type="button"
-          className="button-quiet"
-          title="Re-read the vault git log"
-          onClick={() => void load()}
-        >
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+      <div className="plan-head">
+        <span className="plan-title">Activity</span>
+        <Segmented ariaLabel="Activity kind" options={segOptions} value={kind} onChange={setKind} />
+        <span className="plan-filters">
+          <select
+            className="plan-filter"
+            aria-label="Person filter"
+            value={actorKey}
+            onChange={(e) => setActorKey(e.target.value)}
+          >
+            <option value="all">everyone</option>
+            {actors.map((a) => (
+              <option key={a.email || a.name} value={a.email || a.name}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+          <span className="plan-filter-sep">· from the dex git log</span>
+          <button
+            type="button"
+            className="act-link"
+            title="Re-read the vault git log"
+            onClick={() => void load()}
+          >
+            {loading ? 'refreshing…' : 'refresh'}
+          </button>
+        </span>
       </div>
       {error && <div className="note-error">{error}</div>}
       {events === null ? (
@@ -401,74 +311,71 @@ export function FeedView(): React.JSX.Element {
             Check again
           </button>
         </div>
+      ) : items.length === 0 ? (
+        <div className="feed-none">
+          <p>No matching activity.</p>
+          <button
+            type="button"
+            className="button-quiet"
+            onClick={() => {
+              setKind('all')
+              setActorKey('all')
+            }}
+          >
+            Clear filters
+          </button>
+        </div>
       ) : (
-        <div className="feed-body">
-          <FilterRail
-            counts={counts}
-            total={all.length}
-            actors={actors}
-            kind={kind}
-            actorKey={actorKey}
-            setKind={setKind}
-            setActorKey={setActorKey}
-          />
-          <div className="feed-main">
-            {items.length === 0 ? (
-              <div className="feed-none">
-                <p>No matching activity.</p>
-                <button
-                  type="button"
-                  className="button-quiet"
-                  onClick={() => {
-                    setKind('all')
-                    setActorKey('all')
-                  }}
-                >
-                  Clear filters
-                </button>
-              </div>
-            ) : (
-              <div className="feed-list">
-                {groupItemsByDay(items).map((group) => (
-                  <section key={group.day} aria-label={group.day}>
-                    <h2 className="feed-day">{dayLabel(group.day, today)}</h2>
-                    {group.items.map((item) => {
-                      // a churn card acts (and keys) as its newest flip
-                      const head =
-                        item.type === 'churn' ? (item.events[0] as ActivityEvent) : item.event
-                      const actions = feedActions(head, ctxFor(head))
-                      return item.type === 'churn' ? (
-                        <ChurnCard
-                          key={head.sha}
-                          item={item}
-                          commitBase={commitBase}
-                          now={now}
-                          actions={actions}
-                        />
-                      ) : (
-                        <EventCard
-                          key={head.sha}
-                          event={head}
-                          commitBase={commitBase}
-                          now={now}
-                          actions={actions}
-                        />
-                      )
-                    })}
-                  </section>
-                ))}
-                {kind === 'all' && actorKey === 'all' && (
-                  <button
-                    type="button"
-                    className="button-quiet feed-more"
-                    disabled={loading}
-                    onClick={() => void loadMore()}
-                  >
-                    Load older activity
-                  </button>
-                )}
-              </div>
+        <div className="act-scroll">
+          <div className="act-col">
+            {groupItemsByDay(items).map((group) => (
+              <section key={group.day} aria-label={group.day}>
+                <div className="act-day">{dayLabel(group.day, today).toUpperCase()}</div>
+                <div className="act-card">
+                  {group.items.map((item) => {
+                    const head =
+                      item.type === 'churn' ? (item.events[0] as ActivityEvent) : item.event
+                    const actions = feedActions(head, ctxFor(head))
+                    return item.type === 'churn' ? (
+                      <ChurnRow
+                        key={head.sha}
+                        item={item}
+                        commitBase={commitBase}
+                        today={today}
+                        actions={actions}
+                      />
+                    ) : (
+                      <Row
+                        key={head.sha}
+                        event={head}
+                        summary={
+                          <>
+                            <b>{head.actor.name}</b> {head.summary}
+                          </>
+                        }
+                        commitBase={commitBase}
+                        today={today}
+                        actions={actions}
+                      />
+                    )
+                  })}
+                </div>
+              </section>
+            ))}
+            {kind === 'all' && actorKey === 'all' && (
+              <button
+                type="button"
+                className="button-quiet feed-more"
+                disabled={loading}
+                onClick={() => void loadMore()}
+              >
+                Load older activity
+              </button>
             )}
+            <div className="plan-foot">
+              every consume · file · status · handoff · sync — one attributed git commit each ·
+              newest {relativeTime(all[0]?.at ?? new Date(now).toISOString(), now)}
+            </div>
           </div>
         </div>
       )}

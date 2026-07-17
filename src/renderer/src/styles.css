@@ -7030,3 +7030,63 @@ a.button-primary {
   border-top: 1px solid var(--bg-hover); padding-top: 10px;
 }
 .agents-session .tokens-card { margin-top: 14px; }
+
+/* Rail-fit raw frontmatter (user feedback 2026-07-17): inside the 224px
+   meta rail the properties editor stacks key-line over full-width value —
+   no letter-per-line wrap, no redundant collapse header. */
+.meta-rail .properties { margin: 6px 0 0; }
+.meta-rail .prop-header { display: none; }
+.meta-rail .prop-rows { display: flex; flex-direction: column; gap: 4px; }
+.meta-rail .prop-row { flex-wrap: wrap; row-gap: 1px; }
+.meta-rail .prop-row .prop-key { color: var(--text-3); }
+.meta-rail .prop-row .prop-value,
+.meta-rail .prop-row .prop-value-file,
+.meta-rail .prop-row .prop-value-edit,
+.meta-rail .prop-row .prop-edit,
+.meta-rail .prop-row .prop-tags {
+  flex: 1 0 100%; min-width: 0; padding-left: 22px; text-align: left;
+  white-space: normal; overflow-wrap: anywhere;
+}
+.meta-rail .prop-lock, .meta-rail .prop-remove { margin-left: auto; }
+
+/* ── Activity (v3 slice H — reference 07) ───────────────────────────── */
+.feed { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.act-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px; }
+.act-col { max-width: 680px; }
+.act-day {
+  font: 600 9.5px var(--font-mono); letter-spacing: 0.1em; color: var(--text-3);
+  margin-bottom: 8px;
+}
+.act-card {
+  background: var(--bg-card); border: 1px solid var(--hairline);
+  border-radius: var(--r-lg); margin-bottom: 16px;
+}
+.act-row {
+  display: flex; align-items: center; gap: 10px; padding: 11px 15px;
+  border-bottom: 1px solid var(--bg-hover); cursor: pointer;
+}
+.act-row:last-child { border-bottom: 0; }
+.act-chip {
+  font: 600 9px var(--font-mono); border-radius: 4px; padding: 2px 6px;
+  border: 1px solid var(--hairline-2); color: var(--text-2); flex: 0 0 auto;
+}
+.act-chip.is-ok { color: var(--ok); border-color: rgba(59, 203, 139, 0.35); }
+.act-chip.is-warn { color: var(--warn); border-color: rgba(227, 167, 60, 0.4); }
+.act-chip.is-info { color: var(--info); border-color: rgba(147, 166, 201, 0.35); }
+.act-sentence {
+  font-size: 12.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; flex: 1;
+}
+.act-id { font: 600 11px var(--font-mono); color: var(--text-2); }
+.act-time { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-3); flex: 0 0 auto; }
+.act-sentence + .act-time { margin-left: 0; }
+.act-sha { flex: 0 0 auto; }
+.act-link {
+  font-size: 11.5px; font-weight: 550; color: var(--link); background: none;
+  border: 0; padding: 0; cursor: pointer; flex: 0 0 auto;
+}
+.act-flip {
+  display: flex; align-items: center; gap: 10px; padding: 4px 15px 4px 46px;
+  font: 10.5px var(--font-mono); color: var(--text-3);
+  border-bottom: 1px solid var(--bg-hover);
+}

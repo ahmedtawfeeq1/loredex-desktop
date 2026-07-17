@@ -7238,3 +7238,18 @@ a.button-primary {
 .button-quiet, .button-destructive, .btn {
   white-space: nowrap;
 }
+
+/* collapsible meta rail (user request 2026-07-17) */
+.rail-label-head { display: flex; align-items: center; }
+.rail-collapse {
+  margin-left: auto; background: none; border: 0; cursor: pointer;
+  font: 600 12px var(--font-mono); color: var(--text-3); padding: 0 2px;
+}
+.rail-collapse:hover { color: var(--text-1); }
+.meta-rail-reopen {
+  position: absolute; top: 10px; right: 0; z-index: 5;
+  width: 20px; height: 26px; border-radius: 6px 0 0 6px;
+  background: var(--bg-card); border: 1px solid var(--hairline); border-right: 0;
+  color: var(--text-3); font: 600 12px var(--font-mono); cursor: pointer;
+}
+.meta-rail-reopen:hover { color: var(--text-1); }

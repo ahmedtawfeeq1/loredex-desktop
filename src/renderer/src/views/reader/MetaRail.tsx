@@ -10,6 +10,7 @@
  *   THREAD — the handoff thread rail, re-homed (handoff notes only).
  */
 import { useEffect, useState } from 'react'
+import { create } from 'zustand'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useToasts } from '../../stores/toasts'
 import type { SearchHit } from '../../../../shared/ipc-contract'
@@ -21,7 +22,6 @@ import { qualifiedId } from '../../../../shared/handoff-lanes'
 import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import { useWork } from '../../stores/work'
-import { PropertiesPanel } from './PropertiesPanel'
 
 const STATUS_TONE: Record<string, string> = {
   todo: 'is-warn',
@@ -31,6 +31,12 @@ const STATUS_TONE: Record<string, string> = {
   done: 'is-mut',
   consumed: 'is-mut',
 }
+
+/** meta-rail collapse — session state; full-width reading on demand. */
+export const useMetaRail = create<{ collapsed: boolean; toggle(): void }>((set) => ({
+  collapsed: false,
+  toggle: () => set((s) => ({ collapsed: !s.collapsed })),
+}))
 
 /** note name (wikilink target) from a vault-relative path */
 export function noteName(path: string): string {
@@ -47,7 +53,6 @@ export function MetaRail({
 }): React.JSX.Element {
   const items = useWork((s) => s.items)
   const cards = useHandoffs((s) => s.cards)
-  const [showRaw, setShowRaw] = useState(false)
   const [backlinks, setBacklinks] = useState<SearchHit[] | null>(null)
 
   const name = noteName(selected)
@@ -57,7 +62,6 @@ export function MetaRail({
   }, [items])
 
   useEffect(() => {
-    setShowRaw(false)
     setBacklinks(null)
     let stale = false
     void invoke('vault.search', { q: `[[${name}]]` })
@@ -88,10 +92,35 @@ export function MetaRail({
     ['origin', meta.loredex ? `routed · schema ${meta.loredex}` : 'unrouted'],
   ]
 
+  const collapsed = useMetaRail((s) => s.collapsed)
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        className="meta-rail-reopen"
+        title="Show the note rail"
+        aria-label="Show the note rail"
+        onClick={() => useMetaRail.getState().toggle()}
+      >
+        ‹
+      </button>
+    )
+  }
   return (
     <aside className="meta-rail" aria-label="Note metadata">
       <section>
-        <div className="rail-label">USED BY WORK ITEMS</div>
+        <div className="rail-label rail-label-head">
+          USED BY WORK ITEMS
+          <button
+            type="button"
+            className="rail-collapse"
+            title="Hide the rail — full-width note"
+            aria-label="Hide the note rail"
+            onClick={() => useMetaRail.getState().toggle()}
+          >
+            ›
+          </button>
+        </div>
         {usedBy.length === 0 ? (
           <div className="rail-empty">—</div>
         ) : (
@@ -125,17 +154,7 @@ export function MetaRail({
               <span className="about-val">{v}</span>
             </div>
           ))}
-          <button
-            type="button"
-            className="about-raw"
-            aria-expanded={showRaw}
-            onClick={() => setShowRaw((v) => !v)}
-          >
-            Raw frontmatter {showRaw ? '▾' : '▸'}{' '}
-            {Object.keys(meta).length > 0 ? Object.keys(meta).length : ''}
-          </button>
         </div>
-        {showRaw && <PropertiesPanel key={selected} meta={meta} path={selected} />}
       </section>
 
       <section>

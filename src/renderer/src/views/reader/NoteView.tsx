@@ -29,6 +29,7 @@ import { attributionLines } from '../handoffs/lifecycle'
 import { ContractChips } from '../contracts/ContractChips'
 import { ReadingOrderInline, readingOrderEmptied } from '../handoffs/ReadingOrderInline'
 import { MetaRail } from './MetaRail'
+import { PropertiesPanel } from './PropertiesPanel'
 import {
   ANCHOR_TARGET_CLASS,
   anchorFromEvent,
@@ -323,6 +324,12 @@ export function NoteArticle({
             </Button>
           </div>
         )}
+        <PropertiesPanel
+          key={selected}
+          meta={doc.meta as Record<string, unknown>}
+          path={selected}
+          defaultCollapsed
+        />
         <div
           className="note-body"
           ref={bodyRef}

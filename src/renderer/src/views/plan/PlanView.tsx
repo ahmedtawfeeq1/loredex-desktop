@@ -1,190 +1,252 @@
 /**
- * Plan (DESIGN v3 §5/§6.4, story 26.4) — Board · Backlog · Sprints over
- * unified work items. Ships behind the plan preview flag reading handoffs
- * only (§6.4): until the lib work-item schema (§8) lands, columns derive
- * from the 8.1 handoff state machine —
- *   Triage = open/expired (A/D/S one-key), Parked = snoozed,
- *   In progress = accepted (Consume E), Done = consumed · declined.
- * Sprints is an honest §8-blocked empty state, never fake data. Transitions
- * ride the same store writers as Today/Inbox — no second engine.
+ * Plan (v3 parity slice E — reference 03): Board · Backlog · Sprints over
+ * the lib's REAL work-item plane (loredex ≥ 2.8, `work.list`). Columns:
+ *   TRIAGE (open handoffs/requests — human triage A/D/S) · TODO (tasks) ·
+ *   IN PROGRESS (doing) · REVIEW · DONE·CONSUMED (dimmed).
+ * Cards carry the reference anatomy: caps kind chip + mono id → title →
+ * project dot · P? · S? · actions. Handoff transitions ride the handoffs
+ * store (8.1 machine); task moves ride the one work writer. Deviations from
+ * reference (Dev Agent Record): no drag-and-drop (decline needs a reason,
+ * snooze a date — a drop can't collect either; chips do the moves), and
+ * "＋ New item" opens the compose modal (handoff/request) because the lib
+ * has no createWorkItem yet — task notes are agent-authored today.
  */
-import { useEffect } from 'react'
-import type { HandoffCard } from '../../../../shared/types'
-import { actionsFor, laneCards } from '../../../../shared/handoff-lanes'
+import { useEffect, useMemo, useState } from 'react'
+import type { WorkItem } from '../../../../shared/ipc-contract'
 import { Button } from '../../components/Button'
 import { Segmented } from '../../components/Segmented'
-import { StatusGlyph } from '../../components/StatusChip'
-import { humanizeTitle } from '../../humanize'
 import { useHandoffs } from '../../stores/handoffs'
-import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { usePlanTab } from '../../stores/planFlagTab'
+import { useWork } from '../../stores/work'
 import { sectionTint } from '../reader/sectionTint'
 import { openBrief } from '../handoffs/open-brief'
-import { rowStatus } from '../handoffs/InboxView'
 
-export type PlanColumn = 'triage' | 'parked' | 'doing' | 'done'
+export type PlanColumn = 'triage' | 'todo' | 'doing' | 'review' | 'done'
 
 export const COLUMNS: ReadonlyArray<{ key: PlanColumn; label: string }> = [
-  { key: 'triage', label: 'Triage' },
-  { key: 'parked', label: 'Parked' },
-  { key: 'doing', label: 'In progress' },
-  { key: 'done', label: 'Done' },
+  { key: 'triage', label: 'TRIAGE' },
+  { key: 'todo', label: 'TODO' },
+  { key: 'doing', label: 'IN PROGRESS' },
+  { key: 'review', label: 'REVIEW' },
+  { key: 'done', label: 'DONE · CONSUMED' },
 ]
 
-/** Handoff → board column (flagged mode, §6.4): pure 8.1-state mapping. */
-export function columnOf(card: Pick<HandoffCard, 'status' | 'expired'>): PlanColumn {
-  if (card.status === 'open' || card.expired) return 'triage'
-  if (card.status === 'snoozed') return 'parked'
-  if (card.status === 'accepted') return 'doing'
-  return 'done' // consumed · declined · anything terminal
+/** Reference 03 column mapping over the lib board plane. Pure. */
+export function columnOf(item: Pick<WorkItem, 'kind' | 'status'>): PlanColumn | 'backlog' {
+  if (item.status === 'backlog') return 'backlog'
+  if (item.status === 'todo') return item.kind === 'task' ? 'todo' : 'triage'
+  if (item.status === 'doing') return 'doing'
+  if (item.status === 'review') return 'review'
+  return 'done' // done · consumed
 }
 
-export function boardColumns(
-  cards: readonly HandoffCard[],
-): Record<PlanColumn, HandoffCard[]> {
-  const cols: Record<PlanColumn, HandoffCard[]> = {
+export function boardColumns(items: readonly WorkItem[]): Record<PlanColumn, WorkItem[]> {
+  const cols: Record<PlanColumn, WorkItem[]> = {
     triage: [],
-    parked: [],
+    todo: [],
     doing: [],
+    review: [],
     done: [],
   }
-  for (const c of cards) cols[columnOf(c)].push(c)
-  cols.triage.sort((a, b) => b.ageDays - a.ageDays)
+  for (const item of items) {
+    const col = columnOf(item)
+    if (col !== 'backlog') cols[col].push(item)
+  }
   return cols
 }
 
-function PlanCard({ card }: { card: HandoffCard }): React.JSX.Element {
-  const consume = useHandoffs((s) => s.consume)
+function KindChip({ item }: { item: WorkItem }): React.JSX.Element {
+  if (item.status === 'review') return <span className="plan-check is-ok">✓</span>
+  if (item.status === 'done' || item.status === 'consumed')
+    return <span className="plan-check">–</span>
+  if (item.kind === 'task') return <span className="plan-kind plan-kind--info">TASK</span>
+  const open = item.status === 'todo'
+  return (
+    <span className="plan-kind plan-kind--warn">{open ? '● OPEN' : 'HANDOFF'}</span>
+  )
+}
+
+function PlanCard({ item }: { item: WorkItem }): React.JSX.Element {
+  const cards = useHandoffs((s) => s.cards)
   const setStatus = useHandoffs((s) => s.setStatus)
   const openDecline = useHandoffs((s) => s.openDecline)
   const openSnooze = useHandoffs((s) => s.openSnooze)
-  const select = useHandoffs((s) => s.select)
-  const busy = useHandoffs((s) => s.consumingId !== null || s.transitioningId !== null)
-  const hasIdentity = useIdentity((s) => effectiveIdentity(s) !== null)
-  const disabled = !hasIdentity || busy
-  const actions = actionsFor(card, true)
+  const update = useWork((s) => s.update)
+  const isHandoff = item.kind !== 'task'
+  const card = isHandoff ? (cards ?? []).find((c) => c.id === item.id) : undefined
+  const done = item.status === 'done' || item.status === 'consumed'
+  const inTriage = columnOf(item) === 'triage'
+  const agent = item.delegate ?? item.owner
+
+  const foot = [item.project || 'dex', item.priority, item.sprint].filter(Boolean).join(' · ')
+
   return (
     <div
-      className="plan-card"
+      className={`plan-card${done ? ' is-done' : ''}`}
       role="button"
       tabIndex={0}
-      onClick={() => openBrief(card)}
+      onClick={() => card && openBrief(card)}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' && e.target === e.currentTarget) openBrief(card)
+        if (e.key === 'Enter' && e.target === e.currentTarget && card) openBrief(card)
       }}
-      onMouseEnter={() => select(card.id)}
     >
       <div className="plan-card-head">
-        <StatusGlyph status={rowStatus(card)} />
-        <span className="plan-card-kind">{card.kind}</span>
-        <span className="plan-card-id" title={card.name}>
-          {card.id}
+        <KindChip item={item} />
+        <span className="plan-card-id" title={item.path}>
+          {item.id}
         </span>
       </div>
-      <p className="plan-card-title">{card.objective || humanizeTitle(card.name)}</p>
-      <div className="plan-card-foot">
-        <span className="ops-dot" style={{ background: sectionTint(card.to) }} aria-hidden="true" />
-        <span className="plan-card-proj">{card.to}</span>
-        <span className="plan-card-age">{card.ageDays}d</span>
-        <span className="plan-card-actions">
-          {actions.includes('accept') && (
-            <Button
-              variant="quiet"
-              kbd="A"
-              disabled={disabled}
-              title="Accept"
-              onClick={(e) => {
-                e.stopPropagation()
-                void setStatus(card, { to: 'accepted' })
-              }}
-            >
-              ✓
-            </Button>
-          )}
-          {actions.includes('decline') && (
-            <Button
-              variant="quiet"
-              kbd="D"
-              disabled={disabled}
-              title="Decline…"
-              onClick={(e) => {
-                e.stopPropagation()
-                openDecline(card)
-              }}
-            >
-              ✕
-            </Button>
-          )}
-          {actions.includes('snooze') && (
-            <Button
-              variant="quiet"
-              kbd="S"
-              disabled={disabled}
-              title="Snooze…"
-              onClick={(e) => {
-                e.stopPropagation()
-                openSnooze(card)
-              }}
-            >
-              ⏲
-            </Button>
-          )}
-          {card.status === 'accepted' && (
-            <Button
-              variant="quiet"
-              kbd="E"
-              disabled={disabled}
-              title="Consume"
-              onClick={(e) => {
-                e.stopPropagation()
-                void consume(card)
-              }}
-            >
-              Consume
-            </Button>
-          )}
-          {actions.includes('reopen') && (
-            <Button
-              variant="quiet"
-              disabled={disabled}
-              title="Reopen"
-              onClick={(e) => {
-                e.stopPropagation()
-                void setStatus(card, { to: 'open' })
-              }}
-            >
-              Reopen
-            </Button>
-          )}
-        </span>
-      </div>
+      <p className="plan-card-title">{item.title}</p>
+      {done ? (
+        <div className="plan-card-donefoot">
+          {item.status}
+          {item.date ? ` · ${item.date}` : ''}
+        </div>
+      ) : (
+        <div className="plan-card-foot">
+          <span
+            className="plan-proj-dot"
+            style={{ background: sectionTint(item.project || 'dex') }}
+            aria-hidden="true"
+          />
+          <span className="plan-card-meta">{foot}</span>
+          <span className="plan-card-actions">
+            {inTriage && card && (
+              <>
+                <Button
+                  variant="quiet"
+                  kbd="A"
+                  title="Accept"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void setStatus(card, { to: 'accepted' })
+                  }}
+                >
+                  {''}
+                </Button>
+                <Button
+                  variant="quiet"
+                  kbd="D"
+                  title="Decline…"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openDecline(card)
+                  }}
+                >
+                  {''}
+                </Button>
+                <Button
+                  variant="quiet"
+                  kbd="S"
+                  title="Snooze…"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openSnooze(card)
+                  }}
+                >
+                  {''}
+                </Button>
+              </>
+            )}
+            {item.status === 'doing' && agent && (
+              <span className="plan-agent">{agent}</span>
+            )}
+            {item.kind === 'task' && item.status === 'todo' && (
+              <Button
+                variant="quiet"
+                title="Start — status doing"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void update(item.id, { status: 'doing' })
+                }}
+              >
+                Start
+              </Button>
+            )}
+            {item.kind === 'task' && item.status === 'doing' && (
+              <Button
+                variant="quiet"
+                title="Send to review"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void update(item.id, { status: 'review' })
+                }}
+              >
+                Review
+              </Button>
+            )}
+            {item.kind === 'task' && item.status === 'review' && (
+              <Button
+                variant="quiet"
+                title="Mark done"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void update(item.id, { status: 'done' })
+                }}
+              >
+                Done
+              </Button>
+            )}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
 
 export function PlanView(): React.JSX.Element {
+  const items = useWork((s) => s.items)
+  const error = useWork((s) => s.error)
   const cards = useHandoffs((s) => s.cards)
-  const project = useHandoffs((s) => s.project)
-  const load = useHandoffs((s) => s.load)
   const tab = usePlanTab((s) => s.tab)
   const setTab = usePlanTab((s) => s.setTab)
+  const [typeFilter, setTypeFilter] = useState<'all' | 'task' | 'handoff'>('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [sprintFilter, setSprintFilter] = useState('all')
 
   useEffect(() => {
-    if (cards === null) void load()
-  }, [cards, load])
+    if (items === null) void useWork.getState().load()
+    if (cards === null) void useHandoffs.getState().load()
+  }, [items, cards])
 
-  const all = laneCards(cards ?? [], 'all', project)
-  const cols = boardColumns(all)
+  const sprints = useMemo(
+    () => [...new Set((items ?? []).map((i) => i.sprint).filter(Boolean))].sort() as string[],
+    [items],
+  )
+  const projects = useMemo(
+    () => [...new Set((items ?? []).map((i) => i.project).filter(Boolean))].sort(),
+    [items],
+  )
+
+  const filtered = useMemo(() => {
+    let list = items ?? []
+    if (typeFilter === 'task') list = list.filter((i) => i.kind === 'task')
+    if (typeFilter === 'handoff') list = list.filter((i) => i.kind !== 'task')
+    if (projectFilter !== 'all') list = list.filter((i) => i.project === projectFilter)
+    if (sprintFilter !== 'all') list = list.filter((i) => i.sprint === sprintFilter)
+    return list
+  }, [items, typeFilter, projectFilter, sprintFilter])
+
+  const cols = boardColumns(filtered)
+  const backlog = filtered.filter((i) => i.status === 'backlog')
 
   return (
     <div className="plan">
       <div className="plan-head">
-        <div className="ops-titlewrap">
-          <h1 className="ops-title">Plan</h1>
-          <span className="ops-subtitle">
-            preview · handoffs only — tasks & sprints land with the work-item schema (§8)
-          </span>
-        </div>
+        <span className="plan-title">Plan</span>
+        <select
+          className="sprint-pill"
+          aria-label="Sprint filter"
+          value={sprintFilter}
+          onChange={(e) => setSprintFilter(e.target.value)}
+        >
+          <option value="all">all sprints</option>
+          {sprints.map((sp) => (
+            <option key={sp} value={sp}>
+              {sp}
+            </option>
+          ))}
+        </select>
         <Segmented
           ariaLabel="Plan tab"
           options={[
@@ -195,20 +257,55 @@ export function PlanView(): React.JSX.Element {
           value={tab}
           onChange={setTab}
         />
+        <span className="plan-filters">
+          <select
+            className="plan-filter"
+            aria-label="Type filter"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+          >
+            <option value="all">type: all</option>
+            <option value="task">type: task</option>
+            <option value="handoff">type: handoff</option>
+          </select>
+          <span className="plan-filter-sep">·</span>
+          <select
+            className="plan-filter"
+            aria-label="Project filter"
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+          >
+            <option value="all">project: all</option>
+            {projects.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </span>
+        <Button variant="primary" onClick={() => useHandoffs.getState().openCompose()}>
+          ＋ New item
+        </Button>
       </div>
+      {error && <div className="note-error">{error}</div>}
 
       {tab === 'board' && (
         <div className="plan-board">
           {COLUMNS.map(({ key, label }) => (
             <section key={key} className="plan-col" aria-label={label}>
-              <div className="today-sect">
-                <span className="today-sect-label">{label}</span>
-                <span className="today-sect-note">{cols[key].length}</span>
+              <div className="plan-col-head">
+                <span className="plan-col-label">{label}</span>
+                <span className="plan-col-count">{cols[key].length}</span>
               </div>
               {cols[key].length === 0 ? (
                 <div className="plan-col-empty">—</div>
               ) : (
-                cols[key].map((card) => <PlanCard key={card.id} card={card} />)
+                cols[key]
+                  .slice(0, key === 'done' ? 4 : 50)
+                  .map((item) => <PlanCard key={`${item.kind}/${item.id}`} item={item} />)
+              )}
+              {key === 'done' && cols.done.length > 4 && (
+                <div className="plan-col-empty">＋ {cols.done.length - 4} more</div>
               )}
             </section>
           ))}
@@ -217,25 +314,53 @@ export function PlanView(): React.JSX.Element {
 
       {tab === 'backlog' && (
         <div className="plan-backlog">
-          <div className="today-sect">
-            <span className="today-sect-label">
-              backlog · parked + triage, oldest first · {cols.parked.length + cols.triage.length}
-            </span>
+          <div className="plan-col-head">
+            <span className="plan-col-label">BACKLOG · SNOOZED</span>
+            <span className="plan-col-count">{backlog.length}</span>
           </div>
-          {[...cols.triage, ...cols.parked].length === 0 ? (
-            <div className="ops-clear">Nothing waiting — the backlog is clear.</div>
+          {backlog.length === 0 ? (
+            <div className="ops-clear">Nothing parked — the backlog is clear.</div>
           ) : (
-            [...cols.triage, ...cols.parked].map((card) => <PlanCard key={card.id} card={card} />)
+            backlog.map((item) => <PlanCard key={`${item.kind}/${item.id}`} item={item} />)
           )}
         </div>
       )}
 
       {tab === 'sprints' && (
-        <div className="empty-state" style={{ border: 'none' }}>
-          <p>Sprints need the work-item schema (kind · sprint · owner) — a loredex lib change, not a view.</p>
-          <Button onClick={() => setTab('board')}>Back to Board</Button>
+        <div className="plan-backlog">
+          {sprints.length === 0 ? (
+            <div className="empty-state" style={{ border: 'none' }}>
+              <p>No sprints yet — set `sprint:` on work items (work_update) and they group here.</p>
+              <Button onClick={() => setTab('board')}>Back to Board</Button>
+            </div>
+          ) : (
+            sprints.map((sp) => {
+              const inSprint = filtered.filter((i) => i.sprint === sp)
+              const done = inSprint.filter(
+                (i) => i.status === 'done' || i.status === 'consumed',
+              ).length
+              return (
+                <section key={sp} aria-label={`Sprint ${sp}`} className="plan-sprint">
+                  <div className="plan-col-head">
+                    <span className="plan-col-label">{sp}</span>
+                    <span className="plan-col-count">
+                      {done}/{inSprint.length} done
+                    </span>
+                  </div>
+                  {inSprint.map((item) => (
+                    <PlanCard key={`${item.kind}/${item.id}`} item={item} />
+                  ))}
+                </section>
+              )
+            })
+          )}
         </div>
       )}
+
+      <div className="plan-foot">
+        status moves are attributed git commits · handoffs and tasks share the pipeline · board
+        reads the lib work-item plane
+      </div>
     </div>
   )
 }

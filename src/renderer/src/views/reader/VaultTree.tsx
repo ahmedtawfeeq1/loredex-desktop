@@ -233,6 +233,9 @@ function Branch({
             {node.kind === 'dir' ? (
               <details open>
                 <summary className="tree-dir" title={node.name}>
+                  <span className="tree-dir-icon" aria-hidden>
+                    #
+                  </span>
                   {humanizeTitle(node.name)}
                 </summary>
                 {node.children && (

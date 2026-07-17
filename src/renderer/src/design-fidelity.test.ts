@@ -108,7 +108,14 @@ describe("the Don't list", () => {
         /^linear-gradient\((180deg, )?var\(--accent-(hi|grad-top)\), var\(--accent-(hi|lo|grad-bot)\)\)$/,
       )
     }
-    expect(css).not.toMatch(/radial-gradient/)
+    // reference 02's two state discs are the ONLY non-linear gradients: the
+    // amber ring-dot donut (open) and the half-green progress disc (accepted)
+    const radials = css.match(/radial-gradient\((?:[^()]|\([^()]*\))*\)/g) ?? []
+    for (const g of radials) expect(g).toContain('var(--warn)')
+    expect(radials.length).toBeLessThanOrEqual(1)
+    const conics = css.match(/conic-gradient\((?:[^()]|\([^()]*\))*\)/g) ?? []
+    for (const g of conics) expect(g).toContain('var(--ok)')
+    expect(conics.length).toBeLessThanOrEqual(1)
   })
   it('no border wider than 1px except the sanctioned left rails', () => {
     // any border-* width > 1px (radii are not borders) …

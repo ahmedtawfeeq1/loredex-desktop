@@ -10,6 +10,7 @@ export function RowItem({
   glyph,
   trailing,
   selected = false,
+  dimmed = false,
   onActivate,
 }: {
   title: React.ReactNode
@@ -20,12 +21,14 @@ export function RowItem({
   /** trailing slot — avatar, time, count */
   trailing?: React.ReactNode
   selected?: boolean
+  /** terminal states render at 60% (reference 02 declined/consumed rows) */
+  dimmed?: boolean
   onActivate?: () => void
 }): React.JSX.Element {
   return (
     <button
       type="button"
-      className="row-item"
+      className={`row-item${dimmed ? ' is-dim' : ''}`}
       aria-current={selected ? 'true' : undefined}
       onClick={onActivate}
     >

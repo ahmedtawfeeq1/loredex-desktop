@@ -46,13 +46,13 @@ function NoteScopePicker({
       {selected.length > 0 && (
         <ol className="note-scope-selected" aria-label="Reading order">
           {selected.map((name, i) => (
-            <li className="ro-row" key={name}>
-              <span className="ro-row-check" aria-hidden="true">✓</span>
-              <span className="ro-row-name">{name}</span>
-              <span className="ro-row-ord">{String(i + 1).padStart(2, '0')}</span>
+            <li className="mro-row" key={name}>
+              <span className="mro-check" aria-hidden="true">✓</span>
+              <span className="mro-name">{name}</span>
+              <span className="mro-ord">{String(i + 1).padStart(2, '0')}</span>
               <button
                 type="button"
-                className="ro-row-x"
+                className="mro-x"
                 title="Remove from reading order"
                 onClick={() => onChange(selected.filter((n) => n !== name))}
               >

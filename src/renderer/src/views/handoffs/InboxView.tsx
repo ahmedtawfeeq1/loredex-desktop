@@ -42,6 +42,27 @@ export function rowStatus(card: HandoffCard): string {
   return card.expired ? 'expired' : card.status
 }
 
+/** Reference 02 sub line: open rows carry the route, later states carry the
+ *  state word — the glyph never stands alone. Pure. */
+export function rowSub(card: HandoffCard): string {
+  const age = `${card.ageDays}d`
+  if (card.expired) return `snooze expired · ${age}`
+  switch (card.status) {
+    case 'accepted':
+      return `accepted · ${age}`
+    case 'snoozed':
+      return card.snoozedUntil ? `snoozed until ${card.snoozedUntil}` : `snoozed · ${age}`
+    case 'declined':
+      return `declined · ${age}`
+    case 'consumed':
+      return `consumed · ${age}`
+    default:
+      return `${card.from} ⟶ ${card.to} · ${card.kind} · ${age}`
+  }
+}
+
+const TERMINAL = new Set(['declined', 'consumed'])
+
 function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
   const consume = useHandoffs((s) => s.consume)
   const setStatus = useHandoffs((s) => s.setStatus)
@@ -195,7 +216,7 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
             title={idleTitle ?? 'Consume — mark it done for real (⌘⏎)'}
             onClick={() => void consume(card)}
           >
-            Consume
+            ✓ Consume
           </Button>
         )}
       </div>
@@ -253,39 +274,6 @@ export function InboxView(): React.JSX.Element {
           />
           <span className="inbox-open-count">{openCount} open</span>
         </div>
-        <div className="inbox-list-tools">
-          <select
-            className="inbox-project"
-            aria-label="Project scope"
-            value={project}
-            onChange={(e) => setProject(e.target.value)}
-          >
-            <option value="all">All projects</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <Segmented
-            ariaLabel="Show"
-            options={[
-              { value: 'active' as const, label: 'Active' },
-              { value: 'done' as const, label: 'Done' },
-              { value: 'all' as const, label: 'All' },
-            ]}
-            value={filterMode}
-            onChange={setFilterMode}
-          />
-          <Button
-            variant="primary"
-            kbd="⌘N"
-            title="Compose a handoff"
-            onClick={() => useHandoffs.getState().openCompose()}
-          >
-            New
-          </Button>
-        </div>
         {error && <div className="note-error">{error}</div>}
         {receipt && <ConsumeReceiptView receipt={receipt} onDismiss={dismissReceipt} />}
         <div className="today-sect">
@@ -298,6 +286,41 @@ export function InboxView(): React.JSX.Element {
               show all
             </button>
           )}
+          <span className="inbox-filters">
+            <select
+              className="plan-filter"
+              aria-label="Project scope"
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+            >
+              <option value="all">project: all</option>
+              {projects.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <span className="plan-filter-sep">·</span>
+            <select
+              className="plan-filter"
+              aria-label="Show"
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value as 'active' | 'done' | 'all')}
+            >
+              <option value="active">state: active</option>
+              <option value="done">state: done</option>
+              <option value="all">state: all</option>
+            </select>
+            <span className="plan-filter-sep">·</span>
+            <button
+              type="button"
+              className="act-link"
+              title="Compose a handoff (⌘N)"
+              onClick={() => useHandoffs.getState().openCompose()}
+            >
+              ＋ new
+            </button>
+          </span>
         </div>
         {cards === null ? (
           <div className="inbox-skeleton" aria-hidden>
@@ -320,10 +343,11 @@ export function InboxView(): React.JSX.Element {
             <RowItem
               key={card.id}
               title={card.objective || humanizeTitle(card.name)}
-              sub={`${card.from} ⟶ ${card.to} · ${card.kind} · ${card.ageDays}d`}
+              sub={rowSub(card)}
               glyph={<StatusGlyph status={rowStatus(card)} />}
               trailing={readAt[card.id] === null ? <span className="unread-dot" /> : undefined}
               selected={selected?.id === card.id}
+              dimmed={TERMINAL.has(card.status)}
               onActivate={() => select(card.id)}
             />
           ))

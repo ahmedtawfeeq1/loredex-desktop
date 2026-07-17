@@ -6387,11 +6387,12 @@ a.commit-chip-sha:hover {
 }
 
 .inbox-detail-title {
-  font-size: 20px;
-  font-weight: 650;
-  letter-spacing: -0.015em;
-  line-height: 1.25;
-  margin: 0 0 6px;
+  /* reference 02: 17/600, lh 1.4 */
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  margin: 12px 0 5px;
 }
 
 .inbox-detail-meta {
@@ -7096,20 +7097,71 @@ a.button-primary {
 
 /* ── New-handoff modal rows (v3 slice J — reference 19) ─────────────── */
 .modal-req { font: 600 10px var(--font-mono); color: var(--rust); margin-left: 5px; text-transform: none; }
-.ro-row {
+.mro-row {
   display: flex; align-items: center; gap: 9px; white-space: nowrap;
   background: var(--bg-inset); border: 1px solid var(--hairline);
   border-radius: var(--r-md); padding: 7px 10px;
 }
-.ro-row-check {
+.mro-check {
   width: 13px; height: 13px; border-radius: 4px; flex: 0 0 auto;
   background: rgba(59, 203, 139, 0.14); color: var(--ok);
   font: 700 9px/13px var(--font-mono); text-align: center;
 }
-.ro-row-name { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ro-row-ord { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-3); flex: 0 0 auto; }
-.ro-row-x {
+.mro-name { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.mro-ord { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-3); flex: 0 0 auto; }
+.mro-x {
   background: none; border: 0; padding: 0 0 0 4px; cursor: pointer;
   color: var(--text-3); font-size: 12px; flex: 0 0 auto;
 }
-.ro-row-x:hover { color: var(--rust); }
+.mro-x:hover { color: var(--rust); }
+
+/* ── Inbox parity polish (reference 02) ─────────────────────────────── */
+.row-item.is-dim { opacity: 0.6; }
+.inbox-list .row-item { border-radius: 9px; border-left: 0; border: 1px solid transparent; }
+.inbox-list .row-item[aria-current='true'] {
+  background: var(--bg-hover); border-color: var(--hairline);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+/* 14px state discs — open amber ring-dot, accepted half-green, terminal squares */
+.inbox-list .status-glyph { width: 14px; height: 14px; }
+.inbox-list .status-glyph .chip-glyph { font: 700 9.5px/14px var(--font-mono); }
+.inbox-list .status-glyph.chip-open {
+  /* amber ring-dot without a wide border (fidelity §Don't): gradient donut */
+  border-radius: 50%;
+  background: radial-gradient(
+    circle closest-side,
+    var(--warn) 3.5px,
+    var(--bg-app) 3.5px 5.5px,
+    var(--warn) 5.5px
+  );
+}
+.inbox-list .status-glyph.chip-open .chip-glyph { display: none; }
+.inbox-list .status-glyph.chip-accepted {
+  border-radius: 50%;
+  background: conic-gradient(var(--ok) 0deg, var(--ok) 180deg, var(--hairline-2) 180deg);
+  box-shadow: inset 0 0 0 1.5px var(--hairline-2);
+}
+.inbox-list .status-glyph.chip-accepted .chip-glyph { display: none; }
+.inbox-list .status-glyph.chip-declined,
+.inbox-list .status-glyph.chip-consumed,
+.inbox-list .status-glyph.chip-done,
+.inbox-list .status-glyph.chip-snoozed,
+.inbox-list .status-glyph.chip-stale {
+  border-radius: 4px; text-align: center; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.inbox-list .status-glyph.chip-declined { background: rgba(239, 93, 85, 0.14); color: var(--rust-text); }
+.inbox-list .status-glyph.chip-stale { background: rgba(227, 167, 60, 0.14); color: var(--warn); }
+.inbox-list .status-glyph.chip-consumed,
+.inbox-list .status-glyph.chip-done,
+.inbox-list .status-glyph.chip-snoozed { background: var(--bg-hover); color: var(--text-3); }
+/* caps section labels + fit-content floating bar in the detail pane */
+.inbox-detail .today-sect-label {
+  font: 600 9.5px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase;
+}
+.inbox-actionbar { width: fit-content; flex-wrap: nowrap; }
+.inbox-actionbar-gap { flex: 0 0 0; width: 0; }
+.inbox-filters { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
+
+/* reference 02: detail content column caps at 640px */
+.inbox-detail > * { max-width: 640px; }

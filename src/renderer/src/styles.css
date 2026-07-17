@@ -3645,8 +3645,8 @@ button:disabled {
 }
 
 .modal-title {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 14.5px;
+  font-weight: 650;
   color: var(--text-1);
 }
 
@@ -3676,10 +3676,12 @@ button:disabled {
 }
 
 .modal-row {
+  /* v3 slice J (reference 19): caps label stacked over a full-width control */
   display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 32px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin: 14px 0 0;
 }
 
 .modal-row-block {
@@ -3690,9 +3692,10 @@ button:disabled {
 
 .modal-label {
   flex: none;
-  width: 88px;
-  font-size: 12px;
-  color: var(--text-2);
+  font: 600 9.5px var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
 }
 
 .modal-row-block .modal-label {
@@ -7090,3 +7093,23 @@ a.button-primary {
   font: 10.5px var(--font-mono); color: var(--text-3);
   border-bottom: 1px solid var(--bg-hover);
 }
+
+/* ── New-handoff modal rows (v3 slice J — reference 19) ─────────────── */
+.modal-req { font: 600 10px var(--font-mono); color: var(--rust); margin-left: 5px; text-transform: none; }
+.ro-row {
+  display: flex; align-items: center; gap: 9px; white-space: nowrap;
+  background: var(--bg-inset); border: 1px solid var(--hairline);
+  border-radius: var(--r-md); padding: 7px 10px;
+}
+.ro-row-check {
+  width: 13px; height: 13px; border-radius: 4px; flex: 0 0 auto;
+  background: rgba(59, 203, 139, 0.14); color: var(--ok);
+  font: 700 9px/13px var(--font-mono); text-align: center;
+}
+.ro-row-name { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ro-row-ord { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-3); flex: 0 0 auto; }
+.ro-row-x {
+  background: none; border: 0; padding: 0 0 0 4px; cursor: pointer;
+  color: var(--text-3); font-size: 12px; flex: 0 0 auto;
+}
+.ro-row-x:hover { color: var(--rust); }

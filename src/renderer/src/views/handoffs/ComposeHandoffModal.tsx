@@ -46,16 +46,17 @@ function NoteScopePicker({
       {selected.length > 0 && (
         <ol className="note-scope-selected" aria-label="Reading order">
           {selected.map((name, i) => (
-            <li key={name}>
-              <span className="note-scope-name">
-                {i + 1}. {name}
-              </span>
+            <li className="ro-row" key={name}>
+              <span className="ro-row-check" aria-hidden="true">✓</span>
+              <span className="ro-row-name">{name}</span>
+              <span className="ro-row-ord">{String(i + 1).padStart(2, '0')}</span>
               <button
                 type="button"
-                className="button-quiet"
+                className="ro-row-x"
+                title="Remove from reading order"
                 onClick={() => onChange(selected.filter((n) => n !== name))}
               >
-                Remove
+                ✕
               </button>
             </li>
           ))}
@@ -241,7 +242,9 @@ function ComposeForm({
         </div>
       )}
       <div className="modal-row">
-        <span className="modal-label">Objective</span>
+        <span className="modal-label">
+          Objective<span className="modal-req">* required</span>
+        </span>
         <input
           className="modal-input"
           placeholder="What should the other project do?"
@@ -250,7 +253,7 @@ function ComposeForm({
         />
       </div>
       <div className="modal-row modal-row-block">
-        <span className="modal-label">Reading order</span>
+        <span className="modal-label">Reading order · selection order</span>
         <NoteScopePicker
           candidates={notes}
           selected={state.notes}

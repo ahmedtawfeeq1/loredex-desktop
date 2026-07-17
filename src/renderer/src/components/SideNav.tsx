@@ -14,7 +14,7 @@ import { openCount } from '../../../shared/handoff-lanes'
 import { visibleViews } from '../actions/registry'
 import { useApp, type AppView } from '../stores/app'
 import { useAtlas } from '../stores/atlas'
-import { useDex } from '../stores/dex'
+import { inboxPending, useDex } from '../stores/dex'
 import { useHandoffs } from '../stores/handoffs'
 import { useReader } from '../stores/reader'
 import { useDashboardData } from '../views/home/dashboard-data'
@@ -131,6 +131,8 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
   void dexType // shelves + Clients row recompute when the dex type loads
   const nav = visibleViews()
   const openInbound = openCount(cards ?? [], 'all')
+  // agent-ops: fleet-wide pending-inbox count on the Clients row (judge P1)
+  const clientsPending = inboxPending(useDex((s) => s.fleet))
   const agentsLive = useMemo(
     () => rosterFrom(activity ?? [], Date.now()).some((r) => r.live),
     [activity],
@@ -201,6 +203,10 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
               {label}
               {v === 'handoffs' && openInbound > 0 ? (
                 <span className="nav-count-pill">{openInbound}</span>
+              ) : v === 'clients' && clientsPending > 0 ? (
+                <span className="nav-count-pill is-warn" title="inbox items pending consumption">
+                  {clientsPending}
+                </span>
               ) : v === 'agents' && agentsLive ? (
                 <span className="live-dot nav-live" title="agents live" />
               ) : i < 8 ? (

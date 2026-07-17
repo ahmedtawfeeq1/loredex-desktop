@@ -4162,7 +4162,7 @@ button:disabled {
 
 /* edges: 1.5px hairline, ink arrowheads; blocking routes amber */
 .atlas-edge-line {
-  stroke: var(--hairline);
+  stroke: var(--text-4);
   stroke-width: 1.5;
   fill: none;
 }
@@ -7324,3 +7324,15 @@ a.button-primary {
 .inbox-new { margin-left: auto; flex: 0 0 auto; }
 .inbox-filters-row { display: flex; gap: 6px; padding: 2px 10px 6px; }
 .inbox-filters-row .plan-filter { flex: 1; min-width: 0; height: 22px; font-size: 10px; }
+
+/* ── Audit P1 fixes (2026-07-17 multi-agent audit) ──────────────────── */
+/* native widgets follow the theme — dark scrollbars/checkboxes (P2) */
+:root, :root[data-theme='dark'] { color-scheme: dark; }
+:root[data-theme='light'] { color-scheme: light; }
+/* agents table: idle rows stay readable (P1 contrast) */
+.agents-tr.is-idle { opacity: 0.75; }
+.at-dot { background: var(--text-4); }
+/* clients nav badge: amber = attention */
+.nav-count-pill.is-warn { background: none; border: 1px solid rgba(227, 167, 60, 0.4); color: var(--warn); font: 700 9.5px var(--font-mono); border-radius: 7px; padding: 2px 6px; }
+/* modal scrim: dim the ground decisively (audit: background looked live) */
+.modal-backdrop { background: rgba(5, 7, 10, 0.6); }

@@ -13,7 +13,7 @@ import { dotTone, useSync } from '../stores/sync'
 import { useSettingsTab } from '../stores/settingsTab'
 
 function relative(iso: string | null | undefined, nowMs: number): string {
-  if (!iso) return '—'
+  if (!iso) return ''
   const mins = Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000))
   if (mins < 1) return 'now'
   if (mins < 60) return `${mins}m`

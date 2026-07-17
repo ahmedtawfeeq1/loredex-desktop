@@ -19,7 +19,7 @@ import { ToastStack } from './components/ToastStack'
 import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
-import { inboxPending, useDex } from './stores/dex'
+import { useDex } from './stores/dex'
 import { useFileSearch } from './stores/fileSearch'
 import { useFind } from './stores/find'
 import { useHandoffs } from './stores/handoffs'
@@ -93,7 +93,6 @@ export default function App(): React.JSX.Element {
   // is the fleet-wide pending-inbox count (fs truth via clients.fleet)
   // subscribing to the type makes visibleViews() recompute when the dex loads
   const dexType = useDex((s) => s.type)
-  const clientsPending = inboxPending(useDex((s) => s.fleet))
   const nav = visibleViews()
   void dexType
   // collapsible rails (story 16.2, Addendum D1) — per-vault, loaded with init

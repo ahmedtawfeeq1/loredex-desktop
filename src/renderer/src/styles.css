@@ -7166,3 +7166,15 @@ a.button-primary {
 /* reference 02: detail content column caps at 640px */
 .inbox-detail > * { max-width: 640px; }
 .ro-kind { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-3); flex: 0 0 auto; }
+
+/* ── Tree hierarchy (user feedback 2026-07-17): indented project boxes ── */
+.tree-section-sub {
+  min-height: 26px;
+  padding: 4px 8px 4px 9px;
+  margin-left: 8px;
+  width: calc(100% - 8px);
+  font-size: 10.5px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+.tree-section-sub .tree-section-dot { width: 7px; height: 7px; }

@@ -124,17 +124,25 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
 function SectionNode({
   node,
   isProject,
+  sub = false,
   forceOpen = false,
 }: {
   node: TreeNode
   isProject: boolean
+  /** hierarchy (user feedback 2026-07-17): an indented project box under a
+   *  product — same tinted box, one step in, friendly humanized label */
+  sub?: boolean
   /** an active per-file search overrides collapse — matches must show */
   forceOpen?: boolean
 }): React.JSX.Element {
   const collapsed = useTreeSections((s) => s.collapsed.includes(node.path)) && !forceOpen
   // agent-ops relabel: the projects group reads "clients" (folder name unchanged)
   const agentOps = useDex((s) => s.type === 'agent-ops')
-  const label = agentOps && node.name === 'projects' ? 'clients' : node.name
+  const label = sub
+    ? humanizeTitle(node.name)
+    : agentOps && node.name === 'projects'
+      ? 'clients'
+      : node.name
   // v3 P7 (story 26.8): client rows carry their fleet facts — tag chips +
   // the inbox pending badge (amber = attention, §1) — read-only, from the
   // already-loaded fleet model
@@ -148,7 +156,7 @@ function SectionNode({
     >
       <button
         type="button"
-        className="tree-section"
+        className={sub ? 'tree-section tree-section-sub' : 'tree-section'}
         aria-expanded={!collapsed}
         title={collapsed ? `Expand ${label}` : `Collapse ${label}`}
         onClick={() => useTreeSections.getState().toggle(node.path)}
@@ -179,8 +187,16 @@ function SectionNode({
       {!collapsed && node.children && (
         <Branch
           nodes={node.children}
-          sections={!isProject && node.name === 'projects' ? 'projects' : 'none'}
-          inProject={isProject}
+          sections={
+            sub
+              ? 'none'
+              : isProject
+                ? 'subprojects'
+                : node.name === 'projects'
+                  ? 'projects'
+                  : 'none'
+          }
+          inProject={isProject || sub}
           forceOpen={forceOpen}
         />
       )}
@@ -197,7 +213,7 @@ function Branch({
   nodes: TreeNode[]
   /** which dirs at THIS level are D1 section rows: top-level groups, then
    *  each project under the projects group; everything deeper is a plain dir */
-  sections?: 'groups' | 'projects' | 'none'
+  sections?: 'groups' | 'projects' | 'subprojects' | 'none'
   inProject?: boolean
   forceOpen?: boolean
 }): React.JSX.Element {
@@ -209,13 +225,16 @@ function Branch({
             key={node.path}
             node={node}
             isProject={sections === 'projects'}
+            sub={sections === 'subprojects'}
             forceOpen={forceOpen}
           />
         ) : (
           <li key={node.path}>
             {node.kind === 'dir' ? (
               <details open>
-                <summary className="tree-dir">{node.name}</summary>
+                <summary className="tree-dir" title={node.name}>
+                  {humanizeTitle(node.name)}
+                </summary>
                 {node.children && (
                   <Branch nodes={node.children} inProject={inProject} forceOpen={forceOpen} />
                 )}

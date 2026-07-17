@@ -25,6 +25,13 @@ export function pushWarning(
   return [entry, ...log].slice(0, max)
 }
 
+/** Entries older than the last CLEAN sync are history, not health — a fully
+ *  green tick expires everything logged before it (warnings that raced in
+ *  after the clean moment stay). */
+export function expireBefore(log: WarningEntry[], cleanAt: string): WarningEntry[] {
+  return log.filter((w) => w.at > cleanAt)
+}
+
 /** DESIGN.md sync dot semantics: ink = clean, amber = ahead/behind, rust = error. */
 export function dotTone(health: SyncHealth | null): 'ink' | 'amber' | 'rust' {
   if (!health) return 'ink'
@@ -108,7 +115,15 @@ if (typeof window !== 'undefined' && window.loredex) {
         warnings: pushWarning(s.warnings, { at: new Date().toISOString(), text: e.text }),
       }))
     } else if (e.kind === 'sync.changed') {
-      useSync.setState({ health: e.health })
+      // a fully clean tick (ok + reachable) retires the warning history —
+      // the log shows only what happened since the last good sync
+      useSync.setState((s) => ({
+        health: e.health,
+        warnings:
+          dotTone(e.health) === 'ink'
+            ? expireBefore(s.warnings, new Date().toISOString())
+            : s.warnings,
+      }))
     }
   })
 }

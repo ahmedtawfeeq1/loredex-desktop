@@ -1,7 +1,7 @@
 /** Story 5.2: warning ring buffer + sync dot tone mapping (pure store logic). */
 import { describe, expect, it } from 'vitest'
 import type { SyncHealth } from '../../../shared/types'
-import { dotTone, pushWarning, WARNING_LOG_MAX } from './sync'
+import { dotTone, expireBefore, pushWarning, WARNING_LOG_MAX } from './sync'
 
 const entry = (text: string): { at: string; text: string } => ({
   at: '2026-07-09T12:00:00Z',
@@ -55,5 +55,19 @@ describe('dotTone (DESIGN.md sync dot semantics)', () => {
   it('rust on error or unreachable remote', () => {
     expect(dotTone(health({ state: 'error' }))).toBe('rust')
     expect(dotTone(health({ remoteReachable: false }))).toBe('rust')
+  })
+})
+
+describe('expireBefore (warnings retire on a clean sync)', () => {
+  it('drops entries at/before the clean moment, keeps newer ones', () => {
+    const log = [
+      { at: '2026-07-17T06:31:00Z', text: 'raced in after' },
+      { at: '2026-07-17T06:29:00Z', text: 'old failure' },
+      { at: '2026-07-17T03:29:01Z', text: 'repository not found' },
+    ]
+    expect(expireBefore(log, '2026-07-17T06:30:00Z')).toEqual([
+      { at: '2026-07-17T06:31:00Z', text: 'raced in after' },
+    ])
+    expect(expireBefore(log, '2026-07-17T07:00:00Z')).toEqual([])
   })
 })

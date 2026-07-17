@@ -7,6 +7,14 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-07-17
+
+### Changed
+- **Warning log retires on a clean sync**: a fully green tick (reachable,
+  ok) expires every entry logged before it — the log now shows only what
+  happened since the last good sync, instead of parking old failures under
+  a healthy board. Warnings racing in after the clean moment are kept.
+
 ## [0.7.3] - 2026-07-17
 
 ### Fixed

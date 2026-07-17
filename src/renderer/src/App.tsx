@@ -73,7 +73,7 @@ function ReaderSurface(): React.JSX.Element {
   return <NoteView />
 }
 
-export default /** v3 §5: the dissolved Sync view — deep-links land on Settings › System. */
+/** v3 §5: the dissolved Sync view — deep-links land on Settings › System. */
 function SyncRedirect(): React.JSX.Element {
   useEffect(() => {
     useSettingsTab.getState().setTab('System')
@@ -81,7 +81,7 @@ function SyncRedirect(): React.JSX.Element {
   return <SettingsView />
 }
 
-function App(): React.JSX.Element {
+export default function App(): React.JSX.Element {
   const status = useApp((s) => s.status)
   const view = useApp((s) => s.view)
   const setView = useApp((s) => s.setView)

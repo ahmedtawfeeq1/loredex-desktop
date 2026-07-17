@@ -7,6 +7,21 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-07-17
+
+### Fixed
+- **The app rendered only Settings** — a build-script splice made the
+  Settings redirect the app's default export, orphaning the real shell
+  (sidebar, Today, Inbox, every view). The full v3 app now actually mounts.
+- GitHub card no longer sticks on the boot-time "core host port was
+  re-brokered" race (standard retry, like every store).
+
+### Added
+- **Sign in as a different account while a gh CLI session exists**: the
+  GitHub card now offers device-flow / PAT sign-in even when it detected
+  gh — an in-app sign-in outranks the gh session and drives the app's git,
+  without touching your gh CLI.
+
 ## [0.7.1] - 2026-07-17
 
 ### Fixed

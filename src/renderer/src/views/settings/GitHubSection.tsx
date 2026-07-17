@@ -177,11 +177,13 @@ export function GitHubSection(): React.JSX.Element {
   const [registry, setRegistry] = useState<DexRepo[] | null>(null)
   const [createName, setCreateName] = useState('')
 
-  const refresh = async (): Promise<void> => {
+  const refresh = async (retried = false): Promise<void> => {
     try {
       setStatus(await invoke('auth.status', undefined))
       setError(null)
     } catch (e) {
+      // first-attach port swap drops early invokes — retry once (app.init pattern)
+      if (!retried && isErrEnvelope(e) && e.code === 'PORT_SWAPPED') return refresh(true)
       setError(isErrEnvelope(e) ? e.message : String(e))
     }
   }
@@ -253,6 +255,45 @@ export function GitHubSection(): React.JSX.Element {
               Re-check
             </Button>
           </div>
+          {status.source === 'gh' && (
+            <>
+              <p className="settings-hint">
+                Using a different account than your gh CLI? Sign in below — an in-app sign-in
+                outranks the gh session (and drives the app's git for HTTPS dexes). Your gh CLI
+                stays untouched.
+              </p>
+              <DeviceFlow onSignedIn={() => void refresh()} />
+              <div className="settings-actions">
+                <Button variant="quiet" disabled={busy} onClick={() => setShowPat((v) => !v)}>
+                  Paste a token…
+                </Button>
+              </div>
+              {showPat && (
+                <div className="dexreg-create">
+                  <input
+                    className="settings-input"
+                    type="password"
+                    placeholder="fine-grained PAT — Contents read/write + Metadata"
+                    value={pat}
+                    onChange={(e) => setPat(e.target.value)}
+                  />
+                  <Button
+                    variant="primary"
+                    disabled={busy || pat.trim() === ''}
+                    onClick={() =>
+                      void run(async () => {
+                        setStatus(await invoke('auth.loginWithToken', { token: pat.trim() }))
+                        setPat('')
+                        setShowPat(false)
+                      })
+                    }
+                  >
+                    Sign in
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
           {registry !== null && (
             <div className="dexreg" aria-label="Dex registry">
               <div className="today-sect">

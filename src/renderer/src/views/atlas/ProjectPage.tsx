@@ -1,18 +1,20 @@
 /**
- * Atlas reframe WP1 — the readable project PAGE (spec §Learn). Replaces the
- * Learn SVG graph with a full-width, scrollable HTML document for one project:
- * a serif header + counts, an attention line, a flows-with strip, one section
- * per topic (note cards → Reader), a handoffs section (HandoffCardView → board)
- * and a "Trace connections →" affordance into Deep Dive. Pure data comes from
- * buildProjectPage; this file is presentation + navigation glue only. DESIGN v2.
+ * Atlas Project lens (v3 parity slice I — reference 18): ← Map header with
+ * tint dot · name · mono stats · Deep dive ▸, then three columns —
+ * RECEIVES (inbound handoff cards, open amber / consumed dimmed) ·
+ * TOPICS · NEWEST FIRST (numbered rows that expand to the WP1 note cards —
+ * every card kept, §5.1) · SENDS (outbound cards with trace thread ▸).
+ * Pure data still comes from buildProjectPage; this file is presentation +
+ * navigation glue only.
  */
+import { useState } from 'react'
 import type { AtlasGraph, HandoffCard } from '../../../../shared/types'
-import { HandoffCardView } from '../../components/HandoffCardView'
 import { useApp } from '../../stores/app'
 import { useAtlas } from '../../stores/atlas'
 import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import type { RelationshipChip } from '../../../../shared/atlas-relationships'
+import { sectionTint } from '../reader/sectionTint'
 import { buildProjectPage, type ProjectPageNote } from './project-page'
 
 /** today / Nd ago / Non date → the header's last-activity line. */
@@ -37,87 +39,119 @@ function openBoard(project: string): void {
   useApp.getState().setView('handoffs')
 }
 
+const LANE_TONE: Record<string, string> = {
+  open: 'is-warn',
+  accepted: 'is-ok',
+  snoozed: 'is-mut',
+  declined: 'is-mut',
+  consumed: 'is-mut',
+}
+
+/** One lane card (reference 18): caps status chip · from/to · objective. */
+function LaneCard({
+  card,
+  lane,
+  project,
+  onTrace,
+}: {
+  card: HandoffCard
+  lane: 'in' | 'out'
+  project: string
+  onTrace?: () => void
+}): React.JSX.Element {
+  const done = card.status === 'consumed' || card.status === 'declined'
+  const other = lane === 'in' ? card.from : card.to
+  return (
+    <div
+      className={`lens-card${done ? ' is-done' : ''}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => openBoard(project)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && e.target === e.currentTarget) openBoard(project)
+      }}
+    >
+      <div className="lens-card-head">
+        <span className={`lens-status ${LANE_TONE[card.status] ?? 'is-mut'}`}>
+          {card.status === 'open' ? '● OPEN' : card.status.toUpperCase()}
+        </span>
+        <span className="lens-card-meta">
+          {lane === 'in' ? 'from' : 'to'} {other}
+          {card.status === 'open' && card.ageDays > 0 ? ` · ${card.ageDays}d` : ''}
+        </span>
+      </div>
+      <div className="lens-card-title">{card.objective || card.name}</div>
+      {onTrace && (
+        <button
+          type="button"
+          className="lens-trace"
+          onClick={(e) => {
+            e.stopPropagation()
+            onTrace()
+          }}
+        >
+          trace thread ▸
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function ProjectPage({ graph }: { graph: AtlasGraph }): React.JSX.Element {
   const page = buildProjectPage(graph)
   const { header, attention, flows, topics, handoffs } = page
   const drillProject = useAtlas((s) => s.drillProject)
   const navigate = useAtlas((s) => s.navigate)
   const setPanel = useAtlas((s) => s.setPanel)
+  const [openTopic, setOpenTopic] = useState<string | null>(null)
 
   const hasFlows = flows.inbound.length > 0 || flows.outbound.length > 0
   const empty = topics.length === 0 && handoffs.length === 0
+  const receives = handoffs.filter((c) => c.to === header.project)
+  const sends = handoffs.filter((c) => c.from === header.project)
+  const trace = (): void => {
+    // WP4 (spec §Navigation glue): Deep Dive scoped to this project + Path armed
+    void navigate('deep', { project: header.project })
+    setPanel('path')
+  }
 
   return (
-    <div className="project-page">
-      <header className="pp-header">
-        <h1 className="pp-title">{header.project}</h1>
-        <div className="pp-meta">
-          <span className="pp-counts">
-            {header.noteCount === 1 ? '1 note' : `${header.noteCount} notes`}
-            {' · '}
-            {header.openCount === 1 ? '1 open handoff' : `${header.openCount} open handoffs`}
-          </span>
-          {header.briefPath && (
-            <button
-              type="button"
-              className={`pp-brief-chip pp-brief-${header.briefFreshness}`}
-              title="Open the project brief in the reader"
-              onClick={() => openNote(header.briefPath as string)}
-            >
-              brief {header.briefFreshness}
-            </button>
-          )}
-          {header.lastActivity && (
-            <span className="pp-last" title={header.lastActivity}>
-              last activity {relativeDate(header.lastActivity)}
-            </span>
-          )}
-        </div>
-      </header>
-
-      {(attention.open > 0 || attention.blocked > 0) && (
-        <div className="pp-attention">
-          {attention.open > 0 && (
-            <button
-              type="button"
-              className="pp-attention-link"
-              onClick={() => openBoard(header.project)}
-            >
-              {attention.open} open {attention.open === 1 ? 'handoff' : 'handoffs'} →
-            </button>
-          )}
-          {attention.blocked > 0 && (
-            <button
-              type="button"
-              className="pp-attention-link pp-attention-blocked"
-              onClick={() => openBoard(header.project)}
-            >
-              {attention.blocked} blocked →
-            </button>
-          )}
-        </div>
-      )}
-
-      {hasFlows && (
-        <div className="pp-flows" aria-label="Handoff flow with other projects">
-          {flows.inbound.length > 0 && (
-            <div className="pp-flow-group">
-              <span className="pp-flow-label">Receives from</span>
-              {flows.inbound.map((chip) => (
-                <FlowChip key={`in:${chip.nodeId}`} chip={chip} onPick={drillProject} />
-              ))}
-            </div>
-          )}
-          {flows.outbound.length > 0 && (
-            <div className="pp-flow-group">
-              <span className="pp-flow-label">Sends to</span>
-              {flows.outbound.map((chip) => (
-                <FlowChip key={`out:${chip.nodeId}`} chip={chip} onPick={drillProject} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+    <div className="project-page lens">
+      <div className="lens-head">
+        <button type="button" className="lens-back" onClick={() => void navigate('overview', {})}>
+          ← Map
+        </button>
+        <span
+          className="lens-dot"
+          style={{ background: sectionTint(header.project) }}
+          aria-hidden="true"
+        />
+        <span className="lens-name">{header.project}</span>
+        <span className="lens-stats">
+          {header.noteCount === 1 ? '1 note' : `${header.noteCount} notes`}
+          {attention.open > 0 ? ` · ${attention.open} open in` : ''}
+          {attention.blocked > 0 ? ` · ${attention.blocked} blocked` : ''}
+          {header.lastActivity ? ` · ${relativeDate(header.lastActivity)}` : ''}
+        </span>
+        {header.briefPath && (
+          <button
+            type="button"
+            className={`pp-brief-chip pp-brief-${header.briefFreshness}`}
+            title="Open the project brief in the reader"
+            onClick={() => openNote(header.briefPath as string)}
+          >
+            brief {header.briefFreshness}
+          </button>
+        )}
+        <button
+          type="button"
+          className="button-secondary lens-deep pp-trace"
+          title="Open the Deep Dive graph scoped to this project to trace how work and knowledge connect"
+          onClick={trace}
+        >
+          Deep dive ▸
+        </button>
+      </div>
 
       {empty && (
         <div className="empty-state" style={{ border: 'none' }}>
@@ -125,54 +159,81 @@ export function ProjectPage({ graph }: { graph: AtlasGraph }): React.JSX.Element
         </div>
       )}
 
-      {topics.map((topic) => (
-        <section className="pp-topic" key={topic.topic}>
-          <h2 className="pp-topic-head">
-            <span className="pp-topic-name">{topic.topic}</span>
-            <span className="pp-topic-meta">
-              {topic.count === 1 ? '1 note' : `${topic.count} notes`}
-              {topic.newestDate ? ` · ${topic.newestDate}` : ''}
-            </span>
-          </h2>
-          <div className="pp-note-grid">
-            {topic.notes.map((note) => (
-              <NoteCard key={note.id} note={note} />
-            ))}
+      {!empty && (
+        <div className="lens-cols">
+          <div className="lens-col">
+            <div className="rail-label">RECEIVES</div>
+            {receives.length === 0 ? (
+              <div className="rail-empty">—</div>
+            ) : (
+              receives.map((card) => (
+                <LaneCard key={card.id} card={card} lane="in" project={header.project} />
+              ))
+            )}
+            {hasFlows && flows.inbound.length > 0 && (
+              <div className="lens-flows">
+                {flows.inbound.map((chip) => (
+                  <FlowChip key={`in:${chip.nodeId}`} chip={chip} onPick={drillProject} />
+                ))}
+              </div>
+            )}
           </div>
-        </section>
-      ))}
 
-      {handoffs.length > 0 && (
-        <section className="pp-topic pp-handoffs">
-          <h2 className="pp-topic-head">
-            <span className="pp-topic-name">handoffs</span>
-            <span className="pp-topic-meta">
-              {handoffs.length === 1 ? '1 handoff' : `${handoffs.length} handoffs`}
-            </span>
-          </h2>
-          <div className="pp-handoff-grid">
-            {handoffs.map((card: HandoffCard) => (
-              <HandoffCardView key={card.id} card={card} onOpen={() => openBoard(header.project)} />
+          <div className="lens-col lens-col-topics">
+            <div className="rail-label">TOPICS · NEWEST FIRST</div>
+            {topics.map((topic, i) => (
+              <section className="pp-topic" key={topic.topic}>
+                <button
+                  type="button"
+                  className="lens-topic"
+                  aria-expanded={openTopic === topic.topic}
+                  onClick={() => setOpenTopic(openTopic === topic.topic ? null : topic.topic)}
+                >
+                  <span className="lens-topic-num">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="lens-topic-name">{topic.topic}</span>
+                  <span className="lens-topic-meta">
+                    {topic.count === 1 ? '1 note' : `${topic.count} notes`}
+                    {topic.newestDate ? ` · ${topic.newestDate.slice(5)}` : ''}
+                  </span>
+                </button>
+                {openTopic === topic.topic && (
+                  <div className="pp-note-grid">
+                    {topic.notes.map((note) => (
+                      <NoteCard key={note.id} note={note} />
+                    ))}
+                  </div>
+                )}
+              </section>
             ))}
           </div>
-        </section>
+
+          {handoffs.length > 0 && (
+            <div className="lens-col">
+              <div className="rail-label">SENDS</div>
+              {sends.length === 0 ? (
+                <div className="rail-empty">—</div>
+              ) : (
+                sends.map((card) => (
+                  <LaneCard
+                    key={card.id}
+                    card={card}
+                    lane="out"
+                    project={header.project}
+                    onTrace={trace}
+                  />
+                ))
+              )}
+              {hasFlows && flows.outbound.length > 0 && (
+                <div className="lens-flows">
+                  {flows.outbound.map((chip) => (
+                    <FlowChip key={`out:${chip.nodeId}`} chip={chip} onPick={drillProject} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
-
-      <div className="pp-trace-row">
-        <button
-          type="button"
-          className="button-secondary pp-trace"
-          title="Open the Deep Dive graph scoped to this project to trace how work and knowledge connect"
-          onClick={() => {
-            // WP4 (spec §Navigation glue): jump to Deep Dive scoped to this
-            // project AND arm Path — lineage tracing is why you come here.
-            void navigate('deep', { project: header.project })
-            setPanel('path')
-          }}
-        >
-          Trace connections →
-        </button>
-      </div>
     </div>
   )
 }
@@ -209,8 +270,7 @@ function NoteCard({ note }: { note: ProjectPageNote }): React.JSX.Element {
 }
 
 /** Flows-with chip: `<project> (N)`, gold count when the lane has open handoffs,
- *  clicking opens that project's Learn page. Mirrors the atlas relationship
- *  strip chip vocabulary (reused class names). */
+ *  clicking opens that project's lens. Mirrors the atlas relationship strip. */
 function FlowChip({
   chip,
   onPick,

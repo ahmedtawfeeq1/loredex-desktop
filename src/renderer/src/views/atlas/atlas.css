@@ -641,3 +641,48 @@
   display: flex;
   padding-top: 4px;
 }
+
+/* ── Project lens (v3 slice I — reference 18) ───────────────────────── */
+.project-page.lens { padding: 16px 20px; }
+.lens-head { display: flex; align-items: center; gap: 9px; white-space: nowrap; margin-bottom: 12px; }
+.lens-back {
+  color: var(--link); font-size: 12px; font-weight: 550;
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.lens-dot { width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto; }
+.lens-name { font-size: 15px; font-weight: 650; }
+.lens-stats { font: 10px var(--font-mono); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; }
+.lens-deep { margin-left: auto; }
+.lens-cols { display: flex; gap: 12px; align-items: flex-start; }
+.lens-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.lens-col-topics { flex: 1.35; }
+.lens-card {
+  background: var(--bg-card); border: 1px solid var(--hairline);
+  border-radius: 9px; padding: 9px 11px; cursor: pointer;
+}
+.lens-card.is-done { opacity: 0.55; }
+.lens-card-head { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.lens-status { font: 600 9px var(--font-mono); }
+.lens-status.is-warn { color: var(--warn); }
+.lens-status.is-ok { color: var(--ok); }
+.lens-status.is-mut { color: var(--text-3); }
+.lens-card-meta { font: 9.5px var(--font-mono); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; }
+.lens-card-title { font-size: 12px; margin-top: 5px; line-height: 1.4; }
+.lens-card.is-done .lens-card-title { color: var(--text-2); }
+.lens-trace {
+  display: block; font: 9.5px var(--font-mono); color: var(--link);
+  background: none; border: 0; padding: 6px 0 0; cursor: pointer;
+}
+.lens-topic {
+  display: flex; align-items: center; gap: 8px; width: 100%; white-space: nowrap;
+  background: var(--bg-card); border: 1px solid var(--hairline); border-radius: 9px;
+  padding: 9px 11px; cursor: pointer; text-align: left;
+}
+.lens-topic-num {
+  font: 600 9px var(--font-mono); color: var(--text-2);
+  border: 1px solid var(--hairline-2); border-radius: 3px; padding: 1px 5px;
+}
+.lens-topic-name { font-size: 12.5px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; }
+.lens-topic-meta { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-3); flex: 0 0 auto; }
+.lens-flows { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.lens .pp-note-grid { margin-top: 6px; }

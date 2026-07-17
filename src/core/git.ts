@@ -97,8 +97,30 @@ function ensureAskpassHelper(): string {
  *  credential helpers exactly as before). */
 let cachedGitToken = ''
 
+const CRED_ENV_KEYS = [
+  'GIT_ASKPASS',
+  'LOREDEX_GIT_TOKEN',
+  'GIT_CONFIG_COUNT',
+  'GIT_CONFIG_KEY_0',
+  'GIT_CONFIG_VALUE_0',
+  'GIT_CONFIG_KEY_1',
+  'GIT_CONFIG_VALUE_1',
+  'GIT_CONFIG_KEY_2',
+  'GIT_CONFIG_VALUE_2',
+] as const
+
 export function setGitCredentialToken(token: string | null): void {
   cachedGitToken = token ?? ''
+  // Apply PROCESS-WIDE: the embedded loredex engine spawns its own git
+  // (sync now, auto-commit push, ls-remote reachability) and only inherits
+  // process.env — per-spawn env alone left those on the machine's helpers
+  // (the wrong-account trap). No token = every key removed, the user's own
+  // git setup untouched.
+  if (cachedGitToken) {
+    for (const [key, value] of Object.entries(gitCredentialEnv())) process.env[key] = value
+  } else {
+    for (const key of CRED_ENV_KEYS) delete process.env[key]
+  }
 }
 
 /** Env to splice into any git spawn that may hit an HTTPS GitHub remote.

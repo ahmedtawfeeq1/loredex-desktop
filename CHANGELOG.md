@@ -7,6 +7,15 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-07-17
+
+### Fixed
+- **In-app GitHub token now reaches ALL of the app's git** — the embedded
+  engine's own git calls (Sync now, auto-commit push, reachability probe)
+  spawn from the core host and only saw process env; the credential
+  override is now applied process-wide while signed in, removed fully on
+  sign-out. Private HTTPS dexes sync under the in-app account.
+
 ## [0.7.2] - 2026-07-17
 
 ### Fixed

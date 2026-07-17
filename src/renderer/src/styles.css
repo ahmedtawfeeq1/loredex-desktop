@@ -7182,6 +7182,6 @@ a.button-primary {
 /* topic rows carry a # glyph (user feedback 2026-07-17) */
 .tree-dir { display: flex; align-items: center; gap: 7px; }
 .tree-dir-icon {
-  flex: 0 0 auto; width: 13px; text-align: center;
-  font: 600 10.5px var(--font-mono); color: var(--text-3);
+  flex: 0 0 auto; width: 13px; display: inline-flex;
+  align-items: center; justify-content: center; color: var(--text-3);
 }

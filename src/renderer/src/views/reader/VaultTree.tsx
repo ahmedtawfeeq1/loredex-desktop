@@ -234,7 +234,14 @@ function Branch({
               <details open>
                 <summary className="tree-dir" title={node.name}>
                   <span className="tree-dir-icon" aria-hidden>
-                    #
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M1.5 4a1.5 1.5 0 0 1 1.5-1.5h3.2l1.6 1.8H13A1.5 1.5 0 0 1 14.5 5.8v6.2a1.5 1.5 0 0 1-1.5 1.5H3A1.5 1.5 0 0 1 1.5 12V4Z"
+                        stroke="currentColor"
+                        strokeWidth="1.3"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
                   </span>
                   {humanizeTitle(node.name)}
                 </summary>

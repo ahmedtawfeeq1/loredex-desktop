@@ -22,7 +22,6 @@ import { rosterFrom } from '../views/agents/AgentsView'
 import { sectionTint } from '../views/reader/sectionTint'
 import { BrandMark } from './BrandMark'
 import { NavIcon } from './NavIcon'
-import { VaultMenu } from './VaultMenu'
 
 /** Prototype nav glyphs — text, 15 px slot (reference DOM). */
 const GLYPH: Partial<Record<AppView, string>> = {
@@ -172,7 +171,6 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
       <div className="side-head">
         <BrandMark size={18} />
         <span className="side-dex">{dexName}</span>
-        <VaultMenu compact />
         <span className="side-ver">{engine ? `dex ${engine}` : 'dex'}</span>
       </div>
       <button

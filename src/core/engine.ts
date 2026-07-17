@@ -5,7 +5,7 @@
  */
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, realpathSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, normalize, sep } from 'node:path'
@@ -518,6 +518,38 @@ export function saveNoteBody(path: string, body: string, identity: Identity): { 
     gitAutoCommit(config.vaultPath, config, `loredex: edit ${basename(resolved, '.md')} (${identity.name})`),
   )
   return { path: resolved }
+}
+
+/**
+ * Remove a note from the dex (user request 2026-07-17): archive moves it to
+ * `_archive/<same relative path>` (out of every scan — walkers only read
+ * projects/), delete removes the file. Both land as one attributed commit;
+ * push stays the poller/Sync-now's job. Path guarded via resolveInVault.
+ */
+export function removeNote(
+  path: string,
+  mode: 'delete' | 'archive',
+  identity: Identity,
+): { path: string } {
+  const config = getConfig()
+  const resolved = resolveInVault(path)
+  const vault = config.vaultPath
+  const rel = resolved.slice(vault.length + 1)
+  if (mode === 'archive') {
+    const dest = join(vault, '_archive', rel)
+    mkdirSync(dirname(dest), { recursive: true })
+    renameSync(resolved, dest)
+  } else {
+    unlinkSync(resolved)
+  }
+  withGitIdentity(identity, () =>
+    gitAutoCommit(
+      vault,
+      config,
+      `loredex: ${mode} ${basename(resolved, '.md')} (${identity.name})`,
+    ),
+  )
+  return { path: rel }
 }
 
 /**

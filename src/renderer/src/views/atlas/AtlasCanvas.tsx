@@ -9,7 +9,7 @@
  * (arrows move, Enter drills/expands, Esc/Backspace goes up).
  * Positions arrive precomputed from atlas.graph.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   GUTTER,
   newestDate,
@@ -118,7 +118,7 @@ function openDotAt(
   return { x: end.x + ux * along + -uy * lift, y: end.y + uy * along + ux * lift }
 }
 
-function OrthoEdge({
+const OrthoEdge = memo(function OrthoEdge({
   edge,
   a,
   b,
@@ -247,7 +247,7 @@ function OrthoEdge({
       )}
     </g>
   )
-}
+})
 
 export function AtlasCanvas({
   graph,
@@ -473,30 +473,45 @@ export function AtlasCanvas({
     [hoverId, graph.edges],
   )
 
+  // Scale guard (user crash report 2026-07-17): every hover setState re-renders
+  // the full SVG; at dex-scope Deep Dive (hundreds of nodes, 1000+ edges) a
+  // mouse sweep fired dozens of full re-renders per second and killed the
+  // renderer. Above this budget hover emphasis/callouts are off — click,
+  // keyboard, Path and selection all keep working.
+  const heavyGraph = graph.edges.length + visibleNodes.length > 350
+
   // WP-B: convert a cursor's client coords to pane-relative px and raise the
   // callout there (the pane is position:relative — it anchors the overlay).
-  const showCallout = (text: string, clientX: number, clientY: number): void => {
-    const rect = paneRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setCallout({ x: clientX - rect.left, y: clientY - rect.top, text })
-  }
-  const hideCallout = (): void => setCallout(null)
+  const showCallout = useCallback(
+    (text: string, clientX: number, clientY: number): void => {
+      if (heavyGraph) return
+      const rect = paneRef.current?.getBoundingClientRect()
+      if (!rect) return
+      setCallout({ x: clientX - rect.left, y: clientY - rect.top, text })
+    },
+    [heavyGraph],
+  )
+  const hideCallout = useCallback((): void => setCallout(null), [])
 
   // WP-B: node hover reuses the existing hover-neighborhood state (setHoverId)
   // and, for a PROJECT card, also surfaces its in/out route flow in the callout.
-  const onNodeHover = (id: string | null, e?: React.PointerEvent): void => {
-    setHoverId(id)
-    if (!id) {
-      hideCallout()
-      return
-    }
-    const node = byId.get(id)
-    if (node?.type === 'project' && e) {
-      showCallout(projectFlowCallout(node.id, node.label, graph.edges), e.clientX, e.clientY)
-    } else {
-      hideCallout()
-    }
-  }
+  const onNodeHover = useCallback(
+    (id: string | null, e?: React.PointerEvent): void => {
+      if (heavyGraph) return
+      setHoverId(id)
+      if (!id) {
+        hideCallout()
+        return
+      }
+      const node = byId.get(id)
+      if (node?.type === 'project' && e) {
+        showCallout(projectFlowCallout(node.id, node.label, graph.edges), e.clientX, e.clientY)
+      } else {
+        hideCallout()
+      }
+    },
+    [heavyGraph, byId, graph.edges, showCallout, hideCallout],
+  )
 
   // parallel edges between the same pair fan out ±LANE_STEP per lane
   const lanes = useMemo(() => laneOffsets(graph.edges), [graph.edges])

@@ -20,6 +20,7 @@ import {
   laneCards,
   projectsOf,
 } from '../../../../shared/handoff-lanes'
+import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import { invoke } from '../../api'
 import { Button } from '../../components/Button'
 import { ConsumeReceiptView } from '../../components/ConsumeReceiptView'
@@ -31,6 +32,7 @@ import { AgentChip } from '../../components/AgentChip'
 import { useBoardFilter } from '../../stores/boardFilter'
 import { useHandoffs } from '../../stores/handoffs'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
+import { useToasts } from '../../stores/toasts'
 import { ContractChips } from '../contracts/ContractChips'
 import { relativeTime } from '../feed/feed-logic'
 import { LIVE_WINDOW_MS } from '../agents/AgentsView'
@@ -91,6 +93,43 @@ function useReadingOrderKinds(card: HandoffCard): Record<string, string> {
     }
   }, [card])
   return kinds
+}
+
+/** Archive / delete the selected handoff note (user request 2026-07-17). */
+function RemoveHandoff({ card, disabled }: { card: HandoffCard; disabled: boolean }): React.JSX.Element | null {
+  const identity = useIdentity((s) => effectiveIdentity(s))
+  const [confirm, setConfirm] = useState(false)
+  useEffect(() => setConfirm(false), [card])
+  if (!identity) return null
+  const run = async (mode: 'delete' | 'archive'): Promise<void> => {
+    try {
+      await invoke('vault.removeNote', { path: card.path, mode, identity })
+      useToasts
+        .getState()
+        .push(
+          mode === 'archive' ? 'Handoff archived' : 'Handoff deleted',
+          `${card.id} · committed — will push on next sync`,
+        )
+      void useHandoffs.getState().load()
+    } catch (e) {
+      useToasts.getState().push('Could not remove handoff', isErrEnvelope(e) ? `${(e as { code: string }).code}: ${(e as { message: string }).message}` : String(e))
+    }
+  }
+  return (
+    <>
+      <Button variant="quiet" disabled={disabled} title="Move to _archive/ (one commit)" onClick={() => void run('archive')}>
+        Archive
+      </Button>
+      <Button
+        variant="danger"
+        disabled={disabled}
+        title="Delete this handoff note (one commit)"
+        onClick={() => (confirm ? void run('delete') : setConfirm(true))}
+      >
+        {confirm ? 'Sure?' : 'Delete'}
+      </Button>
+    </>
+  )
 }
 
 function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
@@ -199,6 +238,7 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
             Link request
           </Button>
         )}
+        <RemoveHandoff card={card} disabled={busy} />
         <span className="inbox-actionbar-gap" />
         {actions.includes('accept') && (
           <Button

@@ -461,6 +461,20 @@ export function registerCoreHandlers(
       return { path: rel }
     }),
   )
+  // Remove a note (user request 2026-07-17): archive → _archive/, delete →
+  // gone; one attributed commit either way. Everything re-derives on change.
+  ipc.register('vault.removeNote', ({ path, mode, identity }) =>
+    withWriteLock(() => {
+      requireIdentity(identity, mode === 'archive' ? 'archiving a note' : 'deleting a note')
+      const result = engine.removeNote(path, mode, identity)
+      const vaultPath = engine.getConfig().vaultPath
+      invalidateLinkIndex(vaultPath)
+      clearFacetCache()
+      invalidateAtlas()
+      ipc.emit({ kind: 'vault.changed', paths: [result.path] })
+      return result
+    }),
+  )
   // Inline comments (story 16.4): a NEW anchored type:'comment' note beside
   // the parent — the parent is never mutated; comments are never board cards.
   ipc.register('note.comment.create', ({ path, anchor, body, identity }) =>

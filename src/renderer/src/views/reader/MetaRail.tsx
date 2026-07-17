@@ -10,7 +10,10 @@
  *   THREAD — the handoff thread rail, re-homed (handoff notes only).
  */
 import { useEffect, useState } from 'react'
+import { effectiveIdentity, useIdentity } from '../../stores/identity'
+import { useToasts } from '../../stores/toasts'
 import type { SearchHit } from '../../../../shared/ipc-contract'
+import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import { invoke } from '../../api'
 import { ThreadRail } from '../handoffs/ThreadRail'
 import { openBrief } from '../handoffs/open-brief'
@@ -162,6 +165,52 @@ export function MetaRail({
 
       {/* ThreadRail carries its own "Thread" heading */}
       {handoffRef && <ThreadRail id={qualifiedId(handoffRef)} />}
+
+      <RemoveNote selected={selected} />
     </aside>
+  )
+}
+
+/** Archive / delete the open note (user request 2026-07-17) — archive moves
+ *  it to _archive/, delete removes it; both one attributed commit. Delete
+ *  asks twice. */
+function RemoveNote({ selected }: { selected: string }): React.JSX.Element | null {
+  const identity = useIdentity((s) => effectiveIdentity(s))
+  const [confirm, setConfirm] = useState(false)
+  useEffect(() => setConfirm(false), [selected])
+  if (!identity) return null
+
+  const run = async (mode: 'delete' | 'archive'): Promise<void> => {
+    try {
+      await invoke('vault.removeNote', { path: selected, mode, identity })
+      useToasts
+        .getState()
+        .push(
+          mode === 'archive' ? 'Note archived' : 'Note deleted',
+          `${noteName(selected)} · committed — will push on next sync`,
+        )
+      useReader.getState().reset()
+      void useReader.getState().loadTree()
+    } catch (e) {
+      useToasts.getState().push('Could not remove note', isErrEnvelope(e) ? `${(e as { code: string }).code}: ${(e as { message: string }).message}` : String(e))
+    }
+  }
+
+  return (
+    <section>
+      <div className="rail-label">MANAGE</div>
+      <div className="rail-manage">
+        <button type="button" className="act-link" onClick={() => void run('archive')}>
+          Archive note
+        </button>
+        <button
+          type="button"
+          className="act-link is-danger"
+          onClick={() => (confirm ? void run('delete') : setConfirm(true))}
+        >
+          {confirm ? 'Delete — click again to confirm' : 'Delete note'}
+        </button>
+      </div>
+    </section>
   )
 }

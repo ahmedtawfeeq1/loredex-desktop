@@ -86,9 +86,12 @@ export function ThreadRail({ id }: { id: string }): React.JSX.Element | null {
     thread.broken.length === 0
   if (empty) return null
 
+  const steps = thread.ancestors.length
   return (
     <section className="thread" aria-label="Thread">
-      <h2 className="thread-title">Thread</h2>
+      <h2 className="thread-title">
+        Thread · the hand-off chain, oldest first — this card is the marked stop
+      </h2>
       {/* story 8.3 AC3/AC4: derived FULFILLED badge + labeled connector —
           the request's own status is never auto-written */}
       {thread.fulfilledBy.length > 0 && (
@@ -107,21 +110,42 @@ export function ThreadRail({ id }: { id: string }): React.JSX.Element | null {
           <ThreadCardRow node={thread.fulfills} />
         </div>
       )}
-      {thread.ancestors.map((node) => (
-        <ThreadCardRow key={node.path} node={node} />
-      ))}
-      {(thread.ancestors.length > 0 || thread.replies.length > 0) && (
-        <p className="thread-focus">this note</p>
-      )}
-      {thread.replies.length > 0 && (
-        <div className="thread-rail">
-          {thread.replies.map((node) => (
-            <div key={node.path} style={{ marginLeft: (node.depth - 1) * 20 }}>
+      <div className="thread-chain">
+        {thread.ancestors.map((node, i) => (
+          <div className="thread-step" key={node.path}>
+            <span className="thread-step-gutter" aria-hidden>
+              <span className="thread-step-num">{String(i + 1).padStart(2, '0')}</span>
+              <span className="thread-step-line" />
+            </span>
+            <div className="thread-step-body">
+              <ThreadCardRow node={node} />
+              <span className="thread-edge">↓ handed back as</span>
+            </div>
+          </div>
+        ))}
+        {(thread.ancestors.length > 0 || thread.replies.length > 0) && (
+          <div className="thread-step is-here">
+            <span className="thread-step-gutter" aria-hidden>
+              <span className="thread-step-num is-here">{String(steps + 1).padStart(2, '0')}</span>
+              {thread.replies.length > 0 && <span className="thread-step-line" />}
+            </span>
+            <div className="thread-step-body">
+              <div className="thread-here">this note — the card you are reading</div>
+              {thread.replies.length > 0 && <span className="thread-edge">↓ replies</span>}
+            </div>
+          </div>
+        )}
+        {thread.replies.map((node) => (
+          <div className="thread-step" key={node.path}>
+            <span className="thread-step-gutter" aria-hidden>
+              <span className="thread-step-dot" />
+            </span>
+            <div className="thread-step-body" style={{ marginLeft: (node.depth - 1) * 16 }}>
               <ThreadCardRow node={node} />
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
       {thread.broken.map((b) => (
         <p key={`${b.ownerId}:${b.field}:${b.name}`} className="thread-diagnostic">
           {b.field} ⟶ “{b.name}” on {b.ownerId} no longer resolves

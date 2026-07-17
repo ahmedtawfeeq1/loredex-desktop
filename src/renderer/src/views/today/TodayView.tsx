@@ -28,8 +28,10 @@ import { useReader } from '../../stores/reader'
 import { useRoute } from '../../stores/route'
 import { useWizard } from '../../stores/wizard'
 import { relativeTime } from '../feed/feed-logic'
+import { sectionTint } from '../reader/sectionTint'
 import { openBrief } from '../handoffs/open-brief'
 import { localDay } from '../handoffs/lifecycle'
+import { sprintRollup, useWork } from '../../stores/work'
 import { useDashboardData } from '../home/dashboard-data'
 import '../home/home.css'
 import {
@@ -234,6 +236,7 @@ export function TodayView(): React.JSX.Element {
   const dismissReceipt = useHandoffs((s) => s.dismissReceipt)
   const selectedId = useHandoffs((s) => s.selectedId)
   const brief = useHome((s) => s.brief)
+  const workItems = useWork((s) => s.items)
   const vaultPath = useApp((s) => s.identity?.vaultPath ?? '')
   const setView = useApp((s) => s.setView)
   const [range, setRangeState] = useState<Range>(loadRange)
@@ -244,7 +247,8 @@ export function TodayView(): React.JSX.Element {
   useEffect(() => {
     if (cards === null) void useHandoffs.getState().load()
     if (brief === null) void useHome.getState().load()
-  }, [cards, brief])
+    if (workItems === null) void useWork.getState().load()
+  }, [cards, brief, workItems])
 
   const setRange = (r: Range): void => {
     setRangeState(r)
@@ -275,13 +279,14 @@ export function TodayView(): React.JSX.Element {
   const sync = syncTile(health)
   const healthRows = projectHealth(dash?.states ?? [], all)
   const relations = topRelations(dash?.edges ?? [])
+  const sprint = sprintRollup(workItems ?? [])
   const inFlight = latestByActor(feed, 4)
   const knowledge = newKnowledge(feed, 5)
   const recent = recentActivity(feed, 6)
 
   const metaLine = `${LONG_DATE.format(now).toLowerCase()} · ${queue.length} need you · ${
     inbound.open
-  } open · sync ${sync.value.toLowerCase()}`
+  } open${sprint.sprint ? ` · ${sprint.sprint}` : ''} · sync ${sync.value.toLowerCase()}`
 
   if (empty) {
     return (
@@ -472,8 +477,58 @@ export function TodayView(): React.JSX.Element {
           </section>
         </div>
 
-        {/* ── rail: pulse + velocity + health (§5 Today rail) ── */}
+        {/* ── rail (reference/dom/01): Sprint → Pulse → Velocity; the v2
+            backlog/health capabilities keep their cards below (§5.1) ── */}
         <div className="today-rail">
+          <section className="ops-card sprint-card" aria-label="Sprint">
+            <div className="sprint-head">
+              <span className="sprint-name">
+                {sprint.sprint ? sprint.sprint.toUpperCase() : 'No sprint'}
+              </span>
+              <span className="meta">
+                {sprint.sprint ? `${sprint.done}/${sprint.total} done` : 'set sprint: on work items'}
+              </span>
+            </div>
+            {sprint.total > 0 && (
+              <>
+                <div className="sprint-bar">
+                  <span
+                    className="sprint-bar-fill"
+                    style={{ width: `${Math.round((sprint.done / Math.max(1, sprint.total)) * 100)}%` }}
+                  />
+                </div>
+                <div className="sprint-stats meta">
+                  {sprint.done} done · {sprint.doing} doing ·{' '}
+                  <span className={sprint.todo > 0 ? 'sprint-todo' : ''}>{sprint.todo} to do</span>
+                </div>
+              </>
+            )}
+            <button type="button" className="today-sect-link" onClick={() => setView('plan')}>
+              Open board →
+            </button>
+          </section>
+
+          <section className="ops-card" aria-label="Project pulse">
+            <div className="today-sect" style={{ margin: 0 }}>
+              <span className="today-sect-label">project pulse</span>
+            </div>
+            <div className="pulse-list">
+              {healthRows.slice(0, 6).map((row) => (
+                <div className="pulse-row" key={row.project}>
+                  <span
+                    className="shelf-dot"
+                    style={{ background: sectionTint(row.project) }}
+                    aria-hidden="true"
+                  />
+                  <span className="pulse-name">{row.project}</span>
+                  <span className={`pulse-state ${row.brief === 'stale' ? 'is-stale' : 'is-fresh'}`}>
+                    {row.brief === 'stale' ? 'stale' : 'fresh'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
           <VelocityChart series={velSeries} open={vel.open} />
           <BacklogChart series={velSeries} openNow={inbound.open} />
           <section className="ops-card" aria-label="Project health">

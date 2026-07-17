@@ -1229,3 +1229,74 @@
   user-select: text;
   word-break: break-all;
 }
+
+/* slice D: Today rail — sprint card + project pulse (reference 01) */
+.today-rail {
+  max-width: 320px;
+}
+
+.sprint-card .sprint-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sprint-name {
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.sprint-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  margin: 10px 0 8px;
+  overflow: hidden;
+}
+
+.sprint-bar-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(var(--accent-grad-top), var(--accent-grad-bot));
+}
+
+.sprint-todo {
+  color: var(--warn);
+}
+
+.pulse-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pulse-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pulse-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pulse-state {
+  font: 10px var(--font-mono);
+}
+
+.pulse-state.is-fresh {
+  color: var(--ok);
+}
+
+.pulse-state.is-stale {
+  color: var(--warn);
+}

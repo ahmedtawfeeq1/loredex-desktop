@@ -79,6 +79,11 @@ import {
   undoRoute,
   type VaultSchemaStatus,
   vaultSchemaStatus,
+  listWorkItems,
+  updateWorkItem,
+  type WorkItem,
+  type WorkPatch,
+  type WorkReceipt,
 } from 'loredex'
 import { abbreviatePath } from '../shared/identity'
 import { type DuplicateGroup, findDuplicates, type NoteRecord } from './duplicates'
@@ -276,6 +281,20 @@ export function homeBrief(): HomeBrief {
 /** All handoffs in scope (story 3.2) — lib collector, never app-side note parsing. */
 export function handoffs(scope: HandoffScope): HandoffCard[] {
   return listHandoffs(getConfig().vaultPath, scope)
+}
+
+/** v3 Plan/Today (parity slices D/E): the lib's one work-item plane —
+ *  tasks ∪ handoffs on board statuses (loredex ≥ 2.8). */
+export function workItems(today: string): WorkItem[] {
+  return listWorkItems(getConfig().vaultPath, today)
+}
+
+export function workUpdate(
+  id: string,
+  patch: WorkPatch,
+  identity: Identity,
+): WorkReceipt {
+  return updateWorkItem(getConfig().vaultPath, getConfig(), id, patch, identity)
 }
 
 /** Registered project names from the resolved config ("my projects" — story 3.7 filter). */

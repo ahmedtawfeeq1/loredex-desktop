@@ -11,6 +11,9 @@ import type {
   ProductDashboard,
   SearchHit,
   WorkspaceResult,
+  WorkItem,
+  WorkPatch,
+  WorkReceipt,
 } from 'loredex'
 import type { FontSettings } from './font-settings'
 import type { ThemeSetting } from './theme'
@@ -63,6 +66,7 @@ import type {
 
 // Payload types that exist in the pinned loredex are imported, never redefined.
 export type { ClientInfo, Config, Doc, LintFinding, ProductDashboard, SearchHit, WorkspaceResult }
+export type { WorkItem, WorkPatch, WorkReceipt } from 'loredex'
 
 // ── CoreApi map: renderer → core (request/response) ─────────────────────────
 
@@ -156,6 +160,10 @@ export interface CoreApi {
     out: { state: 'authorized' | 'pending' | 'slow_down' | 'expired' | 'denied' }
   }
   'dex.registry': { in: void; out: DexRepo[] }
+  /** v3 Plan/Today (slices D/E): the lib work-item plane (loredex ≥2.8) —
+   *  reads are board rows; the one writer patches task frontmatter only. */
+  'work.list': { in: void; out: WorkItem[] }
+  'work.update': { in: { id: string; patch: WorkPatch; identity: Identity }; out: WorkReceipt }
   'dex.createRepo': { in: { name: string; isPrivate: boolean }; out: DexRepo }
   'settings.mcpPort.set': { in: { port: number | null }; out: void }
   /** app-local contract evolution (story 14.1): theme preference — per-user app

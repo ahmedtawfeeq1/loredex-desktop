@@ -739,6 +739,11 @@ export function registerCoreHandlers(
     return { state: r.state }
   })
   ipc.register('dex.registry', () => listDexRepos())
+  // v3 Plan/Today (slices D/E): work items over the seam
+  ipc.register('work.list', () => engine.workItems(new Date().toISOString().slice(0, 10)))
+  ipc.register('work.update', ({ id, patch, identity }) =>
+    withWriteLock(() => engine.workUpdate(id, patch, identity)),
+  )
   ipc.register('dex.createRepo', ({ name, isPrivate }) => createDexRepo(name, isPrivate))
   // Theme preference (story 14.1): per-user app state, applied renderer-side.
   ipc.register('settings.theme.get', () => loadThemeSetting())

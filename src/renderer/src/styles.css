@@ -989,14 +989,16 @@ a:hover {
    primary (D1 amendment 4 — Comment leads on handoff cards without spending
    the one-cobalt-primary-per-view budget the header's New handoff owns). */
 .button-emphasis {
+  /* reference 02 "Hand back": filled ink, not inverted white */
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 30px;
-  padding: 0 14px;
-  border-radius: 8px;
-  border: 1px solid var(--text-1);
-  background: var(--text-1);
+  height: 29px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--hairline-2);
+  background: var(--bg-overlay-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: var(--bg-card);
   font-weight: 600;
   transition: filter 100ms ease-out;
@@ -6444,7 +6446,8 @@ a.commit-chip-sha:hover {
   text-overflow: ellipsis;
 }
 
-/* §4 floating action bar: blur ground, radius 14, big shadow, one primary */
+/* §4 floating action bar (reference 02): bordered overlay pill, radius 13,
+   inset highlight — the container itself reads as a control surface */
 .inbox-actionbar {
   position: sticky;
   bottom: 12px;
@@ -6452,12 +6455,13 @@ a.commit-chip-sha:hover {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-top: 16px;
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(24, 28, 36, 0.92);
+  margin-top: 22px;
+  padding: 9px 10px;
+  border-radius: 13px;
+  border: 1px solid var(--hairline-2);
+  background: color-mix(in srgb, var(--bg-overlay) 90%, transparent);
   backdrop-filter: blur(12px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
 [data-theme='light'] .inbox-actionbar {
@@ -7211,4 +7215,16 @@ a.button-primary {
   display: inline-block; font: 600 10.5px var(--font-mono); color: var(--text-1);
   background: var(--bg-hover); border: 1px solid var(--hairline);
   border-left: 2px solid var(--accent); border-radius: 8px; padding: 7px 11px; margin-bottom: 4px;
+}
+
+/* bar buttons at reference scale: h29, r9, ghosts hover-visible, cobalt glow */
+.inbox-actionbar .button-quiet,
+.inbox-actionbar .button-secondary,
+.inbox-actionbar .button-danger {
+  height: 29px; padding: 0 12px; border-radius: 9px; font-size: 12.5px; font-weight: 550;
+}
+.inbox-actionbar .button-quiet:hover:not(:disabled) { background: var(--bg-overlay-2); }
+.inbox-actionbar .button-primary {
+  height: 29px; padding: 0 14px; border-radius: 9px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 8px rgba(85, 132, 232, 0.3);
 }

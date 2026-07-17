@@ -84,13 +84,22 @@ export function MetaRail({
   )
   const handoffRef = (cards ?? []).find((c) => c.id === name)
 
+  // Quick facts only (user feedback 2026-07-17): a row earns its place when
+  // the value FITS the 224px rail — long values (paths, hashes, tag piles)
+  // stay in the note's Properties block. Every row tooltips its full value.
   const filedBy = meta.agent ?? meta.author ?? meta.filed_by
-  const rows: Array<[string, string]> = [
+  const candidates: Array<[string, string]> = [
     ['type', String(meta.type ?? 'note')],
     ['filed', [filedBy, meta.date].filter(Boolean).join(' · ') || '—'],
-    ['tags', Array.isArray(meta.tags) ? meta.tags.join(' · ') : String(meta.tags ?? '—')],
-    ['origin', meta.loredex ? `routed · schema ${meta.loredex}` : 'unrouted'],
+    ['project', String(meta.project ?? '')],
+    ['topic', String(meta.topic ?? '')],
+    ['product', String(meta.product ?? '')],
+    ['source', String(meta.source ?? '')],
+    ['tags', Array.isArray(meta.tags) ? meta.tags.join(' · ') : String(meta.tags ?? '')],
+    ['origin', meta.loredex ? String(meta.loredex) : ''],
+    ['schema', meta.loredex_schema !== undefined ? String(meta.loredex_schema) : ''],
   ]
+  const rows = candidates.filter(([, v]) => v && v !== 'undefined' && v.length <= 24)
 
   const collapsed = useMetaRail((s) => s.collapsed)
   if (collapsed) {
@@ -149,7 +158,7 @@ export function MetaRail({
         <div className="rail-label">ABOUT THIS NOTE</div>
         <div className="about-card">
           {rows.map(([k, v]) => (
-            <div className="about-row" key={k}>
+            <div className="about-row" key={k} title={`${k}: ${v}`}>
               <span className="about-key">{k}</span>
               <span className="about-val">{v}</span>
             </div>

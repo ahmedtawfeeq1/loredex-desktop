@@ -7,7 +7,8 @@ import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { homedir } from 'node:os'
+import { pathToFileURL } from 'node:url'
+import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, normalize, sep } from 'node:path'
 import { promisify } from 'node:util'
 import {
@@ -242,10 +243,24 @@ export async function recurateProject(project: string): Promise<void> {
     'dist',
     'cli.js',
   )
-  await execFileAsync(process.execPath, [cliPath, 'curate', project, '-y'], {
+  // Commander sees process.versions.electron and (no defaultApp) treats
+  // argv[1] — the script path — as the first USER arg, so the CLI reported
+  // "unknown command …/cli.js" (user bug 2026-07-17). A tmp wrapper drops the
+  // script entry from argv before importing the real CLI.
+  const wrapperPath = join(tmpdir(), 'loredex-cli-wrapper.mjs')
+  writeFileSync(
+    wrapperPath,
+    'if (process.versions.electron && !process.defaultApp) process.argv.splice(1, 1)\n' +
+      'await import(process.env.LOREDEX_CLI_URL)\n',
+  )
+  await execFileAsync(process.execPath, [wrapperPath, 'curate', project, '-y'], {
     cwd: vaultPath,
     // Electron's binary runs as plain Node with this flag set (packaged + dev).
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: '1',
+      LOREDEX_CLI_URL: pathToFileURL(cliPath).href,
+    },
     maxBuffer: 32 * 1024 * 1024,
     timeout: 180_000,
   })

@@ -6875,9 +6875,22 @@ a.button-primary {
 }
 .plan-filters { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
 .plan-filter {
-  background: transparent; border: none; font: 10px var(--font-mono); color: var(--text-3);
-  appearance: none; -webkit-appearance: none; cursor: pointer; padding: 0;
+  /* clearly a dropdown (user feedback 2026-07-17): bordered pill + caret */
+  appearance: none;
+  -webkit-appearance: none;
+  height: 24px;
+  padding: 0 20px 0 9px;
+  border: 1px solid var(--hairline-2);
+  border-radius: 7px;
+  background-color: var(--bg-inset);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='5'><path d='M0 0l4 5 4-5z' fill='%236B7280'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  font: 600 10.5px var(--font-mono);
+  color: var(--text-2);
+  cursor: pointer;
 }
+.plan-filter:hover { border-color: var(--accent); color: var(--text-1); }
 .plan-filter-sep { font: 10px var(--font-mono); color: var(--text-3); }
 .plan-board {
   flex: 1; min-height: 0; overflow: auto; padding: 16px 18px;

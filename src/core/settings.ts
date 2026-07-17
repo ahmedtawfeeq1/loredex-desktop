@@ -234,6 +234,21 @@ export function revokeAgentToken(name: string): void {
   writeKey('agentTokens', JSON.stringify(tokens))
 }
 
+/** v3 Settings › MCP server toggles (story: parity slice C). Both default
+ *  true — the reference page's switches are real, not decoration. */
+export function loadMcpAutostart(): boolean {
+  return readJsonKey('mcpAutostart') !== false
+}
+export function saveMcpAutostart(on: boolean): void {
+  writeKey('mcpAutostart', JSON.stringify(on))
+}
+export function loadMcpWriteTools(): boolean {
+  return readJsonKey('mcpWriteTools') !== false
+}
+export function saveMcpWriteTools(on: boolean): void {
+  writeKey('mcpWriteTools', JSON.stringify(on))
+}
+
 /** Settings override for the MCP port; null = preferred default (52017). */
 export function loadMcpPortOverride(): number | null {
   const port = readJsonKey('mcpPort')

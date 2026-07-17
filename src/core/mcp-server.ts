@@ -83,6 +83,17 @@ export function originAllowed(origin: string | undefined): boolean {
 type ToolResult = { content?: Array<Record<string, unknown>> }
 type RegisteredToolLike = { handler?: unknown }
 
+/** Parity slice C: the "Expose write tools" switch — strip dex-writing verbs
+ *  from a server instance (read tools stay). Same _registeredTools seam as
+ *  the identity echo below; guarded for unexpected SDK shapes. */
+export const WRITE_TOOLS = ['vault_store', 'handoff_consume', 'work_claim', 'work_update', 'work_done'] as const
+
+export function stripWriteTools(mcp: object): void {
+  const tools = (mcp as { _registeredTools?: Record<string, unknown> })._registeredTools
+  if (!tools) return
+  for (const name of WRITE_TOOLS) delete tools[name]
+}
+
 /**
  * FR14: every tool response echoes the vault identity — the same line the
  * chrome badge shows. The SDK has no response middleware, so each registered
@@ -108,6 +119,8 @@ export function withIdentityEcho(mcp: object, line: string): void {
 interface McpHostOptions {
   port: number
   token: string
+  /** read live so the Settings switch applies without a restart */
+  writeTools?: () => boolean
   /** per-agent bearer tokens (story 26.9): name → token, read live so mints
    *  apply without a restart */
   agentTokens?: () => Record<string, string>
@@ -149,6 +162,7 @@ async function handle(
   res: ServerResponse,
   token: string,
   agentTokens: () => Record<string, string>,
+  writeTools: () => boolean = () => true,
 ): Promise<void> {
   try {
     if (!originAllowed(req.headers.origin)) {
@@ -175,6 +189,7 @@ async function handle(
     recordMcpRequest(body, undefined, who.agent ?? undefined)
 
     const mcp = engine.createMcpServer()
+    if (writeTools() === false) stripWriteTools(mcp)
     withIdentityEcho(mcp, formatVaultIdentity(engine.identity()))
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
     res.on('close', () => {
@@ -207,8 +222,9 @@ export async function bootMcpServer(
     message: null,
   }
   const agentTokens = opts.agentTokens ?? (() => ({}))
+  const writeTools = opts.writeTools ?? (() => true)
   const server = createServer((req, res) => {
-    void handle(req, res, opts.token, agentTokens)
+    void handle(req, res, opts.token, agentTokens, writeTools)
   })
   try {
     await new Promise<void>((resolve, reject) => {

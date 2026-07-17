@@ -23,7 +23,9 @@ import {
   initSettings,
   loadAgentTokens,
   loadIdentityProfile,
+  loadMcpAutostart,
   loadMcpPortOverride,
+  loadMcpWriteTools,
   loadOrCreateMcpToken,
 } from './settings'
 import { startVaultWatcher } from './watcher'
@@ -203,13 +205,14 @@ if (config && appDb && vid) {
 // In-app MCP server (story 1.6): shares the once-resolved config — the F6 fix
 // by construction. No config yet (picker pending) → no server; picking a vault
 // restarts this host, which boots it then.
-if (config) {
+if (config && loadMcpAutostart()) {
   const portOverride = loadMcpPortOverride()
   void bootMcpServer({
     port: portOverride ?? PREFERRED_MCP_PORT,
     portOverride,
     token: loadOrCreateMcpToken(),
     agentTokens: () => loadAgentTokens(), // story 26.9: mints apply live
+    writeTools: () => loadMcpWriteTools(), // slice C: switch applies live
     onWarning: (text) => ipc.emit({ kind: 'git.warning', text }),
   })
 }

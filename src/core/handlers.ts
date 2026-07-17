@@ -79,6 +79,11 @@ import {
   loadAgentTokens,
   mintAgentToken,
   revokeAgentToken,
+  loadMcpAutostart,
+  loadMcpWriteTools,
+  saveMcpAutostart,
+  saveMcpWriteTools,
+  loadOrCreateMcpToken,
 } from './settings'
 import { buildThread, collectComments } from './threads'
 import { groupProjectsInTree, listMarkdownFiles, walkVault } from './tree'
@@ -657,6 +662,35 @@ export function registerCoreHandlers(
   // MCP host state + port override (story 1.6). The override applies on the
   // next core-host start — no live rebind, the discovery file must stay true.
   ipc.register('mcp.status', () => getMcpStatus())
+  // slice C: MCP server switches + connect snippet
+  ipc.register('mcp.settings.get', () => ({
+    autostart: loadMcpAutostart(),
+    writeTools: loadMcpWriteTools(),
+  }))
+  ipc.register('mcp.settings.set', ({ autostart, writeTools }) => {
+    if (autostart !== undefined) saveMcpAutostart(autostart)
+    if (writeTools !== undefined) saveMcpWriteTools(writeTools)
+  })
+  ipc.register('mcp.connectSnippet', () => {
+    const st = getMcpStatus()
+    const port = st.port ?? st.preferredPort
+    const token = loadOrCreateMcpToken()
+    return {
+      snippet: JSON.stringify(
+        {
+          mcpServers: {
+            loredex: {
+              type: 'http',
+              url: `http://127.0.0.1:${port}/`,
+              headers: { Authorization: `Bearer ${token}` },
+            },
+          },
+        },
+        null,
+        2,
+      ),
+    }
+  })
   // v3 §6.5 (story 26.5): read-only session telemetry for the Agents view
   ipc.register('agents.sessions', () => ({ log: mcpRequestLog(), mcp: getMcpStatus() }))
   // story 26.9: per-agent MCP tokens — mint shows the token once, list = names

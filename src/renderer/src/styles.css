@@ -6617,3 +6617,237 @@ a.button-primary {
   background: var(--bg-hover);
   color: var(--text-1);
 }
+
+/* ── v3 Settings IA (parity slice C — reference 08–17) ─────────────────── */
+
+.settings-v3 {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.settings-nav {
+  width: 212px;
+  flex: none;
+  border-right: 1px solid var(--hairline);
+  overflow-y: auto;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-search {
+  height: 28px;
+  padding: 0 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 7px;
+  color: var(--text-1);
+  font: 11.5px var(--font-ui);
+  margin-bottom: 8px;
+}
+
+.settings-search::placeholder {
+  color: var(--text-3);
+}
+
+.settings-group-label {
+  padding: 6px 10px 4px;
+}
+
+.settings-row-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: var(--text-2);
+  white-space: nowrap;
+  width: 100%;
+}
+
+.settings-row-nav:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.settings-row-nav[aria-current='page'] {
+  background: var(--bg-hover);
+  color: var(--text-1);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.settings-row-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+  flex: 1;
+}
+
+.settings-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.settings-dot.dot-ok {
+  background: var(--ok);
+}
+
+.settings-dot.dot-rust {
+  background: var(--rust);
+}
+
+.settings-content {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 26px 34px;
+  max-width: 860px;
+}
+
+.settings-h1 {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0 0 16px;
+}
+
+/* content rows: card of h44 label/value rows (reference 23/27/28/29) */
+.set-card {
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 14px;
+}
+
+.set-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 44px;
+  padding: 6px 16px;
+}
+
+.set-row + .set-row {
+  border-top: 1px solid var(--hairline);
+}
+
+.set-row-label {
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.set-row-label.mono-label {
+  font: 12px var(--font-mono);
+  color: var(--text-2);
+}
+
+.set-row-value.chip-value {
+  border: 1px solid var(--hairline-2);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+}
+
+.set-row-value.mono-keys {
+  font: 600 12px var(--font-mono);
+  color: var(--text-1);
+}
+
+.settings-foot {
+  margin: 4px 2px 14px;
+}
+
+/* switch (reference 22: MCP toggles) */
+.switch {
+  width: 34px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline-2);
+  position: relative;
+  flex: none;
+  transition: background 120ms ease-out;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform 120ms ease-out, background 120ms ease-out;
+}
+
+.switch.is-on {
+  background: var(--accent);
+  border-color: var(--accent-600);
+}
+
+.switch.is-on .switch-knob {
+  transform: translateX(14px);
+  background: var(--accent-ink);
+}
+
+/* MCP status card (reference 22) */
+.mcp-card {
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.mcp-card.is-ok {
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+  background: color-mix(in srgb, var(--ok) 5%, transparent);
+}
+
+.mcp-card.is-bad {
+  border-color: color-mix(in srgb, var(--rust) 35%, transparent);
+  background: color-mix(in srgb, var(--rust) 5%, transparent);
+}
+
+.mcp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mcp-card-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mcp-card-count {
+  margin-left: auto;
+}
+
+.mcp-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.mono-btn {
+  font-family: var(--font-mono) !important;
+  font-size: 11.5px !important;
+}
+
+.port-input {
+  max-width: 110px;
+  text-align: right;
+  font-family: var(--font-mono);
+}

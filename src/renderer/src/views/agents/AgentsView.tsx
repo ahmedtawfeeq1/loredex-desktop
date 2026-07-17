@@ -72,7 +72,7 @@ function SessionLine({ entry }: { entry: McpLogEntry }): React.JSX.Element {
 /** Per-agent MCP tokens (story 26.9): mint shows the token ONCE — put it in
  *  that agent's MCP config Authorization header; its calls then attribute in
  *  the session feed. Revoke kills the token immediately (host reads live). */
-function AgentTokensCard(): React.JSX.Element {
+export function AgentTokensCard(): React.JSX.Element {
   const [names, setNames] = useState<string[]>([])
   const [name, setName] = useState('')
   const [minted, setMinted] = useState<{ name: string; token: string } | null>(null)

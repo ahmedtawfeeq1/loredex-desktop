@@ -17,33 +17,49 @@ vi.mock('./GitHubSection', () => ({ GitHubSection: () => <div>GitHub-card</div> 
 vi.mock('./McpSection', () => ({ McpSection: () => <div>Mcp-card</div> }))
 vi.mock('./TypographySection', () => ({ TypographySection: () => <div>Typography-card</div> }))
 vi.mock('../sync/SyncPanel', () => ({ SyncPanel: () => <div>Sync-card</div> }))
+vi.mock('./GeneralSection', () => ({ GeneralSection: () => <div>General-card</div> }))
+vi.mock('./McpServerSection', () => ({ McpServerSection: () => <div>McpServer-card</div> }))
+vi.mock('./ShortcutsSection', () => ({ ShortcutsSection: () => <div>Shortcuts-card</div> }))
+vi.mock('../agents/AgentsView', () => ({ AgentTokensCard: () => <div>AgentTokens-card</div> }))
+vi.mock('../../api', () => ({
+  invoke: () => Promise.reject(new Error('stub')),
+  onEvent: () => () => {},
+}))
 
 import { useSettingsTab } from '../../stores/settingsTab'
 import { SettingsView } from './SettingsView'
 
-afterEach(() => useSettingsTab.setState({ tab: 'Workspace' }))
+afterEach(() => useSettingsTab.setState({ section: 'general' }))
 
-describe('SettingsView tabs (v3 §5 regroup)', () => {
-  it('shows Workspace cards by default and hides other tabs', () => {
+describe('SettingsView (v3 slice C — two-pane settings IA)', () => {
+  it('opens on General with the three nav groups', () => {
     render(<SettingsView />)
+    expect(screen.getByText('General-card')).toBeTruthy()
+    expect(screen.getByText('WORKSPACE · SHARED')).toBeTruthy()
+    expect(screen.getByText('PERSONAL · THIS MACHINE')).toBeTruthy()
+    expect(screen.getByText('SYSTEM')).toBeTruthy()
+  })
+
+  it('nav rows switch sections (Filing rules = scope + duplicates)', () => {
+    render(<SettingsView />)
+    fireEvent.click(screen.getByRole('button', { name: 'Filing rules' }))
     expect(screen.getByText('Scope-card')).toBeTruthy()
-    expect(screen.getByText('Contracts-card')).toBeTruthy()
-    expect(screen.queryByText('Appearance-card')).toBeNull()
+    expect(screen.getByText('Duplicates-card')).toBeTruthy()
+    expect(screen.queryByText('General-card')).toBeNull()
   })
 
-  it('switches to Personal on click', () => {
+  it('the legacy tab shim still deep-links (System → Sync & git)', () => {
+    useSettingsTab.getState().setTab('System')
     render(<SettingsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Personal' }))
-    expect(screen.getByText('Identity-card')).toBeTruthy()
-    expect(screen.getByText('Appearance-card')).toBeTruthy()
-    expect(screen.queryByText('Scope-card')).toBeNull()
-  })
-
-  it('System holds the dissolved Sync view + hosts', () => {
-    render(<SettingsView />)
-    fireEvent.click(screen.getByRole('tab', { name: 'System' }))
     expect(screen.getByText('Sync-card')).toBeTruthy()
-    expect(screen.getByText('GitHub-card')).toBeTruthy()
-    expect(screen.getByText('Mcp-card')).toBeTruthy()
+  })
+
+  it('search filters the nav', () => {
+    render(<SettingsView />)
+    fireEvent.change(screen.getByPlaceholderText('search settings…'), {
+      target: { value: 'git' },
+    })
+    expect(screen.getByRole('button', { name: /GitHub/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Appearance' })).toBeNull()
   })
 })

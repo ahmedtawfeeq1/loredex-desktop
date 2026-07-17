@@ -131,6 +131,12 @@ export interface CoreApi {
   /** app-local contract evolution (story 1.6): MCP host state + port override.
    *  The override applies on the next core-host start (vault switch or relaunch). */
   'mcp.status': { in: void; out: McpStatus }
+  /** parity slice C — Settings › MCP server: real switches + the copyable
+   *  connect snippet (built core-side; the bearer token never rides IPC
+   *  except inside this one deliberate copy action). */
+  'mcp.settings.get': { in: void; out: { autostart: boolean; writeTools: boolean } }
+  'mcp.settings.set': { in: { autostart?: boolean; writeTools?: boolean }; out: void }
+  'mcp.connectSnippet': { in: void; out: { snippet: string } }
   /** v3 §6.5 (story 26.5): the Agents view's read-only session telemetry —
    *  the in-app MCP host's request ring. Zero engine writes. */
   'agents.sessions': { in: void; out: { log: McpLogEntry[]; mcp: McpStatus } }

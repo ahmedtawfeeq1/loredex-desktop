@@ -19,14 +19,14 @@ describe('applyFonts', () => {
     expect(root.getPropertyValue('--note-code')).toBe(fontById('space-mono').stack)
   })
 
-  it('defaults clear every inline var so the stylesheet :root fallback wins', () => {
+  it('defaults stamp the design faces — Geist everywhere, Geist Mono for code', () => {
     applyFonts(DEFAULT_FONT_SETTINGS)
     const root = document.documentElement.style
-    expect(root.getPropertyValue('--font-ui')).toBe('')
-    expect(root.getPropertyValue('--note-title')).toBe('')
-    expect(root.getPropertyValue('--note-heading')).toBe('')
-    expect(root.getPropertyValue('--note-body')).toBe('')
-    expect(root.getPropertyValue('--note-code')).toBe('')
+    expect(root.getPropertyValue('--font-ui')).toBe(fontById('geist').stack)
+    expect(root.getPropertyValue('--note-title')).toBe(fontById('geist').stack)
+    expect(root.getPropertyValue('--note-heading')).toBe(fontById('geist').stack)
+    expect(root.getPropertyValue('--note-body')).toBe(fontById('geist').stack)
+    expect(root.getPropertyValue('--note-code')).toBe(fontById('geist-mono').stack)
   })
 
   it('mixed config clears system roles but stamps non-system roles', () => {

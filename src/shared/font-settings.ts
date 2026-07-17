@@ -4,9 +4,11 @@ export interface FontSettings {
   note: { title: string; headings: string; body: string; code: string }
 }
 
+/** v3 defaults = the design's own faces (Geist / Geist Mono, vendored
+ *  woff2s) — selected explicitly so Settings shows the truth. */
 export const DEFAULT_FONT_SETTINGS: FontSettings = {
-  app: 'system',
-  note: { title: 'system', headings: 'system', body: 'system', code: 'system' },
+  app: 'geist',
+  note: { title: 'geist', headings: 'geist', body: 'geist', code: 'geist-mono' },
 }
 
 export function isFontSettings(v: unknown): v is FontSettings {

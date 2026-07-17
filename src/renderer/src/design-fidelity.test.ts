@@ -13,6 +13,8 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(join(import.meta.dirname, 'styles.css'), 'utf8')
+// COLOR + primitives come from the handoff's drop-in file, copied verbatim
+const dropin = readFileSync(join(import.meta.dirname, 'assets/loredex-v3.css'), 'utf8')
 
 /** The first `{...}` block following a selector. */
 function block(selector: string): string {
@@ -22,73 +24,59 @@ function block(selector: string): string {
   return css.slice(open + 1, css.indexOf('}', open))
 }
 
-// DESIGN.md v3 §2 — verbatim (dark is the :root default)
-const DARK: Record<string, string> = {
-  '--bg-app': '#0b0d12',
-  '--bg-card': '#12151c',
-  '--bg-hover': '#171b23',
-  '--bg-inset': '#0f1218',
-  '--bg-overlay': '#1d222c',
-  '--hairline': '#232936',
-  '--hairline-2': '#2f3646',
-  '--text-1': '#e8eaf0',
-  '--text-2': '#9aa3b2',
-  '--text-3': '#6b7280',
-  '--accent': '#5584e8',
-  '--accent-hi': '#6e96ee',
-  '--accent-lo': '#4a75d6',
-  '--accent-press': '#3f69cc',
-  '--accent-ink': '#f5f8ff',
-  '--link': '#8fb1f5',
-  '--warn': '#e3a73c',
-  '--ok': '#3bcb8b',
-  '--rust': '#ef5d55',
-  '--info': '#93a6c9',
-  '--brand': '#d9a63c',
-}
-const LIGHT: Record<string, string> = {
-  '--bg-app': '#f3f2ee',
-  '--bg-card': '#ffffff',
-  '--bg-hover': '#faf9f5',
-  '--bg-inset': '#eae8e1',
-  '--bg-overlay': '#ffffff',
-  '--hairline': '#e1ded4',
-  '--hairline-2': '#d6d3c8',
-  '--text-1': '#16181d',
-  '--text-2': '#565d68',
-  '--text-3': '#8a8f99',
-  '--accent': '#2e5fc7',
-  '--accent-hi': '#3d6fd6',
-  '--accent-lo': '#2854b2',
-  '--accent-press': '#234a9e',
-  '--accent-ink': '#ffffff',
-  '--link': '#2e5fc7',
-  '--warn': '#96700f',
-  '--ok': '#1e8f5f',
-  '--rust': '#b44439',
-  '--info': '#5c6b85',
-  '--brand': '#be8c22',
-}
+// handoff 2/loredex-v3.css — the drop-in IS the truth; spot-check the
+// anchor hexes in BOTH themes plus the redline numbers most often missed.
+const DARK_ANCHORS = [
+  '--bg-app:      #0B0D12',
+  '--bg-card:     #12151C',
+  '--bg-overlay:  #1D222C',
+  '--hairline:    #232936',
+  '--text-1: #E8EAF0',
+  '--accent:     #5584E8',
+  '--accent-grad-top:#6E96EE',
+  '--warn: #E3A73C',
+  '--ok:   #3BCB8B',
+  '--rust: #EF5D55',
+  '--info: #93A6C9',
+  '--focus:      rgba(85,132,232,.55)',
+]
+const LIGHT_ANCHORS = [
+  '--bg-app:#F3F2EE',
+  '--bg-card:#FFFFFF',
+  '--hairline:#E1DED4',
+  '--text-1:#16181D',
+  '--accent:#2E5FC7',
+  '--warn:#96700F',
+  '--ok:#1E8F5F',
+  '--info:#5C6B85',
+]
 
-describe('v3 tokens (DESIGN.md v3 §2, exact)', () => {
-  const dark = block(':root')
-  const light = block("[data-theme='light'] {")
-  it('dark theme is the :root default with the exact §2 hex table', () => {
-    for (const [token, value] of Object.entries(DARK)) {
-      expect(dark, `${token} dark`).toContain(`${token}: ${value};`)
-    }
-    expect(dark).toContain('--focus: rgba(85, 132, 232, 0.55);')
+describe('v3 tokens come from the drop-in file (IMPLEMENTATION-FIDELITY §1)', () => {
+  it('styles.css imports assets/loredex-v3.css instead of transcribing it', () => {
+    expect(css).toContain("@import './assets/loredex-v3.css';")
   })
-  it("light theme overrides via [data-theme='light'] with the exact §2 hex table", () => {
-    for (const [token, value] of Object.entries(LIGHT)) {
-      expect(light, `${token} light`).toContain(`${token}: ${value};`)
+  it('dark anchors are verbatim', () => {
+    for (const line of DARK_ANCHORS) expect(dropin, line).toContain(line)
+  })
+  it('light anchors are verbatim', () => {
+    for (const line of LIGHT_ANCHORS) expect(dropin, line).toContain(line)
+  })
+  it('primitive redlines are verbatim (buttons h29, nav h31, row h40, seg pad 3)', () => {
+    expect(dropin).toContain('height:29px')
+    expect(dropin).toContain('.nav__item{ display:flex; align-items:center; gap:9px; height:31px')
+    expect(dropin).toContain('gap:10px; height:40px')
+    expect(dropin).toContain('border-radius:var(--r-lg); padding:3px;')
+    expect(dropin).toContain('inset 3px 0 0 var(--accent)')
+  })
+  it('legacy alias names still resolve (old rules keep working)', () => {
+    for (const alias of ['--accent-hi', '--accent-lo', '--accent-press', '--wikilink']) {
+      expect(css, alias).toContain(`${alias}: var(`)
     }
-    expect(light).toContain('--focus: rgba(46, 95, 199, 0.45);')
   })
   it('retired tokens are gone — no orphan variables (v1 set + v2 gold/navy)', () => {
-    const dead = ['--ink', '--stamp', '--bg-raised', '--bg-content', '--bg-sidebar', '--gold', '--gold-ink', '--navy']
+    const dead = ['--ink:', '--stamp:', '--bg-raised', '--bg-content', '--bg-sidebar', '--gold', '--gold-ink', '--navy']
     for (const token of dead) {
-      expect(css.includes(`${token}:`) || css.includes(`var(${token})`), token).toBe(false)
+      expect(css.includes(token), token).toBe(false)
     }
   })
 })
@@ -154,7 +142,8 @@ describe('quality floor', () => {
 
 describe('v3 surfaces', () => {
   it('cards use the exact recipe: hairline, radius 12, shadow-sm', () => {
-    expect(css).toContain('--shadow-card: 0 1px 3px rgba(19, 24, 38, 0.06);')
+    // the drop-in owns --shadow-card (0 1px 3px rgba(0,0,0,.4) dark)
+    expect(dropin).toContain('--shadow-card: 0 1px 3px rgba(0,0,0,.4);')
     for (const sel of ['.pane-list', '.handoff-card', '.settings-section', '.sync-grid']) {
       const b = block(sel)
       expect(b, `${sel} card`).toContain('border-radius: 12px')
@@ -294,9 +283,10 @@ describe('Addendum D1: dex tree sections (story 16.3)', () => {
 })
 
 describe('Addendum D1: wikilinks are always visibly links (story 16.1)', () => {
-  it('wikilink token rides cobalt: #8fb1f5 dark / #2e5fc7 light', () => {
-    expect(block(':root')).toContain('--wikilink: #8fb1f5;')
-    expect(block("[data-theme='light'] {")).toContain('--wikilink: #2e5fc7;')
+  it('wikilink rides the drop-in link token via the alias', () => {
+    expect(css).toContain('--wikilink: var(--link);')
+    expect(dropin).toContain('--link:       #8FB1F5;')
+    expect(dropin).toContain('--link:#2E5FC7;')
   })
   it('wikilinks: token color, 500 weight, no underline at rest, underline on hover', () => {
     const link = block('.note-body a.wikilink')
@@ -317,9 +307,10 @@ describe('Addendum D1: wikilinks are always visibly links (story 16.1)', () => {
 })
 
 describe('Addendum D2 (recolored by v3): external links are visibly hyperlinks', () => {
-  it('link token is cobalt 300 dark / cobalt light (§2 --link), never system blue', () => {
-    expect(block(':root')).toContain('--link: #8fb1f5;')
-    expect(block("[data-theme='light'] {")).toContain('--link: #2e5fc7;')
+  it('link token is cobalt 300 dark / cobalt light (drop-in), never system blue', () => {
+    expect(dropin).toContain('--link:       #8FB1F5;')
+    expect(dropin).toContain('--link:#2E5FC7;')
+    expect(dropin).not.toMatch(/#007aff|#0a84ff/i)
   })
   it('note-body anchors: link cobalt, underlined at rest', () => {
     const link = block('.note-body a')

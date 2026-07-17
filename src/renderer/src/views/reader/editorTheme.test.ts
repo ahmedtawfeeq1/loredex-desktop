@@ -9,7 +9,10 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { EDITOR_V2_CSS, HIGHLIGHT_TOKENS, markdownHighlight } from './editorTheme'
 
-const css = readFileSync(join(import.meta.dirname, '../../styles.css'), 'utf8')
+// tokens live in the handoff drop-in now; styles.css holds aliases on top
+const css =
+  readFileSync(join(import.meta.dirname, '../../assets/loredex-v3.css'), 'utf8') +
+  readFileSync(join(import.meta.dirname, '../../styles.css'), 'utf8')
 
 /** The first `{…}` block following a selector (same helper as design-fidelity). */
 function block(selector: string): string {
@@ -19,8 +22,14 @@ function block(selector: string): string {
   return css.slice(open + 1, css.indexOf('}', open))
 }
 
-const dark = block(':root {')
-const light = block("[data-theme='light'] {")
+// theme-independent aliases (styles.css :root) count for BOTH themes —
+// they resolve to themed drop-in tokens
+const aliases = css.slice(css.lastIndexOf('/* legacy aliases'), css.indexOf('--brand'))
+const dark =
+  css.slice(css.indexOf(':root {'), css.indexOf('\n[data-theme="light"] {')) + aliases
+const light =
+  css.slice(css.indexOf('\n[data-theme="light"] {'), css.indexOf('PRIMITIVES — exact values')) +
+  aliases
 
 describe('highlight styles ride the app theme tokens (both themes)', () => {
   it('every syntax tint is a var(--token), nothing hard-coded', () => {

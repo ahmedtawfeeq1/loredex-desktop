@@ -1,0 +1,150 @@
+/* ============================================================================
+   loredex v3 — "Obsidian Glass / Cobalt"  ·  DROP-IN TOKENS + PRIMITIVES
+   Source of truth for COLOR + THE CORE COMPONENTS. Paste into
+   src/renderer/src/styles.css (or @import it). Do NOT transcribe these values
+   by hand and do NOT eyeball them from screenshots — copy this file.
+   Dark-first: :root = dark, [data-theme="light"] overrides.
+   ============================================================================ */
+
+:root {
+  /* ---- ground / surfaces ---- */
+  --bg-app:      #0B0D12;   /* window */
+  --bg-card:     #12151C;   /* raised card */
+  --bg-hover:    #171B23;   /* row/nav hover */
+  --bg-inset:    #0F1218;   /* inputs, tracks, code */
+  --bg-overlay:  #1D222C;   /* secondary button, popover, floating bar */
+  --bg-overlay-2:#232936;   /* secondary hover */
+  --hairline:    #232936;   /* every 1px border */
+  --hairline-2:  #2F3646;   /* stronger border / kbd */
+
+  /* ---- text ---- */
+  --text-1: #E8EAF0;        /* primary        (13.5:1 on app) */
+  --text-2: #9AA3B2;        /* muted          (7.1:1) */
+  --text-3: #6B7280;        /* faint / meta   (4.6:1) */
+  --text-4: #4A5261;        /* counts, ghost */
+
+  /* ---- cobalt (action / primary) — ramp ---- */
+  --accent-300:#8FB1F5; --accent-400:#6E96EE; --accent-500:#5584E8;
+  --accent-600:#3F69CC; --accent-700:#2F52A8;
+  --accent:     #5584E8;
+  --accent-grad-top:#6E96EE; --accent-grad-bot:#4A75D6;  /* button gradient */
+  --accent-ink: #F5F8FF;    /* text on cobalt */
+  --link:       #8FB1F5;
+  --focus:      rgba(85,132,232,.55);
+
+  /* ---- semantic (product status) ---- */
+  --warn: #E3A73C;  /* attention / open / stale — NEVER on buttons */
+  --ok:   #3BCB8B;  /* agents live / success / diff-add — the heartbeat */
+  --rust: #EF5D55; --rust-text:#F0655C;  /* danger / decline / drift */
+  --info: #93A6C9;  /* request / neutral meta */
+
+  /* ---- project tints (dark-lifted) ---- */
+  --pj-sage:#8FB283; --pj-clay:#D68F6C; --pj-slate:#86A0C9;
+  --pj-moss:#A6AC6B; --pj-rose:#C98BA0; --pj-teal:#6FB5B0;
+
+  /* ---- radius / shadow / type ---- */
+  --r-sm:6px; --r-md:8px; --r-lg:10px; --r-xl:14px;
+  --shadow-card: 0 1px 3px rgba(0,0,0,.4);
+  --shadow-pop:  0 24px 70px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.06);
+  --btn-bevel:   inset 0 1px 0 rgba(255,255,255,.25), 0 1px 2px rgba(0,0,0,.5);
+  --font-ui:  'Geist', -apple-system, system-ui, 'Segoe UI', Arial, sans-serif;
+  --font-mono:'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+[data-theme="light"] {
+  --bg-app:#F3F2EE; --bg-card:#FFFFFF; --bg-hover:#FAF9F5; --bg-inset:#EAE8E1;
+  --bg-overlay:#FFFFFF; --bg-overlay-2:#F7F6F1; --hairline:#E1DED4; --hairline-2:#D6D3C8;
+  --text-1:#16181D; --text-2:#565D68; --text-3:#8A8F99; --text-4:#B0ADA2;
+  --accent-300:#5E86DD; --accent-400:#3D6FD6; --accent-500:#2E5FC7;
+  --accent-600:#2854B2; --accent-700:#234A9E;
+  --accent:#2E5FC7; --accent-grad-top:#3D6FD6; --accent-grad-bot:#2854B2;
+  --accent-ink:#FFFFFF; --link:#2E5FC7; --focus:rgba(46,95,199,.45);
+  --warn:#96700F; --ok:#1E8F5F; --rust:#C0392F; --rust-text:#B44439; --info:#5C6B85;
+  --shadow-card:0 1px 3px rgba(23,24,29,.07); --btn-bevel:inset 0 1px 0 rgba(255,255,255,.45),0 1px 2px rgba(23,24,29,.2);
+}
+
+/* ============================================================================
+   PRIMITIVES — exact values. Class names are suggestions; the NUMBERS are law.
+   ============================================================================ */
+
+/* buttons: h29 / pad 0 12-13 / radius 8 / weight 600 / 12.5px */
+.btn        { display:inline-flex; align-items:center; gap:5px; height:29px; padding:0 12px;
+              border-radius:var(--r-md); font:600 12.5px/1 var(--font-ui); cursor:pointer;
+              border:1px solid transparent; white-space:nowrap; }
+.btn--primary{ background:linear-gradient(180deg,var(--accent-grad-top),var(--accent-grad-bot));
+              color:var(--accent-ink); box-shadow:var(--btn-bevel); padding:0 13px; }
+.btn--primary:hover{ filter:brightness(1.06); }
+.btn--secondary{ background:var(--bg-overlay); border-color:var(--hairline-2); color:var(--text-1);
+              box-shadow:inset 0 1px 0 rgba(255,255,255,.06); }
+.btn--secondary:hover{ background:var(--bg-overlay-2); }
+.btn--ghost { color:var(--text-2); }
+.btn--ghost:hover{ background:var(--bg-hover); color:var(--text-1); }
+.btn--danger{ color:var(--rust-text); }
+.btn--danger:hover{ background:color-mix(in srgb, var(--rust) 8%, transparent); }
+:focus-visible{ outline:none; box-shadow:0 0 0 2px var(--bg-card), 0 0 0 4px var(--focus); }
+
+/* kbd hint inside a control */
+.kbd { font:600 9px/1 var(--font-mono); border:1px solid var(--hairline-2); border-radius:3px;
+       padding:1px 4px; color:var(--text-3); }
+
+/* status glyph chip: 15px rounded-square, tinted bg + glyph. glyph+label, never color alone */
+.chip-glyph{ width:15px; height:15px; border-radius:4px; display:inline-flex; align-items:center;
+             justify-content:center; font:700 10px/1 var(--font-mono); flex:none; }
+.chip-glyph--ok  { background:color-mix(in srgb,var(--ok)  14%,transparent); color:var(--ok); }
+.chip-glyph--warn{ background:color-mix(in srgb,var(--warn)14%,transparent); color:var(--warn); }
+.chip-glyph--rust{ background:color-mix(in srgb,var(--rust)14%,transparent); color:var(--rust-text); }
+.chip-glyph--muted{ background:var(--bg-hover); color:var(--text-3); }
+
+/* text stamp chip (OPEN / REQUEST): mono 10, 1px border, radius 5, pad 2 7 */
+.stamp{ font:600 10px/1 var(--font-mono); letter-spacing:.02em; border:1px solid; border-radius:5px;
+        padding:2px 7px; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+.stamp--open   { color:var(--warn); border-color:color-mix(in srgb,var(--warn) 40%,transparent);
+                 background:color-mix(in srgb,var(--warn) 7%,transparent); }
+.stamp--request{ color:var(--info); border-color:color-mix(in srgb,var(--info) 35%,transparent); }
+
+/* segmented control: track inset+hairline r10 pad3; active = overlay r8 pressed-glass */
+.seg      { display:inline-flex; gap:2px; background:var(--bg-inset); border:1px solid var(--hairline);
+            border-radius:var(--r-lg); padding:3px; }
+.seg__opt { height:23px; display:inline-flex; align-items:center; padding:0 11px; border-radius:7px;
+            font:550 11.5px/1 var(--font-ui); color:var(--text-2); cursor:pointer; white-space:nowrap; }
+.seg__opt[aria-selected="true"]{ background:var(--bg-overlay); color:#fff; font-weight:600;
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.12), 0 1px 3px rgba(0,0,0,.5); }
+
+/* card + list row */
+.card{ background:var(--bg-card); border:1px solid var(--hairline); border-radius:var(--r-lg);
+       box-shadow:var(--shadow-card); }
+.row { display:flex; align-items:center; gap:10px; height:40px; padding:0 15px; cursor:pointer; }
+.row:hover{ background:var(--bg-hover); }
+.row[aria-selected="true"]{ box-shadow:inset 2px 0 0 var(--accent); background:var(--bg-hover); }
+.row__title{ font:550 12.5px/1.2 var(--font-ui); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.row__sub  { font:10px/1 var(--font-mono); color:var(--text-3); }
+
+/* nav item (sidebar): h31, gap9, radius7; active = hover bg + 3px cobalt inset bar */
+.nav__item{ display:flex; align-items:center; gap:9px; height:31px; padding:0 10px;
+            border-radius:7px; font:12.5px/1 var(--font-ui); color:var(--text-2); cursor:pointer; }
+.nav__item:hover{ background:var(--bg-hover); color:var(--text-1); }
+.nav__item[aria-current="page"]{ background:var(--bg-hover); color:var(--text-1); font-weight:600;
+            box-shadow:inset 3px 0 0 var(--accent); }
+
+/* agent presence dot — the heartbeat */
+@keyframes lorePulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ok) 55%,transparent)}
+                     55%{box-shadow:0 0 0 6px transparent}}
+.live-dot{ width:8px; height:8px; border-radius:50%; background:var(--ok);
+           box-shadow:0 0 7px color-mix(in srgb,var(--ok) 80%,transparent); flex:none;
+           animation:lorePulse 2.2s infinite; }
+@media (prefers-reduced-motion:reduce){ .live-dot{ animation:none; } }
+
+/* section label + meta */
+.label{ font:600 9.5px/1 var(--font-mono); letter-spacing:.1em; text-transform:uppercase; color:var(--text-3); }
+.meta { font:11px/1 var(--font-mono); color:var(--text-3); }
+
+/* toast receipt */
+.toast{ position:fixed; right:18px; bottom:18px; display:flex; align-items:center; gap:10px;
+        background:color-mix(in srgb,var(--bg-overlay) 95%,transparent); border:1px solid var(--hairline-2);
+        border-radius:12px; padding:11px 14px; box-shadow:0 12px 36px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.07); }
+
+/* code / diff surface */
+.code{ background:var(--bg-inset); border:1px solid var(--hairline); border-radius:9px;
+       font:11.5px/1.9 var(--font-mono); color:#C6CCD8; }
+.diff-add{ background:color-mix(in srgb,var(--ok) 8%,transparent);  box-shadow:inset 2px 0 0 var(--ok); }
+.diff-del{ background:color-mix(in srgb,var(--rust)10%,transparent);box-shadow:inset 2px 0 0 var(--rust); }

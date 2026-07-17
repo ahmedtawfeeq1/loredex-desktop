@@ -53,11 +53,14 @@ no view merges on token-fidelity alone again (the epic26 P0–P8 lesson).
 
 ## Parity workplan (one PR per row, reference attached)
 
-1. **Shell**: top ⌘K bar + sync pill + avatar; sidebar rebuild (+ New [C],
-   numbered rows, product shelves, keys footer, no group labels) — touches
-   every screen, lands first.
-2. **Settings IA** (08–17): two-pane settings-nav with status dots + search.
-3. **Today rail + triage polish** (01, 19).
-4. **Plan on real work items** (03) — loredex ≥ 2.8.0 `listWorkItems`.
-5. **Reader right rail** (04). 6. **Agents table + session panel** (06).
-7. **Activity anatomy** (07). 8. **Atlas toolbar/Project lens** (05, 18).
+1. **Shell** — ✅ shipped (slice B).
+2. **Settings IA** (08–17) — ✅ shipped (slice C).
+3. **Today rail** (01) — ✅ shipped (slice D); modal (19) — ✅ shipped (slice J).
+4. **Plan on real work items** (03) — ✅ shipped (slice E, loredex ≥ 2.8.0).
+5. **Reader right rail** (04) — ✅ shipped (slice F, + rail-fit raw frontmatter).
+6. **Agents table + session panel** (06) — ✅ shipped (slice G).
+7. **Activity anatomy** (07) — ✅ shipped (slice H).
+8. **Atlas Project lens** (05, 18) — ✅ shipped (slice I).
+
+All parity slices A–J are on main. Remaining niceties (not in any slice):
+reference 12's reduce-motion toggle, deeper triage-card polish on 01/02.

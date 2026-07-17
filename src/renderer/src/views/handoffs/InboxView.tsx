@@ -9,7 +9,7 @@
  * project scoping, Active/Done/All display filter, unread dots, receipts,
  * compose/decline/snooze/link-request/comment modals, ⌘⏎ consume.
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { HandoffCard } from '../../../../shared/types'
 import {
   actionsFor,
@@ -20,6 +20,7 @@ import {
   laneCards,
   projectsOf,
 } from '../../../../shared/handoff-lanes'
+import { invoke } from '../../api'
 import { Button } from '../../components/Button'
 import { ConsumeReceiptView } from '../../components/ConsumeReceiptView'
 import { RowItem } from '../../components/RowItem'
@@ -63,6 +64,35 @@ export function rowSub(card: HandoffCard): string {
 
 const TERMINAL = new Set(['declined', 'consumed'])
 
+/** Reference 02 right tag on reading-order rows: the note's frontmatter
+ *  type, resolved like the reader resolves wikilinks. Best-effort. */
+function useReadingOrderKinds(card: HandoffCard): Record<string, string> {
+  const [kinds, setKinds] = useState<Record<string, string>>({})
+  useEffect(() => {
+    setKinds({})
+    let stale = false
+    void (async () => {
+      const out: Record<string, string> = {}
+      for (const name of card.readingOrder.slice(0, 8)) {
+        try {
+          const res = await invoke('vault.resolveLink', { link: name, from: card.path })
+          if (res.status !== 'resolved' || !res.target) continue
+          const doc = await invoke('vault.readNote', { path: res.target })
+          const t = (doc.meta as Record<string, unknown>).type
+          if (typeof t === 'string' && t) out[name] = t
+        } catch {
+          /* unresolved link — row stays untagged */
+        }
+      }
+      if (!stale) setKinds(out)
+    })()
+    return () => {
+      stale = true
+    }
+  }, [card])
+  return kinds
+}
+
 function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
   const consume = useHandoffs((s) => s.consume)
   const setStatus = useHandoffs((s) => s.setStatus)
@@ -83,6 +113,7 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
   // attribution), live-dotted inside the write window — read-only
   const activity = useDashboardData((s) => s.activity)
   const touch = (activity ?? []).find((e) => e.subject.handoffId === card.id && e.actor.name)
+  const roKinds = useReadingOrderKinds(card)
 
   return (
     <div className="inbox-detail" aria-label="Handoff detail">
@@ -129,6 +160,7 @@ function DetailPane({ card }: { card: HandoffCard }): React.JSX.Element {
             >
               <span className="ro-num">{String(i + 1).padStart(2, '0')}</span>
               <span className="ro-name">{humanizeTitle(name)}</span>
+              {roKinds[name] && <span className="ro-kind">{roKinds[name]}</span>}
             </button>
           ))}
         </section>

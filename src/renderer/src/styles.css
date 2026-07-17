@@ -7165,3 +7165,4 @@ a.button-primary {
 
 /* reference 02: detail content column caps at 640px */
 .inbox-detail > * { max-width: 640px; }
+.ro-kind { margin-left: auto; font: 9.5px var(--font-mono); color: var(--text-3); flex: 0 0 auto; }

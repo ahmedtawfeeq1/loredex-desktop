@@ -7396,3 +7396,27 @@ a.button-primary {
 /* expanded nav uses the SVG icon set (user request 2026-07-18) */
 .nav__item .nav-glyph svg { width: 15px; height: 15px; display: block; margin: 0 auto; }
 .side-rail-brand { display: flex; justify-content: center; padding: 10px 0 2px; }
+
+/* ── product shelves as grouped cards (user request 2026-07-18): each
+      product is a soft inset container — clear grouping, still minimal ── */
+.side-shelves { gap: 8px; padding: 4px 2px 0; }
+.side-shelf-group {
+  background: color-mix(in srgb, var(--bg-inset) 55%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  padding: 3px 4px 4px;
+}
+.side-shelf-group .shelf { padding: 7px 8px 5px; }
+.side-shelf-group .shelf-row { border-radius: 6px; }
+.side-shelf-group .shelf-row:hover { background: var(--bg-hover); }
+
+/* colorful product groups (user request 2026-07-18): each card carries its
+   product tint — same hash palette as the reader tree sections */
+.side-shelf-group {
+  background: color-mix(in srgb, var(--shelf-tint, var(--text-4)) 10%, transparent);
+  border-color: color-mix(in srgb, var(--shelf-tint, var(--text-4)) 30%, transparent);
+}
+.shelf-head-dot {
+  width: 8px; height: 8px; border-radius: 2px; flex: 0 0 auto;
+  background: var(--shelf-tint, var(--text-4));
+}

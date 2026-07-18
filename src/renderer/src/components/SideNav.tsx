@@ -72,9 +72,13 @@ function Shelf({
   const shown = showAll ? projects : projects.slice(0, SHELF_LIMIT)
   const total = projects.reduce((a, p) => a + openCount(cards ?? [], p.name), 0)
   return (
-    <>
+    <div
+      className="side-shelf-group"
+      style={{ '--shelf-tint': sectionTint(product ?? 'projects') } as React.CSSProperties}
+    >
       <button type="button" className="shelf" onClick={() => setOpen(!open)}>
         <span className="shelf-caret">{open ? '▾' : '▸'}</span>
+        <span className="shelf-head-dot" aria-hidden="true" />
         <span className="shelf-name">{(product ?? 'projects').toUpperCase()}</span>
         <span className="shelf-tag">product</span>
         <span className="shelf-count">{total || projects.length}</span>
@@ -115,7 +119,7 @@ function Shelf({
           ＋ {projects.length - SHELF_LIMIT} more…
         </button>
       )}
-    </>
+    </div>
   )
 }
 

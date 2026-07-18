@@ -324,12 +324,14 @@ export function AgentPanel(): React.JSX.Element | null {
           ref={inputRef}
           className="agent-input-field"
           rows={Math.min(6, draft.split('\n').length)}
-          placeholder={canSend ? 'Message the agent…' : 'Needs a ready session'}
+          placeholder={canSend ? 'Message the agent…  (↵ send · ⇧↵ newline)' : 'Needs a ready session'}
           value={draft}
           disabled={!canSend}
           onChange={(e) => useAgentPanel.getState().setDraft(e.target.value)}
           onKeyDown={(e) => {
-            // ⌘↵ always sends (Modal.tsx convention) — even with the menu open
+            // Shift+↵ inserts a newline (chat convention); everything else on
+            // Enter sends. ⌘/Ctrl+↵ always sends, even with the slash menu open.
+            if (e.key === 'Enter' && e.shiftKey) return
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault()
               submit()
@@ -341,17 +343,29 @@ export function AgentPanel(): React.JSX.Element | null {
               if (e.key === 'ArrowDown') {
                 e.preventDefault()
                 setSlashSel((s) => (s + 1) % n)
-              } else if (e.key === 'ArrowUp') {
+                return
+              }
+              if (e.key === 'ArrowUp') {
                 e.preventDefault()
                 setSlashSel((s) => (s - 1 + n) % n)
-              } else if (e.key === 'Enter' || e.key === 'Tab') {
-                // plain Enter/Tab picks the command instead of a newline
+                return
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                // Enter/Tab picks the highlighted command
                 e.preventDefault()
                 pickSlash(slashMatches[slashSel].name)
-              } else if (e.key === 'Escape') {
+                return
+              }
+              if (e.key === 'Escape') {
                 e.preventDefault()
                 setSlashDismissed(true)
+                return
               }
+            }
+            // plain ↵ (menu closed) sends
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              submit()
             }
           }}
         />
@@ -361,7 +375,7 @@ export function AgentPanel(): React.JSX.Element | null {
           </Button>
         ) : (
           // the panel's ONE cobalt primary (one-per-view law)
-          <Button variant="primary" kbd="⌘⏎" disabled={!canSend || !draft.trim()} onClick={submit}>
+          <Button variant="primary" kbd="↵" disabled={!canSend || !draft.trim()} onClick={submit}>
             Send
           </Button>
         )}

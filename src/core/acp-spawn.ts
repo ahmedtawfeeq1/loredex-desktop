@@ -37,6 +37,22 @@ const PROVIDER_KEYS: Record<AcpAgent, readonly string[]> = {
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_PATH'],
 }
 
+/** The BILLING credentials only (not executable-path hints). Presence of one
+ *  means the adapter authenticates by API key (pay-per-token); absence means it
+ *  falls back to the CLI subscription login (~/.claude, ~/.codex — plan quota).
+ *  Drives the usage meter's "plan quota" vs "API" tag so the cost figure reads
+ *  as an estimate, not a bill, on a subscription. */
+const BILLING_KEYS: Record<AcpAgent, readonly string[]> = {
+  claude: ['ANTHROPIC_API_KEY'],
+  codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
+}
+
+/** How THIS process would authenticate the given adapter, from the env it will
+ *  forward. Computed at spawn/ready and surfaced per session. */
+export function authMode(agent: AcpAgent): 'api' | 'subscription' {
+  return BILLING_KEYS[agent].some((k) => process.env[k] !== undefined) ? 'api' : 'subscription'
+}
+
 /** Explicit env allowlist — the OPPOSITE of the pty's full inherit
  *  (terminals.ts:78 is the user's own shell; an adapter gets only what it
  *  needs). ELECTRON_RUN_AS_NODE makes process.execPath behave as plain node —

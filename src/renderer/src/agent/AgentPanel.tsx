@@ -275,7 +275,7 @@ export function AgentPanel(): React.JSX.Element | null {
           ))}
         </div>
       )}
-      {active !== null && <UsageBar usage={active.usage} />}
+      {active !== null && <UsageBar usage={active.usage} authMode={active.authMode} />}
       {active !== null && <SessionInfoPanel session={active} />}
       <div
         className="agent-thread"

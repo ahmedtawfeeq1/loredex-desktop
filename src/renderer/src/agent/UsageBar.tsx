@@ -24,12 +24,24 @@ function fmtCost({ amount, currency }: { amount: number; currency: string }): st
   }
 }
 
-export function UsageBar({ usage }: { usage?: AcpSessionView['usage'] }): React.JSX.Element | null {
+export function UsageBar({
+  usage,
+  authMode,
+}: {
+  usage?: AcpSessionView['usage']
+  authMode?: AcpSessionView['authMode']
+}): React.JSX.Element | null {
   const ctx = usage?.context
   if (!ctx || ctx.size <= 0) return null
   const pct = Math.min(100, Math.max(0, Math.round((ctx.used / ctx.size) * 100)))
   const turn = usage?.turn
   const cost = usage?.cost
+  // on a subscription the cost is an estimate (token value at API rates), NOT a
+  // bill — label it so, and tag which billing backs the session
+  const costTip =
+    authMode === 'api'
+      ? 'estimated session spend (API key — pay-per-token)'
+      : 'estimated token value at API rates — this session runs on your subscription (plan quota), not a bill'
 
   return (
     <div className="agent-usage">
@@ -78,8 +90,20 @@ export function UsageBar({ usage }: { usage?: AcpSessionView['usage'] }): React.
             </>
           )}
           {cost && (
-            <span className="agent-usage-cost" title="session cost">
-              {fmtCost(cost)}
+            <span className="agent-usage-cost" title={costTip}>
+              est {fmtCost(cost)}
+            </span>
+          )}
+          {authMode && (
+            <span
+              className="agent-usage-plan"
+              title={
+                authMode === 'api'
+                  ? 'billed per token via your API key'
+                  : 'runs on your subscription — counts against plan quota, not billed per token'
+              }
+            >
+              · {authMode === 'api' ? 'API' : 'plan quota'}
             </span>
           )}
         </div>

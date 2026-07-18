@@ -34,7 +34,7 @@ import {
   type CoreEvent,
   ipcError,
 } from '../shared/ipc-contract'
-import { spawnAdapter, StderrRing } from './acp-spawn'
+import { authMode, spawnAdapter, StderrRing } from './acp-spawn'
 import { getMcpStatus } from './mcp-server'
 import { mintAgentToken, revokeAgentToken } from './settings'
 
@@ -336,6 +336,7 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
     agent,
     state: 'ready',
     ...(attachedMcp.length ? { mcpServers: attachedMcp } : {}),
+    authMode: authMode(agent),
   })
   // initial modes (NewSessionResponse.modes) — the full set + current id, so
   // the session-info view can render the switcher without waiting for a change

@@ -6,9 +6,6 @@
  */
 import type { AcpCommand } from '../../../shared/ipc-contract'
 
-/** Max rows in the menu — enough to scan, not a wall. */
-export const SLASH_LIMIT = 8
-
 /**
  * The query for the slash menu, or null when the menu should be closed.
  * Open only while the draft is a single bare `/token` (leading slash, no
@@ -21,13 +18,14 @@ export function slashQuery(draft: string): string | null {
 }
 
 /**
- * Commands matching `query`, prefix-matches first then substring, capped.
- * Empty query returns the first `limit` commands (the lone-`/` case).
+ * Commands matching `query`, prefix-matches first then substring. ALL matches
+ * are returned (the menu scrolls) — a lone `/` lists every command. `limit` is
+ * optional and defaults to no cap.
  */
 export function filterCommands(
   commands: AcpCommand[],
   query: string,
-  limit = SLASH_LIMIT,
+  limit = Number.POSITIVE_INFINITY,
 ): AcpCommand[] {
   const q = query.toLowerCase()
   if (q === '') return commands.slice(0, limit)

@@ -8344,6 +8344,11 @@ a.button-primary {
   color: var(--text-1);
 }
 
+.agent-usage-plan {
+  white-space: nowrap;
+  color: var(--text-3);
+}
+
 /* ── A7: session info (commands / mode / MCP) ──────────────────────────────
    A collapsed-by-default disclosure under the usage strip: the agent's
    advertised slash-commands, its current mode + a switcher, and the attached
@@ -8488,7 +8493,7 @@ a.button-primary {
   list-style: none;
   margin: 0;
   padding: 4px;
-  max-height: 190px;
+  max-height: 280px;
   overflow-y: auto;
   border-top: 1px solid var(--hairline);
   font-size: 12px;
@@ -8587,4 +8592,21 @@ a.button-primary {
 .agent-perm-diff .tool-diff {
   max-height: 320px;
   overflow-y: auto;
+}
+
+/* Permission options come from the adapter: an allow_always name can be a long
+   command/rule string. Wrap the footer + let a long option wrap inside the
+   modal instead of overflowing off-screen (bug: right-aligned flex pushed the
+   oversized button left, out of the dialog). */
+.agent-perm-actions {
+  flex-wrap: wrap;
+}
+
+.agent-perm-opt {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  overflow-wrap: anywhere;
+  height: auto;
+  line-height: 1.35;
 }

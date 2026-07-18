@@ -71,6 +71,9 @@ export interface AcpSessionView {
   mode?: { currentModeId: string; availableModes?: AcpMode[] }
   /** MCP servers attached on ready (A7) — name/url only, never the token. */
   mcpServers?: AcpMcpServer[]
+  /** auth backing this session: 'subscription' (plan quota) or 'api' (billed).
+   *  Set on ready; makes the usage meter label cost as an estimate vs spend. */
+  authMode?: 'subscription' | 'api'
 }
 
 export interface AcpPermissionView {
@@ -502,6 +505,7 @@ if (typeof window !== 'undefined' && window.loredex) {
                   // MCP list rides the ready event only (A7) — keep it across
                   // later non-ready transitions
                   mcpServers: e.mcpServers ?? v.mcpServers,
+                  authMode: e.authMode ?? v.authMode,
                 }
               : v,
           ),

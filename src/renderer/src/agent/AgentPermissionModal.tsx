@@ -107,12 +107,14 @@ export function AgentPermissionModal(): React.JSX.Element | null {
             ))}
           </div>
         )}
-        <div className="modal-footer">
+        <div className="modal-footer agent-perm-actions">
           {permission.options.map((o, i) => (
             <Button
               key={o.optionId}
+              className="agent-perm-opt"
               variant={i === firstAllowOnce ? 'primary' : (KIND_VARIANT[o.kind] ?? 'quiet')}
               kbd={i === firstAllowOnce ? '⌘⏎' : undefined}
+              title={o.name}
               onClick={() => useAgentPanel.getState().respondPermission(o.optionId)}
             >
               {o.name}

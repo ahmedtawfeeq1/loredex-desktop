@@ -545,6 +545,10 @@ export type CoreEvent =
       /** MCP servers attached to the session, surfaced ONCE on ready — names/
        *  urls only, NEVER the bearer token (A7) */
       mcpServers?: AcpMcpServer[]
+      /** how the adapter authenticates: 'subscription' (CLI login / plan quota)
+       *  or 'api' (API key / pay-per-token). Surfaced on ready so the usage
+       *  meter labels cost as an estimate vs real spend. */
+      authMode?: 'subscription' | 'api'
     }
   | { kind: 'acp.chunk'; sessionId: string; role: 'agent' | 'thought'; text: string }
   | {

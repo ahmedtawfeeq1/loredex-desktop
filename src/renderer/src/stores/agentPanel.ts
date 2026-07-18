@@ -320,6 +320,14 @@ if (typeof window !== 'undefined' && window.loredex) {
         const known = useAgentPanel.getState().sessions.some((v) => v.sessionId === e.sessionId)
         if (!known) return
         commitChunks()
+        // a non-ready state is a dead/blocked session: core already answered its
+        // held permissions 'cancelled' (cancelPendingPermissions on exit/error).
+        // Purge this session's queued requests so a healthy session isn't stalled
+        // behind them, and advance past a surfaced one so the modal doesn't hang
+        // on a dead session — the same reconciliation closeSession does.
+        if (e.state !== 'ready') {
+          permissionQueue = permissionQueue.filter((p) => p.sessionId !== e.sessionId)
+        }
         // any non-ready state also clears busy: a mid-turn death (adapter
         // exit) emits no turnEnd, and a stuck Stop button helps nobody
         useAgentPanel.setState((s) => ({
@@ -333,6 +341,10 @@ if (typeof window !== 'undefined' && window.loredex) {
                 }
               : v,
           ),
+          permission:
+            e.state !== 'ready' && s.permission?.sessionId === e.sessionId
+              ? (permissionQueue.shift() ?? null)
+              : s.permission,
         }))
         return
       }

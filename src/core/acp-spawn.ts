@@ -24,25 +24,27 @@ export function adapterEntry(agent: AcpAgent): string {
   return join(dirname(pkgJson), 'dist/index.js')
 }
 
-/** Env keys forwarded ONLY when already present in our own env. */
-const PASSTHROUGH = [
-  'ANTHROPIC_API_KEY',
-  'CLAUDE_CODE_EXECUTABLE',
-  'CODEX_API_KEY',
-  'OPENAI_API_KEY',
-  'CODEX_PATH',
-] as const
+/** Shell-hygiene + credential-root keys every adapter needs. HOME is the
+ *  credential root (keychain / ~/.claude / ~/.codex), PATH for the agent's own
+ *  subprocesses, the rest is shell hygiene. Forwarded ONLY when already set. */
+const SHARED = ['HOME', 'PATH', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG'] as const
+
+/** Provider credentials scoped PER agent — least privilege: a Codex adapter
+ *  must never receive ANTHROPIC_API_KEY, nor a Claude adapter the user's
+ *  OPENAI_API_KEY/CODEX_API_KEY. Each is forwarded only when already set. */
+const PROVIDER_KEYS: Record<AcpAgent, readonly string[]> = {
+  claude: ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_EXECUTABLE'],
+  codex: ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_PATH'],
+}
 
 /** Explicit env allowlist — the OPPOSITE of the pty's full inherit
  *  (terminals.ts:78 is the user's own shell; an adapter gets only what it
- *  needs). HOME is the credential root (keychain / ~/.claude / ~/.codex),
- *  PATH for the agent's own subprocesses, the rest is shell hygiene.
- *  ELECTRON_RUN_AS_NODE makes process.execPath behave as plain node — the
- *  claude adapter needs node ≥22 and Electron 43 embeds Node 24; the user's
- *  system node is never relied on. */
-export function adapterEnv(): NodeJS.ProcessEnv {
+ *  needs). ELECTRON_RUN_AS_NODE makes process.execPath behave as plain node —
+ *  the claude adapter needs node ≥22 and Electron 43 embeds Node 24; the
+ *  user's system node is never relied on. */
+export function adapterEnv(agent: AcpAgent): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ELECTRON_RUN_AS_NODE: '1' }
-  for (const key of ['HOME', 'PATH', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG', ...PASSTHROUGH]) {
+  for (const key of [...SHARED, ...PROVIDER_KEYS[agent]]) {
     const v = process.env[key]
     if (v !== undefined) env[key] = v
   }
@@ -75,7 +77,7 @@ export class StderrRing {
 export function spawnAdapter(agent: AcpAgent, cwd: string): ChildProcessWithoutNullStreams {
   return spawn(process.execPath, [adapterEntry(agent)], {
     cwd,
-    env: adapterEnv(),
+    env: adapterEnv(agent),
     stdio: ['pipe', 'pipe', 'pipe'],
   })
 }

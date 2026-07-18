@@ -12,8 +12,8 @@ import { adapterEntry, adapterEnv, StderrRing } from './acp-spawn'
 
 afterEach(() => vi.unstubAllEnvs())
 
-/** the ONLY keys adapterEnv may ever emit (allowlist + conditional API keys) */
-const ALLOWED = new Set([
+/** shared keys every adapter may emit (allowlist + ELECTRON_RUN_AS_NODE) */
+const SHARED = new Set([
   'ELECTRON_RUN_AS_NODE',
   'HOME',
   'PATH',
@@ -22,36 +22,63 @@ const ALLOWED = new Set([
   'SHELL',
   'TMPDIR',
   'LANG',
-  'ANTHROPIC_API_KEY',
-  'CLAUDE_CODE_EXECUTABLE',
-  'CODEX_API_KEY',
-  'OPENAI_API_KEY',
-  'CODEX_PATH',
 ])
+/** the ONLY provider credentials each agent may emit — a cross-provider key
+ *  must NEVER appear (least privilege). */
+const PROVIDER_ALLOWED = {
+  claude: new Set(['ANTHROPIC_API_KEY', 'CLAUDE_CODE_EXECUTABLE']),
+  codex: new Set(['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_PATH']),
+} as const
 
-describe('adapterEnv (explicit allowlist)', () => {
-  it('emits ONLY allowlisted keys — seeded secrets never leak into the child', () => {
+describe('adapterEnv (explicit, per-agent allowlist)', () => {
+  it('emits ONLY shared + own-provider keys — seeded secrets never leak into the child', () => {
     vi.stubEnv('SECRET_X', 'y')
     vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'z')
     vi.stubEnv('NPM_TOKEN', 't')
-    const env = adapterEnv()
-    expect(env.SECRET_X).toBeUndefined()
-    expect(env.AWS_SECRET_ACCESS_KEY).toBeUndefined()
-    expect(env.NPM_TOKEN).toBeUndefined()
-    for (const key of Object.keys(env)) {
-      expect(ALLOWED.has(key), `unexpected env key: ${key}`).toBe(true)
+    for (const agent of ['claude', 'codex'] as const) {
+      const env = adapterEnv(agent)
+      expect(env.SECRET_X).toBeUndefined()
+      expect(env.AWS_SECRET_ACCESS_KEY).toBeUndefined()
+      expect(env.NPM_TOKEN).toBeUndefined()
+      for (const key of Object.keys(env)) {
+        expect(
+          SHARED.has(key) || PROVIDER_ALLOWED[agent].has(key),
+          `unexpected env key for ${agent}: ${key}`,
+        ).toBe(true)
+      }
     }
   })
 
   it('always sets ELECTRON_RUN_AS_NODE=1 (the Electron binary runs as plain node)', () => {
-    expect(adapterEnv().ELECTRON_RUN_AS_NODE).toBe('1')
+    expect(adapterEnv('claude').ELECTRON_RUN_AS_NODE).toBe('1')
   })
 
   it('API keys pass through ONLY when already set in our own env', () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
-    expect(adapterEnv().ANTHROPIC_API_KEY).toBe('sk-test')
+    expect(adapterEnv('claude').ANTHROPIC_API_KEY).toBe('sk-test')
     vi.stubEnv('ANTHROPIC_API_KEY', undefined)
-    expect('ANTHROPIC_API_KEY' in adapterEnv()).toBe(false)
+    expect('ANTHROPIC_API_KEY' in adapterEnv('claude')).toBe(false)
+  })
+
+  it('never hands one vendor the OTHER vendor’s credentials (cross-provider least privilege)', () => {
+    // a user who runs both Claude and Codex exports every key at once
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-anthropic')
+    vi.stubEnv('CLAUDE_CODE_EXECUTABLE', '/bin/claude')
+    vi.stubEnv('OPENAI_API_KEY', 'sk-openai')
+    vi.stubEnv('CODEX_API_KEY', 'sk-codex')
+    vi.stubEnv('CODEX_PATH', '/bin/codex')
+    const claude = adapterEnv('claude')
+    expect(claude.ANTHROPIC_API_KEY).toBe('sk-anthropic')
+    expect(claude.CLAUDE_CODE_EXECUTABLE).toBe('/bin/claude')
+    expect('OPENAI_API_KEY' in claude).toBe(false)
+    expect('CODEX_API_KEY' in claude).toBe(false)
+    expect('CODEX_PATH' in claude).toBe(false)
+    const codex = adapterEnv('codex')
+    expect(codex.OPENAI_API_KEY).toBe('sk-openai')
+    expect(codex.CODEX_API_KEY).toBe('sk-codex')
+    expect(codex.CODEX_PATH).toBe('/bin/codex')
+    expect('ANTHROPIC_API_KEY' in codex).toBe(false)
+    expect('CLAUDE_CODE_EXECUTABLE' in codex).toBe(false)
   })
 })
 

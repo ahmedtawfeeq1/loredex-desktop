@@ -406,6 +406,12 @@ function routePermission(
 ): Promise<RequestPermissionResponse> {
   const s = sessions.get(sessionId)
   if (!s) return Promise.resolve(CANCELLED) // session death default-rejects
+  // A request the adapter already put on the wire can land AFTER acpCancel ran
+  // (it was not yet in pendingPermissions, so cancelPendingPermissions missed
+  // it). Auto-reject it instead of surfacing a stale modal for a turn the user
+  // already Stopped — an ignored modal would block the turn forever. cancelling
+  // is reset at the next acpPrompt, so a fresh turn surfaces normally.
+  if (s.cancelling) return Promise.resolve(CANCELLED)
   const requestId = randomUUID()
   flushChunks(sessionId) // ordering law: chunks land BEFORE the request
   s.emit(mapPermissionEvent(sessionId, requestId, params))

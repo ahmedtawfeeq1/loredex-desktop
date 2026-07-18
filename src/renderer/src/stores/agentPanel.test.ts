@@ -322,6 +322,37 @@ describe('permission FIFO', () => {
     emit(perm('r1')) // no session seeded
     expect(useAgentPanel.getState().permission).toBeNull()
   })
+
+  const permFor = (sessionId: string, requestId: string): CoreEvent => ({
+    kind: 'acp.permission',
+    sessionId,
+    requestId,
+    title: 'Write notes/a.md',
+    options: [{ optionId: 'y', name: 'Allow', kind: 'allow_once' }],
+  })
+
+  it('a session dying while its permission is surfaced advances to the next queued session', () => {
+    useAgentPanel.setState({ sessions: [session('s1'), session('s2')], activeId: 's1' })
+    emit(permFor('s1', 'r1')) // surfaces
+    emit(permFor('s2', 'r2')) // queues
+    expect(useAgentPanel.getState().permission).toMatchObject({ sessionId: 's1', requestId: 'r1' })
+    // s1's adapter crashes mid-turn — no turnEnd, core already answered r1
+    emit({ kind: 'acp.session', sessionId: 's1', agent: 'claude', state: 'exited' })
+    // the dead session's modal is replaced by the healthy session's request
+    expect(useAgentPanel.getState().permission).toMatchObject({ sessionId: 's2', requestId: 'r2' })
+  })
+
+  it('a dying session’s queued request is purged, never surfaced behind a healthy one', () => {
+    useAgentPanel.setState({ sessions: [session('s1'), session('s2')], activeId: 's1' })
+    emit(permFor('s1', 'r1')) // surfaces
+    emit(permFor('s2', 'r2')) // queues
+    // s2 dies while queued behind s1's surfaced modal — surfaced modal untouched
+    emit({ kind: 'acp.session', sessionId: 's2', agent: 'claude', state: 'exited' })
+    expect(useAgentPanel.getState().permission).toMatchObject({ sessionId: 's1', requestId: 'r1' })
+    // answering s1 must NOT surface s2's stale request — the queue was purged
+    useAgentPanel.getState().respondPermission('y')
+    expect(useAgentPanel.getState().permission).toBeNull()
+  })
 })
 
 describe('reset (vault switch)', () => {

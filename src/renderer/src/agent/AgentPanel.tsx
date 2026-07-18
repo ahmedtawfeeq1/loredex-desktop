@@ -7,7 +7,7 @@
  * that expand to before/after diffs + clickable file-refs when output arrives.
  * Width drags 280–480 via the left-edge PanelResizeHandle (persisted).
  */
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { AcpAgent, AcpSessionState } from '../../../shared/ipc-contract'
 import { Button } from '../components/Button'
 import {
@@ -20,6 +20,8 @@ import {
 import { renderAgentMarkdown } from './agentMarkdown'
 import { PanelResizeHandle } from './PanelResizeHandle'
 import { SessionInfoPanel } from './SessionInfoPanel'
+import { SlashCommandMenu } from './SlashCommandMenu'
+import { filterCommands, slashQuery } from './slashCommands'
 import { ToolCallRow } from './ToolCallRow'
 import { UsageBar } from './UsageBar'
 
@@ -174,6 +176,33 @@ export function AgentPanel(): React.JSX.Element | null {
     void useAgentPanel.getState().send(text)
   }
 
+  // Slash-command autocomplete (the agent's advertised commands, A7). The menu
+  // opens while the draft is a bare `/token`; picking inserts `/name ` (the
+  // trailing space closes the menu) and the user adds args + sends normally.
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [slashSel, setSlashSel] = useState(0)
+  const [slashDismissed, setSlashDismissed] = useState(false)
+  const query = slashQuery(draft)
+  const slashMatches = useMemo(
+    () => (query !== null && active?.commands ? filterCommands(active.commands, query) : []),
+    [query, active?.commands],
+  )
+  const slashOpen = slashMatches.length > 0 && !slashDismissed
+  // reset selection as the match set shifts; re-arm the menu once the draft
+  // leaves slash mode so a later `/` reopens it
+  useEffect(() => {
+    setSlashSel(0)
+  }, [query])
+  useEffect(() => {
+    if (query === null) setSlashDismissed(false)
+  }, [query])
+
+  function pickSlash(name: string): void {
+    useAgentPanel.getState().setDraft(`/${name} `)
+    setSlashDismissed(true)
+    inputRef.current?.focus()
+  }
+
   return (
     <aside className="agent-panel" style={{ width }} aria-label="Agent panel">
       <PanelResizeHandle />
@@ -282,8 +311,17 @@ export function AgentPanel(): React.JSX.Element | null {
           ))}
         </div>
       )}
+      {slashOpen && (
+        <SlashCommandMenu
+          items={slashMatches}
+          selected={slashSel}
+          onHover={setSlashSel}
+          onPick={pickSlash}
+        />
+      )}
       <div className="agent-input">
         <textarea
+          ref={inputRef}
           className="agent-input-field"
           rows={Math.min(6, draft.split('\n').length)}
           placeholder={canSend ? 'Message the agent…' : 'Needs a ready session'}
@@ -291,10 +329,29 @@ export function AgentPanel(): React.JSX.Element | null {
           disabled={!canSend}
           onChange={(e) => useAgentPanel.getState().setDraft(e.target.value)}
           onKeyDown={(e) => {
-            // ⌘↵ sends (Modal.tsx convention); Enter inserts a newline
+            // ⌘↵ always sends (Modal.tsx convention) — even with the menu open
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault()
               submit()
+              return
+            }
+            // slash menu steals nav keys while open
+            if (slashOpen) {
+              const n = slashMatches.length
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setSlashSel((s) => (s + 1) % n)
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setSlashSel((s) => (s - 1 + n) % n)
+              } else if (e.key === 'Enter' || e.key === 'Tab') {
+                // plain Enter/Tab picks the command instead of a newline
+                e.preventDefault()
+                pickSlash(slashMatches[slashSel].name)
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                setSlashDismissed(true)
+              }
             }
           }}
         />

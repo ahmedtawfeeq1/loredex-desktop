@@ -14,13 +14,27 @@ import type { HandoffRef } from '../../stores/handoffs'
 /** Project names = the directories under the vault's top-level projects/. */
 export function vaultProjects(tree: TreeNode[]): string[] {
   const projects = tree.find((n) => n.kind === 'dir' && n.path === 'projects')
-  return (projects?.children ?? []).filter((n) => n.kind === 'dir').map((n) => n.name).sort()
+  // product-grouped dexes insert virtual `projects#product=…` group nodes —
+  // handoffs address PROJECTS, so descend through them (user bug 2026-07-18)
+  const out: string[] = []
+  for (const child of projects?.children ?? []) {
+    if (child.kind !== 'dir') continue
+    if (child.path.includes('#product=')) {
+      for (const p of child.children ?? []) if (p.kind === 'dir') out.push(p.name)
+    } else {
+      out.push(child.name)
+    }
+  }
+  return out.sort()
 }
 
 /** Note names of one project (recursive), briefs excluded — mirrors lib collectNotes. */
 export function projectNotes(tree: TreeNode[], project: string): string[] {
   const projects = tree.find((n) => n.kind === 'dir' && n.path === 'projects')
-  const root = projects?.children?.find((n) => n.kind === 'dir' && n.name === project)
+  const level = (projects?.children ?? []).flatMap((n) =>
+    n.kind === 'dir' && n.path.includes('#product=') ? (n.children ?? []) : [n],
+  )
+  const root = level.find((n) => n.kind === 'dir' && n.name === project)
   const names: string[] = []
   const walk = (nodes: TreeNode[]): void => {
     for (const node of nodes) {

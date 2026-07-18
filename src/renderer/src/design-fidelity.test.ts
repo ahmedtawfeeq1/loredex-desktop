@@ -110,12 +110,18 @@ describe("the Don't list", () => {
     }
     // reference 02's two state discs are the ONLY non-linear gradients: the
     // amber ring-dot donut (open) and the half-green progress disc (accepted)
+    // amber ring-dot paint + the spinner's colorless mask ring
     const radials = css.match(/radial-gradient\((?:[^()]|\([^()]*\))*\)/g) ?? []
-    for (const g of radials) expect(g).toContain('var(--warn)')
-    expect(radials.length).toBeLessThanOrEqual(1)
+    for (const g of radials) {
+      expect(g.includes('var(--warn)') || g.includes('farthest-side')).toBe(true)
+    }
+    expect(radials.length).toBeLessThanOrEqual(3)
+    // …plus the re-curate spinner ring (accent conic, 2026-07-18)
     const conics = css.match(/conic-gradient\((?:[^()]|\([^()]*\))*\)/g) ?? []
-    for (const g of conics) expect(g).toContain('var(--ok)')
-    expect(conics.length).toBeLessThanOrEqual(1)
+    for (const g of conics) {
+      expect(g.includes('var(--ok)') || g.includes('var(--accent)')).toBe(true)
+    }
+    expect(conics.length).toBeLessThanOrEqual(2)
   })
   it('no border wider than 1px except the sanctioned left rails', () => {
     // any border-* width > 1px (radii are not borders) …

@@ -41,6 +41,9 @@ interface DashboardDataState {
   /** the project whose brief is being re-curated right now (busy affordance),
    *  or null when idle — a re-curate is a ~1min CLI/LLM run in the core host */
   recuratingProject: string | null
+  /** set by the recurate.done event; the Today dialog shows before/after */
+  recurateDone: { project: string; ok: boolean; error?: string } | null
+  clearRecurate(): void
   load(): Promise<void>
   /** re-run curate for a stale project's brief, then refresh so the attention
    *  item clears (its brief is now newer than the notes that outdated it) */
@@ -56,6 +59,7 @@ export const useDashboardData = create<DashboardDataState>((set, get) => ({
   health: null,
   error: null,
   recuratingProject: null,
+  recurateDone: null,
 
   async load() {
     // the core payload — its failure is the view's one honest error line
@@ -84,15 +88,23 @@ export const useDashboardData = create<DashboardDataState>((set, get) => ({
 
   async recurate(project) {
     if (get().recuratingProject) return // one at a time — the CLI holds a vault lock
-    set({ recuratingProject: project })
+    set({ recuratingProject: project, recurateDone: null })
     try {
-      await invoke('dashboard.recurate', { project })
-      await get().load() // refetch: the brief is now fresh, the stale row drops out
+      await invoke('dashboard.recurate', { project }) // returns immediately
     } catch (e) {
-      set({ error: isErrEnvelope(e) ? `${e.code}: ${e.message}` : String(e) })
-    } finally {
-      set({ recuratingProject: null })
+      set({
+        recuratingProject: null,
+        recurateDone: {
+          project,
+          ok: false,
+          error: isErrEnvelope(e) ? `${e.code}: ${e.message}` : String(e),
+        },
+      })
     }
+  },
+
+  clearRecurate() {
+    set({ recurateDone: null })
   },
 
   reset() {
@@ -104,6 +116,7 @@ export const useDashboardData = create<DashboardDataState>((set, get) => ({
       health: null,
       error: null,
       recuratingProject: null,
+  recurateDone: null,
     })
   },
 }))
@@ -153,5 +166,19 @@ if (typeof window !== 'undefined' && window.loredex) {
       recomputeTimer = null
     }
     useDashboardData.getState().reset()
+  })
+}
+
+// recurate.done closes the background job (2026-07-18): refresh so the
+// before/after dialog reads the NEW brief state, then surface the result.
+if (typeof window !== 'undefined' && window.loredex) {
+  onEvent((e) => {
+    if (e.kind === 'recurate.done') {
+      useDashboardData.setState({
+        recuratingProject: null,
+        recurateDone: { project: e.project, ok: e.ok, ...(e.error ? { error: e.error } : {}) },
+      })
+      void useDashboardData.getState().load()
+    }
   })
 }

@@ -181,7 +181,7 @@ function ComposeForm({
       )}
       <div className="modal-row">
         <span className="modal-label">Kind</span>
-        <div className="seg-control" role="group" aria-label="Kind">
+        <div className="seg-control seg-control-split" role="group" aria-label="Kind">
           {(['request', 'delivery'] as const).map((kind) => (
             <button
               key={kind}
@@ -190,7 +190,7 @@ function ComposeForm({
               aria-pressed={state.kind === kind}
               onClick={() => patch({ kind })}
             >
-              {kind}
+              {kind[0].toUpperCase() + kind.slice(1)}
             </button>
           ))}
         </div>

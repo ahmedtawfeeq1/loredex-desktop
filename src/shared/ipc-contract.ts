@@ -263,7 +263,7 @@ export interface CoreApi {
   /** re-curate a project's Start Here brief (story 2.6): the re-curate seam made
    *  real. curate is a CLI/LLM op the lib doesn't expose, so it runs the CLI in
    *  the core host (~1min) — the window drives it async and refreshes on return. */
-  'dashboard.recurate': { in: { project: string }; out: void }
+  'dashboard.recurate': { in: { project: string }; out: { started: true } }
   /** app-local contract evolution (story 2.5): the Start Here brief + freshness */
   'home.brief': { in: void; out: HomeBrief }
   /** Vault Atlas (story 10.1): the whole derived graph — nodes, typed edges,
@@ -331,6 +331,9 @@ export interface CoreApi {
 
 export type CoreEvent =
   | { kind: 'handoff.new'; handoff: HandoffCard }
+  /** re-curate finished (2026-07-18): the ~1min CLI job runs in the core
+   *  host's background — the renderer's progress dialog closes on this. */
+  | { kind: 'recurate.done'; project: string; ok: boolean; error?: string }
   /** M2 (stories 7.2/7.3): a write landed a new note. `card` carries the board
    *  card for optimistic insert; null for comments (thread data, never a card). */
   | { kind: 'handoff.created'; card: HandoffCard | null; relPath: string }

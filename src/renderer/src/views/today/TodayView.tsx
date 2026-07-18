@@ -32,6 +32,7 @@ import { sectionTint } from '../reader/sectionTint'
 import { openBrief } from '../handoffs/open-brief'
 import { localDay } from '../handoffs/lifecycle'
 import { sprintRollup, useWork } from '../../stores/work'
+import { BrandMark } from '../../components/BrandMark'
 import { useDashboardData } from '../home/dashboard-data'
 import '../home/home.css'
 import {
@@ -231,6 +232,11 @@ export function TodayView(): React.JSX.Element {
   const loadDash = useDashboardData((s) => s.load)
   const recurate = useDashboardData((s) => s.recurate)
   const recuratingProject = useDashboardData((s) => s.recuratingProject)
+  const recurateDone = useDashboardData((s) => s.recurateDone)
+  const [recurateTarget, setRecurateTarget] = useState<string | null>(null)
+  const [recurateBefore, setRecurateBefore] = useState<{ brief: string; newer: number } | null>(
+    null,
+  )
   const cards = useHandoffs((s) => s.cards)
   const receipt = useHandoffs((s) => s.receipt)
   const dismissReceipt = useHandoffs((s) => s.dismissReceipt)
@@ -283,6 +289,20 @@ export function TodayView(): React.JSX.Element {
   const inFlight = latestByActor(feed, 4)
   const knowledge = newKnowledge(feed, 5)
   const recent = recentActivity(feed, 6)
+
+  const openRecurate = (project: string): void => {
+    const row = (dash?.states ?? []).find((r) => r.project === project)
+    setRecurateBefore({
+      brief: row?.briefPath ? (row.notesNewerThanBrief > 0 ? 'stale' : 'fresh') : 'none',
+      newer: row?.notesNewerThanBrief ?? 0,
+    })
+    setRecurateTarget(project)
+  }
+  const closeRecurate = (): void => {
+    setRecurateTarget(null)
+    setRecurateBefore(null)
+    useDashboardData.getState().clearRecurate()
+  }
 
   const metaLine = `${LONG_DATE.format(now).toLowerCase()} · ${queue.length} need you · ${
     inbound.open
@@ -365,12 +385,12 @@ export function TodayView(): React.JSX.Element {
                     tabIndex={0}
                     onClick={() =>
                       item.action.kind === 'recurate' && item.project
-                        ? void recurate(item.project)
+                        ? openRecurate(item.project)
                         : goInbox()
                     }
                     onKeyDown={rowKey(() =>
                       item.action.kind === 'recurate' && item.project
-                        ? void recurate(item.project)
+                        ? openRecurate(item.project)
                         : goInbox(),
                     )}
                   >
@@ -383,7 +403,7 @@ export function TodayView(): React.JSX.Element {
                       disabled={item.action.kind === 'recurate' && recuratingProject === item.project}
                       onClick={(e) => {
                         e.stopPropagation()
-                        if (item.action.kind === 'recurate' && item.project) void recurate(item.project)
+                        if (item.action.kind === 'recurate' && item.project) openRecurate(item.project)
                         else goInbox()
                       }}
                     >
@@ -555,6 +575,113 @@ export function TodayView(): React.JSX.Element {
             )}
           </section>
         </div>
+      </div>
+      {recurateTarget && (
+        <RecurateDialog
+          project={recurateTarget}
+          before={recurateBefore}
+          running={recuratingProject === recurateTarget}
+          done={recurateDone?.project === recurateTarget ? recurateDone : null}
+          after={(dash?.states ?? []).find((r) => r.project === recurateTarget) ?? null}
+          onConfirm={() => void recurate(recurateTarget)}
+          onClose={closeRecurate}
+        />
+      )}
+    </div>
+  )
+}
+
+/** Re-curate flow (user request 2026-07-18): confirm → background CLI job with
+ *  the logo as the loading graphic → before vs after, closed by the user. */
+function RecurateDialog({
+  project,
+  before,
+  running,
+  done,
+  after,
+  onConfirm,
+  onClose,
+}: {
+  project: string
+  before: { brief: string; newer: number } | null
+  running: boolean
+  done: { ok: boolean; error?: string } | null
+  after: { briefPath: string | null; notesNewerThanBrief: number } | null
+  onConfirm: () => void
+  onClose: () => void
+}): React.JSX.Element {
+  const stage = done ? 'done' : running ? 'running' : 'confirm'
+  const afterState = after
+    ? after.briefPath
+      ? after.notesNewerThanBrief > 0
+        ? `stale · ${after.notesNewerThanBrief} newer note${after.notesNewerThanBrief === 1 ? '' : 's'}`
+        : 'fresh'
+      : 'no brief'
+    : '…'
+  const beforeState = before
+    ? before.brief === 'none'
+      ? 'no brief'
+      : `${before.brief}${before.newer > 0 ? ` · ${before.newer} newer note${before.newer === 1 ? '' : 's'}` : ''}`
+    : '…'
+  return (
+    // biome-ignore lint: Escape/backdrop close only when not mid-run
+    <div className="modal-backdrop" onMouseDown={stage === 'running' ? undefined : onClose}>
+      <div
+        className="modal recurate-dialog"
+        role="dialog"
+        aria-modal="true"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="modal-title">Re-curate {project}</div>
+        {stage === 'confirm' && (
+          <>
+            <p className="recurate-copy">
+              Rewrites the project's Start-Here brief from everything filed since — runs the
+              bundled loredex CLI and takes about a minute. The dex keeps working while it runs.
+            </p>
+            <div className="modal-footer recurate-footer">
+              <Button variant="quiet" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={onConfirm}>
+                Re-curate
+              </Button>
+            </div>
+          </>
+        )}
+        {stage === 'running' && (
+          <div className="recurate-running">
+            <span className="recurate-logo">
+              <BrandMark size={44} />
+            </span>
+            <p className="recurate-copy">
+              curating {project} — reading every note, rewriting the brief…
+            </p>
+          </div>
+        )}
+        {stage === 'done' && (
+          <>
+            {done?.ok ? (
+              <div className="recurate-result">
+                <div className="recurate-row">
+                  <span className="recurate-key">before</span>
+                  <span className="recurate-val">{beforeState}</span>
+                </div>
+                <div className="recurate-row">
+                  <span className="recurate-key">after</span>
+                  <span className="recurate-val is-ok">{afterState}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="modal-error">{done?.error ?? 'curate failed'}</p>
+            )}
+            <div className="modal-footer recurate-footer">
+              <Button variant="primary" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

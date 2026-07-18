@@ -136,6 +136,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [result, setResult] = useState<WorkspaceResult | null>(null)
   const [status, setStatus] = useState<ClientWorkspaceStatus | null>(null)
   const [pasted, setPasted] = useState<Record<string, string>>({})
+  const [replacing, setReplacing] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   // v3 P7 green heartbeat (story 26.8): connected = the in-app MCP host is
   // listening — the wiring the generated .mcp.json points agents at
@@ -165,6 +166,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
     try {
       setResult(await invoke('clients.tokens.set', { client: info.slug, tokens }))
       setPasted({})
+      setReplacing(new Set())
       refreshStatus()
     } catch (e) {
       setError(String((e as { message?: string }).message ?? e))
@@ -219,13 +221,14 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
         <div className="cp-ws-refs">
           {status.declaredRefs.map((ref) => {
             const missing = status.missingRefs.includes(ref)
+            const editing = missing || replacing.has(ref)
             return (
               <div key={ref} className="cp-ws-ref">
                 <span className={missing ? 'cp-ws-ref-state warn' : 'cp-ws-ref-state ok'}>
                   {missing ? '● needs token' : '✓ token held'}
                 </span>
                 <span className="cp-ws-conn">{ref}</span>
-                {missing && (
+                {editing ? (
                   <input
                     className="cp-ws-token-input"
                     type="password"
@@ -233,6 +236,16 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                     placeholder="paste token"
                     onChange={(e) => setPasted({ ...pasted, [ref]: e.target.value })}
                   />
+                ) : (
+                  // a held token can still be dead server-side (revoked/rotated)
+                  <button
+                    type="button"
+                    className="button-quiet"
+                    title="Paste a new token for this connection (replaces the stored one)"
+                    onClick={() => setReplacing(new Set(replacing).add(ref))}
+                  >
+                    Replace
+                  </button>
                 )}
               </div>
             )

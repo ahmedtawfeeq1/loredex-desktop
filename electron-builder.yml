@@ -18,6 +18,11 @@ files:
 # paths itself, so unpacking the module is all that's needed.
 asarUnpack:
   - '**/node_modules/node-pty/**'
+  # ACP agent panels: adapter entry JS + native claude/codex binaries are
+  # spawned as real processes — nothing executable can live inside app.asar.
+  - '**/node_modules/@agentclientprotocol/**'
+  - '**/node_modules/@anthropic-ai/claude-agent-sdk*/**'
+  - '**/node_modules/@openai/codex/**'
 mac:
   icon: build/icon.icns
   category: public.app-category.developer-tools

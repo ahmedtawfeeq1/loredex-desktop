@@ -403,7 +403,8 @@ a:hover {
 .pane-reader,
 .pane-board,
 .app > .empty-state {
-  margin-top: 12px;
+  /* flush to the top bar's hairline (user request 2026-07-18) */
+  margin-top: 0;
   background: var(--bg-card);
   border: 1px solid var(--hairline);
   border-radius: 12px;
@@ -7377,3 +7378,22 @@ a.button-primary {
    (user overlap report 2026-07-18); collapsed pane sheds its padding too */
 .reader { position: relative; }
 .pane-list.rail-collapsed { padding-left: 0; padding-right: 0; }
+
+/* ── modern icon rail (user request 2026-07-18): 40px rounded targets,
+      19px icons, tinted active with the cobalt rail ─────────────────── */
+.sidebar.rail-collapsed nav {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; padding: 8px 0;
+}
+.sidebar.rail-collapsed .nav-item {
+  width: 40px; height: 40px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; color: var(--text-2);
+}
+.sidebar.rail-collapsed .nav-item:hover { background: var(--bg-hover); color: var(--text-1); }
+.sidebar.rail-collapsed .nav-item[aria-current] {
+  background: var(--bg-hover); color: var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.sidebar.rail-collapsed .nav-item svg { width: 19px; height: 19px; }
+.sidebar.rail-collapsed .side-reopen { font-size: 15px; padding: 4px 8px; }

@@ -51,6 +51,10 @@ contextBridge.exposeInMainWorld('loredex', {
     ipcRenderer.invoke('loredex:list-recent-vaults'),
   openInNewWindow: (vaultPath?: string): Promise<null> =>
     ipcRenderer.invoke('loredex:open-in-new-window', vaultPath),
+  // B3 pop-out: open one agent conversation in its own standalone window (its
+  // own core host, same vault app.db → resumes from the persisted transcript)
+  openAgentWindow: (vaultPath: string | null, conversationId: string): Promise<null> =>
+    ipcRenderer.invoke('loredex:open-agent-window', { vaultPath, conversationId }),
   // story 10.7: atlas export — bytes rendered in the page, saved via a native panel
   saveExport: (defaultName: string, data: string | ArrayBuffer): Promise<string | null> =>
     ipcRenderer.invoke('loredex:save-export', defaultName, data),
@@ -71,5 +75,12 @@ contextBridge.exposeInMainWorld('loredex', {
     const listener = (_e: unknown, url: string): void => cb(url)
     ipcRenderer.on('join-link', listener)
     return () => ipcRenderer.removeListener('join-link', listener)
+  },
+  // B3 pop-out: a standalone agent window receives its conversation id
+  // post-load (mirrors onJoinLink) and resumes it from the vault app.db
+  onOpenAgent: (cb: (conversationId: string) => void): (() => void) => {
+    const listener = (_e: unknown, conversationId: string): void => cb(conversationId)
+    ipcRenderer.on('open-agent', listener)
+    return () => ipcRenderer.removeListener('open-agent', listener)
   },
 })

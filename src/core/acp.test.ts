@@ -18,7 +18,15 @@ vi.mock('./settings', () => ({
   revokeAgentToken: vi.fn(),
 }))
 
-import { mapPermissionEvent, mapUpdate } from './acp'
+import {
+  attachmentBlock,
+  buildPromptBlocks,
+  canLoadSession,
+  mapPermissionEvent,
+  mapUpdate,
+  resumeTargetSessionId,
+  seedBlock,
+} from './acp'
 
 type Update = SessionNotification['update']
 
@@ -267,6 +275,124 @@ describe('mapUpdate — plan + unknown variants', () => {
       const update = { sessionUpdate: variant } as unknown as Update
       expect(mapUpdate('s1', update)).toEqual({ act: 'ignore' })
     }
+  })
+})
+
+describe('B2 — cross-provider continuation seed (prepend logic)', () => {
+  // the shape renderSeed produces: user/assistant turns verbatim, tool actions
+  // reduced to title + touched filenames (agent-conversations.renderSeed)
+  const seed = '**User:** Rename foo\n\n**Assistant:** Done\n\n**Tool:** Edit a.md — a.md'
+
+  it('seedBlock → a plain text block when the adapter has no embeddedContext', () => {
+    expect(seedBlock(seed, false)).toEqual({ type: 'text', text: seed })
+  })
+
+  it('seedBlock → an embedded {type:"resource"} block when embeddedContext is advertised', () => {
+    expect(seedBlock(seed, true)).toEqual({
+      type: 'resource',
+      resource: { uri: 'loredex://conversation-seed', mimeType: 'text/markdown', text: seed },
+    })
+  })
+
+  it('buildPromptBlocks prepends the seed as the FIRST block, the user turn second', () => {
+    expect(buildPromptBlocks('now delete it', seed, false)).toEqual([
+      { type: 'text', text: seed },
+      { type: 'text', text: 'now delete it' },
+    ])
+  })
+
+  it('buildPromptBlocks rides the seed as a resource block first when embeddedContext', () => {
+    const blocks = buildPromptBlocks('now delete it', seed, true)
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0]).toMatchObject({ type: 'resource' })
+    expect(blocks[1]).toEqual({ type: 'text', text: 'now delete it' })
+  })
+
+  it('buildPromptBlocks with no pending seed is just the user turn (ordinary same-session prompt)', () => {
+    // embeddedContext is irrelevant without a seed to carry
+    expect(buildPromptBlocks('hello', null, false)).toEqual([{ type: 'text', text: 'hello' }])
+    expect(buildPromptBlocks('hello', null, true)).toEqual([{ type: 'text', text: 'hello' }])
+  })
+})
+
+describe('B4 — attachment blocks', () => {
+  it('an image rides a {type:"image"} block ONLY when the adapter accepts images', () => {
+    const img = { type: 'image' as const, mimeType: 'image/png', dataB64: 'AAAA' }
+    expect(attachmentBlock(img, true)).toEqual({ type: 'image', data: 'AAAA', mimeType: 'image/png' })
+    // unsupported → dropped (defence in depth behind the renderer's own gate)
+    expect(attachmentBlock(img, false)).toBeNull()
+  })
+
+  it('a file path rides a baseline resource_link (file:// uri + basename, no gate)', () => {
+    expect(attachmentBlock({ type: 'resource', path: '/tmp/reports/q3.pdf' }, false)).toEqual({
+      type: 'resource_link',
+      uri: 'file:///tmp/reports/q3.pdf',
+      name: 'q3.pdf',
+    })
+  })
+
+  it('buildPromptBlocks appends attachments AFTER the text (images gated, files always)', () => {
+    const atts = [
+      { type: 'image' as const, mimeType: 'image/png', dataB64: 'IMG' },
+      { type: 'resource' as const, path: '/tmp/a.md' },
+    ]
+    // imageInput true → both blocks ride, after the text
+    expect(buildPromptBlocks('look at these', null, false, atts, true)).toEqual([
+      { type: 'text', text: 'look at these' },
+      { type: 'image', data: 'IMG', mimeType: 'image/png' },
+      { type: 'resource_link', uri: 'file:///tmp/a.md', name: 'a.md' },
+    ])
+    // imageInput false → the image is dropped, the file link still rides
+    expect(buildPromptBlocks('look at these', null, false, atts, false)).toEqual([
+      { type: 'text', text: 'look at these' },
+      { type: 'resource_link', uri: 'file:///tmp/a.md', name: 'a.md' },
+    ])
+  })
+
+  it('a seed still leads; attachments follow the text (continuation + attachment turn)', () => {
+    const seed = '**User:** hi\n\n**Assistant:** yo'
+    const blocks = buildPromptBlocks('and this file', seed, false, [{ type: 'resource', path: '/x/y.txt' }], true)
+    expect(blocks).toEqual([
+      { type: 'text', text: seed },
+      { type: 'text', text: 'and this file' },
+      { type: 'resource_link', uri: 'file:///x/y.txt', name: 'y.txt' },
+    ])
+  })
+
+  it('no attachments → identical to the plain text turn (back-compat)', () => {
+    expect(buildPromptBlocks('hello', null, false)).toEqual([{ type: 'text', text: 'hello' }])
+    expect(buildPromptBlocks('hello', null, false, [], true)).toEqual([{ type: 'text', text: 'hello' }])
+  })
+})
+
+describe('B2 — same-provider native resume vs cross-provider seed decision', () => {
+  // a conversation that ran on claude (adapter session recorded) but never codex
+  const loaded = {
+    providers: [{ provider: 'claude' as const, acpSessionId: 'claude-sid-1' }],
+  }
+
+  it('resumeTargetSessionId returns the provider\'s own adapter session id', () => {
+    expect(resumeTargetSessionId(loaded, 'claude')).toBe('claude-sid-1')
+  })
+
+  it('resumeTargetSessionId is null for a provider the conversation never ran on (→ seed)', () => {
+    expect(resumeTargetSessionId(loaded, 'codex')).toBeNull()
+  })
+
+  it('resumeTargetSessionId is null when the provider row has no stored session id', () => {
+    const noSid = { providers: [{ provider: 'codex' as const, acpSessionId: null }] }
+    expect(resumeTargetSessionId(noSid, 'codex')).toBeNull()
+  })
+
+  it('canLoadSession: session/load ONLY with both a resume id AND the loadSession cap', () => {
+    // same-provider, adapter advertises loadSession → native resume
+    expect(canLoadSession('claude-sid-1', { loadSession: true })).toBe(true)
+    // cross-provider: no stored id for the target → seed instead
+    expect(canLoadSession(null, { loadSession: true })).toBe(false)
+    // same-provider but the adapter can't load → seed fallback carries context
+    expect(canLoadSession('claude-sid-1', { loadSession: false })).toBe(false)
+    expect(canLoadSession('claude-sid-1', {})).toBe(false)
+    expect(canLoadSession('claude-sid-1', undefined)).toBe(false)
   })
 })
 

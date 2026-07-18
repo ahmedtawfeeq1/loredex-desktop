@@ -13,6 +13,7 @@ import { dotTone, useSync } from '../../stores/sync'
 import { type SettingsSection, useSettingsTab } from '../../stores/settingsTab'
 import { AgentTokensCard } from '../agents/AgentsView'
 import { SyncPanel } from '../sync/SyncPanel'
+import { AgentAuthSection } from './AgentAuthSection'
 import { ContractsSection } from './ContractsSection'
 import { DuplicatesSection } from './DuplicatesSection'
 import { GeneralSection } from './GeneralSection'
@@ -53,6 +54,7 @@ const GROUPS: ReadonlyArray<{ label: string; entries: Entry[] }> = [
       { id: 'mcp-server', label: 'MCP server' },
       { id: 'sync-git', label: 'Sync & git' },
       { id: 'github', label: 'GitHub' },
+      { id: 'agent-auth', label: 'AI providers' },
     ],
   },
 ]
@@ -68,6 +70,7 @@ const TITLES: Record<SettingsSection, string> = {
   'mcp-server': 'MCP server',
   'sync-git': 'Sync & git',
   github: 'GitHub',
+  'agent-auth': 'AI providers',
 }
 
 /** SYSTEM rows carry live dots: green healthy, rust broken, none elsewhere. */
@@ -160,6 +163,7 @@ export function SettingsView(): React.JSX.Element {
         {section === 'mcp-server' && <McpServerSection />}
         {section === 'sync-git' && <SyncPanel />}
         {section === 'github' && <GitHubSection />}
+        {section === 'agent-auth' && <AgentAuthSection />}
       </div>
     </div>
   )

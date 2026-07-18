@@ -9,14 +9,18 @@
  */
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { AcpAgent, AcpSessionState } from '../../../shared/ipc-contract'
+import { pathForFile } from '../api'
 import { Button } from '../components/Button'
 import {
+  lastUserText,
   useAgentPanel,
   visibleSessions,
   type AcpChatItem,
   type AcpSessionView,
+  type AgentAttachment,
   type ProviderAuth,
 } from '../stores/agentPanel'
+import { AgentLoginCard } from './AgentLoginCard'
 import { renderAgentMarkdown } from './agentMarkdown'
 import { PanelResizeHandle } from './PanelResizeHandle'
 import { SessionInfoPanel } from './SessionInfoPanel'
@@ -41,6 +45,7 @@ const STATE_CHIP: Record<AcpSessionState, { glyph: string; label: string; cls: s
 const AGENT_META: Record<AcpAgent, { label: string; tag: string }> = {
   claude: { label: 'Claude', tag: 'CC' },
   codex: { label: 'Codex', tag: 'CX' },
+  gemini: { label: 'Gemini', tag: 'GM' },
 }
 const AGENTS = Object.keys(AGENT_META) as AcpAgent[]
 
@@ -55,6 +60,51 @@ const AUTH_DOT: Record<ProviderAuth, { glyph: string; label: string; cls: string
 
 function agentTag(agent: AcpAgent): string {
   return AGENT_META[agent].tag
+}
+
+/** B4: a File's bytes as raw base64 (the "data:<mime>;base64," prefix stripped)
+ *  for an image attachment that rides the prompt JSON. */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const res = typeof reader.result === 'string' ? reader.result : ''
+      resolve(res.slice(res.indexOf(',') + 1))
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+/** B4 attachment tray: the staged attachments as removable chips above the
+ *  composer (🖼 image · 📄 file). Kind is a glyph, not color alone. */
+function AttachmentTray({ items }: { items: AgentAttachment[] }): React.JSX.Element {
+  return (
+    <div className="agent-attach-tray" role="list" aria-label="Attachments">
+      {items.map((a, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: staged list, remove-by-index
+        <span
+          key={i}
+          className="agent-attach-chip"
+          role="listitem"
+          title={a.type === 'resource' ? a.path : a.name}
+        >
+          <span className="agent-attach-kind" aria-hidden="true">
+            {a.type === 'image' ? '🖼' : '📄'}
+          </span>
+          <span className="agent-attach-name">{a.name}</span>
+          <button
+            type="button"
+            className="agent-attach-remove"
+            aria-label={`Remove ${a.name}`}
+            onClick={() => useAgentPanel.getState().removeAttachment(i)}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  )
 }
 
 function SessionRow({ s, active }: { s: AcpSessionView; active: boolean }): React.JSX.Element {
@@ -85,6 +135,40 @@ function SessionRow({ s, active }: { s: AcpSessionView; active: boolean }): Reac
   )
 }
 
+/** Copy control (chat-completeness COPY): writes `text` to the clipboard with a
+ *  brief "Copied" acknowledgement (glyph + word, never color alone). Same
+ *  navigator.clipboard.writeText the settings device-flow uses. */
+function CopyButton({
+  text,
+  className,
+  label,
+}: {
+  text: string
+  className: string
+  label: string
+}): React.JSX.Element {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      type="button"
+      className={className}
+      title={label}
+      aria-label={label}
+      onClick={() => {
+        try {
+          void navigator.clipboard?.writeText(text)
+        } catch {
+          // no clipboard (node/test) — best-effort, never throw
+        }
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1200)
+      }}
+    >
+      {copied ? '✓ Copied' : 'Copy'}
+    </button>
+  )
+}
+
 /** One thread bubble. Memoized because commitChunks preserves the object
  *  reference of every SETTLED item and only replaces the growing last one, so
  *  memo skips re-parsing markdown for the whole backlog on each streaming rAF
@@ -103,11 +187,52 @@ export const ThreadItem = memo(function ThreadItem({ item }: { item: AcpChatItem
       </details>
     )
   }
-  // user + agent bubbles: sanitized, syntax-highlighted markdown
-  const cls =
-    item.type === 'user' ? 'agent-msg agent-msg-user agent-md' : 'agent-msg agent-msg-agent agent-md'
-  return <div className={cls}>{renderAgentMarkdown(item.text)}</div>
+  // user bubble: sanitized, syntax-highlighted markdown (no copy button — the
+  // user wrote it; fenced code inside still gets its own copy affordance)
+  if (item.type === 'user') {
+    return <div className="agent-msg agent-msg-user agent-md">{renderAgentMarkdown(item.text)}</div>
+  }
+  // agent bubble: markdown + a hover copy button (COPY: raw markdown of the reply)
+  return (
+    <div className="agent-msg agent-msg-agent agent-md">
+      {renderAgentMarkdown(item.text)}
+      <CopyButton text={item.text} className="agent-copy-msg" label="Copy message" />
+    </div>
+  )
 })
+
+/** B2 cross-provider continuation (the killer feature): continue the ACTIVE
+ *  conversation in a DIFFERENT provider. One button per provider that isn't the
+ *  active session's current agent; clicking runs agent.continue (a new session
+ *  bound to the SAME transcript), never a fresh openHere. Rendered only for a
+ *  session with a persisted conversation (conversationId) — a no-db session has
+ *  no transcript to carry. NOT a cobalt primary (Send owns the one-per-view). */
+function ContinueControl({ active }: { active: AcpSessionView }): React.JSX.Element | null {
+  if (!active.conversationId) return null
+  const others = AGENTS.filter((a) => a !== active.agent)
+  if (others.length === 0) return null
+  return (
+    <div
+      className="agent-continue"
+      role="group"
+      aria-label="Continue this conversation in another agent"
+    >
+      <span className="agent-continue-label">Continue in</span>
+      {others.map((a) => (
+        <button
+          key={a}
+          type="button"
+          className="agent-continue-btn"
+          title={`Continue this conversation in ${AGENT_META[a].label} (carries the transcript)`}
+          aria-label={`Continue in ${AGENT_META[a].label}`}
+          onClick={() => void useAgentPanel.getState().continueIn(a)}
+        >
+          <span className="agent-tag">[{agentTag(a)}]</span> {AGENT_META[a].label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 /** Inline auth/error card — graceful, never a crash or modal. */
 function StateNote({ s }: { s: AcpSessionView }): React.JSX.Element {
@@ -116,11 +241,7 @@ function StateNote({ s }: { s: AcpSessionView }): React.JSX.Element {
     <div className={err ? 'agent-state-note is-err' : 'agent-state-note'}>
       <div className="agent-state-note-head">{err ? '✕ error' : '⚠ signed out'}</div>
       {s.detail && <div className="agent-state-note-detail">{s.detail}</div>}
-      {!err && (
-        <div className="agent-state-note-hint">
-          Run `claude /login` (or `codex login`) in the terminal, then start a new session.
-        </div>
-      )}
+      {!err && <AgentLoginCard agent={s.agent} />}
     </div>
   )
 }
@@ -130,6 +251,7 @@ export function AgentPanel(): React.JSX.Element | null {
   const width = useAgentPanel((s) => s.width)
   const filter = useAgentPanel((s) => s.filter)
   const providerAuth = useAgentPanel((s) => s.providerAuth)
+  const popout = useAgentPanel((s) => s.popout)
   const sessions = useAgentPanel((s) => s.sessions)
   const activeId = useAgentPanel((s) => s.activeId)
   const active = sessions.find((v) => v.sessionId === activeId) ?? null
@@ -139,10 +261,16 @@ export function AgentPanel(): React.JSX.Element | null {
 
   // draft lives in the store (A8) so addContext (add-to-chat) can pre-fill it
   const draft = useAgentPanel((s) => s.draft)
+  // staged attachments (B4) live in the store so paste + the picker share them
+  const attachments = useAgentPanel((s) => s.attachments)
   const threadRef = useRef<HTMLDivElement>(null)
   // auto-scroll only while the user is already at the bottom — never yank
   // someone who scrolled up to read
   const stickRef = useRef(true)
+  // state twin of stickRef (chat-completeness JUMP): stickRef is a ref (no
+  // re-render), so mirror it into state to drive the jump-to-newest button's
+  // visibility. true = pinned to bottom → button hidden.
+  const [atBottom, setAtBottom] = useState(true)
 
   const itemCount = active?.items.length ?? 0
   useEffect(() => {
@@ -150,30 +278,78 @@ export function AgentPanel(): React.JSX.Element | null {
     if (el && stickRef.current) el.scrollTop = el.scrollHeight
   }, [itemCount, active?.items])
 
-  if (!open) {
-    // closed with no sessions → nothing (terminal-drawer precedent);
-    // closed with sessions alive → only the reopen tab at the right edge
-    if (sessions.length === 0) return null
-    return (
-      <button
-        type="button"
-        className="agent-panel-reopen"
-        title="Show the agent panel (⌘J)"
-        aria-label="Show the agent panel"
-        onClick={() => useAgentPanel.getState().toggle()}
-      >
-        ‹
-      </button>
-    )
-  }
-
   const canSend = active !== null && active.state === 'ready' && !active.busy
+  const hasContent = draft.trim().length > 0 || attachments.length > 0
+  // chat-completeness RETRY: offered only when the session is idle AND there is
+  // a prior user turn with resendable text (an attachment-only turn strips to '')
+  const retryText = active ? lastUserText(active.items) : null
+  const canRetry = canSend && retryText !== null && retryText.trim().length > 0
+
+  // B4 attach: paste (ClipboardEvent images/files) + an attach button that opens
+  // a hidden file input; images ride as base64, other files as their real path
+  // (webUtils.getPathForFile — the adapter reads it, no `fs` client capability).
+  // URLs paste as plain text (default textarea behavior — no special handling).
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [attachNotice, setAttachNotice] = useState<string | null>(null)
 
   function submit(): void {
-    if (!canSend || !draft.trim()) return
+    if (!canSend || !hasContent) return
     const text = draft
     useAgentPanel.getState().setDraft('')
+    setAttachNotice(null)
+    // send reads (and clears) the staged attachments from the store
     void useAgentPanel.getState().send(text)
+  }
+
+  async function ingestFiles(files: File[]): Promise<void> {
+    let imageBlocked = false
+    for (const file of files) {
+      if (file.type.startsWith('image/')) {
+        // gate on the active session's advertised image capability: a known
+        // false blocks with a notice; undefined (not yet ready) allows
+        // optimistically — the core drops it defensively if still unsupported
+        if (active?.imageInput === false) {
+          imageBlocked = true
+          continue
+        }
+        try {
+          const dataB64 = await fileToBase64(file)
+          useAgentPanel.getState().addAttachment({
+            type: 'image',
+            mimeType: file.type || 'image/png',
+            dataB64,
+            name: file.name || 'pasted image',
+          })
+        } catch {
+          // unreadable clipboard image — skip it silently, never crash the paste
+        }
+      } else {
+        let path = ''
+        try {
+          path = pathForFile(file)
+        } catch {
+          path = '' // no bridge / not a real file — can't attach a path
+        }
+        if (!path) continue
+        useAgentPanel
+          .getState()
+          .addAttachment({ type: 'resource', path, name: file.name || path })
+      }
+    }
+    const label = active ? AGENT_META[active.agent].label : 'This agent'
+    setAttachNotice(imageBlocked ? `${label} doesn’t accept image attachments.` : null)
+  }
+
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>): void {
+    const files = Array.from(e.clipboardData.files)
+    if (files.length === 0) return // plain text / URL → default paste inserts it
+    e.preventDefault() // handling the files ourselves — don't also paste their names
+    void ingestFiles(files)
+  }
+
+  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>): void {
+    void ingestFiles(Array.from(e.target.files ?? []))
+    e.target.value = '' // reset so re-picking the same file fires change again
   }
 
   // Slash-command autocomplete (the agent's advertised commands, A7). The menu
@@ -201,6 +377,28 @@ export function AgentPanel(): React.JSX.Element | null {
     useAgentPanel.getState().setDraft(`/${name} `)
     setSlashDismissed(true)
     inputRef.current?.focus()
+  }
+
+  // Early return placed AFTER every hook above (Rules of Hooks): a conditional
+  // return ahead of the hooks changes the hook count between the closed and open
+  // renders (13 → 21) and unmounts the whole tree with "Rendered more hooks than
+  // during the previous render". All hooks are declared unconditionally; only the
+  // rendered output branches on `open`.
+  if (!open) {
+    // closed with no sessions → nothing (terminal-drawer precedent);
+    // closed with sessions alive → only the reopen tab at the right edge
+    if (sessions.length === 0) return null
+    return (
+      <button
+        type="button"
+        className="agent-panel-reopen"
+        title="Show the agent panel (⌘J)"
+        aria-label="Show the agent panel"
+        onClick={() => useAgentPanel.getState().toggle()}
+      >
+        ‹
+      </button>
+    )
   }
 
   return (
@@ -258,6 +456,20 @@ export function AgentPanel(): React.JSX.Element | null {
         >
           +
         </button>
+        {active?.conversationId && (
+          // B3 pop-out: hand the active conversation to its OWN standalone window
+          // (its own core, same vault app.db → resumed from the transcript).
+          // Shown only for a session with a persisted conversation to carry.
+          <button
+            type="button"
+            className="agent-head-btn"
+            title="Pop out this conversation into its own window (⇧⌘O)"
+            aria-label="Pop out this conversation"
+            onClick={() => void useAgentPanel.getState().popOut()}
+          >
+            ⧉
+          </button>
+        )}
         <button
           type="button"
           className="rail-collapse"
@@ -268,6 +480,15 @@ export function AgentPanel(): React.JSX.Element | null {
           ›
         </button>
       </div>
+      {popout && (
+        // B3 single-port limitation (see main/index.ts open-agent): this pop-out
+        // is a secondary window, so its core can't claim the one fixed in-app
+        // MCP port — the popped-out session runs without the loredex MCP tools.
+        <div className="agent-popout-note" role="note">
+          ⧉ Popped-out window — the in-app MCP server binds one port claimed by the
+          main window, so this conversation has no loredex MCP tools here.
+        </div>
+      )}
       {shown.length > 0 && (
         <div className="agent-sessions">
           {shown.map((s) => (
@@ -275,6 +496,7 @@ export function AgentPanel(): React.JSX.Element | null {
           ))}
         </div>
       )}
+      {active !== null && <ContinueControl active={active} />}
       {active !== null && <UsageBar usage={active.usage} authMode={active.authMode} />}
       {active !== null && <SessionInfoPanel session={active} />}
       <div
@@ -282,7 +504,10 @@ export function AgentPanel(): React.JSX.Element | null {
         ref={threadRef}
         onScroll={() => {
           const el = threadRef.current
-          if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+          if (!el) return
+          const stuck = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+          stickRef.current = stuck
+          setAtBottom(stuck)
         }}
       >
         {active === null ? (
@@ -299,6 +524,26 @@ export function AgentPanel(): React.JSX.Element | null {
               <StateNote s={active} />
             )}
           </>
+        )}
+        {active !== null && !atBottom && (
+          // chat-completeness JUMP: a sticky pill pinned to the bottom of the
+          // thread viewport, shown only while scrolled up — click scrolls to the
+          // newest message and re-arms auto-scroll.
+          <button
+            type="button"
+            className="agent-jump-bottom"
+            title="Jump to newest"
+            aria-label="Jump to newest message"
+            onClick={() => {
+              const el = threadRef.current
+              if (!el) return
+              el.scrollTop = el.scrollHeight
+              stickRef.current = true
+              setAtBottom(true)
+            }}
+          >
+            ↓ Newest
+          </button>
         )}
       </div>
       {active !== null && active.plan.length > 0 && (
@@ -319,7 +564,61 @@ export function AgentPanel(): React.JSX.Element | null {
           onPick={pickSlash}
         />
       )}
+      {attachments.length > 0 && <AttachmentTray items={attachments} />}
+      {attachNotice && (
+        <div className="agent-attach-notice" role="note">
+          ⚠ {attachNotice}
+        </div>
+      )}
+      {active !== null && (
+        // chat-completeness NEW + RETRY: conversation-level actions above the
+        // composer. "New conversation" is the labeled twin of the header + icon
+        // (both reuse openHere — a new session IS a fresh transcript, B0);
+        // Retry re-sends the last user turn. Hairline text buttons, never the
+        // cobalt primary (Send owns the one-per-view).
+        <div className="agent-composer-tools" role="group" aria-label="Conversation actions">
+          <button
+            type="button"
+            className="agent-new-convo"
+            title="Start a new conversation (a fresh session at the vault root)"
+            aria-label="New conversation"
+            onClick={() => void useAgentPanel.getState().openHere()}
+          >
+            ＋ New conversation
+          </button>
+          {canRetry && (
+            <button
+              type="button"
+              className="agent-retry-btn"
+              title="Re-send the last message"
+              aria-label="Retry last message"
+              onClick={() => void useAgentPanel.getState().retry()}
+            >
+              ↻ Retry
+            </button>
+          )}
+        </div>
+      )}
       <div className="agent-input">
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="agent-attach-input"
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={onPickFiles}
+        />
+        <button
+          type="button"
+          className="agent-attach-btn"
+          title="Attach files or images"
+          aria-label="Attach files or images"
+          disabled={!canSend}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          📎
+        </button>
         <textarea
           ref={inputRef}
           className="agent-input-field"
@@ -327,6 +626,7 @@ export function AgentPanel(): React.JSX.Element | null {
           placeholder={canSend ? 'Message the agent…  (↵ send · ⇧↵ newline)' : 'Needs a ready session'}
           value={draft}
           disabled={!canSend}
+          onPaste={onPaste}
           onChange={(e) => useAgentPanel.getState().setDraft(e.target.value)}
           onKeyDown={(e) => {
             // Shift+↵ inserts a newline (chat convention); everything else on
@@ -375,7 +675,7 @@ export function AgentPanel(): React.JSX.Element | null {
           </Button>
         ) : (
           // the panel's ONE cobalt primary (one-per-view law)
-          <Button variant="primary" kbd="↵" disabled={!canSend || !draft.trim()} onClick={submit}>
+          <Button variant="primary" kbd="↵" disabled={!canSend || !hasContent} onClick={submit}>
             Send
           </Button>
         )}

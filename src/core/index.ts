@@ -29,6 +29,7 @@ import {
   loadOrCreateMcpToken,
 } from './settings'
 import { killAllAcpSessions } from './acp'
+import { loadAgentKeys } from './agent-keys'
 import { killAllTerminals } from './terminals'
 import { startVaultWatcher } from './watcher'
 import { writeLock } from './write-lock'
@@ -58,6 +59,9 @@ notifier.refresh()
 // app-db meta (the meta cache answers until the probe lands); Settings
 // re-checks via github.capability {refresh}. Absent gh = plain links, no PRs.
 void initGhCapability(appDb)
+// B1: fold any keychain-stored adapter API keys into the in-memory cache the
+// acp spawn path reads (agent-keys) — best-effort, never blocks boot.
+void loadAgentKeys()
 
 // vault_id scopes every app-db row (story 9.2); null without a config or db.
 const vid = config && appDb ? vaultId(config.vaultPath, engine.identity().remote) : null

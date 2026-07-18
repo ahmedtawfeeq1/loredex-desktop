@@ -35,6 +35,11 @@ interface TerminalState {
   exited: Record<string, number>
   load(): Promise<void>
   toggle(): Promise<void>
+  /** B1 one-click login: open the drawer (spawning a shell if none) and run a
+   *  command line in the active pty — `claude /login` / `codex login` land here
+   *  so the user reuses the same subscription, no API key. Best-effort: no core
+   *  / spawn refused → no-op, never throws. */
+  runCommand(command: string): Promise<void>
   splitActive(dir: 'row' | 'column'): Promise<void>
   closePane(id: string): Promise<void>
   setActive(id: string): void
@@ -127,6 +132,25 @@ export const useTerminal = create<TerminalState>((set, get) => ({
     }
     set({ open: !open })
     persist()
+  },
+
+  async runCommand(command) {
+    // ensure a live pty AND a visible drawer — the login command must be seen
+    if (get().root === null) {
+      await get().toggle() // spawns the shell and opens the drawer
+    } else if (!get().open) {
+      set({ open: true })
+      persist()
+    }
+    const { root, activeId } = get()
+    const id = activeId ?? (root ? firstTermId(root) : null)
+    if (!id) return // spawn refused / no core — best-effort, never throw
+    const data = command.endsWith('\n') ? command : `${command}\n`
+    try {
+      await invoke('term.input', { id, data })
+    } catch {
+      // pty died / no bridge (node tests) — best-effort
+    }
   },
 
   async splitActive(dir) {

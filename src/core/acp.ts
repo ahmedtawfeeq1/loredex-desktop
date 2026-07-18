@@ -11,11 +11,15 @@
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { basename } from 'node:path'
 import { Readable, Writable } from 'node:stream'
+import { pathToFileURL } from 'node:url'
 import type {
+  AgentCapabilities,
   AuthMethod,
   ClientConnection,
   ClientContext,
+  ContentBlock,
   McpServer,
   RequestPermissionRequest,
   RequestPermissionResponse,
@@ -27,14 +31,25 @@ import type {
 } from '@agentclientprotocol/sdk'
 import {
   type AcpAgent,
+  type AcpAttachment,
   type AcpAuthMethod,
+  type AcpConvMessage,
   type AcpSessionState,
   type AcpToolContent,
   type AcpToolLocation,
   type CoreEvent,
   ipcError,
 } from '../shared/ipc-contract'
-import { authMode, spawnAdapter, StderrRing } from './acp-spawn'
+import { authMode, spawnAdapter, spawnErrorDetail, StderrRing } from './acp-spawn'
+import { agentKeyEnv } from './agent-keys'
+import {
+  appendMessage,
+  createConversation,
+  loadConversation,
+  renderSeed,
+  setConvProviderSession,
+} from './agent-conversations'
+import type { AppDb } from './db/index'
 import { getMcpStatus } from './mcp-server'
 import { mintAgentToken, revokeAgentToken } from './settings'
 
@@ -45,12 +60,52 @@ const MAX_ACP_SESSIONS = 4
 
 const CANCELLED: RequestPermissionResponse = { outcome: { outcome: 'cancelled' } }
 
+/** B2 cross-provider seed transport: the uri of the embedded {type:'resource'}
+ *  context block (opaque — the adapter reads resource.text). */
+const SEED_URI = 'loredex://conversation-seed'
+
+/** B2: prepended to a rendered transcript so the target reads it as prior
+ *  context to continue, not as a message to answer. */
+const SEED_PREFACE =
+  'You are continuing an existing conversation. The transcript below is prior context ' +
+  'from another session — pick up where it left off; do not repeat or summarize it.\n\n'
+
+/** app.db handle + vault_id for transcript persistence (B0). null in a bare
+ *  host (no db) — the session still runs, persistence is a no-op (read-state's
+ *  degrade rule). */
+export interface ConvPersist {
+  db: AppDb
+  vaultId: string
+}
+
 interface AcpSession {
   agent: AcpAgent
   child: ReturnType<typeof spawnAdapter> | null // null until boot spawns it
   connection: ClientConnection | null // sdk connection handle, closed on stop
   agentCtx: ClientContext | null // typed context for agent-side requests
   acpSessionId: string | null // the ADAPTER's session/new id (≠ our id)
+  /** OUR vault-scoped thread id (B0) — many AcpSessions over its life (one per
+   *  provider switch / resume / pop-out), the transcript persisted core-side. */
+  conversationId: string
+  /** cross-provider seed context replayed on the next prompt (B2): the rendered
+   *  transcript, prepended as the FIRST prompt block, then cleared. */
+  pendingSeed: string | null
+  /** same-provider native-resume target (B2): the adapter's OWN session id for
+   *  THIS provider (agent_conv_providers). Set AND loadSession-advertised → boot
+   *  calls session/load instead of session/new (and drops pendingSeed). */
+  resumeSessionId: string | null
+  /** promptCapabilities.embeddedContext (B2), captured at initialize — a seed
+   *  rides a {type:'resource'} block when true, else a plain text block. */
+  embeddedContext: boolean
+  /** promptCapabilities.image (B4), captured at initialize — an image
+   *  attachment rides a {type:'image'} block only when true (else dropped;
+   *  the renderer gates on this too, surfaced on the ready event). */
+  imageInput: boolean
+  /** true only while a session/load replay is in flight (B2): routeUpdate drops
+   *  the replayed history (our transcript is the source of truth). */
+  replaying: boolean
+  /** transcript backend — null in a bare host (persistence degrades to no-op). */
+  persist: ConvPersist | null
   state: AcpSessionState
   stderr: StderrRing
   turnActive: boolean
@@ -106,6 +161,17 @@ function errDetail(err: unknown, ring: StderrRing): string {
   return tail ? `${first} — ${tail}` : first
 }
 
+/** Persist one transcript message (B0) — best-effort: a db failure must never
+ *  kill a live turn, and a bare host (no persist backend) is a clean no-op. */
+function persistMessage(s: AcpSession, msg: AcpConvMessage): void {
+  if (!s.persist) return
+  try {
+    appendMessage(s.persist.db, s.conversationId, msg)
+  } catch {
+    // transcript is disposable app-db state — losing a row never blocks the chat
+  }
+}
+
 function flushChunks(sessionId: string): void {
   const s = sessions.get(sessionId)
   if (!s) return
@@ -117,6 +183,9 @@ function flushChunks(sessionId: string): void {
   const { role, text } = s.buf
   s.buf = null
   s.emit({ kind: 'acp.chunk', sessionId, role, text })
+  // the flush seam is the persistence seam — appendMessage grows the last
+  // same-role row, so per-flush fragments reassemble into one contiguous run.
+  persistMessage(s, { role, text })
 }
 
 function appendChunk(sessionId: string, role: 'agent' | 'thought', text: string): void {
@@ -148,11 +217,24 @@ function revokeToken(s: AcpSession): void {
   s.tokenName = null
 }
 
-/** Long-job law made literal: allocate + return sync; boot streams the rest. */
+/** Long-job law made literal: allocate + return sync; boot streams the rest.
+ *  B0: bind (or create) the vault-scoped conversation whose transcript this
+ *  session persists into — the renderer hydrates it via agent.conv.load. */
 export function acpStart(
   emit: (e: CoreEvent) => void,
-  arg: { agent: AcpAgent; cwd: string },
-): { sessionId: string } {
+  arg: {
+    agent: AcpAgent
+    cwd: string
+    conversationId?: string
+    persist?: ConvPersist | null
+    /** B2: prior transcript to seed onto the first prompt (cross-provider or a
+     *  fallback when native session/load is unavailable). */
+    seed?: string | null
+    /** B2: the target provider's own prior adapter session id — boot attempts a
+     *  native session/load when the adapter advertises loadSession. */
+    resumeSessionId?: string | null
+  },
+): { sessionId: string; conversationId: string } {
   let isDir = false
   try {
     isDir = statSync(arg.cwd).isDirectory()
@@ -166,6 +248,13 @@ export function acpStart(
   if (sessions.size >= MAX_ACP_SESSIONS) {
     throw ipcError('INTERNAL', `agent session limit reached (${MAX_ACP_SESSIONS})`)
   }
+  const persist = arg.persist ?? null
+  // resume an existing thread, else start a fresh one. With no db (bare host) an
+  // ephemeral uuid keeps the contract's non-null conversationId — persistence
+  // is simply a no-op for that session.
+  const conversationId =
+    arg.conversationId ??
+    (persist ? createConversation(persist.db, persist.vaultId, { agent: arg.agent }).id : randomUUID())
   const sessionId = randomUUID()
   const s: AcpSession = {
     agent: arg.agent,
@@ -173,6 +262,13 @@ export function acpStart(
     connection: null,
     agentCtx: null,
     acpSessionId: null,
+    conversationId,
+    pendingSeed: arg.seed ?? null,
+    resumeSessionId: arg.resumeSessionId ?? null,
+    embeddedContext: false,
+    imageInput: false,
+    replaying: false,
+    persist,
     state: 'starting',
     stderr: new StderrRing(),
     turnActive: false,
@@ -221,7 +317,35 @@ export function acpStart(
       })
     }
   })
-  return { sessionId }
+  return { sessionId, conversationId }
+}
+
+/** B2 cross-provider continuation (the killer feature): start a NEW session on
+ *  targetProvider bound to the SAME conversation, carrying the prior transcript.
+ *  boot resolves the mechanism — a same-provider resume with the adapter's own
+ *  loadSession replays natively (seed dropped); anything else (a true provider
+ *  switch, or an adapter without loadSession) seeds the rendered transcript onto
+ *  the first prompt. Throws ACP_CONV_UNKNOWN for an unknown / cross-vault id
+ *  (the seam scope-checks too; this is defence in depth). */
+export function acpContinue(
+  emit: (e: CoreEvent) => void,
+  arg: { conversationId: string; targetProvider: AcpAgent; cwd: string; persist: ConvPersist },
+): { sessionId: string; conversationId: string } {
+  const loaded = loadConversation(arg.persist.db, arg.conversationId)
+  if (!loaded || loaded.vaultId !== arg.persist.vaultId) {
+    throw ipcError('ACP_CONV_UNKNOWN', 'unknown conversation')
+  }
+  const resumeSessionId = resumeTargetSessionId(loaded, arg.targetProvider)
+  const seed = renderSeed(arg.persist.db, arg.conversationId)
+  return acpStart(emit, {
+    agent: arg.targetProvider,
+    cwd: arg.cwd,
+    conversationId: arg.conversationId,
+    persist: arg.persist,
+    resumeSessionId,
+    // the seed is a fallback: boot drops it when a native session/load succeeds
+    seed: seed ? SEED_PREFACE + seed : null,
+  })
 }
 
 /** Spawn → ndJsonStream → sdk client → initialize → session/new → 'ready'.
@@ -229,7 +353,9 @@ export function acpStart(
 async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<void> {
   const s = sessions.get(sessionId)
   if (!s) return
-  const child = spawnAdapter(agent, cwd)
+  // B1: fold any keychain-stored API key for this agent into its OWN env
+  // (least-privilege scoped inside adapterEnv). No key set → subscription login.
+  const child = spawnAdapter(agent, cwd, agentKeyEnv())
   s.child = child
   child.stderr.on('data', (chunk: Buffer) => s.stderr.push(chunk))
   // spawn failure fires 'error', not 'exit' — unhandled it would CRASH the
@@ -247,7 +373,8 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
       sessionId,
       agent,
       state: 'error',
-      detail: err.message.split('\n')[0],
+      // ENOENT on a user-binary adapter (gemini not on PATH) → install hint
+      detail: spawnErrorDetail(agent, err),
     })
   })
   child.on('exit', () => {
@@ -298,6 +425,10 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
   // capture BEFORE the liveness guard so the -32000 catch has it even if the
   // session is torn down across the next await
   if (init.authMethods) s.authMethods = init.authMethods.map(mapAuthMethod)
+  // B2: whether a cross-provider seed may ride an embedded resource block
+  s.embeddedContext = init.agentCapabilities?.promptCapabilities?.embeddedContext === true
+  // B4: whether image attachments may ride a {type:'image'} block on prompts
+  s.imageInput = init.agentCapabilities?.promptCapabilities?.image === true
   if (!sessions.has(sessionId)) return
   // MCP auto-attach: core-local server + adapter http support → one bearer
   // minted per session, attributed in the Agents view. The token never
@@ -316,13 +447,64 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
       },
     ]
   }
-  const created = await connection.agent.request(sdk.methods.agent.session.new, {
-    cwd,
-    mcpServers,
-  })
-  if (!sessions.has(sessionId)) return
-  s.acpSessionId = created.sessionId
+  // B2 continuation: a same-provider resume (session/load, loadSession cap) lets
+  // the adapter restore its OWN context by replaying the whole conversation — we
+  // suppress that replay (routeUpdate early-returns while replaying) because our
+  // transcript is the source of truth the renderer already hydrated from. Every
+  // other case (cross-provider, or an adapter without loadSession) uses
+  // session/new and carries the transcript as pendingSeed on the first prompt.
+  let modes: SessionModeState | null | undefined
+  let acpSessionId: string | null = null
+  if (canLoadSession(s.resumeSessionId, init.agentCapabilities)) {
+    // Native same-provider resume. The resume id was minted by a DIFFERENT
+    // adapter process (every acpStart forks a fresh child; a pop-out forks a
+    // fresh core too), so this session/load is cross-process — it can reject when
+    // the adapter doesn't restore ids across processes (unverified for codex/
+    // gemini). On rejection we DON'T let it kill the session: we degrade to
+    // session/new keeping pendingSeed, so the rendered transcript seed carries the
+    // context the native resume would have restored. Without this the whole
+    // pop-out / resume feature hard-errors for any adapter without cross-process
+    // loadSession, even though the seed fallback is already sitting right here.
+    const resumeId = s.resumeSessionId
+    s.replaying = true
+    try {
+      const loaded = await connection.agent.request(sdk.methods.agent.session.load, {
+        sessionId: resumeId,
+        cwd,
+        mcpServers,
+      })
+      if (!sessions.has(sessionId)) return
+      acpSessionId = resumeId
+      s.pendingSeed = null // native resume restored context — the seed is redundant
+      modes = loaded?.modes
+    } catch (err) {
+      if (errCode(err) === -32000) throw err // auth — let boot's auth_required path own it
+      if (!sessions.has(sessionId)) return // torn down across the failed load
+      // acpSessionId stays null → the session/new fallback below runs, pendingSeed intact
+    } finally {
+      s.replaying = false // lift routeUpdate suppression for the fallback path
+    }
+  }
+  if (acpSessionId === null) {
+    const created = await connection.agent.request(sdk.methods.agent.session.new, {
+      cwd,
+      mcpServers,
+    })
+    if (!sessions.has(sessionId)) return
+    acpSessionId = created.sessionId
+    modes = created.modes
+  }
+  s.acpSessionId = acpSessionId
   s.state = 'ready'
+  // record the adapter's provider-scoped session id against our conversation —
+  // same-provider native resume (session/load) reads it back (B0 seam for B2).
+  if (s.persist) {
+    try {
+      setConvProviderSession(s.persist.db, s.conversationId, agent, acpSessionId)
+    } catch {
+      // best-effort — a missing provider row only costs a native resume, not the turn
+    }
+  }
   // surface the attached MCP servers on ready — name/url ONLY. The headers
   // array carries the per-session bearer token and MUST NOT reach the renderer,
   // so it is never mapped here (A7 security invariant).
@@ -336,11 +518,12 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
     agent,
     state: 'ready',
     ...(attachedMcp.length ? { mcpServers: attachedMcp } : {}),
-    authMode: authMode(agent),
+    authMode: authMode(agent, agentKeyEnv()),
+    imageInput: s.imageInput,
   })
-  // initial modes (NewSessionResponse.modes) — the full set + current id, so
-  // the session-info view can render the switcher without waiting for a change
-  if (created.modes) s.emit(mapModeState(sessionId, created.modes))
+  // initial modes (New/LoadSessionResponse.modes) — the full set + current id,
+  // so the session-info view can render the switcher without waiting for a change
+  if (modes) s.emit(mapModeState(sessionId, modes))
 }
 
 /** InitializeResponse authMethod → the captured shape (Phase-2 login). `type`
@@ -419,6 +602,69 @@ function mapTurnUsage(u: Usage): {
     ...(u.cachedReadTokens != null ? { cached: u.cachedReadTokens } : {}),
     ...(u.thoughtTokens != null ? { thought: u.thoughtTokens } : {}),
   }
+}
+
+/** B2: the target provider's own prior adapter session id for same-provider
+ *  native resume, or null when this conversation never ran on that provider (a
+ *  true cross-provider switch → seed instead). Pure. */
+export function resumeTargetSessionId(
+  loaded: { providers: { provider: AcpAgent; acpSessionId: string | null }[] },
+  target: AcpAgent,
+): string | null {
+  return loaded.providers.find((p) => p.provider === target)?.acpSessionId ?? null
+}
+
+/** B2: session/load is chosen ONLY when we have the target provider's own prior
+ *  session id AND the adapter advertises loadSession — otherwise the rendered
+ *  transcript seed carries the context. Type-guards resumeSessionId to non-null
+ *  so boot can pass it straight to session/load. */
+export function canLoadSession(
+  resumeSessionId: string | null,
+  caps: AgentCapabilities | undefined,
+): resumeSessionId is string {
+  return resumeSessionId !== null && caps?.loadSession === true
+}
+
+/** B2: one seed ContentBlock — an embedded {type:'resource'} when the adapter
+ *  advertises promptCapabilities.embeddedContext, else a plain text block. */
+export function seedBlock(seed: string, embeddedContext: boolean): ContentBlock {
+  return embeddedContext
+    ? { type: 'resource', resource: { uri: SEED_URI, mimeType: 'text/markdown', text: seed } }
+    : { type: 'text', text: seed }
+}
+
+/** B4: one attachment → its ContentBlock, or null when it must be dropped.
+ *  An image rides a {type:'image'} block ONLY when the adapter advertises
+ *  promptCapabilities.image (else null — the renderer already gated, this is
+ *  defence in depth). A file path rides a baseline {type:'resource_link'} with
+ *  a file:// uri + basename name — the adapter reads it itself (no `fs` client
+ *  capability; resource_link is baseline so it needs no capability gate). */
+export function attachmentBlock(a: AcpAttachment, imageInput: boolean): ContentBlock | null {
+  if (a.type === 'image') {
+    return imageInput ? { type: 'image', data: a.dataB64, mimeType: a.mimeType } : null
+  }
+  return { type: 'resource_link', uri: pathToFileURL(a.path).href, name: basename(a.path) }
+}
+
+/** B2: the prompt blocks for one turn — a pending cross-provider seed rides as
+ *  the FIRST block (prior transcript as context), the user's text second, then
+ *  B4 attachments (images gated on imageInput, file paths as baseline resource
+ *  links). No seed → just the text (+ attachments) (the ordinary turn). */
+export function buildPromptBlocks(
+  text: string,
+  seed: string | null,
+  embeddedContext: boolean,
+  attachments?: AcpAttachment[],
+  imageInput = false,
+): ContentBlock[] {
+  const blocks: ContentBlock[] = []
+  if (seed) blocks.push(seedBlock(seed, embeddedContext))
+  blocks.push({ type: 'text', text })
+  for (const a of attachments ?? []) {
+    const block = attachmentBlock(a, imageInput)
+    if (block) blocks.push(block)
+  }
+  return blocks
 }
 
 /** What one session/update maps to: a batched chunk, an immediate CoreEvent
@@ -520,12 +766,32 @@ export function mapUpdate(sessionId: string, update: SessionNotification['update
 function routeUpdate(sessionId: string, note: SessionNotification): void {
   const s = sessions.get(sessionId)
   if (!s) return
+  // B2: during a session/load the adapter replays the ENTIRE conversation — drop
+  // it. Our transcript already holds it (the renderer hydrates from that copy),
+  // so re-emitting would double the thread and re-appending would double the db.
+  if (s.replaying) return
   const action = mapUpdate(sessionId, note.update)
   if (action.act === 'chunk') {
     appendChunk(sessionId, action.role, action.text)
   } else if (action.act === 'event') {
     flushChunks(sessionId) // ordering law: chunks land BEFORE the tool/plan row
     s.emit(action.event)
+    // only tool rows join the transcript — plan/usage/commands/mode are ephemeral
+    // session metadata, never replayed as seed. Upsert by toolCallId (B0).
+    if (action.event.kind === 'acp.tool') {
+      const t = action.event
+      persistMessage(s, {
+        role: 'tool',
+        tool: {
+          toolCallId: t.toolCallId,
+          ...(t.title != null ? { title: t.title } : {}),
+          ...(t.toolKind != null ? { toolKind: t.toolKind } : {}),
+          ...(t.status != null ? { status: t.status } : {}),
+          ...(t.content ? { content: t.content } : {}),
+          ...(t.locations ? { locations: t.locations } : {}),
+        },
+      })
+    }
   }
 }
 
@@ -577,8 +843,9 @@ function routePermission(
 }
 
 /** Fire-and-forget the minutes-long session/prompt request; the turn closes
- *  with an acp.turnEnd event (long-job law — never an invoke result). */
-export function acpPrompt(sessionId: string, text: string): void {
+ *  with an acp.turnEnd event (long-job law — never an invoke result). B4:
+ *  attachments ride the prompt as extra ContentBlocks after the text. */
+export function acpPrompt(sessionId: string, text: string, attachments?: AcpAttachment[]): void {
   const s = sessions.get(sessionId)
   if (!s) throw ipcError('ACP_UNKNOWN', 'unknown agent session')
   if (s.state !== 'ready' || !s.agentCtx || !s.acpSessionId) {
@@ -587,12 +854,23 @@ export function acpPrompt(sessionId: string, text: string): void {
   if (s.turnActive) throw ipcError('ACP_BUSY', 'a turn is already in flight')
   s.turnActive = true
   s.cancelling = false
+  // the user turn joins the transcript before the prompt rides the wire (B0) —
+  // adapters echo it as user_message_chunk, which mapUpdate ignores, so this is
+  // the only place the user's words are persisted
+  persistMessage(s, { role: 'user', text })
   // ceiling: one turn in flight per session (ACP_BUSY above)
   const sdk = sdkModule! // state 'ready' implies boot loaded it
+  // B2: a cross-provider continuation seeds the prior transcript as the FIRST
+  // block of this first turn, then clears it — the adapter now holds the context.
+  // Only the user's `text` is persisted (above); the seed is derived from the
+  // transcript, so persisting it would duplicate what it was rendered from. B4:
+  // attachments ride after the text (unsupported images dropped by attachmentBlock).
+  const prompt = buildPromptBlocks(text, s.pendingSeed, s.embeddedContext, attachments, s.imageInput)
+  s.pendingSeed = null
   void s.agentCtx
     .request(sdk.methods.agent.session.prompt, {
       sessionId: s.acpSessionId,
-      prompt: [{ type: 'text', text }],
+      prompt,
     })
     .then((res) => {
       const cur = sessions.get(sessionId)

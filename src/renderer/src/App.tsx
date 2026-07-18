@@ -6,7 +6,7 @@
 import { Fragment, useEffect } from 'react'
 import { appActions, visibleViews } from './actions/registry'
 import { isTypingTarget, matchShortcut } from './actions/shortcuts'
-import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
+import { onEvent, onJoinLink, onOpenAgent, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
 import { AgentPanel } from './agent/AgentPanel'
 import { AgentPermissionModal } from './agent/AgentPermissionModal'
@@ -195,6 +195,17 @@ export default function App(): React.JSX.Element {
       onJoinLink((raw) => {
         const link = parseJoinLink(raw)
         if (link) useWizard.getState().openJoin(link)
+      }),
+    [],
+  )
+
+  useEffect(
+    // B3 pop-out: a standalone agent window receives its conversation id
+    // post-load (mirrors onJoinLink) and resumes it from the shared vault
+    // app.db — a fresh live session seeded from the persisted transcript.
+    () =>
+      onOpenAgent((conversationId) => {
+        if (conversationId) void useAgentPanel.getState().resumeConversation(conversationId)
       }),
     [],
   )

@@ -73,7 +73,7 @@ export type { ClientWorkspaceStatus, CreateClientSpec } from './types'
 
 // ── ACP agent panels (acp blueprint 2026-07-18): shared types ───────────────
 
-export type AcpAgent = 'claude' | 'codex'
+export type AcpAgent = 'claude' | 'codex' | 'gemini'
 export type AcpSessionState = 'starting' | 'ready' | 'auth_required' | 'error' | 'exited'
 export interface AcpPermissionOption {
   optionId: string
@@ -121,6 +121,56 @@ export interface AcpMode {
 export interface AcpMcpServer {
   name: string
   url?: string
+}
+/** B4 prompt attachment: an image (base64-in-JSON — MessagePort-safe; a
+ *  dedicated large-file channel is deferred) or a file path the adapter reads
+ *  itself (no `fs` client capability — a baseline resource_link block). Images
+ *  ride only when the session advertises promptCapabilities.image (else dropped
+ *  with a renderer notice); a file path is always allowed (baseline block). */
+export type AcpAttachment =
+  | { type: 'image'; mimeType: string; dataB64: string }
+  | { type: 'resource'; path: string }
+
+// ── ACP conversation transcript (Phase 2 B0): the vault-scoped, core-persisted
+// thread. The renderer's AcpChatItem[] is a VIEW of this — hydrated on session
+// open, and replayed (renderSeed) as cross-provider seed context (there is no
+// protocol cross-provider session id). Same-provider resume uses the adapter's
+// own acp_session_id (provider-scoped), stored per (conversation, provider). ──
+
+/** One persisted transcript message. Storage collapses to one row per
+ *  contiguous agent/thought run, per tool (by toolCallId, sparse-merged), and
+ *  per user turn — so this maps 1:1 to an AcpChatItem on hydration. `title` is
+ *  optional because a tool_call_update carries only the changed fields. */
+export interface AcpConvMessage {
+  role: 'user' | 'agent' | 'thought' | 'tool'
+  text?: string
+  tool?: {
+    toolCallId: string
+    title?: string
+    toolKind?: string
+    status?: string
+    content?: AcpToolContent[]
+    locations?: AcpToolLocation[]
+  }
+}
+/** One row of agent.conv.list — newest-updated first, provider-neutral. */
+export interface AcpConvSummary {
+  id: string
+  title: string | null
+  lastProvider: AcpAgent
+  createdAt: string
+  updatedAt: string
+}
+/** agent.conv.load payload — the thread plus the per-provider adapter session
+ *  ids (provider-scoped, for same-provider native resume). vault_id is scoped
+ *  at the seam (unknown / cross-vault id → ACP_CONV_UNKNOWN) so it is not
+ *  surfaced here. */
+export interface AcpConvLoad {
+  id: string
+  title: string | null
+  lastProvider: AcpAgent
+  providers: { provider: AcpAgent; acpSessionId: string | null }[]
+  messages: AcpConvMessage[]
 }
 
 // ── CoreApi map: renderer → core (request/response) ─────────────────────────
@@ -396,8 +446,14 @@ export interface CoreApi {
    *  outstanding JSON-RPC request held core-side for minutes and must NEVER
    *  ride an invoke. Session state, chunks, tool calls, permission requests
    *  and turn ends all stream as CoreEvents. cwd omitted → open vault root. */
-  'acp.start': { in: { agent: AcpAgent; cwd?: string }; out: { sessionId: string } }
-  'acp.prompt': { in: { sessionId: string; text: string }; out: void }
+  'acp.start': {
+    in: { agent: AcpAgent; cwd?: string; conversationId?: string }
+    out: { sessionId: string; conversationId: string }
+  }
+  /** B4: a turn's user text plus optional attachments (images base64-in-JSON,
+   *  file paths as baseline resource blocks). Long turns still stream — this
+   *  invoke just fires the prompt (long-job law), attachments ride the JSON. */
+  'acp.prompt': { in: { sessionId: string; text: string; attachments?: AcpAttachment[] }; out: void }
   'acp.cancel': { in: { sessionId: string }; out: void }
   /** optionId null = dismissed → outcome 'cancelled' (dismissing is rejecting) */
   'acp.permission': {
@@ -409,6 +465,29 @@ export interface CoreApi {
    *  confirm via current_mode_update → acp.mode; the renderer also patches the
    *  current mode optimistically and reverts if this rejects. */
   'agent.setMode': { in: { sessionId: string; modeId: string }; out: void }
+  /** ACP conversation transcript (Phase 2 B0): the core host is the sole SQLite
+   *  opener, so the persisted thread rides these reads. list is newest-updated
+   *  first + vault-scoped; load hydrates the renderer thread (and the B3 pop-out)
+   *  and carries the per-provider adapter session id for same-provider resume.
+   *  An unknown / cross-vault id → ACP_CONV_UNKNOWN; a bare host (no db) lists
+   *  empty and load throws. */
+  'agent.conv.list': { in: { limit?: number }; out: AcpConvSummary[] }
+  'agent.conv.load': { in: { conversationId: string }; out: AcpConvLoad }
+  /** B2 cross-provider continuation: start a new session on `provider` bound to
+   *  an EXISTING conversation, carrying its transcript. Same-provider with the
+   *  adapter's own session id + loadSession resumes natively; anything else
+   *  seeds the rendered transcript onto the first prompt. There is NO protocol
+   *  cross-provider session id — the seam replays a client-held transcript.
+   *  Unknown / cross-vault conversation → ACP_CONV_UNKNOWN. */
+  'agent.continue': { in: { conversationId: string; provider: AcpAgent }; out: { sessionId: string } }
+  /** B1 per-provider API-key auth (Settings › AI providers). The key is stored
+   *  in the OS keychain (agent-keys) and folded into ONLY the matching adapter's
+   *  env at spawn — it never enters process.env, the vault, a commit, a renderer
+   *  payload, or a log; status returns presence ONLY. Terminal-login providers
+   *  (claude/codex) reuse the CLI subscription instead — no key needed. */
+  'agent.auth.status': { in: void; out: { agent: AcpAgent; hasKey: boolean }[] }
+  'agent.auth.setKey': { in: { agent: AcpAgent; key: string }; out: void }
+  'agent.auth.clearKey': { in: { agent: AcpAgent }; out: void }
   /** Per-vault panel prefs (settings.terminal pattern): app.db app_settings
    *  row `agentPanel`; get degrades to closed/340 while no vault/db is open. */
   'settings.agentPanel.get': { in: void; out: { open: boolean; width: number } }
@@ -549,6 +628,10 @@ export type CoreEvent =
        *  or 'api' (API key / pay-per-token). Surfaced on ready so the usage
        *  meter labels cost as an estimate vs real spend. */
       authMode?: 'subscription' | 'api'
+      /** B4: whether this adapter accepts image attachments (from
+       *  promptCapabilities.image, captured at initialize). Surfaced on ready so
+       *  the composer can drop pasted images with a notice when unsupported. */
+      imageInput?: boolean
     }
   | { kind: 'acp.chunk'; sessionId: string; role: 'agent' | 'thought'; text: string }
   | {

@@ -35,6 +35,26 @@ export const migrations: Array<(db: AppDb) => void> = [
                                   PRIMARY KEY (vault_id, key));
     `)
   },
+  // 2 — ACP conversation transcript (Phase 2 B0, agent-conversations.ts). The
+  // vault-scoped agent thread the renderer hydrates + renderSeed replays
+  // cross-provider; agent_conv_providers holds the provider-scoped adapter
+  // session id for same-provider native resume; agent_messages is the log
+  // (one row per contiguous run / tool / user turn).
+  (db) => {
+    db.exec(`
+      CREATE TABLE agent_conversations (vault_id TEXT NOT NULL, id TEXT PRIMARY KEY,
+                                        title TEXT, last_provider TEXT NOT NULL,
+                                        created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE INDEX idx_agent_conv_vault ON agent_conversations (vault_id, updated_at);
+      CREATE TABLE agent_conv_providers (conv_id TEXT NOT NULL, provider TEXT NOT NULL,
+                                         acp_session_id TEXT,
+                                         PRIMARY KEY (conv_id, provider));
+      CREATE TABLE agent_messages       (conv_id TEXT NOT NULL, seq INTEGER NOT NULL,
+                                         role TEXT NOT NULL, text TEXT, tool_json TEXT,
+                                         created_at TEXT NOT NULL,
+                                         PRIMARY KEY (conv_id, seq));
+    `)
+  },
 ]
 
 export function runMigrations(db: AppDb): void {

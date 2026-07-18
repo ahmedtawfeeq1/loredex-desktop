@@ -65,7 +65,9 @@ import {
   validateToken,
 } from './auth'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
-import { acpCancel, acpPermission, acpPrompt, acpSetMode, acpStart, acpStop } from './acp'
+import { acpCancel, acpContinue, acpPermission, acpPrompt, acpSetMode, acpStart, acpStop } from './acp'
+import { agentKeyStatus, clearAgentKey, storeAgentKey } from './agent-keys'
+import { listConversations, loadConversation } from './agent-conversations'
 import {
   loadAgentPanelPrefs,
   loadAtlasLegendSeen,
@@ -802,16 +804,69 @@ export function registerCoreHandlers(
   // resources; everything streams as acp.* CoreEvents. NEVER log adapter
   // stdout/stderr or chat content. No withWriteLock (agents write via their
   // own tools, not the engine), no identity.
-  ipc.register('acp.start', ({ agent, cwd }) =>
-    acpStart((e) => ipc.emit(e), { agent, cwd: cwd ?? engine.getConfig().vaultPath }),
+  ipc.register('acp.start', ({ agent, cwd, conversationId }) => {
+    // B0: the core host is the sole SQLite opener, so it hands acp the
+    // transcript backend (db + vault_id). No db/vault yet (picker pending) →
+    // null: the session runs, persistence is a clean no-op.
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return acpStart((e) => ipc.emit(e), {
+      agent,
+      cwd: cwd ?? engine.getConfig().vaultPath,
+      conversationId,
+      persist: db && vid ? { db, vaultId: vid } : null,
+    })
+  })
+  // B0 transcript reads (vault-scoped, sole-opener). load scope-checks the
+  // conversation's vault_id at the seam — a cross-vault / unknown id is
+  // ACP_CONV_UNKNOWN, never another vault's thread.
+  ipc.register('agent.conv.list', ({ limit }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return db && vid ? listConversations(db, vid, limit) : []
+  })
+  ipc.register('agent.conv.load', ({ conversationId }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (!db || !vid) throw ipcError('ACP_CONV_UNKNOWN', 'no conversation store')
+    const loaded = loadConversation(db, conversationId)
+    if (!loaded || loaded.vaultId !== vid) {
+      throw ipcError('ACP_CONV_UNKNOWN', 'unknown conversation')
+    }
+    const { vaultId: _v, ...out } = loaded
+    return out
+  })
+  // B2 cross-provider continuation: a new session on `provider` bound to the
+  // same conversation, seeded (or natively resumed) from its transcript. Needs
+  // the transcript store — acpContinue scope-checks the conversation's vault_id.
+  // cwd is the vault root (the only cwd the panel starts sessions with, B0/B1).
+  ipc.register('agent.continue', ({ conversationId, provider }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (!db || !vid) throw ipcError('ACP_CONV_UNKNOWN', 'no conversation store')
+    const { sessionId } = acpContinue((e) => ipc.emit(e), {
+      conversationId,
+      targetProvider: provider,
+      cwd: engine.getConfig().vaultPath,
+      persist: { db, vaultId: vid },
+    })
+    return { sessionId }
+  })
+  ipc.register('acp.prompt', ({ sessionId, text, attachments }) =>
+    acpPrompt(sessionId, text, attachments),
   )
-  ipc.register('acp.prompt', ({ sessionId, text }) => acpPrompt(sessionId, text))
   ipc.register('acp.cancel', ({ sessionId }) => acpCancel(sessionId))
   ipc.register('acp.permission', ({ sessionId, requestId, optionId }) =>
     acpPermission(sessionId, requestId, optionId),
   )
   ipc.register('acp.stop', ({ sessionId }) => acpStop(sessionId))
   ipc.register('agent.setMode', ({ sessionId, modeId }) => acpSetMode(sessionId, modeId))
+  // B1 per-provider API-key auth (Settings › AI providers). Keychain-backed
+  // (agent-keys); the key never enters process.env / vault / a log — status
+  // reports presence only. Terminal-login providers reuse the CLI subscription.
+  ipc.register('agent.auth.status', () => agentKeyStatus())
+  ipc.register('agent.auth.setKey', ({ agent, key }) => storeAgentKey(agent, key))
+  ipc.register('agent.auth.clearKey', ({ agent }) => clearAgentKey(agent))
   ipc.register('home.brief', () => engine.homeBrief())
   ipc.register('settings.identity.get', () => {
     // no vault yet (first run, story 13.2) → no ambient default, NOT an error:

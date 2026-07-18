@@ -16,6 +16,7 @@ export type SettingsSection =
   | 'mcp-server'
   | 'sync-git'
   | 'github'
+  | 'agent-auth'
 
 export type SettingsTab = 'Workspace' | 'Personal' | 'System'
 

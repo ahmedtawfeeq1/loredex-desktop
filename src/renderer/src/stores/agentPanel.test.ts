@@ -30,9 +30,8 @@ window.loredex = {
 // value imports MUST ride this dynamic import (never a static one) — a static
 // import hoists above the window.loredex assignment above, so the store's
 // onEvent subscription guard would see no bridge and emit would stay unset
-const { DEFAULT_PANEL_WIDTH, quoteForChat, useAgentPanel, visibleSessions } = await import(
-  './agentPanel'
-)
+const { DEFAULT_PANEL_WIDTH, lastUserText, quoteForChat, useAgentPanel, visibleSessions } =
+  await import('./agentPanel')
 
 const session = (id: string, over: Partial<AcpSessionView> = {}): AcpSessionView => ({
   sessionId: id,
@@ -129,6 +128,126 @@ describe('openHere', () => {
     invoke.mockRejectedValue({ code: 'INTERNAL', message: 'agent session limit reached (4)' })
     await useAgentPanel.getState().openHere()
     expect(useAgentPanel.getState()).toMatchObject({ open: true, sessions: [] })
+  })
+
+  it('replays acp.session events that raced AHEAD of the acp.start ack (fast-fail: gemini ENOENT)', async () => {
+    // the fast-fail race: spawn ENOENT fires 'starting' + terminal 'error'
+    // BEFORE `await invoke('acp.start')` resolves and registers the session
+    let resolveStart!: (v: { sessionId: string }) => void
+    invoke.mockImplementation((ch: string) =>
+      ch === 'acp.start'
+        ? new Promise<{ sessionId: string }>((r) => {
+            resolveStart = r
+          })
+        : Promise.resolve(undefined),
+    )
+    useAgentPanel.setState({ agent: 'gemini' })
+    const inFlight = useAgentPanel.getState().openHere()
+    // core emitted BOTH while the session is not yet known (mid-await)
+    emit({ kind: 'acp.session', sessionId: 'g1', agent: 'gemini', state: 'starting' })
+    emit({
+      kind: 'acp.session',
+      sessionId: 'g1',
+      agent: 'gemini',
+      state: 'error',
+      detail: 'gemini CLI not found — install @google/gemini-cli',
+    })
+    // buffered, not applied — the session isn't registered yet
+    expect(useAgentPanel.getState().sessions).toEqual([])
+    resolveStart({ sessionId: 'g1' })
+    await inFlight
+    // the buffered 'error' is replayed on registration → a CLEAN error state
+    // (pre-fix this dropped the event and stranded the session in 'starting')
+    expect(useAgentPanel.getState().sessions[0]).toMatchObject({
+      sessionId: 'g1',
+      state: 'error',
+      detail: 'gemini CLI not found — install @google/gemini-cli',
+    })
+  })
+
+  it('an unknown-session event OUTSIDE any start window is still dropped (no leak/replay)', async () => {
+    // no start in flight → a late event for a closed session must not buffer
+    emit({ kind: 'acp.session', sessionId: 'gone', agent: 'gemini', state: 'error', detail: 'x' })
+    // a subsequent unrelated start must NOT inherit the stale buffered event
+    invoke.mockImplementation((ch: string) =>
+      ch === 'acp.start' ? Promise.resolve({ sessionId: 's1' }) : Promise.resolve(undefined),
+    )
+    await useAgentPanel.getState().openHere()
+    expect(useAgentPanel.getState().sessions).toEqual([
+      expect.objectContaining({ sessionId: 's1', state: 'starting' }),
+    ])
+  })
+})
+
+describe('continueIn (B2 cross-provider continuation)', () => {
+  // seed the store with an active claude session on a persisted conversation
+  const seedActive = (): void => {
+    useAgentPanel.setState({
+      open: true,
+      sessions: [
+        session('c1', {
+          agent: 'claude',
+          conversationId: 'conv-1',
+          title: 'Rename the intro',
+          items: [{ type: 'user', text: 'rename it' }],
+        }),
+      ],
+      activeId: 'c1',
+    })
+  }
+
+  it('agent.continue on the active conversation lists the new provider session bound to the same conv', async () => {
+    seedActive()
+    invoke.mockImplementation((ch: string) =>
+      ch === 'agent.continue'
+        ? Promise.resolve({ sessionId: 'x1' })
+        : // the follow-up hydrate load — empty so it never clobbers
+          Promise.resolve({ messages: [] }),
+    )
+    await useAgentPanel.getState().continueIn('codex')
+    expect(invoke).toHaveBeenCalledWith('agent.continue', {
+      conversationId: 'conv-1',
+      provider: 'codex',
+    })
+    const st = useAgentPanel.getState()
+    expect(st.activeId).toBe('x1')
+    expect(st.agent).toBe('codex') // the picker follows the new active provider
+    expect(st.sessions.map((s) => s.sessionId)).toEqual(['c1', 'x1'])
+    // the new session is the SAME logical thread: same conversationId + title
+    expect(st.sessions.find((s) => s.sessionId === 'x1')).toMatchObject({
+      agent: 'codex',
+      conversationId: 'conv-1',
+      title: 'Rename the intro',
+      state: 'starting',
+    })
+  })
+
+  it('is a no-op when the active session has no persisted conversation (no-db session)', async () => {
+    useAgentPanel.setState({
+      sessions: [session('c1', { agent: 'claude', conversationId: undefined })],
+      activeId: 'c1',
+    })
+    await useAgentPanel.getState().continueIn('codex')
+    expect(invoke).not.toHaveBeenCalledWith('agent.continue', expect.anything())
+    expect(useAgentPanel.getState().sessions).toHaveLength(1)
+  })
+
+  it('a reset() across the awaited agent.continue stops the orphan and never lists it', async () => {
+    seedActive()
+    let resolveContinue!: (v: { sessionId: string }) => void
+    invoke.mockImplementation((ch: string) =>
+      ch === 'agent.continue'
+        ? new Promise<{ sessionId: string }>((r) => {
+            resolveContinue = r
+          })
+        : Promise.resolve({ messages: [] }),
+    )
+    const inFlight = useAgentPanel.getState().continueIn('codex')
+    await useAgentPanel.getState().reset() // vault switch mid-continue
+    resolveContinue({ sessionId: 'orphan' })
+    await inFlight
+    expect(invoke).toHaveBeenCalledWith('acp.stop', { sessionId: 'orphan' })
+    expect(useAgentPanel.getState().sessions).toEqual([])
   })
 })
 
@@ -430,7 +549,11 @@ describe('provider filter + login-state chips (A6)', () => {
   it('a ready session marks its provider signed-in; auth_required flags it', () => {
     useAgentPanel.setState({ sessions: [session('s1', { agent: 'codex' })], activeId: 's1' })
     // fresh default: every provider unknown until one reports in
-    expect(useAgentPanel.getState().providerAuth).toEqual({ claude: 'unknown', codex: 'unknown' })
+    expect(useAgentPanel.getState().providerAuth).toEqual({
+      claude: 'unknown',
+      codex: 'unknown',
+      gemini: 'unknown',
+    })
     emit({ kind: 'acp.session', sessionId: 's1', agent: 'codex', state: 'ready' })
     expect(useAgentPanel.getState().providerAuth.codex).toBe('ok')
     emit({ kind: 'acp.session', sessionId: 's1', agent: 'codex', state: 'auth_required' })
@@ -443,7 +566,7 @@ describe('provider filter + login-state chips (A6)', () => {
     useAgentPanel.setState({
       sessions: [session('s1', { agent: 'claude' })],
       activeId: 's1',
-      providerAuth: { claude: 'ok', codex: 'unknown' },
+      providerAuth: { claude: 'ok', codex: 'unknown', gemini: 'unknown' },
     })
     emit({ kind: 'acp.session', sessionId: 's1', agent: 'claude', state: 'error', detail: 'boom' })
     // an error says nothing about auth — the 'ok' verdict survives
@@ -451,10 +574,17 @@ describe('provider filter + login-state chips (A6)', () => {
   })
 
   it('reset restores filter "all" and unknown login state', async () => {
-    useAgentPanel.setState({ filter: 'codex', providerAuth: { claude: 'ok', codex: 'auth_required' } })
+    useAgentPanel.setState({
+      filter: 'codex',
+      providerAuth: { claude: 'ok', codex: 'auth_required', gemini: 'unknown' },
+    })
     await useAgentPanel.getState().reset()
     expect(useAgentPanel.getState().filter).toBe('all')
-    expect(useAgentPanel.getState().providerAuth).toEqual({ claude: 'unknown', codex: 'unknown' })
+    expect(useAgentPanel.getState().providerAuth).toEqual({
+      claude: 'unknown',
+      codex: 'unknown',
+      gemini: 'unknown',
+    })
   })
 })
 
@@ -539,6 +669,139 @@ describe('send', () => {
       busy: false,
       detail: 'a turn is already in flight',
     })
+  })
+})
+
+describe('retry (chat-completeness)', () => {
+  it('lastUserText returns the most recent user turn, stripping a trailing attachment marker', () => {
+    expect(lastUserText([])).toBeNull()
+    expect(
+      lastUserText([
+        { type: 'user', text: 'first' },
+        { type: 'agent', text: 'reply' },
+        { type: 'user', text: 'second question' },
+        { type: 'tool', toolCallId: 't', title: 'x', status: 'completed' },
+      ]),
+    ).toBe('second question')
+    // a trailing "📎 …" marker line is dropped (attachments are transient)
+    expect(lastUserText([{ type: 'user', text: 'look at this\n\n📎 shot.png' }])).toBe('look at this')
+    // an attachment-only bubble strips to '' → nothing meaningful to resend
+    expect(lastUserText([{ type: 'user', text: '📎 shot.png' }])).toBe('')
+  })
+
+  it('re-sends the last user turn as a fresh prompt when idle', async () => {
+    useAgentPanel.setState({
+      sessions: [
+        session('s1', {
+          title: 'kept',
+          items: [
+            { type: 'user', text: 'do the thing' },
+            { type: 'agent', text: 'did it' },
+          ],
+        }),
+      ],
+      activeId: 's1',
+    })
+    await useAgentPanel.getState().retry()
+    expect(invoke).toHaveBeenCalledWith('acp.prompt', { sessionId: 's1', text: 'do the thing' })
+    // a retry appends a NEW user bubble (standard chat retry), keeps the title
+    expect(items('s1').filter((i) => i.type === 'user')).toHaveLength(2)
+    expect(useAgentPanel.getState().sessions[0].title).toBe('kept')
+  })
+
+  it('is a no-op while busy, not-ready, or with no user turn', async () => {
+    useAgentPanel.setState({
+      sessions: [session('s1', { busy: true, items: [{ type: 'user', text: 'x' }] })],
+      activeId: 's1',
+    })
+    await useAgentPanel.getState().retry() // busy
+    useAgentPanel.setState({
+      sessions: [session('s1', { state: 'starting', items: [{ type: 'user', text: 'x' }] })],
+      activeId: 's1',
+    })
+    await useAgentPanel.getState().retry() // not ready
+    useAgentPanel.setState({ sessions: [session('s1', { items: [] })], activeId: 's1' })
+    await useAgentPanel.getState().retry() // no user turn
+    expect(invoke).not.toHaveBeenCalledWith('acp.prompt', expect.anything())
+  })
+})
+
+describe('B4 — attachments (paste / attach / images)', () => {
+  it('addAttachment stages chips; removeAttachment drops one by index', () => {
+    const st = useAgentPanel.getState()
+    st.addAttachment({ type: 'image', mimeType: 'image/png', dataB64: 'AA', name: 'shot.png' })
+    st.addAttachment({ type: 'resource', path: '/tmp/a.md', name: 'a.md' })
+    expect(useAgentPanel.getState().attachments.map((a) => a.name)).toEqual(['shot.png', 'a.md'])
+    useAgentPanel.getState().removeAttachment(0)
+    expect(useAgentPanel.getState().attachments.map((a) => a.name)).toEqual(['a.md'])
+  })
+
+  it('send maps staged attachments to the contract shape, clears the tray, marks the bubble', async () => {
+    useAgentPanel.setState({
+      sessions: [session('s1')],
+      activeId: 's1',
+      attachments: [
+        { type: 'image', mimeType: 'image/png', dataB64: 'IMG', name: 'shot.png' },
+        { type: 'resource', path: '/tmp/notes/a.md', name: 'a.md' },
+      ],
+    })
+    await useAgentPanel.getState().send('here you go')
+    // the display-only `name` is stripped; the contract attachments ride the prompt
+    expect(invoke).toHaveBeenCalledWith('acp.prompt', {
+      sessionId: 's1',
+      text: 'here you go',
+      attachments: [
+        { type: 'image', mimeType: 'image/png', dataB64: 'IMG' },
+        { type: 'resource', path: '/tmp/notes/a.md' },
+      ],
+    })
+    const s = useAgentPanel.getState()
+    expect(s.attachments).toEqual([]) // tray cleared as the turn fired
+    // the thread bubble records what rode along (clean text + a mono marker line)
+    expect(s.sessions[0].items).toEqual([
+      { type: 'user', text: 'here you go\n\n📎 shot.png, a.md' },
+    ])
+  })
+
+  it('an attachment-only turn sends (empty text) with a marker bubble + derived title', async () => {
+    useAgentPanel.setState({
+      sessions: [session('s1')],
+      activeId: 's1',
+      attachments: [{ type: 'image', mimeType: 'image/png', dataB64: 'IMG', name: 'diagram.png' }],
+    })
+    await useAgentPanel.getState().send('')
+    expect(invoke).toHaveBeenCalledWith('acp.prompt', {
+      sessionId: 's1',
+      text: '',
+      attachments: [{ type: 'image', mimeType: 'image/png', dataB64: 'IMG' }],
+    })
+    expect(useAgentPanel.getState().sessions[0]).toMatchObject({
+      title: '📎 diagram.png',
+      items: [{ type: 'user', text: '📎 diagram.png' }],
+    })
+  })
+
+  it('no attachments → the prompt carries no attachments key (back-compat)', async () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    await useAgentPanel.getState().send('plain turn')
+    expect(invoke).toHaveBeenCalledWith('acp.prompt', { sessionId: 's1', text: 'plain turn' })
+  })
+
+  it('an empty draft with an empty tray is a no-op', async () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1', attachments: [] })
+    await useAgentPanel.getState().send('   ')
+    expect(invoke).not.toHaveBeenCalledWith('acp.prompt', expect.anything())
+  })
+
+  it('acp.session ready surfaces imageInput; reset clears the tray', async () => {
+    useAgentPanel.setState({ sessions: [session('s1', { state: 'starting' })], activeId: 's1' })
+    emit({ kind: 'acp.session', sessionId: 's1', agent: 'claude', state: 'ready', imageInput: true })
+    expect(useAgentPanel.getState().sessions[0].imageInput).toBe(true)
+    useAgentPanel.setState({
+      attachments: [{ type: 'resource', path: '/x', name: 'x' }],
+    })
+    await useAgentPanel.getState().reset()
+    expect(useAgentPanel.getState().attachments).toEqual([])
   })
 })
 

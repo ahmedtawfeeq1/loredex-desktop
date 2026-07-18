@@ -7898,6 +7898,44 @@ a.button-primary {
   background: var(--bg-hover);
 }
 
+/* B2 cross-provider continuation: continue the active thread in another agent.
+   Secondary chips (Send owns the one cobalt primary); 1px hairline, both themes. */
+.agent-continue {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.agent-continue-label {
+  font: 10px var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.agent-continue-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--text-2);
+  font: 11px var(--font-mono);
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.agent-continue-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+  border-color: var(--hairline-strong, var(--hairline));
+}
+
 /* chat thread: plain pre-wrap text bubbles (markdown deferred) */
 .agent-thread {
   flex: 1;
@@ -7969,6 +8007,99 @@ a.button-primary {
   margin-bottom: 4px;
 }
 
+/* ── chat-completeness: COPY (message + code block) · JUMP · NEW/RETRY ───────
+   Hover-revealed copy chips + conversation-action buttons. Hairline + tokens
+   (both themes flip automatically), Geist Mono, no gradient, no border > 1px,
+   and never the cobalt primary (Send owns the one-per-view). */
+
+/* COPY: the agent bubble anchors a hover copy button in its top-right corner. */
+.agent-msg-agent {
+  position: relative;
+}
+
+.agent-copy-msg,
+.agent-copy-code {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  border: 1px solid var(--hairline);
+  background: var(--bg-card);
+  color: var(--text-3);
+  font: 10px var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 120ms ease-out;
+}
+
+.agent-msg-agent:hover .agent-copy-msg,
+.agent-md pre:hover .agent-copy-code,
+.agent-copy-msg:focus-visible,
+.agent-copy-code:focus-visible {
+  opacity: 1;
+}
+
+.agent-copy-msg:hover,
+.agent-copy-code:hover {
+  color: var(--text-1);
+  background: var(--bg-hover);
+}
+
+/* JUMP: sticky pill pinned to the bottom of the thread viewport while scrolled
+   up (rendered only then) — floats over the newest content, click re-arms. */
+.agent-jump-bottom {
+  position: sticky;
+  bottom: 6px;
+  align-self: center;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--hairline);
+  background: var(--bg-card);
+  color: var(--text-2);
+  font: 10.5px var(--font-mono);
+  padding: 3px 11px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+}
+
+.agent-jump-bottom:hover {
+  color: var(--text-1);
+  background: var(--bg-hover);
+}
+
+/* NEW + RETRY: conversation actions above the composer. */
+.agent-composer-tools {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 0;
+}
+
+.agent-new-convo,
+.agent-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--text-2);
+  font: 10.5px var(--font-mono);
+  padding: 2px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.agent-new-convo:hover,
+.agent-retry-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
 /* markdown-in-bubble: the sanctioned pipeline's block elements, sized for chat.
    Tokens only (both themes auto-flip); 1px hairlines; no gradients. */
 .agent-md {
@@ -8021,6 +8152,7 @@ a.button-primary {
   padding: 0 4px;
 }
 .agent-md pre {
+  position: relative;
   margin: 0 0 8px;
   padding: 8px 10px;
   background: var(--bg-inset);
@@ -8256,6 +8388,81 @@ a.button-primary {
 .agent-state-note-hint {
   margin-top: 4px;
   font-size: 11.5px;
+  color: var(--text-2);
+}
+
+/* B1 login card (inside the auth_required state note): the one-click "Log in
+   with X" CTA opens the terminal and runs the CLI login. Hairline accent button
+   — Send owns the one cobalt primary per view (design law). Tokens both themes,
+   1px hairline, no gradient. */
+.agent-login {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.agent-login-btn {
+  align-self: flex-start;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: 600 11.5px var(--font-ui);
+  padding: 3px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.agent-login-btn:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.agent-login-hint {
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+/* B1 Settings › AI providers: per-provider API-key rows (keychain-backed). The
+   card primitives are reused from settings-*; 1px hairline divider, tokens both
+   themes, no gradient (design law). */
+.agent-auth-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.agent-auth-row:first-of-type {
+  border-top: none;
+}
+
+.agent-auth-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-auth-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+.agent-auth-mode {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* B3 pop-out: the standalone agent window can't claim the single fixed in-app
+   MCP port (main-window only), so a small hairline note explains the missing
+   tools. Tokens flip for both themes; 1px hairline, no gradient (design law). */
+.agent-popout-note {
+  margin: 8px 8px 0;
+  padding: 7px 9px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--bg-card);
+  font: 11px/1.5 var(--font-mono);
   color: var(--text-2);
 }
 
@@ -8567,6 +8774,96 @@ a.button-primary {
 .agent-input-field:disabled {
   color: var(--text-4);
   background: var(--bg-inset);
+}
+
+/* B4 attachments: staged tray above the composer + the attach button + the
+   image-unsupported notice. 1px hairlines, tokens (both themes), no gradient. */
+.agent-attach-tray {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 12px 0;
+}
+
+.agent-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 220px;
+  border: 1px solid var(--hairline);
+  background: var(--bg-card);
+  border-radius: 6px;
+  padding: 2px 4px 2px 7px;
+}
+
+.agent-attach-kind {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.agent-attach-name {
+  font: 11px var(--font-mono);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-attach-remove {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: 600 12px var(--font-mono);
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.agent-attach-remove:hover {
+  color: var(--rust);
+}
+
+.agent-attach-notice {
+  flex: 0 0 auto;
+  margin: 6px 12px 0;
+  padding: 5px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--warn);
+  font: 11px var(--font-mono);
+}
+
+/* the real file input is offscreen — the 📎 button proxies the click */
+.agent-attach-input {
+  display: none;
+}
+
+.agent-attach-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  width: 30px;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--text-2);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.agent-attach-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.agent-attach-btn:disabled {
+  color: var(--text-4);
+  cursor: default;
 }
 
 /* permission modal extras (raw modal classes carry the anatomy) */

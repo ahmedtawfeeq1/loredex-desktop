@@ -248,6 +248,13 @@ describe('agent panel actions (acp blueprint 2026-07-18)', () => {
     expect(actionItems('agent').some((i) => i.key === 'action:open-agent-here')).toBe(true)
   })
 
+  it('Retry last agent message is a combo-less palette row (chat-completeness)', () => {
+    const action = appActions().find((a) => a.id === 'action:agent-retry')
+    expect(action?.title).toBe('Retry last agent message')
+    expect(action?.combo).toBeUndefined() // palette/nav reachable, no shortcut spent
+    expect(actionItems('retry').some((i) => i.key === 'action:agent-retry')).toBe(true)
+  })
+
   it('Add selection to chat carries ⇧⌘L and no-ops off the reader (A8)', () => {
     useReader.setState({ selected: 'n.md', doc: { meta: {}, body: 'x' } as never })
     useAgentPanel.setState({ open: false, draft: '' })

@@ -289,3 +289,29 @@ describe('reset (vault switch)', () => {
     })
   })
 })
+
+describe('runCommand (B1 one-click login)', () => {
+  it('spawns a shell on a cold drawer then writes the newline-terminated command', async () => {
+    invoke.mockImplementation((ch: string) =>
+      ch === 'term.create' ? Promise.resolve({ id: 't1' }) : Promise.resolve(undefined),
+    )
+    await useTerminal.getState().runCommand('claude /login')
+    expect(invoke).toHaveBeenCalledWith('term.create', { cols: 80, rows: 24 })
+    expect(invoke).toHaveBeenCalledWith('term.input', { id: 't1', data: 'claude /login\n' })
+    expect(useTerminal.getState().open).toBe(true)
+  })
+
+  it('reuses the active pty (no second spawn) and opens a closed-but-alive drawer', async () => {
+    useTerminal.setState({ root: { kind: 'term', id: 't9' }, activeId: 't9', open: false })
+    await useTerminal.getState().runCommand('codex login')
+    expect(invoke).not.toHaveBeenCalledWith('term.create', expect.anything())
+    expect(invoke).toHaveBeenCalledWith('term.input', { id: 't9', data: 'codex login\n' })
+    expect(useTerminal.getState().open).toBe(true)
+  })
+
+  it('no-ops when the spawn is refused (no core) — never throws', async () => {
+    invoke.mockRejectedValue(new Error('no core'))
+    await expect(useTerminal.getState().runCommand('claude /login')).resolves.toBeUndefined()
+    expect(invoke).not.toHaveBeenCalledWith('term.input', expect.anything())
+  })
+})

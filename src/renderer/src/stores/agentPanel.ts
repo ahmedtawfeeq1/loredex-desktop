@@ -12,7 +12,9 @@ import { create } from 'zustand'
 import {
   isErrEnvelope,
   type AcpAgent,
+  type AcpAttachment,
   type AcpCommand,
+  type AcpConvMessage,
   type AcpMcpServer,
   type AcpMode,
   type AcpPermissionOption,
@@ -20,9 +22,11 @@ import {
   type AcpSessionState,
   type AcpToolContent,
   type AcpToolLocation,
+  type CoreEvent,
 } from '../../../shared/ipc-contract'
 import { clampPanelWidth, DEFAULT_PANEL_WIDTH } from '../agent/panelWidth'
-import { invoke, onEvent } from '../api'
+import { invoke, onEvent, openAgentWindow } from '../api'
+import { useApp } from './app'
 
 // re-exported so existing importers (store test) keep their one entry point;
 // the source of truth is agent/panelWidth.ts (clone of listPaneWidth.ts)
@@ -44,9 +48,28 @@ export type AcpChatItem =
       locations?: AcpToolLocation[]
     }
 
+/** A staged composer attachment (B4): the contract shape plus a display `name`
+ *  for the tray chip (the name is stripped when it rides acp.prompt). An image
+ *  carries base64; a file carries its absolute path (adapter reads it). */
+export type AgentAttachment =
+  | { type: 'image'; mimeType: string; dataB64: string; name: string }
+  | { type: 'resource'; path: string; name: string }
+
+/** B4: strip the display-only `name`, leaving the contract AcpAttachment that
+ *  crosses the seam. */
+export function toContractAttachment(a: AgentAttachment): AcpAttachment {
+  return a.type === 'image'
+    ? { type: 'image', mimeType: a.mimeType, dataB64: a.dataB64 }
+    : { type: 'resource', path: a.path }
+}
+
 export interface AcpSessionView {
   sessionId: string
   agent: AcpAgent
+  /** OUR vault-scoped conversation id (B0) — the persisted transcript this
+   *  session's thread is a view of; hydrated via agent.conv.load on open.
+   *  Optional: a session started with no core db carries none. */
+  conversationId?: string
   /** first prompt words; 'New session' until then */
   title: string
   state: AcpSessionState
@@ -74,6 +97,10 @@ export interface AcpSessionView {
   /** auth backing this session: 'subscription' (plan quota) or 'api' (billed).
    *  Set on ready; makes the usage meter label cost as an estimate vs spend. */
   authMode?: 'subscription' | 'api'
+  /** whether this adapter accepts image attachments (B4) — from the ready
+   *  event's promptCapabilities.image. Undefined until ready (attach allowed
+   *  optimistically); explicit false blocks image attach with a composer notice. */
+  imageInput?: boolean
 }
 
 export interface AcpPermissionView {
@@ -97,6 +124,7 @@ export type ProviderAuth = 'unknown' | 'ok' | 'auth_required'
 const defaultProviderAuth = (): Record<AcpAgent, ProviderAuth> => ({
   claude: 'unknown',
   codex: 'unknown',
+  gemini: 'unknown',
 })
 
 /** The session list the panel shows for a filter (A6): 'all' shows every
@@ -122,6 +150,27 @@ export function quoteForChat(text: string, path: string): string {
   return (rest.length ? `${head}\n${body}` : head) + '\n'
 }
 
+/** Add-to-chat's attachment sibling (B4): a mono marker line naming the staged
+ *  attachments, appended to the sent user bubble so the thread records what rode
+ *  along (the image bytes / file paths themselves are not kept in the thread).
+ *  '' for no attachments. */
+export function attachmentSummary(attachments: AgentAttachment[]): string {
+  if (attachments.length === 0) return ''
+  return `📎 ${attachments.map((a) => a.name).join(', ')}`
+}
+
+/** Retry (chat-completeness): the text to resend on Retry — the most recent
+ *  user turn's text with a trailing attachment-marker line stripped (the staged
+ *  attachments themselves are transient and can't be re-sent, so only the clean
+ *  prompt text is replayed). null when the thread holds no user turn. */
+export function lastUserText(items: AcpChatItem[]): string | null {
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i]
+    if (it.type === 'user') return it.text.replace(/(?:\n\n)?📎 [^\n]*$/, '')
+  }
+  return null
+}
+
 interface AgentPanelState {
   open: boolean
   width: number
@@ -135,6 +184,12 @@ interface AgentPanelState {
   filter: AcpAgent | 'all'
   /** per-provider login state, updated from acp.session (A6) */
   providerAuth: Record<AcpAgent, ProviderAuth>
+  /** B3: true when THIS window is a pop-out (opened via loredex:open-agent-window).
+   *  Its fresh core reads the shared vault app.db but is a SECONDARY window, so
+   *  it can't claim the single fixed in-app MCP port — drives the panel's
+   *  "no MCP tools here" note. Set on the resumeConversation entry, cleared on
+   *  reset (vault switch). */
+  popout: boolean
   sessions: AcpSessionView[]
   activeId: string | null
   /** the surfaced permission request; more queue module-side (FIFO) */
@@ -142,6 +197,9 @@ interface AgentPanelState {
   /** the composer draft — lifted into the store (A8) so addContext can
    *  pre-fill it from a note selection; the panel textarea is controlled by it */
   draft: string
+  /** staged attachments for the next turn (B4) — images pasted/picked as base64
+   *  chips, files as absolute paths; cleared after send. */
+  attachments: AgentAttachment[]
   load(): Promise<void>
   /** open/close + persist — no session spawn (unlike the terminal toggle) */
   toggle(): void
@@ -158,6 +216,19 @@ interface AgentPanelState {
   setFilter(f: AcpAgent | 'all'): void
   /** open the panel + acp.start + select the new session */
   openHere(cwd?: string): Promise<void>
+  /** B2 cross-provider continuation: take the ACTIVE session's conversation and
+   *  continue it on `provider` (agent.continue) — a new session bound to the
+   *  same transcript, hydrated so the prior thread shows while the target boots.
+   *  No active conversation → no-op. */
+  continueIn(provider: AcpAgent): Promise<void>
+  /** B3 pop-out: open the ACTIVE conversation in its OWN standalone window (its
+   *  own core host reads the same vault app.db). No active conversation → no-op. */
+  popOut(): Promise<void>
+  /** B3 pop-out ENTRY (fires in the freshly-booted pop-out window from the
+   *  onOpenAgent post-load send): resume `conversationId` from the persisted
+   *  transcript. This window's core has no live session for it, so it reuses the
+   *  B2 continuation (agent.continue) to seed a fresh session from the thread. */
+  resumeConversation(conversationId: string): Promise<void>
   select(id: string): void
   /** controlled-input setter for the composer textarea (A8) */
   setDraft(text: string): void
@@ -165,7 +236,15 @@ interface AgentPanelState {
    *  quoted, source-attributed excerpt from a note — never auto-sends. Stacks
    *  onto an existing draft (blank-line separated) so several excerpts gather. */
   addContext(text: string, path: string): void
+  /** stage an attachment for the next turn (B4) — paste handler / attach picker. */
+  addAttachment(a: AgentAttachment): void
+  /** drop one staged attachment by index (B4 tray remove). */
+  removeAttachment(index: number): void
   send(text: string): Promise<void>
+  /** retry (chat-completeness): re-send the last user turn as a fresh prompt.
+   *  No-op unless the active session is idle (ready, not busy) with a user turn
+   *  to resend. */
+  retry(): Promise<void>
   /** switch a session's mode (A7) — optimistic, reverts if agent.setMode fails */
   setMode(sessionId: string, modeId: string): Promise<void>
   cancel(): void
@@ -229,6 +308,77 @@ function commitChunks(): void {
   })
 }
 
+// ── fast-fail start race (B5 gemini) ────────────────────────────────────────
+// A spawn ENOENT (e.g. `gemini` not installed) fires the child 'error' ~6ms
+// after spawn — BEFORE openHere's `await invoke('acp.start')` resolves and adds
+// the session to the store. The core emits 'starting' then the terminal 'error'
+// for that sessionId while it is not yet `known`, so plain "drop unknown-session
+// events" (which we still want for genuinely-closed sessions) would strand the
+// UI in 'starting' forever. Fix: WHILE a start is in flight, buffer that
+// session's acp.session events keyed by id and replay them the instant the
+// session registers (drainPendingSession). Slow adapters (Claude/Codex) never
+// hit this — their ready/auth events land long after the ack.
+type AcpSessionEvent = Extract<CoreEvent, { kind: 'acp.session' }>
+/** how many openHere/continue starts are awaiting their ack — only then may an
+ *  unknown-session acp.session event be a raced-ahead start (else it's a late
+ *  event for a closed session, still dropped). */
+let startsInFlight = 0
+const pendingSessionEvents = new Map<string, AcpSessionEvent[]>()
+
+/** Apply one acp.session event to a session that is (now) known — the shared
+ *  body of the live handler and the buffered replay. */
+function applySessionEvent(e: AcpSessionEvent): void {
+  commitChunks()
+  // a non-ready state is a dead/blocked session: core already answered its held
+  // permissions 'cancelled' (cancelPendingPermissions on exit/error). Purge this
+  // session's queued requests so a healthy session isn't stalled behind them,
+  // and advance past a surfaced one so the modal doesn't hang on a dead session.
+  if (e.state !== 'ready') {
+    permissionQueue = permissionQueue.filter((p) => p.sessionId !== e.sessionId)
+  }
+  // any non-ready state also clears busy: a mid-turn death (adapter exit) emits
+  // no turnEnd, and a stuck Stop button helps nobody.
+  useAgentPanel.setState((s) => ({
+    sessions: s.sessions.map((v) =>
+      v.sessionId === e.sessionId
+        ? {
+            ...v,
+            state: e.state,
+            detail: e.detail,
+            busy: e.state === 'ready' ? v.busy : false,
+            // MCP list rides the ready event only (A7) — keep it across later
+            // non-ready transitions
+            mcpServers: e.mcpServers ?? v.mcpServers,
+            authMode: e.authMode ?? v.authMode,
+            // image-input capability rides the ready event (B4) — keep it
+            imageInput: e.imageInput ?? v.imageInput,
+          }
+        : v,
+    ),
+    permission:
+      e.state !== 'ready' && s.permission?.sessionId === e.sessionId
+        ? (permissionQueue.shift() ?? null)
+        : s.permission,
+    // login-state chip (A6): a ready session proves the provider is signed in;
+    // auth_required flags it needs login. Other states (starting / error /
+    // exited) say nothing about auth — leave the last verdict.
+    providerAuth:
+      e.state === 'ready' || e.state === 'auth_required'
+        ? { ...s.providerAuth, [e.agent]: e.state === 'ready' ? 'ok' : 'auth_required' }
+        : s.providerAuth,
+  }))
+}
+
+/** Replay buffered acp.session events for a just-registered session (fast-fail
+ *  race). Called synchronously right after the register set(), before any new
+ *  event can interleave. */
+function drainPendingSession(sessionId: string): void {
+  const buffered = pendingSessionEvents.get(sessionId)
+  if (!buffered) return
+  pendingSessionEvents.delete(sessionId)
+  for (const e of buffered) applySessionEvent(e)
+}
+
 function persist(): void {
   const { open, width } = useAgentPanel.getState()
   try {
@@ -247,6 +397,104 @@ function patchSession(id: string, patch: Partial<AcpSessionView>): void {
   }))
 }
 
+/** A persisted transcript message → a chat item (B0). Storage already collapsed
+ *  to one row per contiguous run / tool / user turn, so this is a 1:1 map. */
+function toChatItem(m: AcpConvMessage): AcpChatItem {
+  if (m.role === 'tool' && m.tool) {
+    return {
+      type: 'tool',
+      toolCallId: m.tool.toolCallId,
+      title: m.tool.title ?? 'Tool call',
+      toolKind: m.tool.toolKind,
+      status: m.tool.status ?? 'completed',
+      content: m.tool.content,
+      locations: m.tool.locations,
+    }
+  }
+  return { type: m.role as 'user' | 'agent' | 'thought', text: m.text ?? '' }
+}
+
+/** Hydrate a session's thread from its persisted conversation (B0). A fresh
+ *  conversation loads empty (no-op); a resumed one (B2/B3 pop-out) repopulates
+ *  the thread. Never clobbers a thread that already has live items. */
+async function hydrate(sessionId: string, conversationId: string): Promise<void> {
+  let loaded
+  try {
+    loaded = await invoke('agent.conv.load', { conversationId })
+  } catch {
+    return // unknown / no store — leave the thread as-is
+  }
+  if (loaded.messages.length === 0) return
+  useAgentPanel.setState((s) => ({
+    sessions: s.sessions.map((v) =>
+      v.sessionId === sessionId && v.items.length === 0
+        ? { ...v, items: loaded.messages.map(toChatItem) }
+        : v,
+    ),
+  }))
+}
+
+/** Continuation body shared by B2 continueIn + B3 resumeConversation: open the
+ *  panel, agent.continue on (conversationId → provider) — a new session bound to
+ *  the SAME transcript — install it active, hydrate the thread. The resetGen race
+ *  guard (openHere precedent) drops a session whose core was torn down across the
+ *  await. */
+async function startContinuation(
+  conversationId: string,
+  provider: AcpAgent,
+  title: string,
+): Promise<void> {
+  useAgentPanel.setState({ open: true })
+  const gen = resetGen
+  // fast-fail race guard (see pendingSessionEvents): mark a start in flight so
+  // acp.session events that beat the ack get buffered, not dropped.
+  startsInFlight++
+  try {
+    let sessionId: string
+    try {
+      ;({ sessionId } = await invoke('agent.continue', { conversationId, provider }))
+    } catch {
+      // unknown conversation / dead core — the continue silently doesn't happen
+      return
+    }
+    if (resetGen !== gen) {
+      // a vault-switch reset() landed across the await — belongs to the dead core
+      void invoke('acp.stop', { sessionId }).catch(() => {})
+      return
+    }
+    useAgentPanel.setState((s) => ({
+      sessions: [
+        ...s.sessions,
+        {
+          sessionId,
+          conversationId,
+          agent: provider,
+          // carry the conversation's title — it is the same logical thread
+          title,
+          state: 'starting' as const,
+          busy: false,
+          items: [],
+          plan: [],
+        },
+      ],
+      activeId: sessionId,
+      // reflect the now-active provider so the picker/+ agree with the thread
+      agent: provider,
+    }))
+    // replay any acp.session events the core emitted before the ack resolved
+    // (fast adapters race the register — e.g. a missing target binary)
+    drainPendingSession(sessionId)
+    // show the prior conversation immediately (the target boots in the
+    // background; a native session/load replay is suppressed core-side, so this
+    // hydrated copy is the single source of the thread)
+    void hydrate(sessionId, conversationId)
+  } finally {
+    // last start in flight → drop any buffered events for sessions that never
+    // registered (reset-race / a concurrently-closed session), bounding the map
+    if (--startsInFlight === 0) pendingSessionEvents.clear()
+  }
+}
+
 export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   open: false,
   width: DEFAULT_PANEL_WIDTH,
@@ -254,10 +502,12 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   agent: 'claude',
   filter: 'all',
   providerAuth: defaultProviderAuth(),
+  popout: false,
   sessions: [],
   activeId: null,
   permission: null,
   draft: '',
+  attachments: [],
 
   async load() {
     try {
@@ -305,38 +555,99 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     persist()
     const gen = resetGen
     const agent = get().agent
-    let sessionId: string
+    // fast-fail race guard (see pendingSessionEvents): mark a start in flight so
+    // a spawn-error acp.session event that beats the ack gets buffered, not
+    // dropped — otherwise a missing adapter (gemini ENOENT) strands 'starting'.
+    startsInFlight++
     try {
-      ;({ sessionId } = await invoke(
-        'acp.start',
-        cwd === undefined ? { agent } : { agent, cwd },
-      ))
+      let sessionId: string
+      let conversationId: string | undefined
+      try {
+        ;({ sessionId, conversationId } = await invoke(
+          'acp.start',
+          cwd === undefined ? { agent } : { agent, cwd },
+        ))
+      } catch {
+        // session cap / invalid cwd / no core — the start silently doesn't
+        // happen (terminal splitActive precedent); the panel stays open
+        return
+      }
+      if (resetGen !== gen) {
+        // a vault-switch reset() landed across the await — this session belongs
+        // to the torn-down core; best-effort stop, never list it
+        void invoke('acp.stop', { sessionId }).catch(() => {})
+        return
+      }
+      set((s) => ({
+        sessions: [
+          ...s.sessions,
+          {
+            sessionId,
+            conversationId,
+            agent,
+            title: 'New session',
+            state: 'starting' as const,
+            busy: false,
+            items: [],
+            plan: [],
+          },
+        ],
+        activeId: sessionId,
+      }))
+      // replay any acp.session events (e.g. a fast spawn 'error') the core
+      // emitted for this session before the ack resolved and it was known
+      drainPendingSession(sessionId)
+      // B0: hydrate the thread from the persisted transcript. A fresh conversation
+      // is empty (no-op); a resumed one (B2/B3) repopulates the thread on open.
+      if (conversationId) void hydrate(sessionId, conversationId)
+    } finally {
+      // last start in flight → drop any buffered events for sessions that never
+      // registered (reset-race / a concurrently-closed session), bounding the map
+      if (--startsInFlight === 0) pendingSessionEvents.clear()
+    }
+  },
+
+  async continueIn(provider) {
+    const { activeId, sessions } = get()
+    const active = sessions.find((v) => v.sessionId === activeId)
+    // continuation needs a persisted thread to carry — a no-db session (no
+    // conversationId) or no active session has nothing to continue
+    if (!active?.conversationId) return
+    await startContinuation(active.conversationId, provider, active.title)
+  },
+
+  async popOut() {
+    const { activeId, sessions } = get()
+    const active = sessions.find((v) => v.sessionId === activeId)
+    // nothing to pop out without a persisted conversation to hand the new window
+    if (!active?.conversationId) return
+    // the pop-out window forks a core on THIS vault, then resumes the transcript
+    const vaultPath = useApp.getState().identity?.vaultPath ?? null
+    try {
+      await openAgentWindow(vaultPath, active.conversationId)
     } catch {
-      // session cap / invalid cwd / no core — the start silently doesn't
-      // happen (terminal splitActive precedent); the panel stays open
+      // no bridge (node tests) / window failed to open — best-effort, no throw
+    }
+  },
+
+  async resumeConversation(conversationId) {
+    // fires in the freshly-booted pop-out window. This is a SECONDARY window, so
+    // its core can't claim the single fixed in-app MCP port — flag it so the
+    // panel shows the "no MCP tools here" note (see main/index.ts open-agent).
+    set({ open: true, popout: true })
+    persist()
+    let loaded
+    try {
+      loaded = await invoke('agent.conv.load', { conversationId })
+    } catch {
+      // unknown / cross-vault / no store — nothing to resume, panel stays empty
       return
     }
-    if (resetGen !== gen) {
-      // a vault-switch reset() landed across the await — this session belongs
-      // to the torn-down core; best-effort stop, never list it
-      void invoke('acp.stop', { sessionId }).catch(() => {})
-      return
-    }
-    set((s) => ({
-      sessions: [
-        ...s.sessions,
-        {
-          sessionId,
-          agent,
-          title: 'New session',
-          state: 'starting' as const,
-          busy: false,
-          items: [],
-          plan: [],
-        },
-      ],
-      activeId: sessionId,
-    }))
+    // this window's core has NO live session for the conversation, so reuse the
+    // B2 continuation to seed a fresh one from the transcript on its last
+    // provider (same-provider resumes natively via session/load — adapters
+    // persist sessions to disk, so a fresh core can still load them).
+    await startContinuation(conversationId, loaded.lastProvider, loaded.title ?? 'New session')
   },
 
   select(id) {
@@ -357,30 +668,65 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     persist() // opening rides the same {open,width} row as toggle()
   },
 
+  addAttachment(a) {
+    set((s) => ({ attachments: [...s.attachments, a] }))
+  },
+
+  removeAttachment(index) {
+    set((s) => ({ attachments: s.attachments.filter((_, i) => i !== index) }))
+  },
+
   async send(text) {
-    if (!text.trim()) return
-    const { activeId, sessions } = get()
+    const { activeId, sessions, attachments } = get()
+    // a turn needs SOMETHING — text or at least one attachment (B4)
+    if (!text.trim() && attachments.length === 0) return
     const session = sessions.find((v) => v.sessionId === activeId)
     // belt and braces — the input is disabled in these states anyway
     if (!session || session.state !== 'ready' || session.busy) return
     const id = session.sessionId
+    // title from the first prompt words; an attachment-only first turn keeps the
+    // marker so the session is never a blank "New session"
+    const marker = attachmentSummary(attachments)
+    const titleSource = text.trim() || marker
     const title =
       session.title === 'New session'
-        ? text.trim().split(/\s+/).slice(0, 6).join(' ').slice(0, 48)
+        ? titleSource.split(/\s+/).slice(0, 6).join(' ').slice(0, 48)
         : session.title
+    // the thread bubble records the attachment marker beneath the text; the
+    // prompt itself carries the clean text (the marker is renderer sugar)
+    const bubble = marker ? (text ? `${text}\n\n${marker}` : marker) : text
+    const contractAttachments = attachments.map(toContractAttachment)
     set((s) => ({
+      // clear the tray as the turn fires — the staged attachments are now sent
+      attachments: [],
       sessions: s.sessions.map((v) =>
         v.sessionId === id
-          ? { ...v, busy: true, title, items: [...v.items, { type: 'user' as const, text }] }
+          ? { ...v, busy: true, title, items: [...v.items, { type: 'user' as const, text: bubble }] }
           : v,
       ),
     }))
     try {
-      await invoke('acp.prompt', { sessionId: id, text })
+      await invoke('acp.prompt', {
+        sessionId: id,
+        text,
+        ...(contractAttachments.length ? { attachments: contractAttachments } : {}),
+      })
     } catch (e) {
       // ACP_BUSY / dead core: revert busy, surface the envelope as detail
       patchSession(id, { busy: false, detail: isErrEnvelope(e) ? e.message : String(e) })
     }
+  },
+
+  async retry() {
+    const { activeId, sessions } = get()
+    const session = sessions.find((v) => v.sessionId === activeId)
+    // only from an idle session — the composer/palette gate on this too
+    if (!session || session.state !== 'ready' || session.busy) return
+    const text = lastUserText(session.items)
+    if (!text || !text.trim()) return
+    // resend as a fresh turn — send() appends a new user bubble (standard chat
+    // retry) and rides the same guards; attachments were transient, text only
+    await get().send(text)
   },
 
   async setMode(sessionId, modeId) {
@@ -458,6 +804,7 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       }
     }
     pendingChunks.clear()
+    pendingSessionEvents.clear() // any raced-ahead events belong to the dead core
     permissionQueue = []
     set({
       open: false,
@@ -466,10 +813,12 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       agent: 'claude',
       filter: 'all',
       providerAuth: defaultProviderAuth(),
+      popout: false,
       sessions: [],
       activeId: null,
       permission: null,
       draft: '',
+      attachments: [],
     })
   },
 }))
@@ -482,45 +831,19 @@ if (typeof window !== 'undefined' && window.loredex) {
     switch (e.kind) {
       case 'acp.session': {
         const known = useAgentPanel.getState().sessions.some((v) => v.sessionId === e.sessionId)
-        if (!known) return
-        commitChunks()
-        // a non-ready state is a dead/blocked session: core already answered its
-        // held permissions 'cancelled' (cancelPendingPermissions on exit/error).
-        // Purge this session's queued requests so a healthy session isn't stalled
-        // behind them, and advance past a surfaced one so the modal doesn't hang
-        // on a dead session — the same reconciliation closeSession does.
-        if (e.state !== 'ready') {
-          permissionQueue = permissionQueue.filter((p) => p.sessionId !== e.sessionId)
+        if (!known) {
+          // Not yet registered. If a start is in flight, this is the fast-fail
+          // race (a spawn 'error' beating openHere's acp.start ack) — buffer it
+          // and replay on registration (drainPendingSession). Outside a start
+          // window it's a late event for a closed session — drop it as before.
+          if (startsInFlight > 0) {
+            const buf = pendingSessionEvents.get(e.sessionId) ?? []
+            buf.push(e)
+            pendingSessionEvents.set(e.sessionId, buf)
+          }
+          return
         }
-        // any non-ready state also clears busy: a mid-turn death (adapter
-        // exit) emits no turnEnd, and a stuck Stop button helps nobody
-        useAgentPanel.setState((s) => ({
-          sessions: s.sessions.map((v) =>
-            v.sessionId === e.sessionId
-              ? {
-                  ...v,
-                  state: e.state,
-                  detail: e.detail,
-                  busy: e.state === 'ready' ? v.busy : false,
-                  // MCP list rides the ready event only (A7) — keep it across
-                  // later non-ready transitions
-                  mcpServers: e.mcpServers ?? v.mcpServers,
-                  authMode: e.authMode ?? v.authMode,
-                }
-              : v,
-          ),
-          permission:
-            e.state !== 'ready' && s.permission?.sessionId === e.sessionId
-              ? (permissionQueue.shift() ?? null)
-              : s.permission,
-          // login-state chip (A6): a ready session proves the provider is signed
-          // in; auth_required flags it needs login. Other states (starting /
-          // error / exited) say nothing about auth — leave the last verdict.
-          providerAuth:
-            e.state === 'ready' || e.state === 'auth_required'
-              ? { ...s.providerAuth, [e.agent]: e.state === 'ready' ? 'ok' : 'auth_required' }
-              : s.providerAuth,
-        }))
+        applySessionEvent(e)
         return
       }
       case 'acp.chunk': {

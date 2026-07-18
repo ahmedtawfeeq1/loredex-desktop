@@ -20,7 +20,9 @@ declare global {
       pickVaultFolder(): Promise<string | null>
       listRecentVaults(): Promise<RecentVault[]>
       openInNewWindow(vaultPath?: string): Promise<null>
+      openAgentWindow(vaultPath: string | null, conversationId: string): Promise<null>
       onJoinLink(cb: (url: string) => void): Unsubscribe
+      onOpenAgent(cb: (conversationId: string) => void): Unsubscribe
       pathForFile(file: File): string
       saveExport(defaultName: string, data: string | ArrayBuffer): Promise<string | null>
     }
@@ -88,9 +90,21 @@ export function openInNewWindow(vaultPath?: string): Promise<null> {
   return window.loredex.openInNewWindow(vaultPath)
 }
 
+/** B3 pop-out: open one agent conversation in its own standalone window (its own
+ *  core host, same vault app.db → resumed from the persisted transcript). */
+export function openAgentWindow(vaultPath: string | null, conversationId: string): Promise<null> {
+  return window.loredex.openAgentWindow(vaultPath, conversationId)
+}
+
 /** loredex://join deep link (story 13.2): raw URL, parsed by shared/join-link. */
 export function onJoinLink(cb: (url: string) => void): Unsubscribe {
   return window.loredex.onJoinLink(cb)
+}
+
+/** B3 pop-out: the standalone agent window receives its conversation id post-load
+ *  (mirrors onJoinLink) and resumes it from the vault app.db. */
+export function onOpenAgent(cb: (conversationId: string) => void): Unsubscribe {
+  return window.loredex.onOpenAgent(cb)
 }
 
 /** Real filesystem path of a dropped File (preload webUtils, story 7.4). */

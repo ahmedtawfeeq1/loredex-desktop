@@ -283,6 +283,26 @@ export function appActions(): AppAction[] {
       run: () => void useAgentPanel.getState().openHere(),
     },
     {
+      // chat-completeness: re-send the last user turn (palette twin of the
+      // composer Retry control). Combo-less (open-agent-here precedent) — the
+      // store no-ops unless the active session is idle with a turn to resend,
+      // so the row is never dead.
+      id: 'action:agent-retry',
+      title: 'Retry last agent message',
+      run: () => void useAgentPanel.getState().retry(),
+    },
+    {
+      // B3 pop-out: open the active conversation in its own standalone window
+      // (its own core reads the same vault app.db). ⇧⌘O — 'o' for pop OUT,
+      // free in the registry (⌘O is the native menu accelerator, no combo
+      // here). No active conversation → the store no-ops (never a dead row).
+      id: 'action:pop-out-agent',
+      title: 'Pop out agent conversation',
+      shortcut: '⇧⌘O',
+      combo: { key: 'o', meta: true, shift: true },
+      run: () => void useAgentPanel.getState().popOut(),
+    },
+    {
       // A8 add-to-chat: ⇧⌘L stages the Read-mode note selection into the agent
       // panel (⌘F precedent — guards to the reader; Edit mode is handled by the
       // CM keymap on the same chord, so this no-ops there). 'l' is free in the

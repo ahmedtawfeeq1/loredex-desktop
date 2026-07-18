@@ -34,6 +34,42 @@ const agentSchema = {
   },
 }
 
+/** Custom <pre> for fenced code (chat-completeness COPY): the sanitized code
+ *  plus a hover copy button. The button reads the <code>'s textContent on click
+ *  (the raw code — the button itself lives outside <code>, so its label never
+ *  pollutes the copy) and writes it to the clipboard, the same navigator API
+ *  the settings device-flow uses. Injected via rehype-react's `components`
+ *  AFTER sanitize, so it needs no schema widening. */
+function CodeBlock(props: React.HTMLAttributes<HTMLPreElement>): React.JSX.Element {
+  const { children, ...rest } = props
+  return (
+    <pre {...rest}>
+      <button
+        type="button"
+        className="agent-copy-code"
+        aria-label="Copy code"
+        title="Copy code"
+        onClick={(e) => {
+          const code = e.currentTarget.closest('pre')?.querySelector('code')
+          try {
+            void navigator.clipboard?.writeText(code?.textContent ?? '')
+          } catch {
+            // no clipboard (node/test) — best-effort, never throw mid-render
+          }
+        }}
+      >
+        Copy
+      </button>
+      {children}
+    </pre>
+  )
+}
+
+// panel-local options: the reader components (anchors / task checkboxes) plus
+// the copy-enabled <pre>. The shared `options` object is never mutated (arch
+// law) — this is a fresh object that only spreads its fields.
+const agentOptions = { ...options, components: { ...options.components, pre: CodeBlock } }
+
 const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
@@ -42,7 +78,7 @@ const processor = unified()
   // never throw mid-render and blank the bubble.
   .use(rehypeHighlight, { ignoreMissing: true })
   .use(rehypeSanitize, agentSchema)
-  .use(rehypeReact, options)
+  .use(rehypeReact, agentOptions)
 
 /** Render one bubble body (user / agent / thought) as sanitized, highlighted markdown. */
 export function renderAgentMarkdown(body: string): ReactNode {

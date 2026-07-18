@@ -232,6 +232,35 @@ app.whenReady().then(() => {
     openWindow(typeof vaultPath === 'string' && vaultPath ? vaultPath : loadVaultPath())
     return null
   })
+  // B3 pop-out (Phase 2): open one agent conversation in its OWN standalone
+  // window. The new window forks its OWN core host bound to the SAME vault, so
+  // its core reads the same vault app.db and resumes the conversation from the
+  // persisted transcript (renderer-side, on the 'open-agent' post-load send).
+  // Mirrors open-in-new-window + the forwardDeepLink post-load send.
+  //
+  // KNOWN LIMITATION (see the file header): the in-app MCP server binds one
+  // fixed port, claimed by the FIRST window's core. A pop-out is always a
+  // secondary window, so its core can't claim that port — the popped-out
+  // session runs WITHOUT the loredex MCP tools (the renderer shows a small UI
+  // note; the vault UI is otherwise unaffected).
+  ipcMain.handle(
+    'loredex:open-agent-window',
+    (_event, arg: { vaultPath?: string | null; conversationId: string }) => {
+      const vaultPath =
+        typeof arg?.vaultPath === 'string' && arg.vaultPath ? arg.vaultPath : loadVaultPath()
+      const win = openWindow(vaultPath)
+      const conversationId = arg?.conversationId
+      // Hand the conversation id to the fresh renderer once it has loaded. The
+      // core port is brokered in bootWindowCore's own did-finish-load handler,
+      // registered FIRST inside openWindow, so it runs before this send — the
+      // renderer has its core (and its onOpenAgent listener) by then, exactly
+      // like the deep-link (join-link) post-load forward.
+      win.webContents.once('did-finish-load', () => {
+        win.webContents.send('open-agent', conversationId)
+      })
+      return null
+    },
+  )
   // story 7.4: native markdown picker for route-a-note (no business logic here)
   ipcMain.handle('loredex:pick-route-file', (event) => pickRouteFileDialog(windowFor(event)))
   // story 11.1: native folder picker for contract project roots (TCC rule)

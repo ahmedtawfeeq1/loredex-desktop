@@ -48,6 +48,8 @@ export interface ClientWorkspaceStatus {
   missingRefs: string[]
   /** generated files out of date vs a fresh materialize (workspace --check) */
   drift: boolean
+  /** generated tooling exists on this machine — Wire vs Re-wire */
+  generated: boolean
 }
 
 /**

@@ -14,6 +14,7 @@ import type {
 import { invoke } from '../../api'
 import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
+import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
 import { sectionTint } from '../reader/sectionTint'
 import { buildClientPage, type UnitSection } from './client-page'
@@ -142,6 +143,123 @@ function Unit({ unit }: { unit: UnitSection }): React.JSX.Element {
 
 type ProbeState = { state: 'testing' | 'ok' | 'fail'; detail: string }
 
+/**
+ * A client with no tooling yet: the dex's STANDARD connections (derived from
+ * the fleet) render as one token row each — paste, Wire, done. Nobody picks a
+ * "golden client"; the copy source is resolved core-side.
+ */
+function StandardToolingCard({
+  client,
+  onDone,
+}: {
+  client: string
+  onDone: () => void
+}): React.JSX.Element {
+  const identity = useIdentity((s) => effectiveIdentity(s))
+  const [standard, setStandard] = useState<
+    Array<{ server: string; source: string; envRefs: string[] }>
+  >([])
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [tokens, setTokens] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void invoke('clients.standardTooling', undefined)
+      .then((list) => {
+        const usable = list.filter((c) => c.source !== client)
+        setStandard(usable)
+        setChecked(new Set(usable.map((c) => c.server)))
+      })
+      .catch(() => setStandard([]))
+  }, [client])
+
+  async function wire(): Promise<void> {
+    if (identity === null || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      // group the checked connections by their copy source (usually one)
+      const bySource = new Map<string, string[]>()
+      for (const c of standard) {
+        if (checked.has(c.server)) bySource.set(c.source, [...(bySource.get(c.source) ?? []), c.server])
+      }
+      for (const [from, servers] of bySource) {
+        const refs = new Set(
+          standard.filter((c) => servers.includes(c.server)).flatMap((c) => c.envRefs),
+        )
+        await invoke('clients.tooling.copy', {
+          client,
+          from,
+          servers,
+          tokens: Object.fromEntries(
+            Object.entries(tokens).filter(([ref, v]) => refs.has(ref) && v.trim()),
+          ),
+          identity,
+        })
+      }
+      onDone()
+    } catch (e) {
+      setError(String((e as { message?: string }).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (standard.length === 0) {
+    return <div className="cp-empty">No tooling in this dex yet to inherit.</div>
+  }
+  const single = standard.length === 1
+  return (
+    <div className="cp-conn">
+      {error && <div className="cp-conn-detail warn">{error}</div>}
+      {standard.map((conn) => (
+        <div key={conn.server} className="cp-ws-ref">
+          {single ? (
+            <span className="cp-conn-name">{conn.server}</span>
+          ) : (
+            <label className="cp-conn-name">
+              <input
+                type="checkbox"
+                checked={checked.has(conn.server)}
+                onChange={(e) => {
+                  const next = new Set(checked)
+                  if (e.target.checked) next.add(conn.server)
+                  else next.delete(conn.server)
+                  setChecked(next)
+                }}
+              />{' '}
+              {conn.server}
+            </label>
+          )}
+          {checked.has(conn.server) &&
+            conn.envRefs.map((ref) => (
+              <input
+                key={ref}
+                className="cp-ws-token-input"
+                type="password"
+                value={tokens[ref] ?? ''}
+                placeholder="Paste this client's token"
+                onChange={(e) => setTokens({ ...tokens, [ref]: e.target.value })}
+              />
+            ))}
+        </div>
+      ))}
+      <div className="cp-ws-row" style={{ marginTop: 8 }}>
+        <button
+          type="button"
+          className="button-emphasis"
+          disabled={busy || identity === null || checked.size === 0}
+          title={identity === null ? 'Set your name and email in Settings first' : undefined}
+          onClick={() => void wire()}
+        >
+          {busy ? 'Wiring…' : 'Wire'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<WorkspaceResult | null>(null)
@@ -226,7 +344,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           }
           onClick={() => void rewire({})}
         >
-          Re-wire
+          {status?.generated ? 'Re-wire' : 'Wire'}
         </button>
         <button
           type="button"
@@ -247,7 +365,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
         </button>
       </div>
       {conns.length === 0 && info.hasWorkspaceYml && (
-        <div className="cp-empty">No connections declared yet — edit workspace.yml.</div>
+        <StandardToolingCard client={info.slug} onDone={() => refreshAll(true)} />
       )}
       {conns.map((conn) => {
         const probe = probes[conn.server]

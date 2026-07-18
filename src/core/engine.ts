@@ -49,6 +49,7 @@ import {
   type HandoffScope,
   type Identity,
   listHandoffs,
+  listProjects,
   listReceipts,
   loadConfig,
   loadProducts,
@@ -244,6 +245,70 @@ export function createClient(
 /** The `${VAR}` names a client's workspace.yml declares — the needs-token diff input. */
 export function clientEnvRefs(client: string): string[] {
   return workspaceEnvRefs(join(getConfig().vaultPath, 'projects', client))
+}
+
+/** Generated tooling exists on this machine — drives the Wire vs Re-wire label. */
+export function workspaceGenerated(client: string): boolean {
+  return existsSync(join(getConfig().vaultPath, 'projects', client, '.mcp.json'))
+}
+
+/**
+ * The dex's STANDARD tooling: the deduped union of connections across every
+ * tooled client, each with the first client that declares it as its copy
+ * source. An agency fleet is homogeneous — the UI asks for a token, never for
+ * "which client to copy from"; the source is bookkeeping, resolved here.
+ */
+export function standardTooling(): Array<{ server: string; source: string; envRefs: string[] }> {
+  const config = getConfig()
+  const out = new Map<string, { server: string; source: string; envRefs: string[] }>()
+  for (const slug of listProjects(config.vaultPath)) {
+    let conns: ReturnType<typeof clientConnections>
+    try {
+      conns = clientConnections(slug)
+    } catch {
+      continue // no/invalid workspace.yml — not a tooling source
+    }
+    for (const c of conns) {
+      if (!out.has(c.server)) out.set(c.server, { server: c.server, source: slug, envRefs: c.envRefs })
+    }
+  }
+  return [...out.values()].sort((a, b) => a.server.localeCompare(b.server))
+}
+
+/**
+ * Post-hoc tooling copy for an EXISTING client (the Add-Client copy, without
+ * the scaffold): golden workspace.yml in, env refs rewritten, materialize with
+ * the token overlay, reindex, one attributed commit (workspace.yml is vault
+ * content). Same golden-keyed token contract as createClient.
+ */
+export function copyTooling(
+  client: string,
+  from: string,
+  servers: string[] | undefined,
+  tokens: Record<string, string>,
+  identity: Identity,
+): { workspace: WorkspaceResult; tokenRefs: Record<string, string> } {
+  const config = getConfig()
+  const { renamed } = copyWorkspaceSpec(config.vaultPath, from, client, { servers })
+  const tokenRefs: Record<string, string> = {}
+  const env: Record<string, string> = {}
+  for (const [ref, token] of Object.entries(tokens)) {
+    const final = renamed.find((r) => r.from === ref)?.to ?? ref
+    tokenRefs[ref] = final
+    if (token) env[final] = token
+  }
+  const workspace = materializeWorkspace(config.vaultPath, client, {
+    env: { ...process.env, ...env },
+  })
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(
+      config.vaultPath,
+      config,
+      `loredex: ${client} tooling from ${from} (${identity.name})`,
+    ),
+  )
+  return { workspace, tokenRefs }
 }
 
 /**

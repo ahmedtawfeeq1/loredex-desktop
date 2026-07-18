@@ -34,6 +34,7 @@ const MODAL_CSS = `
 
 interface Connection {
   server: string
+  source: string
   envRefs: string[]
 }
 
@@ -47,13 +48,13 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
     () => [...new Set(fleet.map((c) => c.manager).filter((m): m is string => Boolean(m)))].sort(),
     [fleet],
   )
-  const goldens = useMemo(() => fleet.filter((c) => c.hasWorkspaceYml).map((c) => c.slug), [fleet])
 
   const [name, setName] = useState('')
   const [manager, setManager] = useState('')
   const [tags, setTags] = useState('new-platform')
-  // '' = empty workspace — the default; copying a golden client is opt-in
-  const [golden, setGolden] = useState('')
+  // the dex's STANDARD tooling — a new client gets it by default; the team
+  // pastes a token, never picks a "client to copy from" (that's bookkeeping,
+  // resolved core-side)
   const [connections, setConnections] = useState<Connection[]>([])
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [tokens, setTokens] = useState<Record<string, string>>({})
@@ -61,22 +62,16 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!golden) {
-      setConnections([])
-      setChecked(new Set())
-      return
-    }
-    void invoke('clients.connections', { client: golden })
-      .then((conns) => {
-        // a golden client may declare no connections — that's an empty, valid list
-        setConnections(conns)
-        setChecked(new Set(conns.map((c) => c.server)))
+    void invoke('clients.standardTooling', undefined)
+      .then((list) => {
+        setConnections(list)
+        setChecked(new Set(list.map((c) => c.server)))
       })
       .catch(() => {
         setConnections([])
         setChecked(new Set())
       })
-  }, [golden])
+  }, [])
 
   const blockedReason = !name.trim()
     ? 'client name is required'
@@ -91,23 +86,39 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
     setBusy(true)
     setError(null)
     try {
-      const servers = [...checked]
-      const activeRefs = new Set(
-        connections.filter((c) => checked.has(c.server)).flatMap((c) => c.envRefs),
-      )
+      // group checked connections by copy source (usually one across a fleet);
+      // the first source rides clients.create, the rest apply post-create
+      const active = connections.filter((c) => checked.has(c.server))
+      const bySource = new Map<string, Connection[]>()
+      for (const c of active) bySource.set(c.source, [...(bySource.get(c.source) ?? []), c])
+      const sources = [...bySource.entries()].sort((a, b) => b[1].length - a[1].length)
+      const tokensFor = (list: Connection[]): Record<string, string> => {
+        const refs = new Set(list.flatMap((c) => c.envRefs))
+        return Object.fromEntries(
+          Object.entries(tokens).filter(([ref, v]) => refs.has(ref) && v.trim()),
+        )
+      }
+      const [primary, ...rest] = sources
       const { slug } = await invoke('clients.create', {
         spec: {
           name: name.trim(),
           manager: manager.trim(),
           tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-          fromClient: golden || undefined,
-          servers: golden && servers.length < connections.length ? servers : undefined,
+          fromClient: primary?.[0],
+          servers: primary ? primary[1].map((c) => c.server) : undefined,
         },
-        tokens: Object.fromEntries(
-          Object.entries(tokens).filter(([ref, v]) => activeRefs.has(ref) && v.trim()),
-        ),
+        tokens: primary ? tokensFor(primary[1]) : {},
         identity,
       })
+      for (const [from, list] of rest) {
+        await invoke('clients.tooling.copy', {
+          client: slug,
+          from,
+          servers: list.map((c) => c.server),
+          tokens: tokensFor(list),
+          identity,
+        })
+      }
       await refreshFleet()
       selectClient(slug)
       onClose()
@@ -164,54 +175,44 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
           placeholder="new-platform, dental"
         />
       </label>
-      <label className="acm-field">
-        <span className="modal-label">Copy tooling from</span>
-        <select className="acm-input" value={golden} onChange={(e) => setGolden(e.target.value)}>
-          <option value="">none — empty workspace</option>
-          {goldens.map((slug) => (
-            <option key={slug} value={slug}>
-              {slug}
-            </option>
-          ))}
-        </select>
-      </label>
       {connections.length > 0 && (
         <div className="acm-field">
-          <span className="modal-label">Connections</span>
+          <span className="modal-label">
+            {connections.length === 1 ? 'Connection' : 'Connections'}
+          </span>
           {connections.map((conn) => (
             <div key={conn.server} className="acm-conn">
-              <label className="acm-conn-head">
-                <input
-                  type="checkbox"
-                  checked={checked.has(conn.server)}
-                  onChange={(e) => {
-                    const next = new Set(checked)
-                    if (e.target.checked) next.add(conn.server)
-                    else next.delete(conn.server)
-                    setChecked(next)
-                  }}
-                />
+              {connections.length === 1 ? (
                 <span className="acm-conn-name">{conn.server}</span>
-              </label>
+              ) : (
+                <label className="acm-conn-head">
+                  <input
+                    type="checkbox"
+                    checked={checked.has(conn.server)}
+                    onChange={(e) => {
+                      const next = new Set(checked)
+                      if (e.target.checked) next.add(conn.server)
+                      else next.delete(conn.server)
+                      setChecked(next)
+                    }}
+                  />
+                  <span className="acm-conn-name">{conn.server}</span>
+                </label>
+              )}
               {checked.has(conn.server) &&
                 conn.envRefs.map((ref) => (
                   <label key={ref} className="acm-conn-token">
-                    <span className="acm-conn-ref">{ref} → this client's token</span>
                     <input
                       className="acm-input"
                       type="password"
                       value={tokens[ref] ?? ''}
                       onChange={(e) => setTokens({ ...tokens, [ref]: e.target.value })}
-                      placeholder="paste token (stored in your OS keychain, never in git)"
+                      placeholder="Paste this client's token (stored in your OS keychain, never in git)"
                     />
                   </label>
                 ))}
             </div>
           ))}
-          <span className="acm-hint">
-            Tokens stay on this machine (OS keychain) and land only in the client's gitignored
-            generated files.
-          </span>
         </div>
       )}
     </Modal>

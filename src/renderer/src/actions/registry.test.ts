@@ -4,7 +4,8 @@
  * nav action, and the contextual providers still list. An action added to the
  * registry without palette coverage fails HERE.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { useAgentPanel } from '../stores/agentPanel'
 import { useApp, type AppView } from '../stores/app'
 import { useDex } from '../stores/dex'
 import { useEditor } from '../stores/editor'
@@ -213,6 +214,38 @@ describe('D1 writing surface: ⌘E edit toggle + ⌘S save (story 16.4)', () => 
     useEditor.getState().reset()
     expect(() => appActions().find((a) => a.id === 'action:save-note')?.run()).not.toThrow()
     expect(useEditor.getState().busy).toBe(false)
+  })
+})
+
+describe('agent panel actions (acp blueprint 2026-07-18)', () => {
+  afterEach(() => {
+    useAgentPanel.setState({ open: false, sessions: [], activeId: null })
+  })
+
+  it('⌘J toggles the panel with a live title (VS Code panel muscle memory)', () => {
+    useAgentPanel.setState({ open: false })
+    const toggle = appActions().find((a) => a.id === 'action:toggle-agent-panel')
+    expect(toggle?.shortcut).toBe('⌘J')
+    expect(toggle?.combo).toEqual({ key: 'j', meta: true })
+    expect(toggle?.title).toBe('Open agent panel')
+    toggle?.run()
+    expect(useAgentPanel.getState().open).toBe(true)
+    // titles are live — the palette row says what the toggle will DO
+    expect(appActions().find((a) => a.id === 'action:toggle-agent-panel')?.title).toBe(
+      'Close agent panel',
+    )
+  })
+
+  it('Open agent here is a combo-less palette row that opens the panel', () => {
+    useAgentPanel.setState({ open: false })
+    const action = appActions().find((a) => a.id === 'action:open-agent-here')
+    expect(action?.title).toBe('Open agent here')
+    expect(action?.combo).toBeUndefined() // palette/nav reachable, no shortcut spent
+    action?.run()
+    // node env has no bridge: acp.start silently doesn't happen (splitActive
+    // precedent) but the panel opens — the palette row is never dead
+    expect(useAgentPanel.getState().open).toBe(true)
+    expect(actionItems('agent').some((i) => i.key === 'action:open-agent-here')).toBe(true)
   })
 })
 

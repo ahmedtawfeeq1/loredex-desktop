@@ -132,6 +132,24 @@ export interface CoreApi {
       env: Record<string, string>
     }>
   }
+  /** agent-ops: the dex's standard tooling — deduped connection union across all
+   *  tooled clients, each with its copy source. The UI asks for tokens only. */
+  'clients.standardTooling': {
+    in: void
+    out: Array<{ server: string; source: string; envRefs: string[] }>
+  }
+  /** agent-ops: copy a golden client's tooling onto an EXISTING client (create's
+   *  copy step, post-hoc) — golden-keyed tokens, one attributed commit */
+  'clients.tooling.copy': {
+    in: {
+      client: string
+      from: string
+      servers?: string[]
+      tokens: Record<string, string>
+      identity: Identity
+    }
+    out: WorkspaceResult
+  }
   /** agent-ops: LIVE health probe of one connection — spawns the mcp server with
    *  this machine's keychain tokens and completes a JSON-RPC initialize. The only
    *  honest "connected": a held token can still be revoked server-side. */

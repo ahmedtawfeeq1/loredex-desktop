@@ -229,6 +229,7 @@ export function registerCoreHandlers(
       declaredRefs,
       missingRefs,
       drift: check.wouldChange.length > 0,
+      generated: engine.workspaceGenerated(client),
     }
   })
   // Paste/replace tokens on THIS machine + re-materialize. Only the keychain
@@ -244,6 +245,24 @@ export function registerCoreHandlers(
     }),
   )
   ipc.register('clients.connections', ({ client }) => engine.clientConnections(client))
+  ipc.register('clients.standardTooling', () => engine.standardTooling())
+  // Post-hoc tooling copy: an existing client (created with an empty workspace)
+  // gets the golden client's connections + tokens — no hand-edited YAML.
+  ipc.register('clients.tooling.copy', ({ client, from, servers, tokens, identity }) =>
+    withWriteLock(async () => {
+      if (!isValidIdentity(identity)) {
+        throw ipcError('INTERNAL', 'copying tooling needs an identity — set name and email in Settings')
+      }
+      const { workspace, tokenRefs } = engine.copyTooling(client, from, servers, tokens, identity)
+      for (const [ref, token] of Object.entries(tokens)) {
+        if (token) await storeClientToken(tokenRefs[ref] ?? ref, token)
+      }
+      invalidateAtlas()
+      ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
+      notifier.refresh()
+      return workspace
+    }),
+  )
   // Health probe: spawn the connection's mcp server with keychain-expanded env
   // and complete an initialize handshake. 8s budget — inside the invoke limit.
   ipc.register('clients.connections.test', async ({ client, server }) => {

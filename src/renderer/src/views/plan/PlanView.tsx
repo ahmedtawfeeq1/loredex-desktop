@@ -320,31 +320,35 @@ export function PlanView(): React.JSX.Element {
           value={tab}
           onChange={setTab}
         />
-        <span className="plan-filters">
-          <select
-            className="plan-filter"
-            aria-label="Type filter"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
-          >
-            <option value="all">type: all</option>
-            <option value="task">type: task</option>
-            <option value="handoff">type: handoff</option>
-          </select>
-          <span className="plan-filter-sep">·</span>
-          <select
-            className="plan-filter"
-            aria-label="Project filter"
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-          >
-            <option value="all">project: all</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+        {/* search-page facet anatomy — real labeled dropdowns, not filter chips */}
+        <span className="plan-filters facet-row">
+          <label className="facet">
+            <span>type</span>
+            <select
+              aria-label="Type filter"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+            >
+              <option value="all">All</option>
+              <option value="task">Task</option>
+              <option value="handoff">Handoff</option>
+            </select>
+          </label>
+          <label className="facet">
+            <span>project</span>
+            <select
+              aria-label="Project filter"
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+            >
+              <option value="all">All</option>
+              {projects.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
         </span>
         <Button variant="primary" onClick={() => useHandoffs.getState().openCompose()}>
           ＋ New item

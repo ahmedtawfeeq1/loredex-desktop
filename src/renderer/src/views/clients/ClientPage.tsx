@@ -6,7 +6,11 @@
  * reader open target (hyperlink-everything).
  */
 import { useEffect, useState } from 'react'
-import type { ClientInfo, WorkspaceResult } from '../../../../shared/ipc-contract'
+import type {
+  ClientInfo,
+  ClientWorkspaceStatus,
+  WorkspaceResult,
+} from '../../../../shared/ipc-contract'
 import { invoke } from '../../api'
 import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
@@ -55,6 +59,15 @@ const PAGE_CSS = `
 .cp-ws-result { margin-top: 8px; font-size: 12px; color: var(--text-2); }
 .cp-ws-result .ok { color: var(--ok, #2e6e5e); }
 .cp-ws-result .warn { color: var(--rust, #a33f2e); }
+.cp-ws-refs { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.cp-ws-ref { display: flex; align-items: center; gap: 10px; }
+.cp-ws-ref-state { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.cp-ws-ref-state.ok { color: var(--ok, #2e6e5e); }
+.cp-ws-ref-state.warn { color: var(--rust, #a33f2e); }
+.cp-ws-token-input {
+  flex: 1; font-size: 12px; color: var(--text-1); background: var(--bg-inset);
+  border: 1px solid var(--hairline); border-radius: 6px; padding: 4px 8px;
+}
 .cp-empty { font-size: 12.5px; color: var(--text-2); }
 `
 
@@ -121,6 +134,8 @@ function Unit({ unit }: { unit: UnitSection }): React.JSX.Element {
 function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<WorkspaceResult | null>(null)
+  const [status, setStatus] = useState<ClientWorkspaceStatus | null>(null)
+  const [pasted, setPasted] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   // v3 P7 green heartbeat (story 26.8): connected = the in-app MCP host is
   // listening — the wiring the generated .mcp.json points agents at
@@ -132,11 +147,25 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
       .catch(() => setMcp({ running: false, port: null }))
   }, [])
 
-  async function run(check: boolean): Promise<void> {
+  const refreshStatus = (): void => {
+    if (!info.hasWorkspaceYml) return
+    void invoke('clients.workspace.status', { client: info.slug })
+      .then(setStatus)
+      .catch(() => setStatus(null))
+  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refetch per client only
+  useEffect(refreshStatus, [info.slug])
+
+  // Re-wire always goes through clients.tokens.set — it materializes WITH this
+  // machine's keychain tokens; the bare clients.workspace channel would expand
+  // from a shell env that desktop users don't have.
+  async function rewire(tokens: Record<string, string>): Promise<void> {
     setBusy(true)
     setError(null)
     try {
-      setResult(await invoke('clients.workspace', { client: info.slug, check }))
+      setResult(await invoke('clients.tokens.set', { client: info.slug, tokens }))
+      setPasted({})
+      refreshStatus()
     } catch (e) {
       setError(String((e as { message?: string }).message ?? e))
     } finally {
@@ -144,6 +173,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
     }
   }
 
+  const pastedReady = Object.entries(pasted).filter(([, v]) => v.trim())
   return (
     <div className="cp-ws">
       <div className="cp-ws-row">
@@ -168,36 +198,71 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           disabled={busy || !info.hasWorkspaceYml}
           title={
             info.hasWorkspaceYml
-              ? 'Generate .mcp.json / .claude settings / AGENTS.md from workspace.yml (gitignored)'
+              ? "Regenerate .mcp.json / .claude settings / AGENTS.md with this machine's stored tokens (gitignored files only)"
               : 'No workspace.yml in this client'
           }
-          onClick={() => void run(false)}
+          onClick={() => void rewire({})}
         >
-          Generate workspace
+          Re-wire
         </button>
         <button
           type="button"
           className="button-quiet"
           disabled={busy || !info.hasWorkspaceYml}
-          onClick={() => void run(true)}
+          title="Open a terminal in this client's directory — then just type claude"
+          onClick={() => void invoke('clients.openTerminal', { client: info.slug }).catch(() => {})}
         >
-          Check
+          Open in Terminal
         </button>
       </div>
+      {status && (
+        <div className="cp-ws-refs">
+          {status.declaredRefs.map((ref) => {
+            const missing = status.missingRefs.includes(ref)
+            return (
+              <div key={ref} className="cp-ws-ref">
+                <span className={missing ? 'cp-ws-ref-state warn' : 'cp-ws-ref-state ok'}>
+                  {missing ? '● needs token' : '✓ token held'}
+                </span>
+                <span className="cp-ws-conn">{ref}</span>
+                {missing && (
+                  <input
+                    className="cp-ws-token-input"
+                    type="password"
+                    value={pasted[ref] ?? ''}
+                    placeholder="paste token"
+                    onChange={(e) => setPasted({ ...pasted, [ref]: e.target.value })}
+                  />
+                )}
+              </div>
+            )
+          })}
+          {pastedReady.length > 0 && (
+            <button
+              type="button"
+              className="button-emphasis"
+              disabled={busy}
+              onClick={() => void rewire(Object.fromEntries(pastedReady))}
+            >
+              Save token{pastedReady.length === 1 ? '' : 's'} &amp; re-wire
+            </button>
+          )}
+          {status.drift && !busy && (
+            <div className="cp-ws-result warn">generated files out of date — Re-wire</div>
+          )}
+        </div>
+      )}
       {error && <div className="cp-ws-result warn">{error}</div>}
       {result && !error && (
         <div className="cp-ws-result">
           {result.wrote.length > 0 && <div className="ok">wrote: {result.wrote.join(', ')}</div>}
-          {result.wouldChange.length > 0 && (
-            <div className="warn">out of date: {result.wouldChange.join(', ')}</div>
-          )}
           {result.missingEnv.length > 0 && (
             <div className="warn">
-              missing env: {result.missingEnv.map((v) => `\${${v}}`).join(', ')} — set them in the
-              environment the agent launches from
+              still missing: {result.missingEnv.map((v) => `\${${v}}`).join(', ')} — paste the
+              token above
             </div>
           )}
-          {result.ok && result.wrote.length === 0 && result.wouldChange.length === 0 && (
+          {result.ok && result.wrote.length === 0 && (
             <div className="ok">workspace up to date</div>
           )}
         </div>

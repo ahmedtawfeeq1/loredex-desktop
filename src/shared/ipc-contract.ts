@@ -27,8 +27,10 @@ import type {
   AtlasLevel,
   AtlasPathResult,
   AtlasScope,
+  ClientWorkspaceStatus,
   ConsumeReceipt,
   ContractChange,
+  CreateClientSpec,
   CreateHandoffInput,
   CreateVaultResult,
   Facets,
@@ -67,6 +69,7 @@ import type {
 // Payload types that exist in the pinned loredex are imported, never redefined.
 export type { ClientInfo, Config, Doc, LintFinding, ProductDashboard, SearchHit, WorkspaceResult }
 export type { WorkItem, WorkPatch, WorkReceipt } from 'loredex'
+export type { ClientWorkspaceStatus, CreateClientSpec } from './types'
 
 // ── CoreApi map: renderer → core (request/response) ─────────────────────────
 
@@ -87,6 +90,30 @@ export interface CoreApi {
   'clients.lints': { in: void; out: LintFinding[] }
   /** agent-ops: generate (or check) a client's workspace files from workspace.yml */
   'clients.workspace': { in: { client: string; check: boolean }; out: WorkspaceResult }
+  /** agent-ops Add-Client (docs/plan/agent-ops-desktop-flow.md): scaffold + golden
+   *  copy + keychain tokens + materialize + one attributed commit, in one verb.
+   *  Tokens ride the payload once, land in the OS keychain + gitignored files only. */
+  'clients.create': {
+    in: { spec: CreateClientSpec; tokens: Record<string, string>; identity: Identity }
+    out: { slug: string; workspace: WorkspaceResult }
+  }
+  /** agent-ops: per-machine wiring state — declared ${VAR} refs vs this machine's
+   *  keychain + generated-file drift. Drives the needs-token badge. */
+  'clients.workspace.status': { in: { client: string }; out: ClientWorkspaceStatus }
+  /** agent-ops: paste/replace this machine's tokens for a client, re-materialize.
+   *  No commit — only keychain + gitignored generated files change. */
+  'clients.tokens.set': {
+    in: { client: string; tokens: Record<string, string> }
+    out: WorkspaceResult
+  }
+  /** agent-ops: the golden client's mcp connections — Add-Client modal checkboxes */
+  'clients.connections': {
+    in: { client: string }
+    out: Array<{ server: string; envRefs: string[] }>
+  }
+  /** agent-ops: open the OS terminal in the client's directory (the terminal-free
+   *  bridge to `claude`) */
+  'clients.openTerminal': { in: { client: string }; out: { ok: boolean } }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,
    *  aggregated core-side from vault frontmatter (memoized per mtime) */

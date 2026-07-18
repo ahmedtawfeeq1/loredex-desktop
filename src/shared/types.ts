@@ -27,6 +27,29 @@ export type {
 /** Reply payload (lib PR-11): route + replies_to are derived from the parent. */
 export type ReplyHandoffInput = Omit<CreateHandoffInput, 'fromProject' | 'toProject' | 'repliesTo'>
 
+/** Add-Client input (agent-ops, docs/plan/agent-ops-desktop-flow.md). */
+export interface CreateClientSpec {
+  name: string
+  manager: string
+  tags: string[]
+  /** golden client whose workspace.yml seeds the new client's tooling */
+  fromClient?: string
+  /** narrow the copy to these mcp connections (default: all of the golden's) */
+  servers?: string[]
+}
+
+/** Per-machine wiring state of a client's agent tooling — needs-token badge input. */
+export interface ClientWorkspaceStatus {
+  /** client has a workspace.yml that declares tooling */
+  hasTooling: boolean
+  /** `${VAR}` names the workspace.yml references */
+  declaredRefs: string[]
+  /** declared refs this machine's keychain does NOT hold */
+  missingRefs: string[]
+  /** generated files out of date vs a fresh materialize (workspace --check) */
+  drift: boolean
+}
+
 /**
  * Route plan for the confirm card (story 7.4, built on lib previewRoute).
  * Lib PR-3 (plan/apply split + persisted receipts + undo) supersedes this shape.

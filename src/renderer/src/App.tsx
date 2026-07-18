@@ -99,6 +99,12 @@ export default function App(): React.JSX.Element {
   const sidebarCollapsed = useRails((s) => s.sidebar)
   const listCollapsed = useRails((s) => s.list)
 
+  // dex-type boot race: the first load() can beat the core host and fail; once
+  // the app reports ready, resolve the type for real (null = still unknown)
+  useEffect(() => {
+    if (status === 'ready' && useDex.getState().type === null) void useDex.getState().load()
+  }, [status])
+
   useEffect(() => {
     void init()
     void useDex.getState().load()

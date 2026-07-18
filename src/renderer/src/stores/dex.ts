@@ -32,7 +32,10 @@ export const useDex = create<DexState>((set, get) => ({
       set({ type })
       if (type === 'agent-ops') await get().refreshFleet()
     } catch {
-      set({ type: 'research' }) // older core host — behave like a research dex
+      // boot race (core host not up yet) or an older core host. Stay null so
+      // the app-ready retry in App.tsx can resolve the real type — a hard
+      // 'research' here permanently hid the Clients nav on slow boots.
+      set({ type: null })
     }
   },
 

@@ -20,14 +20,18 @@ import {
   type ClientInfo,
   parseActivity,
   type Config,
+  copyWorkspaceSpec,
   type DexType,
   type LintFinding,
   type WorkspaceResult,
   lintAgentOps,
   loadDexType,
+  loadWorkspaceSpec,
   materializeWorkspace,
   productOf,
+  scaffoldClient,
   scanFleet,
+  workspaceEnvRefs,
   type HandoffTransition,
   type ConsumeReceipt,
   consumeHandoff,
@@ -92,7 +96,12 @@ import { gitLog, withGitIdentity } from './git'
 import { ipcError } from '../shared/ipc-contract'
 import { applyFrontmatterEdit, spliceBody } from './notes'
 import { listMarkdownFiles } from './tree'
-import type { HomeBrief, ReplyHandoffInput, VaultIdentity } from '../shared/types'
+import type {
+  CreateClientSpec,
+  HomeBrief,
+  ReplyHandoffInput,
+  VaultIdentity,
+} from '../shared/types'
 
 /** undefined = not yet initialized; null = initialized, no config on disk. */
 let config: Config | null | undefined
@@ -178,9 +187,83 @@ export function agentOpsLints(): LintFinding[] {
   return lintAgentOps(getConfig().vaultPath).findings
 }
 
-/** Generate (or check) a client's workspace files from workspace.yml. */
-export function generateWorkspace(client: string, check: boolean): WorkspaceResult {
-  return materializeWorkspace(getConfig().vaultPath, client, { check })
+/**
+ * Generate (or check) a client's workspace files from workspace.yml. `env`
+ * overlays process.env at expansion time — the handler passes this machine's
+ * keychain tokens so materialize works without any shell environment.
+ */
+export function generateWorkspace(
+  client: string,
+  check: boolean,
+  env?: Record<string, string>,
+): WorkspaceResult {
+  return materializeWorkspace(getConfig().vaultPath, client, {
+    check,
+    env: { ...process.env, ...env },
+  })
+}
+
+/**
+ * The desktop Add-Client verb (docs/plan/agent-ops-desktop-flow.md): scaffold
+ * → copy golden tooling (env refs rewritten per slug) → materialize with the
+ * caller's env overlay → reindex → ONE attributed commit. Tokens arrive as an
+ * env-shaped record and only ever land in the gitignored generated files.
+ */
+export function createClient(
+  spec: CreateClientSpec,
+  tokens: Record<string, string>,
+  identity: Identity,
+): { slug: string; workspace: WorkspaceResult; tokenRefs: Record<string, string> } {
+  const config = getConfig()
+  const { slug } = scaffoldClient(config.vaultPath, spec.name, {
+    manager: spec.manager,
+    tags: spec.tags,
+  })
+  const renamed = spec.fromClient
+    ? copyWorkspaceSpec(config.vaultPath, spec.fromClient, slug, { servers: spec.servers }).renamed
+    : []
+  // tokens arrive keyed by the GOLDEN client's ref names — the modal never has
+  // to predict the new slug; the copy's rename map is the source of truth
+  const tokenRefs: Record<string, string> = {}
+  const env: Record<string, string> = {}
+  for (const [ref, token] of Object.entries(tokens)) {
+    const final = renamed.find((r) => r.from === ref)?.to ?? ref
+    tokenRefs[ref] = final
+    if (token) env[final] = token
+  }
+  const workspace = materializeWorkspace(config.vaultPath, slug, {
+    env: { ...process.env, ...env },
+  })
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(config.vaultPath, config, `loredex: new client ${slug} (${identity.name})`),
+  )
+  return { slug, workspace, tokenRefs }
+}
+
+/** The `${VAR}` names a client's workspace.yml declares — the needs-token diff input. */
+export function clientEnvRefs(client: string): string[] {
+  return workspaceEnvRefs(join(getConfig().vaultPath, 'projects', client))
+}
+
+/** The golden client's connections — what the Add-Client modal offers as checkboxes. */
+export function clientConnections(
+  client: string,
+): Array<{ server: string; envRefs: string[] }> {
+  const spec = loadWorkspaceSpec(join(getConfig().vaultPath, 'projects', client))
+  const ENV_REF = /\$\{([A-Z0-9_]+)\}/g
+  return Object.entries(spec.mcp).map(([server, def]) => {
+    const refs = new Set<string>()
+    for (const value of Object.values(def.env ?? {})) {
+      for (const m of value.matchAll(ENV_REF)) refs.add(m[1] as string)
+    }
+    return { server, envRefs: [...refs].sort() }
+  })
+}
+
+/** Absolute path of a client's directory — the Open-in-Terminal target. */
+export function clientDirAbs(client: string): string {
+  return join(getConfig().vaultPath, 'projects', client)
 }
 
 const RAW_EXTS = ['.yaml', '.yml', '.json', '.csv'] as const

@@ -48,10 +48,16 @@ function machineKey(): Buffer {
   return scryptSync(`loredex:${hostname()}:${userInfo().username}`, 'loredex-cred-v1', 32)
 }
 
-function readEncryptedFile(): string | null {
+/** AES-256-GCM under the machine-local key — shared with the client-token store. */
+export function encryptCredString(plaintext: string): Buffer {
+  const iv = randomBytes(12)
+  const c = createCipheriv('aes-256-gcm', machineKey(), iv)
+  const data = Buffer.concat([c.update(plaintext, 'utf8'), c.final()])
+  return Buffer.concat([iv, c.getAuthTag(), data])
+}
+
+export function decryptCredString(raw: Buffer): string | null {
   try {
-    if (!existsSync(CRED_FILE)) return null
-    const raw = readFileSync(CRED_FILE)
     const iv = raw.subarray(0, 12)
     const tag = raw.subarray(12, 28)
     const data = raw.subarray(28)
@@ -63,12 +69,18 @@ function readEncryptedFile(): string | null {
   }
 }
 
+function readEncryptedFile(): string | null {
+  try {
+    if (!existsSync(CRED_FILE)) return null
+    return decryptCredString(readFileSync(CRED_FILE))
+  } catch {
+    return null
+  }
+}
+
 function writeEncryptedFile(token: string): void {
   mkdirSync(CRED_DIR, { recursive: true })
-  const iv = randomBytes(12)
-  const c = createCipheriv('aes-256-gcm', machineKey(), iv)
-  const data = Buffer.concat([c.update(token, 'utf8'), c.final()])
-  writeFileSync(CRED_FILE, Buffer.concat([iv, c.getAuthTag(), data]), { mode: 0o600 })
+  writeFileSync(CRED_FILE, encryptCredString(token), { mode: 0o600 })
   chmodSync(CRED_FILE, 0o600)
 }
 

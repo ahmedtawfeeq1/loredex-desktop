@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ClientInfo } from '../../../../shared/ipc-contract'
 import { useDex } from '../../stores/dex'
 import { sectionTint } from '../reader/sectionTint'
+import { AddClientModal } from './AddClientModal'
 import { ClientPage } from './ClientPage'
 
 const CLIENTS_CSS = `
@@ -87,6 +88,7 @@ export function ClientsView(): React.JSX.Element {
   const selectClient = useDex((s) => s.selectClient)
   const refreshFleet = useDex((s) => s.refreshFleet)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
 
   useEffect(() => {
     if (fleet === null) void refreshFleet()
@@ -117,7 +119,12 @@ export function ClientsView(): React.JSX.Element {
         <span className="clients-count">
           {visible.length} client{visible.length === 1 ? '' : 's'}
         </span>
+        <span style={{ flex: 1 }} />
+        <button type="button" className="button-emphasis" onClick={() => setAdding(true)}>
+          ＋ Add client
+        </button>
       </div>
+      {adding && <AddClientModal onClose={() => setAdding(false)} />}
       {allTags.length > 0 && (
         <div className="clients-tags" role="group" aria-label="Filter by tag">
           {allTags.map((tag) => (

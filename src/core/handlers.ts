@@ -2,7 +2,11 @@
  * Registers the CoreApi handlers implemented so far onto the dispatcher.
  * Unregistered channels answer NOT_IMPLEMENTED from the dispatcher itself.
  */
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import { isFontSettings } from '../shared/font-settings'
+
+const execFileAsync = promisify(execFile)
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting } from '../shared/theme'
@@ -16,6 +20,7 @@ import type {
 } from '../shared/types'
 import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
+import { readClientTokens, storeClientToken } from './client-tokens'
 import {
   capDiff,
   computeLinks,
@@ -186,6 +191,66 @@ export function registerCoreHandlers(
   ipc.register('clients.fleet', () => engine.fleet())
   ipc.register('clients.lints', () => engine.agentOpsLints())
   ipc.register('clients.workspace', ({ client, check }) => engine.generateWorkspace(client, check))
+  // Add-Client (docs/plan/agent-ops-desktop-flow.md): tokens land in the OS
+  // keychain FIRST, then one lib write op scaffolds + copies the golden
+  // tooling + materializes with the keychain env — never a token in git.
+  ipc.register('clients.create', ({ spec, tokens, identity }) =>
+    withWriteLock(async () => {
+      if (!isValidIdentity(identity)) {
+        throw ipcError('INTERNAL', 'adding a client needs an identity — set name and email in Settings')
+      }
+      const { slug, workspace, tokenRefs } = engine.createClient(spec, tokens, identity)
+      // keychain AFTER the copy — tokens are stored under the REWRITTEN ref
+      // names (the ones the new client's workspace.yml actually declares)
+      for (const [ref, token] of Object.entries(tokens)) {
+        if (token) await storeClientToken(tokenRefs[ref] ?? ref, token)
+      }
+      invalidateAtlas()
+      ipc.emit({ kind: 'vault.changed', paths: [`projects/${slug}`] })
+      notifier.refresh()
+      return { slug, workspace }
+    }),
+  )
+  // Per-machine wiring state: declared ${VAR} refs vs keychain + file drift.
+  ipc.register('clients.workspace.status', async ({ client }) => {
+    const declaredRefs = engine.clientEnvRefs(client)
+    const held = await readClientTokens(declaredRefs)
+    const missingRefs = declaredRefs.filter((r) => !(r in held))
+    const connections = engine.clientConnections(client)
+    const check = engine.generateWorkspace(client, true, held)
+    return {
+      hasTooling: connections.length > 0,
+      declaredRefs,
+      missingRefs,
+      drift: check.wouldChange.length > 0,
+    }
+  })
+  // Paste/replace tokens on THIS machine + re-materialize. Only the keychain
+  // and gitignored generated files change — no commit, but the write lock
+  // still serializes against the poller's pull.
+  ipc.register('clients.tokens.set', ({ client, tokens }) =>
+    withWriteLock(async () => {
+      for (const [ref, token] of Object.entries(tokens)) {
+        if (token) await storeClientToken(ref, token)
+      }
+      const held = await readClientTokens(engine.clientEnvRefs(client))
+      return engine.generateWorkspace(client, false, held)
+    }),
+  )
+  ipc.register('clients.connections', ({ client }) => engine.clientConnections(client))
+  // The terminal-free bridge: drop the teammate exactly where `claude` runs.
+  ipc.register('clients.openTerminal', async ({ client }) => {
+    const dir = engine.clientDirAbs(client)
+    if (process.platform === 'darwin') {
+      await execFileAsync('open', ['-a', 'Terminal', dir], { timeout: 5000 })
+      return { ok: true }
+    }
+    // linux/windows: no uniform terminal launcher — reveal the folder instead
+    await execFileAsync(process.platform === 'win32' ? 'explorer' : 'xdg-open', [dir], {
+      timeout: 5000,
+    })
+    return { ok: true }
+  })
   // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
   // same recomputed-cache tier as the link index (never authoritative).
   ipc.register('atlas.graph', ({ level, scope }) => atlasGraph(level, scope ?? {}))

@@ -252,7 +252,8 @@ describe('Addendum D1: collapsible rails (story 16.2)', () => {
     expect(block('.sidebar.rail-collapsed')).toContain('width: 56px;')
     const list = block('.pane-list.rail-collapsed')
     expect(list).toContain('width: 0;')
-    expect(list).toContain('margin-right: -12px;') // swallows the flex gap
+    // v3: no flex gap to swallow — -12px overlapped the sidebar (2026-07-18)
+    expect(list).toContain('margin-right: 0;')
   })
   it('the slide is 160ms ease-out on both rails (reduced-motion kills it globally)', () => {
     expect(block('.sidebar')).toContain('width 160ms ease-out')

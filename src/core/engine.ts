@@ -136,7 +136,9 @@ export function readNote(path: string): Doc {
 }
 
 export function search(q: string, limit?: number): SearchHit[] {
-  return searchVault(getConfig().vaultPath, q, limit === undefined ? {} : { limit })
+  return searchVault(getConfig().vaultPath, q, limit === undefined ? {} : { limit }).filter(
+    (h) => !/(^|\/)_archive\//.test(h.path),
+  )
 }
 
 /** Parsed frontmatter of one note (facet narrowing, story 2.4) — read-only. */
@@ -269,6 +271,15 @@ export async function recurateProject(project: string): Promise<void> {
       maxBuffer: 32 * 1024 * 1024,
       timeout: 180_000,
     })
+  } catch (e) {
+    // surface the CLI's own words (it prints failures to stdout/stderr —
+    // e.g. a vault-lock collision when two curates overlap), not the bare
+    // "Command failed: <argv>" (user report 2026-07-18)
+    const err = e as { stderr?: string; stdout?: string; message?: string }
+    const detail =
+      (err.stderr ?? '').trim().split('\n').slice(-4).join(' ') ||
+      (err.stdout ?? '').trim().split('\n').slice(-4).join(' ')
+    throw new Error(detail || err.message || String(e))
   } finally {
     rmSync(wrapperDir, { recursive: true, force: true })
   }
@@ -309,7 +320,10 @@ export function handoffs(scope: HandoffScope): HandoffCard[] {
 /** v3 Plan/Today (parity slices D/E): the lib's one work-item plane —
  *  tasks ∪ handoffs on board statuses (loredex ≥ 2.8). */
 export function workItems(today: string): WorkItem[] {
-  return listWorkItems(getConfig().vaultPath, today)
+  // _archive/ is out of the working set (2026-07-18)
+  return listWorkItems(getConfig().vaultPath, today).filter(
+    (i) => !/(^|\/)_archive\//.test(i.path),
+  )
 }
 
 export function workUpdate(
@@ -551,15 +565,27 @@ export function saveNoteBody(path: string, body: string, identity: Identity): { 
  */
 export function removeNote(
   path: string,
-  mode: 'delete' | 'archive',
+  mode: 'delete' | 'archive' | 'unarchive',
   identity: Identity,
 ): { path: string } {
   const config = getConfig()
   const resolved = resolveInVault(path)
   const vault = config.vaultPath
   const rel = resolved.slice(vault.length + 1)
-  if (mode === 'archive') {
-    const dest = join(vault, '_archive', rel)
+  if (mode === 'unarchive') {
+    // back to its original home: strip the _archive/ prefix (user 2026-07-18)
+    const cleanRel = rel.replace(/^(_archive\/)+/, '')
+    const dest = join(vault, cleanRel)
+    if (resolved !== dest) {
+      mkdirSync(dirname(dest), { recursive: true })
+      renameSync(resolved, dest)
+    }
+  } else if (mode === 'archive') {
+    // idempotent: archiving an already-archived note must never nest
+    // _archive/_archive/… (user bug 2026-07-18) — strip leading segments
+    const cleanRel = rel.replace(/^(_archive\/)+/, '')
+    const dest = join(vault, '_archive', cleanRel)
+    if (resolved === dest) return { path: rel } // already exactly there
     mkdirSync(dirname(dest), { recursive: true })
     renameSync(resolved, dest)
   } else {

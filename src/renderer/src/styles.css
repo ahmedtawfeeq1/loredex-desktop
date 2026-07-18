@@ -898,7 +898,9 @@ a:hover {
    back instantly via the base transition) */
 .pane-list.rail-collapsed {
   width: 0;
-  margin-right: -12px;
+  /* v3 layout has no flex gap to swallow — the old -12px pulled the note
+     12px INTO the sidebar (user overlap report 2026-07-18) */
+  margin-right: 0;
   border-width: 0;
   overflow: hidden;
   visibility: hidden;
@@ -7362,3 +7364,16 @@ a.button-primary {
 .recurate-key { width: 64px; color: var(--text-3); flex: 0 0 auto; }
 .recurate-val { color: var(--text-1); }
 .recurate-val.is-ok { color: var(--ok); }
+
+/* sidebar collapse controls (user request 2026-07-18: the button came back) */
+.side-collapse {
+  margin-left: 4px; flex: 0 0 auto; background: none; border: 0; cursor: pointer;
+  font: 600 13px var(--font-mono); color: var(--text-3); padding: 0 3px; border-radius: 5px;
+}
+.side-collapse:hover { color: var(--text-1); background: var(--bg-hover); }
+.side-reopen { display: block; margin: 4px auto 6px; }
+
+/* the rail expander anchors INSIDE the reader — never over the sidebar
+   (user overlap report 2026-07-18); collapsed pane sheds its padding too */
+.reader { position: relative; }
+.pane-list.rail-collapsed { padding-left: 0; padding-right: 0; }

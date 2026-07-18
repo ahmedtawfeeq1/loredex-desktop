@@ -64,11 +64,13 @@ export const VIEW_ORDER: ReadonlyArray<{
   { view: 'atlas', label: 'Atlas', group: 'Workspace' },
   { view: 'agents', label: 'Agents', group: 'Workspace' },
   { view: 'feed', label: 'Activity', group: 'Workspace' },
+  // back in the nav by user request 2026-07-18: Search rides ⌘8 under
+  // Activity (pre-v3 muscle memory); Settings moves to ⌘9
+  { view: 'search', label: 'Search', group: 'Workspace' },
   { view: 'settings', label: 'Settings', group: 'System' },
   // agent-ops only (nav row appears with the dex type)
   { view: 'clients', label: 'Clients', group: 'Workspace' },
   // §5 absorptions: views stay routable, nav rows retired
-  { view: 'search', label: 'Search', group: 'Workspace', navHidden: true },
   { view: 'contracts', label: 'Contracts', group: 'Workspace', navHidden: true },
 ]
 
@@ -119,6 +121,14 @@ export function appActions(): AppAction[] {
     })
   }
   actions.push(
+    {
+      // dex switching lives in File ▸ Open Vault…; the palette mirrors it
+      // (user request 2026-07-18 — the sidebar caret is gone by choice)
+      id: 'action:open-dex',
+      title: 'Open another dex… (pick a folder)',
+      shortcut: '⌘O',
+      run: () => void window.loredex.pickVault(),
+    },
     {
       id: 'action:new-handoff',
       title: 'New handoff…',

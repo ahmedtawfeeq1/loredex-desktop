@@ -98,9 +98,9 @@ export interface CoreApi {
    *  the payload (F7). Guarded per-path through resolveNoteInsideVault. */
   'vault.dedupe': { in: { paths: string[]; identity: Identity }; out: { removed: string[] } }
   'vault.resolveLink': { in: { link: string; from: string }; out: LinkResolution }
-  /** archive (→ _archive/) or delete a note — one attributed commit */
+  /** archive (→ _archive/), unarchive (back home), or delete — one commit */
   'vault.removeNote': {
-    in: { path: string; mode: 'delete' | 'archive'; identity: Identity }
+    in: { path: string; mode: 'delete' | 'archive' | 'unarchive'; identity: Identity }
     out: { path: string }
   }
   /** app-local contract evolution (story 3.2): optional project qualifier — lib

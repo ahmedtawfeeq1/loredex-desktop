@@ -208,13 +208,13 @@ function RemoveNote({ selected }: { selected: string }): React.JSX.Element | nul
   useEffect(() => setConfirm(false), [selected])
   if (!identity) return null
 
-  const run = async (mode: 'delete' | 'archive'): Promise<void> => {
+  const run = async (mode: 'delete' | 'archive' | 'unarchive'): Promise<void> => {
     try {
       await invoke('vault.removeNote', { path: selected, mode, identity })
       useToasts
         .getState()
         .push(
-          mode === 'archive' ? 'Note archived' : 'Note deleted',
+          mode === 'archive' ? 'Note archived' : mode === 'unarchive' ? 'Note restored' : 'Note deleted',
           `${noteName(selected)} · committed — will push on next sync`,
         )
       useReader.getState().reset()
@@ -224,13 +224,20 @@ function RemoveNote({ selected }: { selected: string }): React.JSX.Element | nul
     }
   }
 
+  const archived = /(^|\/)_archive\//.test(`/${selected}`)
   return (
     <section>
       <div className="rail-label">MANAGE</div>
       <div className="rail-manage">
-        <button type="button" className="act-link" onClick={() => void run('archive')}>
-          Archive note
-        </button>
+        {archived ? (
+          <button type="button" className="act-link" onClick={() => void run('unarchive')}>
+            Unarchive note
+          </button>
+        ) : (
+          <button type="button" className="act-link" onClick={() => void run('archive')}>
+            Archive note
+          </button>
+        )}
         <button
           type="button"
           className="act-link is-danger"

@@ -25,16 +25,14 @@ const ALL_VIEWS: AppView[] = [
   'atlas',
   'agents',
   'feed',
+  'search', // back in the nav at ⌘8 (user 2026-07-18)
   'settings',
   'clients', // agent-ops only in nav; always present in VIEW_ORDER
-  'search', // absorbed per §5 — palette/deep-link only
   'contracts', // absorbed per §5 — palette/deep-link only
 ]
 
 /** the nav on a research dex (clients + absorbed views hidden) */
-const RESEARCH_VIEWS = ALL_VIEWS.filter(
-  (v) => v !== 'clients' && v !== 'search' && v !== 'contracts',
-)
+const RESEARCH_VIEWS = ALL_VIEWS.filter((v) => v !== 'clients' && v !== 'contracts')
 
 beforeEach(() => {
   useApp.setState({ view: 'home', cheatsheetOpen: false })
@@ -48,7 +46,7 @@ describe('the action registry (story 15.3)', () => {
     RESEARCH_VIEWS.forEach((view, i) => {
       const action = actions.find((a) => a.id === `view:${view}`)
       expect(action, `view:${view}`).toBeDefined()
-      if (i < 8) {
+      if (i < 9) {
         expect(action?.shortcut).toBe(`⌘${i + 1}`)
         expect(action?.combo).toEqual({ key: String(i + 1), meta: true })
       }
@@ -56,15 +54,13 @@ describe('the action registry (story 15.3)', () => {
     expect(actions.some((a) => a.id === 'view:clients')).toBe(false)
     // Plan's preview flag is retired — the work-item schema shipped
     expect(actions.some((a) => a.id === 'view:plan')).toBe(true)
-    // absorbed views stay ⌘K-complete without numbers (§5)
-    for (const v of ['search', 'contracts'] as const) {
-      const a = actions.find((x) => x.id === `view:${v}`)
-      expect(a, `view:${v}`).toBeDefined()
-      expect(a?.shortcut).toBeUndefined()
-    }
+    // contracts stays ⌘K-complete without a number (§5); search is ⌘8 now
+    const contracts = actions.find((x) => x.id === 'view:contracts')
+    expect(contracts).toBeDefined()
+    expect(contracts?.shortcut).toBeUndefined()
   })
 
-  it('agent-ops dexes add Clients: first nine keep ⌘1-9, the tenth is unbound', () => {
+  it('agent-ops dexes add Clients: first nine keep ⌘1-9, the rest unbound', () => {
     useDex.setState({ type: 'agent-ops' })
     const actions = appActions()
     ALL_VIEWS.forEach((view, i) => {

@@ -16,6 +16,7 @@ import { useApp, type AppView } from '../stores/app'
 import { useAtlas } from '../stores/atlas'
 import { inboxPending, useDex } from '../stores/dex'
 import { useHandoffs } from '../stores/handoffs'
+import { useRails } from '../stores/rails'
 import { useReader } from '../stores/reader'
 import { useDashboardData } from '../views/home/dashboard-data'
 import { rosterFrom } from '../views/agents/AgentsView'
@@ -130,6 +131,7 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
   const dexType = useDex((s) => s.type)
   void dexType // shelves + Clients row recompute when the dex type loads
   const nav = visibleViews()
+  const settingsNum = nav.findIndex((e) => e.view === 'settings') + 1
   const openInbound = openCount(cards ?? [], 'all')
   // agent-ops: fleet-wide pending-inbox count on the Clients row (judge P1)
   const clientsPending = inboxPending(useDex((s) => s.fleet))
@@ -147,6 +149,16 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
   // ── collapsed: the v2 56px icon rail survives (§5.1) ──
   if (collapsed) {
     return (
+      <>
+      <button
+        type="button"
+        className="side-collapse side-reopen"
+        title="Expand the sidebar (⌘\\)"
+        aria-label="Expand the sidebar"
+        onClick={() => useRails.getState().toggleSidebar()}
+      >
+        ›
+      </button>
       <nav aria-label="Views">
         {nav.map(({ view: v, label }, i) => (
           <button
@@ -154,7 +166,7 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
             type="button"
             className="nav-item"
             aria-current={view === v}
-            title={i < 8 ? `${label} (⌘${i + 1})` : label}
+            title={i < 9 ? `${label} (⌘${i + 1})` : label}
             aria-label={label}
             onClick={() => setView(v)}
           >
@@ -165,6 +177,7 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
           </button>
         ))}
       </nav>
+      </>
     )
   }
 
@@ -174,6 +187,15 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
         <BrandMark size={18} />
         <span className="side-dex">{dexName}</span>
         <span className="side-ver">{engine ? `dex ${engine}` : 'dex'}</span>
+        <button
+          type="button"
+          className="side-collapse"
+          title="Collapse the sidebar (⌘\\)"
+          aria-label="Collapse the sidebar"
+          onClick={() => useRails.getState().toggleSidebar()}
+        >
+          ‹
+        </button>
       </div>
       <button
         type="button"
@@ -187,14 +209,16 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
         ＋ New<span className="new-btn-cap">C</span>
       </button>
       <nav aria-label="Views" className="side-nav">
-        {nav.filter((e) => e.view !== 'settings').map(({ view: v, label }, i) => (
+        {nav.map((e, i) => ({ ...e, num: i + 1 }))
+          .filter((e) => e.view !== 'settings')
+          .map(({ view: v, label, num }) => (
           <Fragment key={v}>
             <button
               type="button"
               className="nav__item"
               aria-current={view === v ? 'page' : undefined}
-              title={i < 8 ? `${label} (⌘${i + 1})` : label}
-              {...(i < 8 ? { 'aria-keyshortcuts': `Meta+${i + 1}` } : {})}
+              title={num <= 9 ? `${label} (⌘${num})` : label}
+              {...(num <= 9 ? { 'aria-keyshortcuts': `Meta+${num}` } : {})}
               onClick={() => setView(v)}
             >
               <span className="nav-glyph" aria-hidden="true">
@@ -209,8 +233,8 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
                 </span>
               ) : v === 'agents' && agentsLive ? (
                 <span className="live-dot nav-live" title="agents live" />
-              ) : i < 8 ? (
-                <span className="nav-num">{i + 1}</span>
+              ) : num <= 9 ? (
+                <span className="nav-num">{num}</span>
               ) : null}
             </button>
           </Fragment>
@@ -226,15 +250,15 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
         type="button"
         className="nav__item"
         aria-current={view === 'settings' ? 'page' : undefined}
-        title="Settings (⌘8)"
-        aria-keyshortcuts="Meta+8"
+        title={`Settings (⌘${settingsNum})`}
+        aria-keyshortcuts={`Meta+${settingsNum}`}
         onClick={() => setView('settings')}
       >
         <span className="nav-glyph" aria-hidden="true">⚙</span>
         Settings
-        <span className="nav-num">8</span>
+        <span className="nav-num">{settingsNum}</span>
       </button>
-      <div className="keys-footer">keys 1–8 · ⌘K · C new · E consume</div>
+      <div className="keys-footer">keys 1–9 · ⌘K · C new · E consume</div>
     </>
   )
 }

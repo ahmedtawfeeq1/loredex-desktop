@@ -465,7 +465,7 @@ export function registerCoreHandlers(
   // gone; one attributed commit either way. Everything re-derives on change.
   ipc.register('vault.removeNote', ({ path, mode, identity }) =>
     withWriteLock(() => {
-      requireIdentity(identity, mode === 'archive' ? 'archiving a note' : 'deleting a note')
+      requireIdentity(identity, `${mode.replace(/e$/, '')}ing a note`)
       const result = engine.removeNote(path, mode, identity)
       const vaultPath = engine.getConfig().vaultPath
       invalidateLinkIndex(vaultPath)

@@ -7914,6 +7914,14 @@ a.button-primary {
   color: var(--text-4);
 }
 
+/* Chat content is selectable — body sets user-select:none (desktop chrome), so
+   re-enable it on the thread so any part of a message can be drag-selected +
+   copied (not just the whole-message copy button). */
+.agent-thread {
+  user-select: text;
+  cursor: auto;
+}
+
 .agent-msg {
   font-size: 12.5px;
   line-height: 1.5;

@@ -21,6 +21,7 @@ const MODAL_CSS = `
   border: 1px solid var(--hairline); border-radius: 8px; padding: 7px 10px;
 }
 .acm-input:focus { outline: none; border-color: var(--accent); }
+.acm-input::placeholder { color: var(--text-2); opacity: 0.55; }
 .acm-conn { border: 1px solid var(--hairline); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
 .acm-conn-head { display: flex; align-items: center; gap: 8px; }
 .acm-conn-name { font-family: var(--font-mono); font-size: 12px; color: var(--text-1); flex: 1; }
@@ -51,16 +52,18 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
   const [name, setName] = useState('')
   const [manager, setManager] = useState('')
   const [tags, setTags] = useState('new-platform')
-  const [golden, setGolden] = useState<string>('')
+  // null = not defaulted yet; '' = the user explicitly chose "none" — the
+  // default-to-first-golden effect must never override an explicit none
+  const [golden, setGolden] = useState<string | null>(null)
   const [connections, setConnections] = useState<Connection[]>([])
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [tokens, setTokens] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // default golden: first tooled client — connections load whenever it changes
+  // default golden: first tooled client, applied once — an explicit "none" sticks
   useEffect(() => {
-    if (!golden && goldens.length > 0) setGolden(goldens[0] ?? '')
+    if (golden === null && goldens.length > 0) setGolden(goldens[0] ?? '')
   }, [golden, goldens])
   useEffect(() => {
     if (!golden) {
@@ -138,7 +141,7 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
             className="acm-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="BrightSmile Dental"
+            placeholder="client name"
           />
         </label>
         <label className="acm-field">
@@ -168,7 +171,11 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
       </label>
       <label className="acm-field">
         <span className="modal-label">Copy tooling from</span>
-        <select className="acm-input" value={golden} onChange={(e) => setGolden(e.target.value)}>
+        <select
+          className="acm-input"
+          value={golden ?? ''}
+          onChange={(e) => setGolden(e.target.value)}
+        >
           <option value="">none — empty workspace</option>
           {goldens.map((slug) => (
             <option key={slug} value={slug}>

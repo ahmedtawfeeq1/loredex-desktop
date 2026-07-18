@@ -13,12 +13,15 @@
  * the tree with a flat result list (fileSearch store).
  */
 import { Button } from '../../components/Button'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+import { create } from 'zustand'
 import type { SearchHit } from '../../../../shared/ipc-contract'
 import type { TreeNode } from '../../../../shared/types'
+import { invoke, openInNewWindow } from '../../api'
 import { RailChevron } from '../../components/NavIcon'
 import { humanizeTitle, noteDate } from '../../humanize'
 import { useDex } from '../../stores/dex'
+import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useFileSearch } from '../../stores/fileSearch'
 import { useRails } from '../../stores/rails'
 import { useReader } from '../../stores/reader'
@@ -93,6 +96,115 @@ const TREE_FILTER_CSS = `
 }
 `
 
+/** Right-click menu on note rows: every lifecycle action without hunting the
+ *  meta rail — Open, Open in New Window, Archive/Unarchive, Delete. */
+const useNoteMenu = create<{
+  menu: { path: string; x: number; y: number } | null
+  close(): void
+}>((set) => ({ menu: null, close: () => set({ menu: null }) }))
+
+function openNoteMenu(path: string, x: number, y: number): void {
+  useNoteMenu.setState({ menu: { path, x, y } })
+}
+
+function NoteContextMenu(): React.JSX.Element | null {
+  const menu = useNoteMenu((s) => s.menu)
+  const close = useNoteMenu((s) => s.close)
+  const identity = useIdentity((s) => effectiveIdentity(s))
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the delete arm per target
+  useEffect(() => setConfirmDelete(false), [menu])
+  if (menu === null) return null
+
+  const archived = menu.path.startsWith('_archive/') || menu.path.includes('/_archive/')
+  async function lifecycle(mode: 'delete' | 'archive' | 'unarchive'): Promise<void> {
+    if (identity === null || menu === null) return
+    try {
+      await invoke('vault.removeNote', { path: menu.path, mode, identity })
+      const reader = useReader.getState()
+      if (reader.selected === menu.path && mode !== 'unarchive') reader.reset()
+      void reader.loadTree()
+    } catch {
+      // vault.changed refresh will reconcile; the action simply didn't apply
+    }
+    close()
+  }
+  const needsIdentity = identity === null ? 'Set your name and email in Settings first' : undefined
+
+  return (
+    // biome-ignore lint: backdrop click-away; Esc closes via keydown below
+    <div
+      className="ctx-menu-backdrop"
+      onMouseDown={close}
+      onKeyDown={(e) => e.key === 'Escape' && close()}
+    >
+      <div
+        className="ctx-menu"
+        role="menu"
+        style={{ left: menu.x, top: menu.y }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            void useReader.getState().open(menu.path)
+            close()
+          }}
+        >
+          Open
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          title="Open this dex in a second window"
+          onClick={() => {
+            void openInNewWindow()
+            close()
+          }}
+        >
+          Open in New Window
+        </button>
+        {archived ? (
+          <button
+            type="button"
+            role="menuitem"
+            disabled={identity === null}
+            title={needsIdentity}
+            onClick={() => void lifecycle('unarchive')}
+          >
+            Unarchive
+          </button>
+        ) : (
+          <button
+            type="button"
+            role="menuitem"
+            disabled={identity === null}
+            title={needsIdentity}
+            onClick={() => void lifecycle('archive')}
+          >
+            Archive
+          </button>
+        )}
+        <button
+          type="button"
+          role="menuitem"
+          className="ctx-menu-danger"
+          disabled={identity === null}
+          title={needsIdentity}
+          onClick={() => {
+            if (confirmDelete) void lifecycle('delete')
+            else setConfirmDelete(true)
+          }}
+        >
+          {confirmDelete ? 'Confirm delete' : 'Delete'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): React.JSX.Element {
   const selected = useReader((s) => s.selected)
   const open = useReader((s) => s.open)
@@ -102,20 +214,45 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
   // agent-ops data files keep their raw name + show a type glyph instead of a date
   const isData = node.fileType !== undefined && node.fileType !== 'md'
   return (
-    <button
-      type="button"
-      className={inProject ? 'tree-file tree-file-project' : 'tree-file'}
-      aria-current={selected === node.path}
-      title={node.path}
-      onClick={() => void open(node.path)}
+    <div
+      className="tree-file-row"
+      onContextMenu={(e) => {
+        // md notes only — data files have no archive/delete lifecycle here
+        if (isData) return
+        e.preventDefault()
+        openNoteMenu(node.path, e.clientX, e.clientY)
+      }}
     >
-      <span className="tree-file-name">{isData ? node.name : humanizeTitle(node.name)}</span>
-      {isData ? (
-        <span className="tree-file-type">{node.fileType}</span>
-      ) : (
-        date && <span className="tree-file-date">{date}</span>
+      <button
+        type="button"
+        className={inProject ? 'tree-file tree-file-project' : 'tree-file'}
+        aria-current={selected === node.path}
+        title={node.path}
+        onClick={() => void open(node.path)}
+      >
+        <span className="tree-file-name">{isData ? node.name : humanizeTitle(node.name)}</span>
+        {isData ? (
+          <span className="tree-file-type">{node.fileType}</span>
+        ) : (
+          date && <span className="tree-file-date">{date}</span>
+        )}
+      </button>
+      {!isData && (
+        <button
+          type="button"
+          className="tree-file-menu"
+          aria-label={`Actions for ${humanizeTitle(node.name)}`}
+          title="Actions"
+          onClick={(e) => {
+            e.stopPropagation()
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            openNoteMenu(node.path, r.right, r.bottom)
+          }}
+        >
+          ⋯
+        </button>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -184,22 +321,25 @@ function SectionNode({
           <RailChevron dir={collapsed ? 'right' : 'down'} />
         </span>
       </button>
-      {!collapsed && node.children && (
-        <Branch
-          nodes={node.children}
-          sections={
-            sub
-              ? 'none'
-              : isProject
-                ? 'subprojects'
-                : node.name === 'projects'
-                  ? 'projects'
-                  : 'none'
-          }
-          inProject={isProject || sub}
-          forceOpen={forceOpen}
-        />
-      )}
+      {!collapsed &&
+        (node.children && node.children.length > 0 ? (
+          <Branch
+            nodes={node.children}
+            sections={
+              sub
+                ? 'none'
+                : isProject
+                  ? 'subprojects'
+                  : node.name === 'projects'
+                    ? 'projects'
+                    : 'none'
+            }
+            inProject={isProject || sub}
+            forceOpen={forceOpen}
+          />
+        ) : (
+          <div className="tree-empty tree-empty-nested">Empty</div>
+        ))}
     </li>
   )
 }
@@ -245,8 +385,10 @@ function Branch({
                   </span>
                   {humanizeTitle(node.name)}
                 </summary>
-                {node.children && (
+                {node.children && node.children.length > 0 ? (
                   <Branch nodes={node.children} inProject={inProject} forceOpen={forceOpen} />
+                ) : (
+                  <div className="tree-empty">Empty</div>
                 )}
               </details>
             ) : (
@@ -422,6 +564,7 @@ export function VaultTree(): React.JSX.Element {
           )}
         </>
       )}
+      <NoteContextMenu />
     </div>
   )
 }

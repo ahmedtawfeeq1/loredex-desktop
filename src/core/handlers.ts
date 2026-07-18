@@ -183,9 +183,11 @@ export function registerCoreHandlers(
     // group the projects/ subtree Product → Project → Topic → Note (flat when
     // no products are defined) — the grouper reads the vault's product manifest.
     // Agent-ops dexes also list yaml/json/csv (tables, exports, action files).
+    const agentOps = engine.getDexType() === 'agent-ops'
     return groupProjectsInTree(
       walkVault(engine.getConfig().vaultPath, '', {
-        dataFiles: engine.getDexType() === 'agent-ops',
+        dataFiles: agentOps,
+        includeEmpty: agentOps, // empty dirs are schema on agent-ops dexes
       }),
       engine.productGrouper(),
     )

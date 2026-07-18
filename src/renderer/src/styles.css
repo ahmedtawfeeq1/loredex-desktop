@@ -569,6 +569,85 @@ a:hover {
   padding: 16px;
 }
 
+/* empty folder marker under an expanded toggle — smaller, indented, italic so
+   it reads as "nothing here yet" not as an item */
+details > .tree-empty,
+.tree-empty-nested {
+  padding: 4px 8px 6px 28px;
+  font-size: 11.5px;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* note row = open button + three-dots menu button (right-click also works) */
+.tree-file-row {
+  display: flex;
+  align-items: center;
+}
+.tree-file-row .tree-file {
+  flex: 1;
+  min-width: 0;
+}
+.tree-file-menu {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin-right: 4px;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 100ms ease-out, background 100ms ease-out;
+}
+.tree-file-row:hover .tree-file-menu,
+.tree-file-menu:focus-visible {
+  opacity: 1;
+}
+.tree-file-menu:hover {
+  background: color-mix(in srgb, var(--text-1) 10%, transparent);
+  color: var(--text-1);
+}
+
+/* right-click / three-dots action menu */
+.ctx-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.ctx-menu {
+  position: fixed;
+  min-width: 190px;
+  padding: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ctx-menu button {
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--text-1);
+}
+.ctx-menu button:hover:not(:disabled) {
+  background: var(--bg-inset);
+}
+.ctx-menu button:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+.ctx-menu .ctx-menu-danger {
+  color: var(--rust, #a33f2e);
+}
+.ctx-menu .ctx-menu-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--rust, #a33f2e) 14%, transparent);
+}
+
 /* ── Addendum D1: vault tree sections, Notability-style (story 16.3) ───────
    Rounded tinted rows for top-level groups and each project. The color rides
    an inline --section-color (deterministic hash, sectionTint.ts) and inherits

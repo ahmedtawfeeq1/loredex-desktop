@@ -14,6 +14,8 @@ const DATA_EXTS = ['.yaml', '.yml', '.json', '.csv'] as const
 
 export interface WalkOptions {
   dataFiles?: boolean
+  /** agent-ops: empty dirs ARE structure (pipelines/, knowledge_tables/…) — show them */
+  includeEmpty?: boolean
 }
 
 function dataFileType(name: string): TreeNode['fileType'] {
@@ -30,7 +32,9 @@ export function walkVault(root: string, rel = '', opts: WalkOptions = {}): TreeN
     const path = rel ? `${rel}/${entry.name}` : entry.name
     if (entry.isDirectory()) {
       const children = walkVault(root, path, opts)
-      if (children.length > 0) nodes.push({ name: entry.name, path, kind: 'dir', children })
+      if (children.length > 0 || opts.includeEmpty) {
+        nodes.push({ name: entry.name, path, kind: 'dir', children })
+      }
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
       nodes.push({ name: entry.name.replace(/\.md$/, ''), path, kind: 'file', fileType: 'md' })
     } else if (

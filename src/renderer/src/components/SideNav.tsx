@@ -58,6 +58,60 @@ export function shelvesFrom(
 
 const SHELF_LIMIT = 3
 
+/**
+ * Agent-ops shelves: one row per manager (product), no client children — 59
+ * clients across 6 managers drowned the nav. Click = the product page: the
+ * Clients view scoped to that manager. Badge: the manager's pending inbox.
+ */
+function ManagerShelves(): React.JSX.Element {
+  const fleet = useDex((s) => s.fleet) ?? []
+  const byManager = new Map<string, { clients: number; pending: number }>()
+  for (const c of fleet) {
+    const key = c.manager ?? 'Unassigned'
+    const row = byManager.get(key) ?? { clients: 0, pending: 0 }
+    row.clients += 1
+    row.pending += c.inboxCount
+    byManager.set(key, row)
+  }
+  const managers = [...byManager.keys()].sort((a, b) =>
+    a === 'Unassigned' ? 1 : b === 'Unassigned' ? -1 : a.localeCompare(b),
+  )
+  return (
+    <>
+      {managers.map((m) => {
+        const row = byManager.get(m)
+        return (
+          <div
+            key={m}
+            className="side-shelf-group"
+            style={{ '--shelf-tint': sectionTint(m) } as React.CSSProperties}
+          >
+            <button
+              type="button"
+              className="shelf"
+              title={`${m} — open this manager's clients`}
+              onClick={() => {
+                useDex.getState().selectManager(m === 'Unassigned' ? null : m)
+                useApp.getState().setView('clients')
+              }}
+            >
+              <span className="shelf-head-dot" aria-hidden="true" />
+              <span className="shelf-name">{m.toUpperCase()}</span>
+              {row && row.pending > 0 ? (
+                <span className="nav-count-pill is-warn" title="inbox items pending">
+                  {row.pending}
+                </span>
+              ) : (
+                <span className="shelf-count">{row?.clients ?? 0}</span>
+              )}
+            </button>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 function Shelf({
   product,
   projects,
@@ -80,7 +134,6 @@ function Shelf({
         <span className="shelf-caret">{open ? '▾' : '▸'}</span>
         <span className="shelf-head-dot" aria-hidden="true" />
         <span className="shelf-name">{(product ?? 'projects').toUpperCase()}</span>
-        <span className="shelf-tag">product</span>
         <span className="shelf-count">{total || projects.length}</span>
       </button>
       {open &&
@@ -132,8 +185,7 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
   const cards = useHandoffs((s) => s.cards)
   const tree = useReader((s) => s.tree)
   const activity = useDashboardData((s) => s.activity)
-  const dexType = useDex((s) => s.type)
-  void dexType // shelves + Clients row recompute when the dex type loads
+  const dexType = useDex((s) => s.type) // gates Clients row + manager shelves
   const nav = visibleViews()
   const settingsNum = nav.findIndex((e) => e.view === 'settings') + 1
   const openInbound = openCount(cards ?? [], 'all')
@@ -248,9 +300,13 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
         ))}
       </nav>
       <div className="side-shelves">
-        {shelves.map((s) => (
-          <Shelf key={s.product ?? '_flat'} product={s.product} projects={s.projects} />
-        ))}
+        {dexType === 'agent-ops' ? (
+          <ManagerShelves />
+        ) : (
+          shelves.map((s) => (
+            <Shelf key={s.product ?? '_flat'} product={s.product} projects={s.projects} />
+          ))
+        )}
       </div>
       <div className="side-spring" />
       <button

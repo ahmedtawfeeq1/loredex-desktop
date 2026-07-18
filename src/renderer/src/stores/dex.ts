@@ -14,9 +14,12 @@ interface DexState {
   lints: LintFinding[] | null
   /** vault-relative selected client slug (Clients view drill-down) */
   selectedClient: string | null
+  /** manager scope for the Clients view — the sidebar's product-page drill */
+  selectedManager: string | null
   load(): Promise<void>
   refreshFleet(): Promise<void>
   selectClient(slug: string | null): void
+  selectManager(manager: string | null): void
   reset(): void
 }
 
@@ -25,6 +28,7 @@ export const useDex = create<DexState>((set, get) => ({
   fleet: null,
   lints: null,
   selectedClient: null,
+  selectedManager: null,
 
   async load() {
     try {
@@ -55,8 +59,12 @@ export const useDex = create<DexState>((set, get) => ({
     set({ selectedClient: slug })
   },
 
+  selectManager(manager) {
+    set({ selectedManager: manager, selectedClient: null })
+  },
+
   reset() {
-    set({ type: null, fleet: null, lints: null, selectedClient: null })
+    set({ type: null, fleet: null, lints: null, selectedClient: null, selectedManager: null })
   },
 }))
 

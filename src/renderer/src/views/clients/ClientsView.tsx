@@ -13,6 +13,7 @@ import { ClientPage } from './ClientPage'
 const CLIENTS_CSS = `
 .clients-view { padding: 24px 32px; overflow-y: auto; width: 100%; }
 .clients-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+.clients-view .cp-back { font-size: 12px; color: var(--text-2); margin-bottom: 10px; }
 .clients-title { font-family: var(--font-ui); font-size: 24px; color: var(--text-1); }
 .clients-count { font-size: 12px; color: var(--text-2); }
 .clients-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
@@ -87,6 +88,9 @@ export function ClientsView(): React.JSX.Element {
   const selected = useDex((s) => s.selectedClient)
   const selectClient = useDex((s) => s.selectClient)
   const refreshFleet = useDex((s) => s.refreshFleet)
+  // manager scope (sidebar product-page drill): show only this manager's clients
+  const managerScope = useDex((s) => s.selectedManager)
+  const selectManager = useDex((s) => s.selectManager)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
 
@@ -94,11 +98,12 @@ export function ClientsView(): React.JSX.Element {
     if (fleet === null) void refreshFleet()
   }, [fleet, refreshFleet])
 
-  const allTags = useMemo(
-    () => [...new Set((fleet ?? []).flatMap((c) => c.tags))].sort(),
-    [fleet],
+  const scoped = useMemo(
+    () => (fleet ?? []).filter((c) => !managerScope || c.manager === managerScope),
+    [fleet, managerScope],
   )
-  const visible = (fleet ?? []).filter((c) => !tagFilter || c.tags.includes(tagFilter))
+  const allTags = useMemo(() => [...new Set(scoped.flatMap((c) => c.tags))].sort(), [scoped])
+  const visible = scoped.filter((c) => !tagFilter || c.tags.includes(tagFilter))
   const byManager = new Map<string, ClientInfo[]>()
   for (const client of visible) {
     const key = client.manager ?? ''
@@ -114,8 +119,13 @@ export function ClientsView(): React.JSX.Element {
   return (
     <div className="clients-view">
       <style>{CLIENTS_CSS}</style>
+      {managerScope && (
+        <button type="button" className="cp-back button-quiet" onClick={() => selectManager(null)}>
+          ← All managers
+        </button>
+      )}
       <div className="clients-head">
-        <span className="clients-title">Clients</span>
+        <span className="clients-title">{managerScope ?? 'Clients'}</span>
         <span className="clients-count">
           {visible.length} client{visible.length === 1 ? '' : 's'}
         </span>
@@ -148,7 +158,7 @@ export function ClientsView(): React.JSX.Element {
       ) : (
         managers.map((manager) => (
           <section key={manager || '_unassigned'}>
-            <div className="clients-manager">{manager || 'Unassigned'}</div>
+            {!managerScope && <div className="clients-manager">{manager || 'Unassigned'}</div>}
             <div className="clients-grid">
               {(byManager.get(manager) ?? []).map((info) => (
                 <ClientCard key={info.slug} info={info} onOpen={() => selectClient(info.slug)} />

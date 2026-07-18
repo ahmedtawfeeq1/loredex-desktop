@@ -52,19 +52,14 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
   const [name, setName] = useState('')
   const [manager, setManager] = useState('')
   const [tags, setTags] = useState('new-platform')
-  // null = not defaulted yet; '' = the user explicitly chose "none" — the
-  // default-to-first-golden effect must never override an explicit none
-  const [golden, setGolden] = useState<string | null>(null)
+  // '' = empty workspace — the default; copying a golden client is opt-in
+  const [golden, setGolden] = useState('')
   const [connections, setConnections] = useState<Connection[]>([])
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [tokens, setTokens] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // default golden: first tooled client, applied once — an explicit "none" sticks
-  useEffect(() => {
-    if (golden === null && goldens.length > 0) setGolden(goldens[0] ?? '')
-  }, [golden, goldens])
   useEffect(() => {
     if (!golden) {
       setConnections([])
@@ -171,11 +166,7 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
       </label>
       <label className="acm-field">
         <span className="modal-label">Copy tooling from</span>
-        <select
-          className="acm-input"
-          value={golden ?? ''}
-          onChange={(e) => setGolden(e.target.value)}
-        >
+        <select className="acm-input" value={golden} onChange={(e) => setGolden(e.target.value)}>
           <option value="">none — empty workspace</option>
           {goldens.map((slug) => (
             <option key={slug} value={slug}>

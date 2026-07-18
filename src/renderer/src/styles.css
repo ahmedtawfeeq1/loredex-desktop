@@ -298,6 +298,7 @@ a:hover {
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -308,6 +309,8 @@ a:hover {
   padding: 14px 10px 5px;
   white-space: nowrap;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .shelf-caret {
@@ -319,6 +322,11 @@ a:hover {
   font: 600 9px var(--font-mono);
   letter-spacing: 0.1em;
   color: var(--text-2);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
 }
 
 .shelf-tag {

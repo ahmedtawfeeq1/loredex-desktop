@@ -22,7 +22,9 @@ import { useReader } from '../stores/reader'
 import { useRoute } from '../stores/route'
 import { useSearch } from '../stores/search'
 import { useSync } from '../stores/sync'
+import { useTerminal } from '../stores/terminal'
 import { useToasts } from '../stores/toasts'
+import { firstTermId } from '../terminal/paneTree'
 
 export interface ActionCombo {
   /** KeyboardEvent.key, lowercase for letters ('k', '1', '?') */
@@ -230,6 +232,38 @@ export function appActions(): AppAction[] {
       shortcut: '⇧⌘\\',
       combo: { key: '|', meta: true, shift: true },
       run: () => useRails.getState().toggleList(),
+    },
+    {
+      // terminal-splits blueprint 2026-07-18: `meta` matches ⌘ OR ⌃
+      // (shortcuts.ts rule), and on macOS ⌘` is the OS window cycler — so
+      // users press ⌃`, exactly VS Code muscle memory. Title is live
+      // (toggle-sidebar pattern): the palette row says what it will DO.
+      id: 'action:toggle-terminal',
+      title: useTerminal.getState().open ? 'Close terminal' : 'Open terminal',
+      shortcut: '⌃`',
+      combo: { key: '`', meta: true },
+      run: () => void useTerminal.getState().toggle(),
+    },
+    {
+      // split/close-pane are palette + drawer-header only (⌘\ is the
+      // sidebar's; split combos deferred) — combo-less, so no hint needed
+      id: 'action:terminal-split-right',
+      title: 'Terminal: Split right',
+      run: () => void useTerminal.getState().splitActive('row'),
+    },
+    {
+      id: 'action:terminal-split-down',
+      title: 'Terminal: Split down',
+      run: () => void useTerminal.getState().splitActive('column'),
+    },
+    {
+      id: 'action:terminal-close-pane',
+      title: 'Terminal: Close pane',
+      run: () => {
+        const { activeId, root } = useTerminal.getState()
+        const id = activeId ?? (root ? firstTermId(root) : null)
+        if (id) void useTerminal.getState().closePane(id)
+      },
     },
     {
       // Addendum D1 edit mode (story 16.4): Read ⇄ Edit for the open note.

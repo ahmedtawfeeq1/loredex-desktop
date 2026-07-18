@@ -11,6 +11,13 @@ directories:
   output: dist
 files:
   - out/**
+  # node-pty win32 prebuilds carry ~35 MB of .pdb debug symbols — never ship them
+  - '!**/node_modules/node-pty/prebuilds/**/*.pdb'
+# node-pty's spawn-helper must exist as a real on-disk executable (posix_spawn
+# can't exec inside an asar); node-pty rewrites app.asar → app.asar.unpacked
+# paths itself, so unpacking the module is all that's needed.
+asarUnpack:
+  - '**/node_modules/node-pty/**'
 mac:
   icon: build/icon.icns
   category: public.app-category.developer-tools

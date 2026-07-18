@@ -71,6 +71,7 @@ import {
   loadIdentityProfile,
   loadListPaneWidth,
   loadRailsCollapsed,
+  loadTerminalPrefs,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
   saveAtlasLegendSeen,
@@ -79,6 +80,7 @@ import {
   saveListPaneWidth,
   saveMcpPortOverride,
   saveRailsCollapsed,
+  saveTerminalPrefs,
   saveThemeSetting,
   saveTreeSectionsCollapsed,
   loadAgentTokens,
@@ -90,6 +92,7 @@ import {
   saveMcpWriteTools,
   loadOrCreateMcpToken,
 } from './settings'
+import { termCreate, termInput, termKill, termResize } from './terminals'
 import { buildThread, collectComments } from './threads'
 import { groupProjectsInTree, listMarkdownFiles, walkVault } from './tree'
 import { createVault, joinVault, validateRemote, type WizardDeps } from './wizard'
@@ -692,6 +695,15 @@ export function registerCoreHandlers(
       )
     return { started: true as const }
   })
+  // Embedded terminal (terminal-splits blueprint): ptys are core-owned OS
+  // resources; output rides CoreEvents (term.data/term.exit). NEVER log pty
+  // data. No withWriteLock (ptys don't touch the vault), no identity.
+  ipc.register('term.create', ({ cwd, cols, rows }) =>
+    termCreate((e) => ipc.emit(e), { cwd: cwd ?? engine.getConfig().vaultPath, cols, rows }),
+  )
+  ipc.register('term.input', ({ id, data }) => termInput(id, data))
+  ipc.register('term.resize', ({ id, cols, rows }) => termResize(id, cols, rows))
+  ipc.register('term.kill', ({ id }) => termKill(id))
   ipc.register('home.brief', () => engine.homeBrief())
   ipc.register('settings.identity.get', () => {
     // no vault yet (first run, story 13.2) → no ambient default, NOT an error:
@@ -885,6 +897,18 @@ export function registerCoreHandlers(
   ipc.register('settings.listWidth.set', ({ width }) => {
     const { db, vid } = requireDb()
     saveListPaneWidth(db, vid, width)
+  })
+  // Terminal drawer prefs (terminal-splits blueprint): per-vault UI pref,
+  // app.db only — same placement rules as settings.rails. No vault/db →
+  // closed at the 280px default.
+  ipc.register('settings.terminal.get', () => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return db && vid ? loadTerminalPrefs(db, vid) : { open: false, height: 280 }
+  })
+  ipc.register('settings.terminal.set', (prefs) => {
+    const { db, vid } = requireDb()
+    saveTerminalPrefs(db, vid, prefs)
   })
   // Atlas legend seen (story epic17.2, D1 amendment 3): app-global meta flag —
   // no vault/db needed to READ (defaults to unseen so the popover shows once);

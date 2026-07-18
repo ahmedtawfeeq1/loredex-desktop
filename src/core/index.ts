@@ -28,6 +28,7 @@ import {
   loadMcpWriteTools,
   loadOrCreateMcpToken,
 } from './settings'
+import { killAllTerminals } from './terminals'
 import { startVaultWatcher } from './watcher'
 import { writeLock } from './write-lock'
 
@@ -216,9 +217,13 @@ if (config && loadMcpAutostart()) {
     onWarning: (text) => ipc.emit({ kind: 'git.warning', text }),
   })
 }
-// Clean shutdown removes the discovery file (main kills this host on quit —
+// Clean shutdown kills every pty (terminal-splits blueprint — no orphan
+// shells) and removes the discovery file (main kills this host on quit —
 // SIGTERM on posix; 'exit' also covers engine crashes after a clean boot).
-process.on('exit', () => removeDiscovery())
+process.on('exit', () => {
+  killAllTerminals()
+  removeDiscovery()
+})
 process.on('SIGTERM', () => process.exit(0))
 process.on('SIGINT', () => process.exit(0))
 
@@ -232,6 +237,7 @@ function mainPortAdapter(port: Electron.MessagePortMain): PortLike {
 
 type PortEvent = { data: unknown; ports: Electron.MessagePortMain[] }
 
+let portAttached = false
 process.parentPort.on('message', (e: PortEvent) => {
   const msg = e.data as CoreControlMessage | null
   // story 9.1: main forwards window focus/blur — the poller swaps its cadence
@@ -240,6 +246,13 @@ process.parentPort.on('message', (e: PortEvent) => {
     return
   }
   if (msg?.t !== 'port' || !e.ports[0]) return
+  // A second port on a LIVE core only happens when the renderer reloaded (⌘R —
+  // main re-brokers into the same core on did-finish-load). The fresh window
+  // boots with no pane tree, so every existing pty would be ownerless: shells
+  // running invisibly, output buffering unbounded renderer-side, cap slots
+  // consumed forever. Reap them before attaching (no-orphan-shells rule).
+  if (portAttached) killAllTerminals()
+  portAttached = true
   ipc.attach(mainPortAdapter(e.ports[0]))
 })
 

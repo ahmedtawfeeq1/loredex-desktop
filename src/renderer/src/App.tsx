@@ -27,8 +27,10 @@ import { useRails } from './stores/rails'
 import { useReader } from './stores/reader'
 import { useRoute } from './stores/route'
 import { useSuggests } from './stores/suggests'
+import { useTerminal } from './stores/terminal'
 import { useTreeSections } from './stores/treeSections'
 import { useWizard } from './stores/wizard'
+import { TerminalDrawer } from './terminal/TerminalDrawer'
 import { openCount } from '../../shared/handoff-lanes'
 import { useFeed } from './stores/feed'
 import { useHome } from './stores/home'
@@ -109,6 +111,7 @@ export default function App(): React.JSX.Element {
     void init()
     void useDex.getState().load()
     void useRails.getState().load()
+    void useTerminal.getState().load()
     void useTreeSections.getState().load()
     // menu-driven vault change (main) → refresh identity + reset the stores
     return onVaultChanged(() => {
@@ -127,6 +130,13 @@ export default function App(): React.JSX.Element {
       useSuggests.getState().reset()
       useRails.getState().reset()
       useTreeSections.getState().reset()
+      // terminal drawer: kill this window's ptys + dispose xterms (the old
+      // core host may already be down — kill failures are swallowed), then
+      // read the NEW vault's drawer prefs
+      void useTerminal
+        .getState()
+        .reset()
+        .then(() => useTerminal.getState().load())
       void init()
       void useRails.getState().load() // the NEW vault's persisted rail state
       void useTreeSections.getState().load() // …and its collapsed sections (16.3)
@@ -292,6 +302,10 @@ export default function App(): React.JSX.Element {
       <ToastStack />
       <SuggestToastStack />
       </div>
+      {/* terminal-splits blueprint: the drawer stacks full-width under
+          sidebar+content (.app-shell is flex-column) and exists across all
+          views; it renders nothing until the first terminal spawns */}
+      <TerminalDrawer />
     </div>
   )
 }

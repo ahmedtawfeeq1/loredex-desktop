@@ -154,6 +154,50 @@ export function saveListPaneWidth(db: AppDb, vaultId: string, width: number): vo
   appSettingSet(db, vaultId, 'listWidth', JSON.stringify({ width: clampWidth(width) }))
 }
 
+// ── Terminal drawer (terminal-splits blueprint 2026-07-18) ──────────────────
+// PER-VAULT UI pref, app_settings row `terminal` beside `rails`. The clamp is
+// the renderer's drawerHeight band; core keeps a defensive copy so a
+// hand-edited row can never size the drawer past the design bounds.
+
+const MIN_TERM_HEIGHT = 120
+const MAX_TERM_HEIGHT = 600
+const DEFAULT_TERM_HEIGHT = 280
+
+function clampTermHeight(px: number): number {
+  if (!Number.isFinite(px)) return DEFAULT_TERM_HEIGHT
+  return Math.min(MAX_TERM_HEIGHT, Math.max(MIN_TERM_HEIGHT, Math.round(px)))
+}
+
+export function loadTerminalPrefs(db: AppDb, vaultId: string): { open: boolean; height: number } {
+  const raw = appSettingGet(db, vaultId, 'terminal')
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw) as { open?: unknown; height?: unknown }
+      return {
+        open: parsed.open === true,
+        height:
+          typeof parsed.height === 'number' ? clampTermHeight(parsed.height) : DEFAULT_TERM_HEIGHT,
+      }
+    } catch {
+      // malformed row — fall through to the closed default
+    }
+  }
+  return { open: false, height: DEFAULT_TERM_HEIGHT }
+}
+
+export function saveTerminalPrefs(
+  db: AppDb,
+  vaultId: string,
+  prefs: { open: boolean; height: number },
+): void {
+  appSettingSet(
+    db,
+    vaultId,
+    'terminal',
+    JSON.stringify({ open: prefs.open === true, height: clampTermHeight(prefs.height) }),
+  )
+}
+
 // ── Vault tree sections (story 16.3, Addendum D1) ───────────────────────────
 // Collapsed section-row paths, PER VAULT — app_settings, beside `rails`.
 

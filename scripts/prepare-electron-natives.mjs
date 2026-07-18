@@ -19,6 +19,17 @@
  * Idempotent: a stamp (module + electron versions) skips the rebuild; the
  * plain-node check + `npm rebuild better-sqlite3` runs every time, which is
  * what un-breaks the tree after `npm run dist` rebuilt natives in place.
+ *
+ * node-pty (terminal-splits blueprint 2026-07-18) is N-API like
+ * @parcel/watcher — one binary serves both runtimes, so it is NOT staged and
+ * NOT part of the stamp. `install-app-deps` may drop an Electron-header build
+ * into its `build/Release`; that build is also N-API, so no restore is needed.
+ * Two node-pty-specific chores DO run every time:
+ *   1. re-run scripts/fix-pty-spawn-helper.mjs (normally a `postinstall`) —
+ *      the npm tarball ships spawn-helper mode 644 and a non-executable helper
+ *      makes every spawn die with "posix_spawnp failed".
+ *   2. an electronCanOpen-style spawn guard, so a broken pty binary fails
+ *      `predev` instead of app runtime.
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -101,4 +112,36 @@ if (!nodeCanOpen(null)) {
   if (!nodeCanOpen(null)) fail('build/Release still does not load under plain node after rebuild')
 }
 
-console.log(`[natives] OK — electron: ${staged} | node: build/Release (default)`)
+// 3 — node-pty chores (N-API, nothing to stage; see header)
+/** Guard: node-pty must load AND spawn a shell under the Electron runtime. */
+function electronCanSpawnPty() {
+  const checkFile = join(stageDir, 'pty-check.cjs')
+  mkdirSync(stageDir, { recursive: true })
+  const spawnLine =
+    process.platform === 'win32'
+      ? `process.exit(0);\n` // win32: require alone is the guard (ConPTY untested here)
+      : `const p = pty.spawn('/bin/sh', ['-c', 'exit 0'], { name: 'xterm-256color', cols: 80, rows: 24, cwd: process.cwd() });\n` +
+        `p.onExit(({ exitCode }) => process.exit(exitCode === 0 ? 0 : 1));\n` +
+        `setTimeout(() => process.exit(1), 10000);\n`
+  writeFileSync(
+    checkFile,
+    `const { createRequire } = require('node:module');\n` +
+      `const r = createRequire(${JSON.stringify(join(root, 'package.json'))});\n` +
+      `const pty = r('node-pty');\n` +
+      spawnLine,
+  )
+  const electronBin = join(root, 'node_modules', '.bin', 'electron')
+  const res = spawnSync(electronBin, [checkFile], {
+    cwd: root,
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    timeout: 20_000,
+  })
+  rmSync(checkFile, { force: true })
+  return res.status === 0
+}
+
+if (!run(process.execPath, [join(root, 'scripts', 'fix-pty-spawn-helper.mjs')]))
+  fail('fix-pty-spawn-helper.mjs exited non-zero')
+if (!electronCanSpawnPty()) fail('node-pty does not load/spawn under Electron')
+
+console.log(`[natives] OK — electron: ${staged} | node: build/Release (default) | node-pty: N-API (no staging)`)

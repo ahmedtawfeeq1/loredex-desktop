@@ -291,6 +291,18 @@ export interface CoreApi {
    *  real. curate is a CLI/LLM op the lib doesn't expose, so it runs the CLI in
    *  the core host (~1min) — the window drives it async and refreshes on return. */
   'dashboard.recurate': { in: { project: string }; out: { started: true } }
+  /** Embedded terminal (terminal-splits blueprint 2026-07-18): pty sessions
+   *  live in the CORE HOST. create/input/resize/kill are cheap invokes; the
+   *  output stream rides CoreEvents (term.data batched ~8ms core-side) —
+   *  a pty stream must never ride an invoke. cwd omitted → open vault root. */
+  'term.create': { in: { cwd?: string; cols: number; rows: number }; out: { id: string } }
+  'term.input': { in: { id: string; data: string }; out: void }
+  'term.resize': { in: { id: string; cols: number; rows: number }; out: void }
+  'term.kill': { in: { id: string }; out: void }
+  /** Per-vault drawer prefs (rails pattern): app.db `app_settings` row
+   *  `terminal`; get degrades to closed/280 while no vault/db is open. */
+  'settings.terminal.get': { in: void; out: { open: boolean; height: number } }
+  'settings.terminal.set': { in: { open: boolean; height: number }; out: void }
   /** app-local contract evolution (story 2.5): the Start Here brief + freshness */
   'home.brief': { in: void; out: HomeBrief }
   /** Vault Atlas (story 10.1): the whole derived graph — nodes, typed edges,
@@ -404,6 +416,10 @@ export type CoreEvent =
   | { kind: 'vault.changed'; paths: string[] }
   | { kind: 'sync.changed'; health: SyncHealth }
   | { kind: 'git.warning'; text: string } // F8: surface stderr, never swallow
+  /** Embedded terminal (terminal-splits blueprint 2026-07-18): batched pty
+   *  output + exit — the async half of the term.* invoke family. */
+  | { kind: 'term.data'; id: string; data: string }
+  | { kind: 'term.exit'; id: string; code: number }
 
 // ── Core → main control channel (story 3.7) ────────────────────────────────
 // The core host DECIDES (filter, dedupe, batch); main only DISPLAYS (native
@@ -460,6 +476,9 @@ export type IpcCode =
   | 'ROUTE_BLOCKED'
   | 'ROUTE_ALREADY_UNDONE'
   | 'ROUTE_RECEIPT_NOT_FOUND'
+  // Embedded terminal (terminal-splits blueprint 2026-07-18)
+  | 'TERM_CWD_INVALID'
+  | 'TERM_UNKNOWN'
 
 export interface ErrEnvelope {
   code: IpcCode

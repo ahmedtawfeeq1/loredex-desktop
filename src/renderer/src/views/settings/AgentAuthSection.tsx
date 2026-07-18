@@ -88,7 +88,7 @@ function ProviderRow({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <Button variant="primary" disabled={busy || draft.trim() === ''} onClick={() => void save()}>
+        <Button variant="secondary" disabled={busy || draft.trim() === ''} onClick={() => void save()}>
           {hasKey ? 'Replace key' : 'Save key'}
         </Button>
         {hasKey && (

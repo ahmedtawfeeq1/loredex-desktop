@@ -90,7 +90,7 @@ function AttachmentTray({ items }: { items: AgentAttachment[] }): React.JSX.Elem
           title={a.type === 'resource' ? a.path : a.name}
         >
           <span className="agent-attach-kind" aria-hidden="true">
-            {a.type === 'image' ? '🖼' : '📄'}
+            {a.type === 'image' ? '▦' : '▤'}
           </span>
           <span className="agent-attach-name">{a.name}</span>
           <button
@@ -617,7 +617,7 @@ export function AgentPanel(): React.JSX.Element | null {
           disabled={!canSend}
           onClick={() => fileInputRef.current?.click()}
         >
-          📎
+          ⊕
         </button>
         <textarea
           ref={inputRef}

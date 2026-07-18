@@ -154,6 +154,18 @@ export function loadConversation(db: AppDb, convId: string): LoadedConversation 
   }
 }
 
+/** Drop a conversation that never recorded a message (an opened-then-closed
+ *  session mints a row eagerly for its id — GC it on stop so empty rows don't
+ *  accumulate). No-op once any message exists; provider rows go with it. */
+export function deleteConversationIfEmpty(db: AppDb, convId: string): void {
+  const row = db
+    .prepare('SELECT COUNT(*) AS n FROM agent_messages WHERE conv_id = ?')
+    .get(convId) as { n: number }
+  if (row.n > 0) return
+  db.prepare('DELETE FROM agent_conv_providers WHERE conv_id = ?').run(convId)
+  db.prepare('DELETE FROM agent_conversations WHERE id = ?').run(convId)
+}
+
 /** All threads for a vault, newest-updated first. */
 export function listConversations(db: AppDb, vaultId: string, limit = 50): AcpConvSummary[] {
   const rows = db
@@ -191,7 +203,11 @@ export function renderSeed(db: AppDb, convId: string): string {
     else if (m.role === 'agent') blocks.push(`**Assistant:** ${m.text ?? ''}`)
     else if (m.role === 'tool' && m.tool) {
       const files = toolFiles(m.tool)
-      blocks.push(`**Tool:** ${m.tool.title ?? 'Tool call'}${files.length ? ` — ${files.join(', ')}` : ''}`)
+      // the title is machine-generated ("Read /Users/…/x.md", a bash command) —
+      // collapse any absolute path to its basename so no machine path (home dir,
+      // drive layout) rides the cross-provider seed
+      const title = redactPaths(m.tool.title ?? 'Tool call')
+      blocks.push(`**Tool:** ${title}${files.length ? ` — ${files.join(', ')}` : ''}`)
     }
     // thought rows are the model's private reasoning — omitted from the seed
   }
@@ -251,4 +267,13 @@ function toolFiles(tool: ToolMsg): string[] {
 function basename(p: string): string {
   const i = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'))
   return i >= 0 ? p.slice(i + 1) : p
+}
+
+/** Collapse absolute POSIX/Windows path tokens in free text to their basename,
+ *  so a machine path never rides the cross-provider seed. Anchored at a word
+ *  boundary so ratios like "3/4" are untouched. */
+function redactPaths(s: string): string {
+  return s
+    .replace(/(^|\s)(\/[^\s]+)/g, (_m, pre: string, p: string) => pre + basename(p))
+    .replace(/(^|\s)([A-Za-z]:\\[^\s]+)/g, (_m, pre: string, p: string) => pre + basename(p))
 }

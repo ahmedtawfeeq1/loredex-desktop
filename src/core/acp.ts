@@ -45,6 +45,7 @@ import { agentKeyEnv } from './agent-keys'
 import {
   appendMessage,
   createConversation,
+  deleteConversationIfEmpty,
   loadConversation,
   renderSeed,
   setConvProviderSession,
@@ -975,6 +976,19 @@ export function acpStop(sessionId: string, silent = false): void {
   s.connection?.close()
   s.child?.kill()
   revokeToken(s)
+  // GC the eagerly-minted conversation row if this session recorded nothing and
+  // no other live session shares it (an opened-then-closed session leaves an
+  // empty row otherwise). Best-effort — a db hiccup must not block teardown.
+  if (s.persist) {
+    const stillLive = [...sessions.values()].some((o) => o.conversationId === s.conversationId)
+    if (!stillLive) {
+      try {
+        deleteConversationIfEmpty(s.persist.db, s.conversationId)
+      } catch {
+        // empty-row GC is housekeeping — never fail a stop over it
+      }
+    }
+  }
   if (!silent) {
     s.emit({ kind: 'acp.session', sessionId, agent: s.agent, state: 'exited' })
   }

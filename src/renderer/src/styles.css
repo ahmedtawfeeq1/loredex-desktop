@@ -7933,7 +7933,7 @@ a.button-primary {
 .agent-continue-btn:hover {
   background: var(--bg-hover);
   color: var(--text-1);
-  border-color: var(--hairline-strong, var(--hairline));
+  border-color: var(--text-4);
 }
 
 /* chat thread: plain pre-wrap text bubbles (markdown deferred) */

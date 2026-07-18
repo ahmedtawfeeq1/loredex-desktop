@@ -13,6 +13,7 @@ import { openAppDb } from './db/index'
 import {
   appendMessage,
   createConversation,
+  deleteConversationIfEmpty,
   listConversations,
   loadConversation,
   renderSeed,
@@ -180,6 +181,50 @@ describe('renderSeed', () => {
   it('is empty for an unknown conversation', () => {
     const d = db()
     expect(renderSeed(d, 'nope')).toBe('')
+    d.close()
+  })
+})
+
+describe('renderSeed — no machine paths leak into the cross-provider seed', () => {
+  it('collapses absolute POSIX paths in a tool title to the basename', () => {
+    const d = db()
+    const { id } = createConversation(d, 'v1', { agent: 'claude' })
+    appendMessage(d, id, { role: 'tool', tool: { toolCallId: 't1', title: 'Read /Users/alice/vault/notes/x.md' } })
+    const seed = renderSeed(d, id)
+    expect(seed).toContain('Read x.md')
+    expect(seed).not.toContain('/Users/alice')
+    d.close()
+  })
+
+  it('collapses a Windows path and leaves ratios like 3/4 alone', () => {
+    const d = db()
+    const { id } = createConversation(d, 'v1', { agent: 'claude' })
+    appendMessage(d, id, { role: 'tool', tool: { toolCallId: 't1', title: 'Edit C:\\Users\\bob\\a.md' } })
+    appendMessage(d, id, { role: 'agent', text: 'progress 3/4 done' })
+    const seed = renderSeed(d, id)
+    expect(seed).toContain('Edit a.md')
+    expect(seed).not.toContain('C:\\Users')
+    expect(seed).toContain('3/4') // a ratio is not a path token
+    d.close()
+  })
+})
+
+describe('deleteConversationIfEmpty — GC opened-then-closed rows', () => {
+  it('drops a message-less conversation (+ its provider rows)', () => {
+    const d = db()
+    const { id } = createConversation(d, 'v1', { agent: 'claude' })
+    setConvProviderSession(d, id, 'claude', 'acp-1')
+    deleteConversationIfEmpty(d, id)
+    expect(loadConversation(d, id)).toBeNull()
+    d.close()
+  })
+
+  it('keeps a conversation once it has any message', () => {
+    const d = db()
+    const { id } = createConversation(d, 'v1', { agent: 'claude' })
+    appendMessage(d, id, { role: 'user', text: 'hi' })
+    deleteConversationIfEmpty(d, id)
+    expect(loadConversation(d, id)).not.toBeNull()
     d.close()
   })
 })

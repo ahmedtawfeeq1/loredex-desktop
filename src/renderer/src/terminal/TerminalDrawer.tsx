@@ -6,6 +6,7 @@
  * Killing happens on close-pane, vault switch, window close, quit.
  */
 import { useEffect, useRef, useState } from 'react'
+import { useAgentPanel } from '../stores/agentPanel'
 import { useTerminal } from '../stores/terminal'
 import { collectTermIds, firstTermId } from './paneTree'
 import { PaneNode } from './PaneNode'
@@ -118,6 +119,14 @@ export function TerminalDrawer(): React.JSX.Element | null {
           }}
         >
           close
+        </button>
+        <button
+          type="button"
+          className="term-hdr-btn"
+          title="Open agent here (vault root)"
+          onClick={() => void useAgentPanel.getState().openHere()}
+        >
+          agent ▸
         </button>
       </div>
       <div className="terminal-drawer-body">

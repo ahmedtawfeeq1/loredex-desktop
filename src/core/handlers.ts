@@ -65,7 +65,9 @@ import {
   validateToken,
 } from './auth'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
+import { acpCancel, acpPermission, acpPrompt, acpStart, acpStop } from './acp'
 import {
+  loadAgentPanelPrefs,
   loadAtlasLegendSeen,
   loadFontSettings,
   loadIdentityProfile,
@@ -77,6 +79,7 @@ import {
   saveAtlasLegendSeen,
   saveFontSettings,
   saveIdentityProfile,
+  saveAgentPanelPrefs,
   saveListPaneWidth,
   saveMcpPortOverride,
   saveRailsCollapsed,
@@ -241,6 +244,71 @@ export function registerCoreHandlers(
     }),
   )
   ipc.register('clients.connections', ({ client }) => engine.clientConnections(client))
+  // Health probe: spawn the connection's mcp server with keychain-expanded env
+  // and complete an initialize handshake. 8s budget — inside the invoke limit.
+  ipc.register('clients.connections.test', async ({ client, server }) => {
+    const conn = engine.clientConnections(client).find((c) => c.server === server)
+    if (!conn) throw ipcError('INTERNAL', `no connection "${server}" in ${client}/workspace.yml`)
+    const held = await readClientTokens(conn.envRefs)
+    const env = { ...process.env }
+    const unexpanded: string[] = []
+    for (const [key, value] of Object.entries(conn.env)) {
+      env[key] = value.replace(/\$\{([A-Z0-9_]+)\}/g, (whole, ref: string) => {
+        const token = held[ref]
+        if (token === undefined) unexpanded.push(ref)
+        return token ?? whole
+      })
+    }
+    if (unexpanded.length > 0) {
+      return { ok: false, detail: `missing token: ${unexpanded.join(', ')}` }
+    }
+    return await new Promise<{ ok: boolean; detail: string }>((resolve) => {
+      const child = execFile(conn.command, conn.args, {
+        env,
+        cwd: engine.clientDirAbs(client),
+        timeout: 9000,
+      })
+      let stderr = ''
+      let settled = false
+      const done = (r: { ok: boolean; detail: string }): void => {
+        if (settled) return
+        settled = true
+        child.kill()
+        resolve(r)
+      }
+      const timer = setTimeout(() => done({ ok: false, detail: 'no response within 9s' }), 9000)
+      timer.unref?.()
+      child.stderr?.on('data', (d: Buffer | string) => {
+        stderr += String(d)
+        // fail fast on the common bridge patterns instead of burning the budget
+        if (/auth failed|401|unauthorized|invalid token/i.test(stderr)) {
+          done({ ok: false, detail: stderr.trim().split('\n').pop() ?? 'auth failed' })
+        }
+      })
+      child.stdout?.on('data', (d: Buffer | string) => {
+        if (String(d).includes('"result"')) done({ ok: true, detail: 'initialize ok' })
+      })
+      child.on('error', (e) => done({ ok: false, detail: e.message }))
+      child.on('exit', (code) =>
+        done({
+          ok: false,
+          detail: stderr.trim().split('\n').pop() ?? `exited with code ${code}`,
+        }),
+      )
+      child.stdin?.write(
+        `${JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'loredex-desktop-probe', version: '0' },
+          },
+        })}\n`,
+      )
+    })
+  })
   // The terminal-free bridge: drop the teammate exactly where `claude` runs.
   ipc.register('clients.openTerminal', async ({ client }) => {
     const dir = engine.clientDirAbs(client)
@@ -704,6 +772,19 @@ export function registerCoreHandlers(
   ipc.register('term.input', ({ id, data }) => termInput(id, data))
   ipc.register('term.resize', ({ id, cols, rows }) => termResize(id, cols, rows))
   ipc.register('term.kill', ({ id }) => termKill(id))
+  // ACP agent panels (acp blueprint): adapter processes are core-owned OS
+  // resources; everything streams as acp.* CoreEvents. NEVER log adapter
+  // stdout/stderr or chat content. No withWriteLock (agents write via their
+  // own tools, not the engine), no identity.
+  ipc.register('acp.start', ({ agent, cwd }) =>
+    acpStart((e) => ipc.emit(e), { agent, cwd: cwd ?? engine.getConfig().vaultPath }),
+  )
+  ipc.register('acp.prompt', ({ sessionId, text }) => acpPrompt(sessionId, text))
+  ipc.register('acp.cancel', ({ sessionId }) => acpCancel(sessionId))
+  ipc.register('acp.permission', ({ sessionId, requestId, optionId }) =>
+    acpPermission(sessionId, requestId, optionId),
+  )
+  ipc.register('acp.stop', ({ sessionId }) => acpStop(sessionId))
   ipc.register('home.brief', () => engine.homeBrief())
   ipc.register('settings.identity.get', () => {
     // no vault yet (first run, story 13.2) → no ambient default, NOT an error:
@@ -909,6 +990,17 @@ export function registerCoreHandlers(
   ipc.register('settings.terminal.set', (prefs) => {
     const { db, vid } = requireDb()
     saveTerminalPrefs(db, vid, prefs)
+  })
+  // Agent panel prefs (acp blueprint): per-vault UI pref, app.db only — same
+  // placement rules as settings.terminal. No vault/db → closed at 340px.
+  ipc.register('settings.agentPanel.get', () => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return db && vid ? loadAgentPanelPrefs(db, vid) : { open: false, width: 340 }
+  })
+  ipc.register('settings.agentPanel.set', (prefs) => {
+    const { db, vid } = requireDb()
+    saveAgentPanelPrefs(db, vid, prefs)
   })
   // Atlas legend seen (story epic17.2, D1 amendment 3): app-global meta flag —
   // no vault/db needed to READ (defaults to unseen so the popover shows once);

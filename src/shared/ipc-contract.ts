@@ -71,6 +71,21 @@ export type { ClientInfo, Config, Doc, LintFinding, ProductDashboard, SearchHit,
 export type { WorkItem, WorkPatch, WorkReceipt } from 'loredex'
 export type { ClientWorkspaceStatus, CreateClientSpec } from './types'
 
+// ── ACP agent panels (acp blueprint 2026-07-18): shared types ───────────────
+
+export type AcpAgent = 'claude' | 'codex'
+export type AcpSessionState = 'starting' | 'ready' | 'auth_required' | 'error' | 'exited'
+export interface AcpPermissionOption {
+  optionId: string
+  name: string
+  kind: 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always'
+}
+export interface AcpPlanEntry {
+  content: string
+  priority: 'high' | 'medium' | 'low'
+  status: 'pending' | 'in_progress' | 'completed'
+}
+
 // ── CoreApi map: renderer → core (request/response) ─────────────────────────
 
 export interface CoreApi {
@@ -109,7 +124,20 @@ export interface CoreApi {
   /** agent-ops: the golden client's mcp connections — Add-Client modal checkboxes */
   'clients.connections': {
     in: { client: string }
-    out: Array<{ server: string; envRefs: string[] }>
+    out: Array<{
+      server: string
+      envRefs: string[]
+      command: string
+      args: string[]
+      env: Record<string, string>
+    }>
+  }
+  /** agent-ops: LIVE health probe of one connection — spawns the mcp server with
+   *  this machine's keychain tokens and completes a JSON-RPC initialize. The only
+   *  honest "connected": a held token can still be revoked server-side. */
+  'clients.connections.test': {
+    in: { client: string; server: string }
+    out: { ok: boolean; detail: string }
   }
   /** agent-ops: open the OS terminal in the client's directory (the terminal-free
    *  bridge to `claude`) */
@@ -303,6 +331,25 @@ export interface CoreApi {
    *  `terminal`; get degrades to closed/280 while no vault/db is open. */
   'settings.terminal.get': { in: void; out: { open: boolean; height: number } }
   'settings.terminal.set': { in: { open: boolean; height: number }; out: void }
+  /** ACP agent panels (acp blueprint 2026-07-18): adapter processes live in the
+   *  CORE HOST. All acp.* invokes are cheap — acp.start allocates the id and
+   *  returns before the adapter finishes booting; a prompt turn is an
+   *  outstanding JSON-RPC request held core-side for minutes and must NEVER
+   *  ride an invoke. Session state, chunks, tool calls, permission requests
+   *  and turn ends all stream as CoreEvents. cwd omitted → open vault root. */
+  'acp.start': { in: { agent: AcpAgent; cwd?: string }; out: { sessionId: string } }
+  'acp.prompt': { in: { sessionId: string; text: string }; out: void }
+  'acp.cancel': { in: { sessionId: string }; out: void }
+  /** optionId null = dismissed → outcome 'cancelled' (dismissing is rejecting) */
+  'acp.permission': {
+    in: { sessionId: string; requestId: string; optionId: string | null }
+    out: void
+  }
+  'acp.stop': { in: { sessionId: string }; out: void }
+  /** Per-vault panel prefs (settings.terminal pattern): app.db app_settings
+   *  row `agentPanel`; get degrades to closed/340 while no vault/db is open. */
+  'settings.agentPanel.get': { in: void; out: { open: boolean; width: number } }
+  'settings.agentPanel.set': { in: { open: boolean; width: number }; out: void }
   /** app-local contract evolution (story 2.5): the Start Here brief + freshness */
   'home.brief': { in: void; out: HomeBrief }
   /** Vault Atlas (story 10.1): the whole derived graph — nodes, typed edges,
@@ -420,6 +467,36 @@ export type CoreEvent =
    *  output + exit — the async half of the term.* invoke family. */
   | { kind: 'term.data'; id: string; data: string }
   | { kind: 'term.exit'; id: string; code: number }
+  /** ACP agent panels (acp blueprint 2026-07-18): the async half of the acp.*
+   *  family. acp.chunk is batched ~8ms core-side and always flushed BEFORE any
+   *  other event for the same session (ordering law). detail on acp.session
+   *  carries the auth message / stderr tail — bounded, never wholesale logs. */
+  | {
+      kind: 'acp.session'
+      sessionId: string
+      agent: AcpAgent
+      state: AcpSessionState
+      detail?: string
+    }
+  | { kind: 'acp.chunk'; sessionId: string; role: 'agent' | 'thought'; text: string }
+  | {
+      kind: 'acp.tool'
+      sessionId: string
+      toolCallId: string
+      title?: string
+      toolKind?: string
+      status?: 'pending' | 'in_progress' | 'completed' | 'failed'
+    }
+  | { kind: 'acp.plan'; sessionId: string; entries: AcpPlanEntry[] }
+  | {
+      kind: 'acp.permission'
+      sessionId: string
+      requestId: string
+      title: string
+      toolKind?: string
+      options: AcpPermissionOption[]
+    }
+  | { kind: 'acp.turnEnd'; sessionId: string; stopReason: string }
 
 // ── Core → main control channel (story 3.7) ────────────────────────────────
 // The core host DECIDES (filter, dedupe, batch); main only DISPLAYS (native
@@ -479,6 +556,11 @@ export type IpcCode =
   // Embedded terminal (terminal-splits blueprint 2026-07-18)
   | 'TERM_CWD_INVALID'
   | 'TERM_UNKNOWN'
+  // ACP agent panels (acp blueprint 2026-07-18)
+  | 'ACP_CWD_INVALID'
+  | 'ACP_UNKNOWN'
+  | 'ACP_NOT_READY'
+  | 'ACP_BUSY'
 
 export interface ErrEnvelope {
   code: IpcCode

@@ -198,6 +198,55 @@ export function saveTerminalPrefs(
   )
 }
 
+// ── ACP agent panel (acp blueprint 2026-07-18) ──────────────────────────────
+// PER-VAULT UI pref, app_settings row `agentPanel` beside `terminal`. Same
+// defensive clamp rationale: a hand-edited row can never size the panel past
+// the design bounds.
+
+const MIN_AGENT_PANEL_WIDTH = 280
+const MAX_AGENT_PANEL_WIDTH = 480
+const DEFAULT_AGENT_PANEL_WIDTH = 340
+
+function clampAgentPanelWidth(px: number): number {
+  if (!Number.isFinite(px)) return DEFAULT_AGENT_PANEL_WIDTH
+  return Math.min(MAX_AGENT_PANEL_WIDTH, Math.max(MIN_AGENT_PANEL_WIDTH, Math.round(px)))
+}
+
+export function loadAgentPanelPrefs(
+  db: AppDb,
+  vaultId: string,
+): { open: boolean; width: number } {
+  const raw = appSettingGet(db, vaultId, 'agentPanel')
+  if (raw !== null) {
+    try {
+      const parsed = JSON.parse(raw) as { open?: unknown; width?: unknown }
+      return {
+        open: parsed.open === true,
+        width:
+          typeof parsed.width === 'number'
+            ? clampAgentPanelWidth(parsed.width)
+            : DEFAULT_AGENT_PANEL_WIDTH,
+      }
+    } catch {
+      // malformed row — fall through to the closed default
+    }
+  }
+  return { open: false, width: DEFAULT_AGENT_PANEL_WIDTH }
+}
+
+export function saveAgentPanelPrefs(
+  db: AppDb,
+  vaultId: string,
+  prefs: { open: boolean; width: number },
+): void {
+  appSettingSet(
+    db,
+    vaultId,
+    'agentPanel',
+    JSON.stringify({ open: prefs.open === true, width: clampAgentPanelWidth(prefs.width) }),
+  )
+}
+
 // ── Vault tree sections (story 16.3, Addendum D1) ───────────────────────────
 // Collapsed section-row paths, PER VAULT — app_settings, beside `rails`.
 

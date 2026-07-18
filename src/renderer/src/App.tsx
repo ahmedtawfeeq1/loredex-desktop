@@ -8,6 +8,8 @@ import { appActions, visibleViews } from './actions/registry'
 import { isTypingTarget, matchShortcut } from './actions/shortcuts'
 import { onEvent, onJoinLink, onOpenHandoff, onVaultChanged } from './api'
 import { parseJoinLink } from '../../shared/join-link'
+import { AgentPanel } from './agent/AgentPanel'
+import { AgentPermissionModal } from './agent/AgentPermissionModal'
 import { SideNav } from './components/SideNav'
 import { TopBar } from './components/TopBar'
 import { QuickActionsMenu } from './components/QuickActionsMenu'
@@ -16,6 +18,7 @@ import { NavIcon, RailChevron } from './components/NavIcon'
 import { ShortcutCheatsheet } from './components/ShortcutCheatsheet'
 import { SuggestToastStack } from './components/SuggestToast'
 import { ToastStack } from './components/ToastStack'
+import { useAgentPanel } from './stores/agentPanel'
 import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
@@ -112,6 +115,7 @@ export default function App(): React.JSX.Element {
     void useDex.getState().load()
     void useRails.getState().load()
     void useTerminal.getState().load()
+    void useAgentPanel.getState().load()
     void useTreeSections.getState().load()
     // menu-driven vault change (main) → refresh identity + reset the stores
     return onVaultChanged(() => {
@@ -137,6 +141,12 @@ export default function App(): React.JSX.Element {
         .getState()
         .reset()
         .then(() => useTerminal.getState().load())
+      // agent panel: acp.stop this window's sessions (the old core may
+      // already be down — failures swallowed), then the NEW vault's prefs
+      void useAgentPanel
+        .getState()
+        .reset()
+        .then(() => useAgentPanel.getState().load())
       void init()
       void useRails.getState().load() // the NEW vault's persisted rail state
       void useTreeSections.getState().load() // …and its collapsed sections (16.3)
@@ -298,9 +308,14 @@ export default function App(): React.JSX.Element {
       <DeclineReasonModal />
       <SnoozeUntilPicker />
       <LinkRequestModal />
+      <AgentPermissionModal />
       <RouteConfirmCard />
       <ToastStack />
       <SuggestToastStack />
+      {/* acp blueprint 2026-07-18: .app is a flex ROW, so the agent panel
+          mounted last docks right across every view — the row-axis analog of
+          the terminal drawer's column-axis mount below */}
+      <AgentPanel />
       </div>
       {/* terminal-splits blueprint: the drawer stacks full-width under
           sidebar+content (.app-shell is flex-column) and exists across all

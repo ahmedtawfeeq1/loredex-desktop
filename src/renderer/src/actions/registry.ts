@@ -16,6 +16,7 @@ import { useEditor } from '../stores/editor'
 import { useFind } from '../stores/find'
 import { useHandoffs } from '../stores/handoffs'
 import { actionsFor, filterByDisplay, laneCards } from '../../../shared/handoff-lanes'
+import { useAgentPanel } from '../stores/agentPanel'
 import { effectiveIdentity, useIdentity } from '../stores/identity'
 import { useRails } from '../stores/rails'
 import { useReader } from '../stores/reader'
@@ -264,6 +265,22 @@ export function appActions(): AppAction[] {
         const id = activeId ?? (root ? firstTermId(root) : null)
         if (id) void useTerminal.getState().closePane(id)
       },
+    },
+    {
+      // acp blueprint 2026-07-18: ⌘J free in the registry; VS Code panel
+      // muscle memory. Title is live (toggle-sidebar pattern).
+      id: 'action:toggle-agent-panel',
+      title: useAgentPanel.getState().open ? 'Close agent panel' : 'Open agent panel',
+      shortcut: '⌘J',
+      combo: { key: 'j', meta: true },
+      run: () => useAgentPanel.getState().toggle(),
+    },
+    {
+      // combo-less palette action (split-right precedent): open the panel and
+      // start a session at the vault root with the picked agent
+      id: 'action:open-agent-here',
+      title: 'Open agent here',
+      run: () => void useAgentPanel.getState().openHere(),
     },
     {
       // Addendum D1 edit mode (story 16.4): Read ⇄ Edit for the open note.

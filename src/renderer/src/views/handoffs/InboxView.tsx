@@ -362,39 +362,37 @@ export function InboxView(): React.JSX.Element {
               show all
             </button>
           )}
-          <button
-            type="button"
-            className="act-link inbox-new"
-            title="Compose a handoff (⌘N)"
-            onClick={() => useHandoffs.getState().openCompose()}
-          >
-            ＋ new
-          </button>
         </div>
-        <div className="inbox-filters-row">
-          <select
-            className="plan-filter"
-            aria-label="Project scope"
-            value={project}
-            onChange={(e) => setProject(e.target.value)}
-          >
-            <option value="all">project: all</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-          <select
-            className="plan-filter"
-            aria-label="Show"
-            value={filterMode}
-            onChange={(e) => setFilterMode(e.target.value as 'active' | 'done' | 'all')}
-          >
-            <option value="active">state: active</option>
-            <option value="done">state: done</option>
-            <option value="all">state: all</option>
-          </select>
+        {/* search-page facet anatomy — real labeled dropdowns, not filter chips;
+            composing lives in the sidebar's ＋ New alone */}
+        <div className="inbox-filters-row facet-row">
+          <label className="facet">
+            <span>project</span>
+            <select
+              aria-label="Project scope"
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+            >
+              <option value="all">All</option>
+              {projects.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="facet">
+            <span>state</span>
+            <select
+              aria-label="Show"
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value as 'active' | 'done' | 'all')}
+            >
+              <option value="active">Active</option>
+              <option value="done">Done</option>
+              <option value="all">All</option>
+            </select>
+          </label>
         </div>
         {cards === null ? (
           <div className="inbox-skeleton" aria-hidden>

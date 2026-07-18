@@ -28,6 +28,7 @@ import {
   loadMcpWriteTools,
   loadOrCreateMcpToken,
 } from './settings'
+import { killAllAcpSessions } from './acp'
 import { killAllTerminals } from './terminals'
 import { startVaultWatcher } from './watcher'
 import { writeLock } from './write-lock'
@@ -222,6 +223,7 @@ if (config && loadMcpAutostart()) {
 // SIGTERM on posix; 'exit' also covers engine crashes after a clean boot).
 process.on('exit', () => {
   killAllTerminals()
+  killAllAcpSessions(true) // silent — a dying core has nobody listening
   removeDiscovery()
 })
 process.on('SIGTERM', () => process.exit(0))
@@ -251,7 +253,11 @@ process.parentPort.on('message', (e: PortEvent) => {
   // boots with no pane tree, so every existing pty would be ownerless: shells
   // running invisibly, output buffering unbounded renderer-side, cap slots
   // consumed forever. Reap them before attaching (no-orphan-shells rule).
-  if (portAttached) killAllTerminals()
+  if (portAttached) {
+    killAllTerminals()
+    // acp sessions are equally ownerless after a renderer reload — reap them
+    killAllAcpSessions(true)
+  }
   portAttached = true
   ipc.attach(mainPortAdapter(e.ports[0]))
 })

@@ -59,9 +59,18 @@ const PAGE_CSS = `
 .cp-ws-result { margin-top: 8px; font-size: 12px; color: var(--text-2); }
 .cp-ws-result .ok { color: var(--ok, #2e6e5e); }
 .cp-ws-result .warn { color: var(--rust, #a33f2e); }
+.cp-conn { border: 1px solid var(--hairline); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.cp-conn-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.cp-conn-name { font-size: 13.5px; font-weight: 650; color: var(--text-1); }
+.cp-conn-state { font-size: 12px; font-weight: 600; }
+.cp-conn-state.ok { color: var(--ok, #2e6e5e); }
+.cp-conn-state.warn { color: var(--rust, #a33f2e); }
+.cp-conn-state.dim { color: var(--text-2); }
+.cp-conn-detail { font-size: 12px; margin: 2px 0 8px; }
+.cp-conn-detail.warn { color: var(--rust, #a33f2e); }
 .cp-ws-refs { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
-.cp-ws-ref { display: flex; align-items: center; gap: 10px; }
-.cp-ws-ref-state { font-size: 11px; font-weight: 600; white-space: nowrap; }
+.cp-ws-ref { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.cp-ws-ref-state { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .cp-ws-ref-state.ok { color: var(--ok, #2e6e5e); }
 .cp-ws-ref-state.warn { color: var(--rust, #a33f2e); }
 .cp-ws-token-input {
@@ -131,31 +140,53 @@ function Unit({ unit }: { unit: UnitSection }): React.JSX.Element {
   )
 }
 
+type ProbeState = { state: 'testing' | 'ok' | 'fail'; detail: string }
+
 function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<WorkspaceResult | null>(null)
   const [status, setStatus] = useState<ClientWorkspaceStatus | null>(null)
+  const [conns, setConns] = useState<
+    Array<{ server: string; envRefs: string[] }>
+  >([])
+  // per-connection LIVE probe — the only honest "Connected": a held token can
+  // still be revoked server-side, so green must mean a real handshake passed
+  const [probes, setProbes] = useState<Record<string, ProbeState>>({})
   const [pasted, setPasted] = useState<Record<string, string>>({})
   const [replacing, setReplacing] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
-  // v3 P7 green heartbeat (story 26.8): connected = the in-app MCP host is
-  // listening — the wiring the generated .mcp.json points agents at
-  const [mcp, setMcp] = useState<{ running: boolean; port: number | null } | null>(null)
 
-  useEffect(() => {
-    void invoke('mcp.status', undefined)
-      .then((st) => setMcp({ running: st.state === 'running', port: st.port }))
-      .catch(() => setMcp({ running: false, port: null }))
-  }, [])
+  const testConnection = (server: string): void => {
+    setProbes((p) => ({ ...p, [server]: { state: 'testing', detail: '' } }))
+    void invoke('clients.connections.test', { client: info.slug, server })
+      .then((r) =>
+        setProbes((p) => ({
+          ...p,
+          [server]: { state: r.ok ? 'ok' : 'fail', detail: r.detail },
+        })),
+      )
+      .catch((e) =>
+        setProbes((p) => ({
+          ...p,
+          [server]: { state: 'fail', detail: String((e as { message?: string }).message ?? e) },
+        })),
+      )
+  }
 
-  const refreshStatus = (): void => {
+  const refreshAll = (probe: boolean): void => {
     if (!info.hasWorkspaceYml) return
     void invoke('clients.workspace.status', { client: info.slug })
       .then(setStatus)
       .catch(() => setStatus(null))
+    void invoke('clients.connections', { client: info.slug })
+      .then((list) => {
+        setConns(list)
+        if (probe) for (const c of list) testConnection(c.server)
+      })
+      .catch(() => setConns([]))
   }
   // biome-ignore lint/correctness/useExhaustiveDependencies: refetch per client only
-  useEffect(refreshStatus, [info.slug])
+  useEffect(() => refreshAll(true), [info.slug])
 
   // Re-wire always goes through clients.tokens.set — it materializes WITH this
   // machine's keychain tokens; the bare clients.workspace channel would expand
@@ -167,7 +198,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
       setResult(await invoke('clients.tokens.set', { client: info.slug, tokens }))
       setPasted({})
       setReplacing(new Set())
-      refreshStatus()
+      refreshAll(true) // re-probe — status must reflect the new token, not hope
     } catch (e) {
       setError(String((e as { message?: string }).message ?? e))
     } finally {
@@ -176,24 +207,14 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   }
 
   const pastedReady = Object.entries(pasted).filter(([, v]) => v.trim())
+  const PROBE_LABEL: Record<ProbeState['state'], string> = {
+    testing: '◌ Testing…',
+    ok: '✓ Connected',
+    fail: '✗ Failed',
+  }
   return (
     <div className="cp-ws">
       <div className="cp-ws-row">
-        <span
-          className={`agent-dot${mcp?.running ? ' agent-dot-live' : ''}`}
-          title={
-            mcp?.running
-              ? `connected — MCP host on 127.0.0.1:${mcp.port}`
-              : 'MCP host not running — agents cannot connect'
-          }
-          aria-hidden="true"
-        />
-        <span className="cp-ws-conn">
-          {mcp === null ? 'checking…' : mcp.running ? `connected · :${mcp.port}` : 'not connected'}
-        </span>
-        <button type="button" className="cp-filelink" onClick={() => openNote(`${info.dir}/workspace.yml`)}>
-          workspace.yml
-        </button>
         <button
           type="button"
           className="button-emphasis"
@@ -209,74 +230,110 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
         </button>
         <button
           type="button"
-          className="button-quiet"
-          disabled={busy || !info.hasWorkspaceYml}
+          className="button-secondary"
+          disabled={!info.hasWorkspaceYml}
           title="Open a terminal in this client's directory — then just type claude"
           onClick={() => void invoke('clients.openTerminal', { client: info.slug }).catch(() => {})}
         >
           Open in Terminal
         </button>
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="cp-filelink"
+          onClick={() => openNote(`${info.dir}/workspace.yml`)}
+        >
+          workspace.yml
+        </button>
       </div>
-      {status && (
-        <div className="cp-ws-refs">
-          {status.declaredRefs.map((ref) => {
-            const missing = status.missingRefs.includes(ref)
-            const editing = missing || replacing.has(ref)
-            return (
-              <div key={ref} className="cp-ws-ref">
-                <span className={missing ? 'cp-ws-ref-state warn' : 'cp-ws-ref-state ok'}>
-                  {missing ? '● needs token' : '✓ token held'}
-                </span>
-                <span className="cp-ws-conn">{ref}</span>
-                {editing ? (
-                  <input
-                    className="cp-ws-token-input"
-                    type="password"
-                    value={pasted[ref] ?? ''}
-                    placeholder="paste token"
-                    onChange={(e) => setPasted({ ...pasted, [ref]: e.target.value })}
-                  />
-                ) : (
-                  // a held token can still be dead server-side (revoked/rotated)
-                  <button
-                    type="button"
-                    className="button-quiet"
-                    title="Paste a new token for this connection (replaces the stored one)"
-                    onClick={() => setReplacing(new Set(replacing).add(ref))}
-                  >
-                    Replace
-                  </button>
-                )}
+      {conns.length === 0 && info.hasWorkspaceYml && (
+        <div className="cp-empty">No connections declared yet — edit workspace.yml.</div>
+      )}
+      {conns.map((conn) => {
+        const probe = probes[conn.server]
+        return (
+          <div key={conn.server} className="cp-conn">
+            <div className="cp-conn-head">
+              <span className="cp-conn-name">{conn.server}</span>
+              <span
+                className={`cp-conn-state ${probe?.state === 'ok' ? 'ok' : probe?.state === 'fail' ? 'warn' : 'dim'}`}
+              >
+                {probe ? PROBE_LABEL[probe.state] : '○ Not tested'}
+              </span>
+              <span style={{ flex: 1 }} />
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={probe?.state === 'testing'}
+                title="Launch this connection with the stored token and verify the handshake"
+                onClick={() => testConnection(conn.server)}
+              >
+                Test
+              </button>
+            </div>
+            {probe?.state === 'fail' && (
+              <div className="cp-conn-detail warn">
+                {probe.detail} — paste a fresh token below and Save.
               </div>
-            )
-          })}
-          {pastedReady.length > 0 && (
-            <button
-              type="button"
-              className="button-emphasis"
-              disabled={busy}
-              onClick={() => void rewire(Object.fromEntries(pastedReady))}
-            >
-              Save token{pastedReady.length === 1 ? '' : 's'} &amp; re-wire
-            </button>
-          )}
-          {status.drift && !busy && (
-            <div className="cp-ws-result warn">generated files out of date — Re-wire</div>
-          )}
-        </div>
+            )}
+            {conn.envRefs.map((ref) => {
+              const missing = status?.missingRefs.includes(ref) ?? false
+              const editing = missing || replacing.has(ref)
+              return (
+                <div key={ref} className="cp-ws-ref">
+                  <span className={missing ? 'cp-ws-ref-state warn' : 'cp-ws-ref-state ok'}>
+                    {missing ? '● Token needed' : '✓ Token held'}
+                  </span>
+                  <span className="cp-ws-conn">{ref}</span>
+                  {editing ? (
+                    <input
+                      className="cp-ws-token-input"
+                      type="password"
+                      value={pasted[ref] ?? ''}
+                      placeholder="Paste token"
+                      onChange={(e) => setPasted({ ...pasted, [ref]: e.target.value })}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="button-secondary"
+                      title="Paste a new token for this connection (replaces the stored one)"
+                      onClick={() => setReplacing(new Set(replacing).add(ref))}
+                    >
+                      Replace
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
+      {pastedReady.length > 0 && (
+        <button
+          type="button"
+          className="button-emphasis"
+          disabled={busy}
+          onClick={() => void rewire(Object.fromEntries(pastedReady))}
+        >
+          Save token{pastedReady.length === 1 ? '' : 's'} &amp; Re-wire
+        </button>
+      )}
+      {status?.drift && !busy && (
+        <div className="cp-ws-result warn">Generated files out of date — press Re-wire.</div>
       )}
       {error && <div className="cp-ws-result warn">{error}</div>}
       {result && !error && (
         <div className="cp-ws-result">
-          {result.wrote.length > 0 && <div className="ok">wrote: {result.wrote.join(', ')}</div>}
+          {result.wrote.length > 0 && <div className="ok">Wrote: {result.wrote.join(', ')}</div>}
           {result.missingEnv.length > 0 && (
             <div className="warn">
-              still missing: {result.missingEnv.map((v) => `\${${v}}`).join(', ')} — paste the
-              token above
+              Still missing: {result.missingEnv.map((v) => `\${${v}}`).join(', ')} — paste the
+              token above.
             </div>
           )}
           {result.ok && result.wrote.length === 0 && (
-            <div className="ok">workspace up to date</div>
+            <div className="ok">Workspace up to date.</div>
           )}
         </div>
       )}

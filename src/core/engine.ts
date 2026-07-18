@@ -246,10 +246,18 @@ export function clientEnvRefs(client: string): string[] {
   return workspaceEnvRefs(join(getConfig().vaultPath, 'projects', client))
 }
 
-/** The golden client's connections — what the Add-Client modal offers as checkboxes. */
-export function clientConnections(
-  client: string,
-): Array<{ server: string; envRefs: string[] }> {
+/**
+ * A client's mcp connections with their launch config (env values still
+ * `${VAR}`-refs — secret-free). Feeds the Add-Client modal checkboxes and the
+ * connection health probe.
+ */
+export function clientConnections(client: string): Array<{
+  server: string
+  envRefs: string[]
+  command: string
+  args: string[]
+  env: Record<string, string>
+}> {
   const spec = loadWorkspaceSpec(join(getConfig().vaultPath, 'projects', client))
   const ENV_REF = /\$\{([A-Z0-9_]+)\}/g
   return Object.entries(spec.mcp).map(([server, def]) => {
@@ -257,7 +265,13 @@ export function clientConnections(
     for (const value of Object.values(def.env ?? {})) {
       for (const m of value.matchAll(ENV_REF)) refs.add(m[1] as string)
     }
-    return { server, envRefs: [...refs].sort() }
+    return {
+      server,
+      envRefs: [...refs].sort(),
+      command: def.command,
+      args: def.args ?? [],
+      env: def.env ?? {},
+    }
   })
 }
 

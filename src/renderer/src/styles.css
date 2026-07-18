@@ -7615,3 +7615,328 @@ a.button-primary {
 .term-exit-close:hover {
   color: var(--text-1);
 }
+
+/* ── ACP agent panel (acp blueprint 2026-07-18): right dock ─────────────────
+   Docks right inside .app (a flex row) across every view. All colors ride
+   the v3 tokens (both themes free); hairlines only, no gradients; Geist Mono
+   for machine facts (session rows, tool lines, plan, chips). Width comes
+   from an inline style (fixed 340 in v1 — drag deferred). */
+
+.agent-panel {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--hairline);
+  background: var(--bg-inset);
+}
+
+/* .meta-rail-reopen recipe, minus position:absolute — as the last flex child
+   of .app the half-pill already sits glued to the right edge */
+.agent-panel-reopen {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 10px;
+  width: 20px;
+  height: 26px;
+  border-radius: 6px 0 0 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-right: 0;
+  color: var(--text-3);
+  font: 600 12px var(--font-mono);
+  cursor: pointer;
+}
+
+.agent-panel-reopen:hover {
+  color: var(--text-1);
+}
+
+.agent-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.agent-head-label {
+  margin-bottom: 0; /* .rail-label's stacked margin is noise on a toolbar row */
+}
+
+.agent-head-seg {
+  margin-left: auto;
+}
+
+.agent-head-seg .seg-option {
+  padding: 2px 9px;
+  font-size: 10.5px;
+}
+
+.agent-head-btn {
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: 600 13px var(--font-mono);
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.agent-head-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+/* session list: mono machine rows (.session-line-v3 recipe) */
+.agent-sessions {
+  flex: 0 0 auto;
+  max-height: 132px;
+  overflow-y: auto;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--hairline);
+  font: 11px/2.1 var(--font-mono);
+  color: var(--text-2);
+}
+
+.agent-session-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+  border-radius: 6px;
+}
+
+.agent-session-row:hover {
+  background: var(--bg-hover);
+}
+
+.agent-session-row[aria-current='true'] {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.agent-session-pick {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.agent-tag {
+  color: var(--info);
+}
+
+/* status = glyph + label, never color alone (design-fidelity law) */
+.agent-state-chip {
+  flex: 0 0 auto;
+  font: 10px var(--font-mono);
+  white-space: nowrap;
+}
+
+.agent-state-chip.is-ok {
+  color: var(--ok);
+}
+
+.agent-state-chip.is-warn {
+  color: var(--warn);
+}
+
+.agent-state-chip.is-err {
+  color: var(--rust);
+}
+
+.agent-state-chip.is-start,
+.agent-state-chip.is-off {
+  color: var(--text-3);
+}
+
+.agent-session-close {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: 12px var(--font-mono);
+  padding: 0 3px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.agent-session-close:hover {
+  color: var(--text-1);
+  background: var(--bg-hover);
+}
+
+/* chat thread: plain pre-wrap text bubbles (markdown deferred) */
+.agent-thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-empty {
+  font: 11px var(--font-mono);
+  color: var(--text-4);
+}
+
+.agent-msg {
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: var(--text-1);
+}
+
+.agent-msg-user {
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 6px 9px;
+  box-shadow: var(--shadow-card);
+}
+
+.agent-msg-thought {
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+/* tool rows: mono machine line — tool TITLES only, never raw adapter output */
+.agent-tool-line {
+  font: 11px/1.8 var(--font-mono);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-tool-line .agent-state-chip {
+  margin-right: 6px;
+}
+
+/* graceful auth_required / error card — warm-tint hairline (chip-open rgbas) */
+.agent-state-note {
+  border: 1px solid rgba(227, 167, 60, 0.4);
+  border-radius: 8px;
+  background: rgba(227, 167, 60, 0.07);
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-1);
+}
+
+.agent-state-note.is-err {
+  border-color: rgba(239, 93, 85, 0.4);
+  background: rgba(239, 93, 85, 0.07);
+}
+
+.agent-state-note-head {
+  font: 600 10px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+
+.agent-state-note.is-err .agent-state-note-head {
+  color: var(--rust);
+}
+
+.agent-state-note-detail {
+  margin-top: 4px;
+  font: 11px var(--font-mono);
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.agent-state-note-hint {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+/* latest plan: compact mono checklist above the input */
+.agent-plan {
+  flex: 0 0 auto;
+  max-height: 108px;
+  overflow-y: auto;
+  padding: 6px 12px;
+  border-top: 1px solid var(--hairline);
+  font: 11px/2.1 var(--font-mono);
+  color: var(--text-2);
+}
+
+.agent-plan-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-plan-line.is-done {
+  color: var(--text-4);
+}
+
+.agent-input {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.agent-input-field {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-1);
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 6px 9px;
+}
+
+.agent-input-field:disabled {
+  color: var(--text-4);
+  background: var(--bg-inset);
+}
+
+/* permission modal extras (raw modal classes carry the anatomy) */
+.agent-perm-title-row {
+  display: flex;
+  align-items: center;
+}
+
+.agent-perm-close {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--text-3);
+  font: 600 12px var(--font-mono);
+  padding: 0 3px;
+  cursor: pointer;
+}
+
+.agent-perm-close:hover {
+  color: var(--text-1);
+}
+
+.agent-perm-value {
+  font: 12px var(--font-mono);
+  color: var(--text-1);
+  overflow-wrap: break-word;
+}

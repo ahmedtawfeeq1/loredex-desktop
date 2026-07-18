@@ -5,13 +5,13 @@
  *   IN PROGRESS (doing) · REVIEW · DONE·CONSUMED (dimmed).
  * Cards carry the reference anatomy: caps kind chip + mono id → title →
  * project dot · P? · S? · actions. Handoff transitions ride the handoffs
- * store (8.1 machine); task moves ride the one work writer. Deviations from
- * reference (Dev Agent Record): no drag-and-drop (decline needs a reason,
- * snooze a date — a drop can't collect either; chips do the moves), and
- * "＋ New item" opens the compose modal (handoff/request) because the lib
- * has no createWorkItem yet — task notes are agent-authored today.
+ * store (8.1 machine); task moves ride the one work writer. Drag-and-drop
+ * (user request 2026-07-18) runs the SAME transitions as the buttons —
+ * dropAction() is the pure legality map; decline/snooze stay buttons (they
+ * need a reason/date a drop can't carry). "＋ New item" opens the compose
+ * modal (handoff/request) — the lib has no createWorkItem yet.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { WorkItem } from '../../../../shared/ipc-contract'
 import { Button } from '../../components/Button'
 import { Segmented } from '../../components/Segmented'
@@ -40,6 +40,36 @@ export function columnOf(item: Pick<WorkItem, 'kind' | 'status'>): PlanColumn | 
   return 'done' // done · consumed
 }
 
+/** Drag legality (user request 2026-07-18): what dropping ITEM on COL does.
+ *  Tasks move freely between their four columns; handoffs ride the 8.1
+ *  machine — accept (→ doing), reopen (→ triage), consume (→ done).
+ *  Decline/snooze stay buttons: they need a reason/date a drop can't carry.
+ *  Pure — unit-tested. */
+export type DropAction =
+  | { kind: 'task'; status: 'todo' | 'doing' | 'review' | 'done' }
+  | { kind: 'accept' }
+  | { kind: 'reopen' }
+  | { kind: 'consume' }
+
+export function dropAction(
+  item: Pick<WorkItem, 'kind' | 'status'>,
+  col: PlanColumn,
+): DropAction | null {
+  const from = columnOf(item)
+  if (from === col) return null
+  if (item.kind === 'task') {
+    if (col === 'triage') return null // triage is the handoff lane
+    return { kind: 'task', status: col === 'done' ? 'done' : col }
+  }
+  // handoff/request
+  if (col === 'doing' && item.status === 'todo') return { kind: 'accept' }
+  if (col === 'triage' && (item.status === 'doing' || item.status === 'done'))
+    return { kind: 'reopen' }
+  if (col === 'done' && (item.status === 'todo' || item.status === 'doing'))
+    return { kind: 'consume' }
+  return null
+}
+
 export function boardColumns(items: readonly WorkItem[]): Record<PlanColumn, WorkItem[]> {
   const cols: Record<PlanColumn, WorkItem[]> = {
     triage: [],
@@ -54,6 +84,9 @@ export function boardColumns(items: readonly WorkItem[]): Record<PlanColumn, Wor
   }
   return cols
 }
+
+/** the card mid-drag — dragover can't read dataTransfer, so module state */
+let draggingItem: WorkItem | null = null
 
 function KindChip({ item }: { item: WorkItem }): React.JSX.Element {
   if (item.status === 'review') return <span className="plan-check is-ok">✓</span>
@@ -85,6 +118,16 @@ function PlanCard({ item }: { item: WorkItem }): React.JSX.Element {
       className={`plan-card${done ? ' is-done' : ''}`}
       role="button"
       tabIndex={0}
+      draggable
+      onDragStart={(e) => {
+        draggingItem = item
+        e.dataTransfer.effectAllowed = 'move'
+        e.currentTarget.classList.add('is-dragging')
+      }}
+      onDragEnd={(e) => {
+        draggingItem = null
+        e.currentTarget.classList.remove('is-dragging')
+      }}
       onClick={() => card && openBrief(card)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' && e.target === e.currentTarget && card) openBrief(card)
@@ -229,6 +272,26 @@ export function PlanView(): React.JSX.Element {
 
   const cols = boardColumns(filtered)
   const backlog = filtered.filter((i) => i.status === 'backlog')
+  const [dropCol, setDropCol] = useState<PlanColumn | null>(null)
+
+  // drop = the same transitions the buttons run (user request 2026-07-18)
+  const performDrop = (col: PlanColumn): void => {
+    const item = draggingItem
+    draggingItem = null
+    setDropCol(null)
+    if (!item) return
+    const action = dropAction(item, col)
+    if (!action) return
+    if (action.kind === 'task') {
+      void useWork.getState().update(item.id, { status: action.status })
+      return
+    }
+    const card = (useHandoffs.getState().cards ?? []).find((c) => c.id === item.id)
+    if (!card) return
+    if (action.kind === 'accept') void useHandoffs.getState().setStatus(card, { to: 'accepted' })
+    else if (action.kind === 'reopen') void useHandoffs.getState().setStatus(card, { to: 'open' })
+    else void useHandoffs.getState().consume(card)
+  }
 
   return (
     <div className="plan">
@@ -292,7 +355,26 @@ export function PlanView(): React.JSX.Element {
       {tab === 'board' && (
         <div className="plan-board">
           {COLUMNS.map(({ key, label }) => (
-            <section key={key} className="plan-col" aria-label={label}>
+            <section
+              key={key}
+              className={`plan-col${dropCol === key ? ' is-drop-ok' : ''}`}
+              aria-label={label}
+              onDragOver={(e) => {
+                if (draggingItem && dropAction(draggingItem, key)) {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  if (dropCol !== key) setDropCol(key)
+                }
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node) && dropCol === key)
+                  setDropCol(null)
+              }}
+              onDrop={(e) => {
+                e.preventDefault()
+                performDrop(key)
+              }}
+            >
               <div className="plan-col-head">
                 <span className="plan-col-label">{label}</span>
                 <span className="plan-col-count">{cols[key].length}</span>
@@ -358,8 +440,8 @@ export function PlanView(): React.JSX.Element {
       )}
 
       <div className="plan-foot">
-        status moves are attributed git commits · handoffs and tasks share the pipeline · board
-        reads the lib work-item plane
+        drag a card = status transition (decline/snooze stay buttons — they need words) · every
+        move is an attributed git commit · handoffs and tasks share the pipeline
       </div>
     </div>
   )

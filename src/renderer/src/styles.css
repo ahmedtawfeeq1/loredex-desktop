@@ -7397,3 +7397,13 @@ a.button-primary {
 }
 .sidebar.rail-collapsed .nav-item svg { width: 19px; height: 19px; }
 .sidebar.rail-collapsed .side-reopen { font-size: 15px; padding: 4px 8px; }
+
+/* board drag-and-drop (user request 2026-07-18) */
+.plan-card[draggable='true'] { cursor: grab; }
+.plan-card.is-dragging { opacity: 0.4; }
+.plan-col.is-drop-ok {
+  border-radius: 9px;
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}

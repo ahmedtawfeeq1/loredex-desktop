@@ -7379,23 +7379,8 @@ a.button-primary {
 .reader { position: relative; }
 .pane-list.rail-collapsed { padding-left: 0; padding-right: 0; }
 
-/* ── modern icon rail (user request 2026-07-18): 40px rounded targets,
-      19px icons, tinted active with the cobalt rail ─────────────────── */
-.sidebar.rail-collapsed nav {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 6px; padding: 8px 0;
-}
-.sidebar.rail-collapsed .nav-item {
-  width: 40px; height: 40px; padding: 0;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 10px; color: var(--text-2);
-}
-.sidebar.rail-collapsed .nav-item:hover { background: var(--bg-hover); color: var(--text-1); }
-.sidebar.rail-collapsed .nav-item[aria-current] {
-  background: var(--bg-hover); color: var(--accent);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-.sidebar.rail-collapsed .nav-item svg { width: 19px; height: 19px; }
+/* collapsed rail: the pre-2026-07-18 look, icons one notch smaller */
+.sidebar.rail-collapsed .nav-item svg { width: 15px; height: 15px; }
 .sidebar.rail-collapsed .side-reopen { font-size: 15px; padding: 4px 8px; }
 
 /* board drag-and-drop (user request 2026-07-18) */
@@ -7407,3 +7392,6 @@ a.button-primary {
   outline-offset: 2px;
   background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
+
+/* expanded nav uses the SVG icon set (user request 2026-07-18) */
+.nav__item .nav-glyph svg { width: 15px; height: 15px; display: block; margin: 0 auto; }

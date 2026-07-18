@@ -165,7 +165,7 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
             key={v}
             type="button"
             className="nav-item"
-            aria-current={view === v}
+            aria-current={view === v ? 'page' : undefined}
             title={i < 9 ? `${label} (⌘${i + 1})` : label}
             aria-label={label}
             onClick={() => setView(v)}
@@ -222,7 +222,7 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
               onClick={() => setView(v)}
             >
               <span className="nav-glyph" aria-hidden="true">
-                {GLYPH[v] ?? '·'}
+                <NavIcon view={v} />
               </span>
               {label}
               {v === 'handoffs' && openInbound > 0 ? (
@@ -254,7 +254,9 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
         aria-keyshortcuts={`Meta+${settingsNum}`}
         onClick={() => setView('settings')}
       >
-        <span className="nav-glyph" aria-hidden="true">⚙</span>
+        <span className="nav-glyph" aria-hidden="true">
+          <NavIcon view="settings" />
+        </span>
         Settings
         <span className="nav-num">{settingsNum}</span>
       </button>

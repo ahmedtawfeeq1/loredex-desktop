@@ -27,7 +27,12 @@ window.loredex = {
   },
 } as unknown as typeof window.loredex
 
-const { DEFAULT_PANEL_WIDTH, useAgentPanel } = await import('./agentPanel')
+// value imports MUST ride this dynamic import (never a static one) — a static
+// import hoists above the window.loredex assignment above, so the store's
+// onEvent subscription guard would see no bridge and emit would stay unset
+const { DEFAULT_PANEL_WIDTH, quoteForChat, useAgentPanel, visibleSessions } = await import(
+  './agentPanel'
+)
 
 const session = (id: string, over: Partial<AcpSessionView> = {}): AcpSessionView => ({
   sessionId: id,
@@ -239,6 +244,257 @@ describe('event routing — plan, turnEnd, session state', () => {
     useAgentPanel.setState({ sessions: [session('s1')] })
     emit({ kind: 'acp.session', sessionId: 'ghost', agent: 'codex', state: 'exited' })
     expect(useAgentPanel.getState().sessions).toEqual([session('s1')])
+  })
+})
+
+describe('event routing — usage (context, cost, and turn all replace)', () => {
+  it('context + cost + turn all REPLACE (latest wins — the turn snapshot is cumulative)', () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    emit({
+      kind: 'acp.usage',
+      sessionId: 's1',
+      context: { used: 1000, size: 200000 },
+      cost: { amount: 0.05, currency: 'USD' },
+      turn: { total: 300, input: 200, output: 100, cached: 50 },
+    })
+    emit({
+      kind: 'acp.usage',
+      sessionId: 's1',
+      context: { used: 2500, size: 200000 },
+      cost: { amount: 0.09, currency: 'USD' },
+      turn: { total: 400, input: 250, output: 150, thought: 20 },
+    })
+    expect(useAgentPanel.getState().sessions[0].usage).toEqual({
+      context: { used: 2500, size: 200000 }, // replaced, not summed
+      cost: { amount: 0.09, currency: 'USD' }, // replaced
+      // turn is a cumulative snapshot → the latest wholly replaces the prior one
+      // (no summing, no field-level merge of the earlier snapshot's `cached`)
+      turn: { total: 400, input: 250, output: 150, thought: 20 },
+    })
+  })
+
+  it('a turn-only event keeps the prior context/cost (an absent half never clobbers)', () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    emit({ kind: 'acp.usage', sessionId: 's1', context: { used: 10, size: 100 } })
+    emit({ kind: 'acp.usage', sessionId: 's1', turn: { total: 5, input: 3, output: 2 } })
+    expect(useAgentPanel.getState().sessions[0].usage).toEqual({
+      context: { used: 10, size: 100 }, // survived the turn-only event
+      turn: { total: 5, input: 3, output: 2 },
+    })
+  })
+
+  it('a session with no usage event leaves usage undefined (codex may emit none)', () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    expect(useAgentPanel.getState().sessions[0].usage).toBeUndefined()
+  })
+
+  it('usage for an unknown session is ignored', () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    emit({ kind: 'acp.usage', sessionId: 'ghost', context: { used: 1, size: 2 } })
+    expect(useAgentPanel.getState().sessions[0].usage).toBeUndefined()
+  })
+})
+
+describe('event routing — commands + mode + MCP (A7)', () => {
+  it('acp.commands REPLACES the session commands (never appends)', () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    emit({
+      kind: 'acp.commands',
+      sessionId: 's1',
+      commands: [
+        { name: 'plan', description: 'Make a plan', hint: 'what to plan' },
+        { name: 'review', description: 'Review code' },
+      ],
+    })
+    expect(useAgentPanel.getState().sessions[0].commands).toEqual([
+      { name: 'plan', description: 'Make a plan', hint: 'what to plan' },
+      { name: 'review', description: 'Review code' },
+    ])
+    emit({ kind: 'acp.commands', sessionId: 's1', commands: [{ name: 'test', description: 'Run tests' }] })
+    expect(useAgentPanel.getState().sessions[0].commands).toEqual([
+      { name: 'test', description: 'Run tests' },
+    ])
+  })
+
+  it('the initial acp.mode carries the full set; a later id-only update keeps availableModes', () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    emit({
+      kind: 'acp.mode',
+      sessionId: 's1',
+      currentModeId: 'code',
+      availableModes: [
+        { id: 'code', name: 'Code' },
+        { id: 'plan', name: 'Plan', description: 'Read-only planning' },
+      ],
+    })
+    expect(useAgentPanel.getState().sessions[0].mode).toEqual({
+      currentModeId: 'code',
+      availableModes: [
+        { id: 'code', name: 'Code' },
+        { id: 'plan', name: 'Plan', description: 'Read-only planning' },
+      ],
+    })
+    // current_mode_update: only the id — the earlier set survives
+    emit({ kind: 'acp.mode', sessionId: 's1', currentModeId: 'plan' })
+    expect(useAgentPanel.getState().sessions[0].mode).toEqual({
+      currentModeId: 'plan',
+      availableModes: [
+        { id: 'code', name: 'Code' },
+        { id: 'plan', name: 'Plan', description: 'Read-only planning' },
+      ],
+    })
+  })
+
+  it('commands / mode for an unknown session are ignored', () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    emit({ kind: 'acp.commands', sessionId: 'ghost', commands: [{ name: 'x', description: 'y' }] })
+    emit({ kind: 'acp.mode', sessionId: 'ghost', currentModeId: 'z' })
+    expect(useAgentPanel.getState().sessions[0].commands).toBeUndefined()
+    expect(useAgentPanel.getState().sessions[0].mode).toBeUndefined()
+  })
+
+  it('acp.session ready surfaces the attached MCP servers (name/url, no token); a later state keeps them', () => {
+    useAgentPanel.setState({ sessions: [session('s1', { state: 'starting' })], activeId: 's1' })
+    emit({
+      kind: 'acp.session',
+      sessionId: 's1',
+      agent: 'claude',
+      state: 'ready',
+      mcpServers: [{ name: 'loredex', url: 'http://127.0.0.1:5599/' }],
+    })
+    expect(useAgentPanel.getState().sessions[0].mcpServers).toEqual([
+      { name: 'loredex', url: 'http://127.0.0.1:5599/' },
+    ])
+    // a later non-ready event carries no list — the surfaced servers survive
+    emit({ kind: 'acp.session', sessionId: 's1', agent: 'claude', state: 'error', detail: 'boom' })
+    expect(useAgentPanel.getState().sessions[0].mcpServers).toEqual([
+      { name: 'loredex', url: 'http://127.0.0.1:5599/' },
+    ])
+  })
+})
+
+describe('setMode (A7)', () => {
+  const withModes = (id: string) =>
+    session(id, {
+      mode: {
+        currentModeId: 'code',
+        availableModes: [
+          { id: 'code', name: 'Code' },
+          { id: 'plan', name: 'Plan' },
+        ],
+      },
+    })
+
+  it('optimistically switches the current mode and invokes agent.setMode', async () => {
+    useAgentPanel.setState({ sessions: [withModes('s1')], activeId: 's1' })
+    await useAgentPanel.getState().setMode('s1', 'plan')
+    expect(invoke).toHaveBeenCalledWith('agent.setMode', { sessionId: 's1', modeId: 'plan' })
+    expect(useAgentPanel.getState().sessions[0].mode?.currentModeId).toBe('plan')
+    // the available set is untouched by a switch
+    expect(useAgentPanel.getState().sessions[0].mode?.availableModes).toHaveLength(2)
+  })
+
+  it('reverts the current mode when agent.setMode rejects (not-ready / dead core)', async () => {
+    useAgentPanel.setState({ sessions: [withModes('s1')], activeId: 's1' })
+    invoke.mockRejectedValue({ code: 'ACP_NOT_READY', message: 'agent session is not ready' })
+    await useAgentPanel.getState().setMode('s1', 'plan')
+    expect(useAgentPanel.getState().sessions[0].mode?.currentModeId).toBe('code')
+  })
+
+  it('is a no-op when the mode is unchanged or the session has no modes', async () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    await useAgentPanel.getState().setMode('s1', 'plan') // no modes at all
+    useAgentPanel.setState({ sessions: [withModes('s1')], activeId: 's1' })
+    await useAgentPanel.getState().setMode('s1', 'code') // already on it
+    expect(invoke).not.toHaveBeenCalledWith('agent.setMode', expect.anything())
+  })
+})
+
+describe('provider filter + login-state chips (A6)', () => {
+  it('setFilter narrows the DERIVED visible list to that provider; "all" shows every session', () => {
+    useAgentPanel.setState({
+      sessions: [session('s1', { agent: 'claude' }), session('s2', { agent: 'codex' })],
+    })
+    // default is 'all' — every session shows
+    expect(useAgentPanel.getState().filter).toBe('all')
+    const all = useAgentPanel.getState().sessions
+    expect(visibleSessions(all, 'all').map((v) => v.sessionId)).toEqual(['s1', 's2'])
+
+    useAgentPanel.getState().setFilter('codex')
+    expect(useAgentPanel.getState().filter).toBe('codex')
+    expect(visibleSessions(all, 'codex').map((v) => v.sessionId)).toEqual(['s2'])
+    // the filter is a VIEW filter only — it never drops a live session
+    expect(useAgentPanel.getState().sessions).toHaveLength(2)
+  })
+
+  it('a ready session marks its provider signed-in; auth_required flags it', () => {
+    useAgentPanel.setState({ sessions: [session('s1', { agent: 'codex' })], activeId: 's1' })
+    // fresh default: every provider unknown until one reports in
+    expect(useAgentPanel.getState().providerAuth).toEqual({ claude: 'unknown', codex: 'unknown' })
+    emit({ kind: 'acp.session', sessionId: 's1', agent: 'codex', state: 'ready' })
+    expect(useAgentPanel.getState().providerAuth.codex).toBe('ok')
+    emit({ kind: 'acp.session', sessionId: 's1', agent: 'codex', state: 'auth_required' })
+    expect(useAgentPanel.getState().providerAuth.codex).toBe('auth_required')
+    // claude was never touched
+    expect(useAgentPanel.getState().providerAuth.claude).toBe('unknown')
+  })
+
+  it('non-auth states (error / exited / starting) never clobber a known login verdict', () => {
+    useAgentPanel.setState({
+      sessions: [session('s1', { agent: 'claude' })],
+      activeId: 's1',
+      providerAuth: { claude: 'ok', codex: 'unknown' },
+    })
+    emit({ kind: 'acp.session', sessionId: 's1', agent: 'claude', state: 'error', detail: 'boom' })
+    // an error says nothing about auth — the 'ok' verdict survives
+    expect(useAgentPanel.getState().providerAuth.claude).toBe('ok')
+  })
+
+  it('reset restores filter "all" and unknown login state', async () => {
+    useAgentPanel.setState({ filter: 'codex', providerAuth: { claude: 'ok', codex: 'auth_required' } })
+    await useAgentPanel.getState().reset()
+    expect(useAgentPanel.getState().filter).toBe('all')
+    expect(useAgentPanel.getState().providerAuth).toEqual({ claude: 'unknown', codex: 'unknown' })
+  })
+})
+
+describe('add-to-chat (A8)', () => {
+  it('quoteForChat renders a source-attributed blockquote; multi-line stays fully quoted', () => {
+    expect(quoteForChat('the selected words', 'notes/x.md')).toBe(
+      '> from [notes/x.md]: the selected words\n',
+    )
+    expect(quoteForChat('first line\nsecond line', 'a/b.md')).toBe(
+      '> from [a/b.md]: first line\n> second line\n',
+    )
+  })
+
+  it('addContext opens the panel and pre-fills the draft — it never sends', () => {
+    useAgentPanel.setState({ open: false, draft: '' })
+    useAgentPanel.getState().addContext('hello world', 'notes/x.md')
+    expect(useAgentPanel.getState().open).toBe(true)
+    expect(useAgentPanel.getState().draft).toBe('> from [notes/x.md]: hello world\n')
+    // add-to-chat STAGES only — no prompt rides the invoke
+    expect(invoke).not.toHaveBeenCalledWith('acp.prompt', expect.anything())
+  })
+
+  it('a second addContext stacks onto the existing draft (blank-line separated)', () => {
+    useAgentPanel.setState({ open: true, draft: '' })
+    useAgentPanel.getState().addContext('one', 'a.md')
+    useAgentPanel.getState().addContext('two', 'b.md')
+    expect(useAgentPanel.getState().draft).toBe('> from [a.md]: one\n\n> from [b.md]: two\n')
+  })
+
+  it('an empty / whitespace selection is a no-op (nothing to quote, draft untouched)', () => {
+    useAgentPanel.setState({ open: false, draft: 'kept' })
+    useAgentPanel.getState().addContext('   ', 'a.md')
+    expect(useAgentPanel.getState()).toMatchObject({ open: false, draft: 'kept' })
+  })
+
+  it('setDraft replaces the composer draft; reset clears it', async () => {
+    useAgentPanel.getState().setDraft('typed text')
+    expect(useAgentPanel.getState().draft).toBe('typed text')
+    await useAgentPanel.getState().reset()
+    expect(useAgentPanel.getState().draft).toBe('')
   })
 })
 

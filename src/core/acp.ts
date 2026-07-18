@@ -13,16 +13,24 @@ import { statSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { Readable, Writable } from 'node:stream'
 import type {
+  AuthMethod,
   ClientConnection,
   ClientContext,
   McpServer,
   RequestPermissionRequest,
   RequestPermissionResponse,
+  SessionModeState,
   SessionNotification,
+  ToolCallContent,
+  ToolCallLocation,
+  Usage,
 } from '@agentclientprotocol/sdk'
 import {
   type AcpAgent,
+  type AcpAuthMethod,
   type AcpSessionState,
+  type AcpToolContent,
+  type AcpToolLocation,
   type CoreEvent,
   ipcError,
 } from '../shared/ipc-contract'
@@ -52,6 +60,7 @@ interface AcpSession {
   timer: NodeJS.Timeout | null
   pendingPermissions: Map<string, (outcome: RequestPermissionResponse) => void>
   tokenName: string | null // minted MCP agent-token name, revoked on stop
+  authMethods: AcpAuthMethod[] | null // from InitializeResponse; attached on the auth path
   emit: (e: CoreEvent) => void
 }
 
@@ -172,6 +181,7 @@ export function acpStart(
     timer: null,
     pendingPermissions: new Map(),
     tokenName: null,
+    authMethods: null,
     emit,
   }
   sessions.set(sessionId, s)
@@ -197,6 +207,8 @@ export function acpStart(
         agent: arg.agent,
         state: 'auth_required',
         detail: errFirstLine(err), // the adapter's own words; renderer adds the login hint
+        // captured from initialize before session/new rejected — Phase-2 login
+        ...(cur.authMethods ? { authMethods: cur.authMethods } : {}),
       })
     } else {
       cur.state = 'error'
@@ -278,9 +290,14 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
   // (watcher filters to .md) — accepted v1 ceiling.
   const init = await connection.agent.request(sdk.methods.agent.initialize, {
     protocolVersion: sdk.PROTOCOL_VERSION,
-    clientCapabilities: {},
+    // auth: {} makes adapters return authMethods (captured for the Phase-2
+    // login UI). The ONLY handshake change — still no fs/terminal caps (v1).
+    clientCapabilities: { auth: {} },
     clientInfo: { name: 'loredex', version: appVersion() },
   })
+  // capture BEFORE the liveness guard so the -32000 catch has it even if the
+  // session is torn down across the next await
+  if (init.authMethods) s.authMethods = init.authMethods.map(mapAuthMethod)
   if (!sessions.has(sessionId)) return
   // MCP auto-attach: core-local server + adapter http support → one bearer
   // minted per session, attributed in the Agents view. The token never
@@ -306,7 +323,101 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
   if (!sessions.has(sessionId)) return
   s.acpSessionId = created.sessionId
   s.state = 'ready'
-  s.emit({ kind: 'acp.session', sessionId, agent, state: 'ready' })
+  // surface the attached MCP servers on ready — name/url ONLY. The headers
+  // array carries the per-session bearer token and MUST NOT reach the renderer,
+  // so it is never mapped here (A7 security invariant).
+  const attachedMcp = mcpServers.map((m) => ({
+    name: m.name,
+    ...('url' in m && m.url ? { url: m.url } : {}),
+  }))
+  s.emit({
+    kind: 'acp.session',
+    sessionId,
+    agent,
+    state: 'ready',
+    ...(attachedMcp.length ? { mcpServers: attachedMcp } : {}),
+  })
+  // initial modes (NewSessionResponse.modes) — the full set + current id, so
+  // the session-info view can render the switcher without waiting for a change
+  if (created.modes) s.emit(mapModeState(sessionId, created.modes))
+}
+
+/** InitializeResponse authMethod → the captured shape (Phase-2 login). `type`
+ *  is the union discriminator ('env_var'/'terminal'); the default agent method
+ *  carries none. */
+function mapAuthMethod(m: AuthMethod): AcpAuthMethod {
+  const type = (m as { type?: string }).type
+  return {
+    id: m.id,
+    name: m.name,
+    ...(m.description != null ? { description: m.description } : {}),
+    ...(type ? { type } : {}),
+  }
+}
+
+/** NewSessionResponse.modes (SessionModeState) → the initial acp.mode event. */
+function mapModeState(sessionId: string, modes: SessionModeState): CoreEvent {
+  return {
+    kind: 'acp.mode',
+    sessionId,
+    currentModeId: modes.currentModeId,
+    availableModes: modes.availableModes.map((m) => ({
+      id: m.id,
+      name: m.name,
+      ...(m.description != null ? { description: m.description } : {}),
+    })),
+  }
+}
+
+/** ToolCall/ToolCallUpdate.content → AcpToolContent[]: diffs and text survive,
+ *  terminal + non-text content blocks are dropped. Undefined when nothing maps
+ *  (so the event stays clean and the renderer renders no diff panel). */
+function mapToolContent(
+  content: Array<ToolCallContent> | null | undefined,
+): AcpToolContent[] | undefined {
+  if (!content) return undefined
+  const out: AcpToolContent[] = []
+  for (const c of content) {
+    if (c.type === 'diff') {
+      out.push({
+        kind: 'diff',
+        path: c.path,
+        ...(c.oldText != null ? { oldText: c.oldText } : {}),
+        newText: c.newText,
+      })
+    } else if (c.type === 'content' && c.content.type === 'text') {
+      out.push({ kind: 'text', text: c.content.text })
+    }
+    // type 'terminal' + non-text content blocks (image/audio/resource) → skip
+  }
+  return out.length ? out : undefined
+}
+
+/** ToolCall/ToolCallUpdate.locations → AcpToolLocation[] (ABSOLUTE paths). */
+function mapToolLocations(
+  locations: Array<ToolCallLocation> | null | undefined,
+): AcpToolLocation[] | undefined {
+  if (!locations || locations.length === 0) return undefined
+  return locations.map((l) => ({ path: l.path, ...(l.line != null ? { line: l.line } : {}) }))
+}
+
+/** PromptResponse.usage (Usage) → the acp.usage turn half. `cached` = cache
+ *  READ tokens (the cost-savings figure); cachedWriteTokens is dropped (one
+ *  display field — v1 ceiling). */
+function mapTurnUsage(u: Usage): {
+  total: number
+  input: number
+  output: number
+  cached?: number
+  thought?: number
+} {
+  return {
+    total: u.totalTokens,
+    input: u.inputTokens,
+    output: u.outputTokens,
+    ...(u.cachedReadTokens != null ? { cached: u.cachedReadTokens } : {}),
+    ...(u.thoughtTokens != null ? { thought: u.thoughtTokens } : {}),
+  }
 }
 
 /** What one session/update maps to: a batched chunk, an immediate CoreEvent
@@ -318,9 +429,8 @@ export type UpdateAction =
 
 /** Pure protocol→event mapping for session/update — exported for unit tests
  *  (the batching/emit side effects stay in routeUpdate). Unknown variants map
- *  to 'ignore' defensively: sdk minors add unstable ones (usage/config/mode
- *  updates) and a crash here would take the whole session down for cosmetic
- *  data. */
+ *  to 'ignore' defensively: the sdk union is open-ended and a crash here would
+ *  take the whole session down for cosmetic data. */
 export function mapUpdate(sessionId: string, update: SessionNotification['update']): UpdateAction {
   switch (update.sessionUpdate) {
     case 'agent_message_chunk':
@@ -334,7 +444,9 @@ export function mapUpdate(sessionId: string, update: SessionNotification['update
       }
     }
     case 'tool_call':
-    case 'tool_call_update':
+    case 'tool_call_update': {
+      const content = mapToolContent(update.content)
+      const locations = mapToolLocations(update.locations)
       return {
         act: 'event',
         event: {
@@ -344,6 +456,41 @@ export function mapUpdate(sessionId: string, update: SessionNotification['update
           title: update.title ?? undefined,
           toolKind: update.kind ?? undefined,
           status: update.status ?? undefined,
+          ...(content ? { content } : {}),
+          ...(locations ? { locations } : {}),
+        },
+      }
+    }
+    case 'available_commands_update':
+      return {
+        act: 'event',
+        event: {
+          kind: 'acp.commands',
+          sessionId,
+          commands: update.availableCommands.map((c) => ({
+            name: c.name,
+            description: c.description,
+            ...(c.input?.hint ? { hint: c.input.hint } : {}),
+          })),
+        },
+      }
+    case 'current_mode_update':
+      // only the id changed — the full set arrived with the initial acp.mode
+      return {
+        act: 'event',
+        event: { kind: 'acp.mode', sessionId, currentModeId: update.currentModeId },
+      }
+    case 'usage_update':
+      // context half: window fill + cumulative cost (turn half rides acpPrompt)
+      return {
+        act: 'event',
+        event: {
+          kind: 'acp.usage',
+          sessionId,
+          context: { used: update.used, size: update.size },
+          ...(update.cost
+            ? { cost: { amount: update.cost.amount, currency: update.cost.currency } }
+            : {}),
         },
       }
     case 'plan':
@@ -361,8 +508,10 @@ export function mapUpdate(sessionId: string, update: SessionNotification['update
       }
     default:
       // user_message_chunk (we render the submitted text ourselves),
-      // available_commands_update, current_mode_update, unstable variants —
-      // all deliberately ignored in v1.
+      // plan_update/plan_removed, config_option_update, session_info_update and
+      // any future/unstable variants — deliberately ignored. Unknown variants
+      // must map here (never throw): a crash would kill the session for cosmetic
+      // data. The sdk union is open-ended.
       return { act: 'ignore' }
   }
 }
@@ -387,6 +536,10 @@ export function mapPermissionEvent(
   requestId: string,
   params: RequestPermissionRequest,
 ): CoreEvent {
+  // the proposed change rides toolCall.content/locations (same ToolCallUpdate
+  // shape a tool_call carries) — A3 surfaces the before/after diff in the modal
+  const content = mapToolContent(params.toolCall.content)
+  const locations = mapToolLocations(params.toolCall.locations)
   return {
     kind: 'acp.permission',
     sessionId,
@@ -394,6 +547,8 @@ export function mapPermissionEvent(
     title: params.toolCall.title ?? 'Tool call',
     toolKind: params.toolCall.kind ?? undefined,
     options: params.options.map((o) => ({ optionId: o.optionId, name: o.name, kind: o.kind })),
+    ...(content ? { content } : {}),
+    ...(locations ? { locations } : {}),
   }
 }
 
@@ -443,6 +598,9 @@ export function acpPrompt(sessionId: string, text: string): void {
       if (!cur) return
       flushChunks(sessionId)
       cur.turnActive = false
+      // turn-half usage (best-effort, @experimental) lands BEFORE turnEnd so the
+      // renderer folds it in as the turn closes; codex may omit it entirely
+      if (res.usage) cur.emit({ kind: 'acp.usage', sessionId, turn: mapTurnUsage(res.usage) })
       cur.emit({ kind: 'acp.turnEnd', sessionId, stopReason: res.stopReason })
     })
     .catch((err: unknown) => {
@@ -507,6 +665,24 @@ export function acpCancel(sessionId: string): void {
         // connection may be mid-teardown — the child exit path reports that
       })
   }
+}
+
+/** session/set_mode (A7): switch the agent's operating mode. Keyed by OUR
+ *  sessionId; the ADAPTER's id rides the request. The adapter may confirm via
+ *  a current_mode_update (→ acp.mode) — we don't emit optimistically here (the
+ *  renderer does that). Unknown / not-ready throws the same envelopes as
+ *  acpPrompt so a stale UI can't wedge the session. */
+export async function acpSetMode(sessionId: string, modeId: string): Promise<void> {
+  const s = sessions.get(sessionId)
+  if (!s) throw ipcError('ACP_UNKNOWN', 'unknown agent session')
+  if (s.state !== 'ready' || !s.agentCtx || !s.acpSessionId) {
+    throw ipcError('ACP_NOT_READY', 'agent session is not ready')
+  }
+  const sdk = sdkModule! // state 'ready' implies boot loaded it
+  await s.agentCtx.request(sdk.methods.agent.session.setMode, {
+    sessionId: s.acpSessionId,
+    modeId,
+  })
 }
 
 /** Idempotent: stop can race the adapter's own exit — unknown id is a no-op.

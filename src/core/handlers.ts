@@ -65,7 +65,7 @@ import {
   validateToken,
 } from './auth'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
-import { acpCancel, acpPermission, acpPrompt, acpStart, acpStop } from './acp'
+import { acpCancel, acpPermission, acpPrompt, acpSetMode, acpStart, acpStop } from './acp'
 import {
   loadAgentPanelPrefs,
   loadAtlasLegendSeen,
@@ -354,6 +354,11 @@ export function registerCoreHandlers(
   ipc.register('vault.resolveLink', ({ link, from }) =>
     resolveLink(engine.getConfig().vaultPath, link, from),
   )
+  // ACP file-refs (acp Phase 1 A2): agent tool paths are ABSOLUTE — the reader
+  // opens by vault-relative path. Same mapping the handoff/route writers use.
+  ipc.register('vault.relativize', ({ path }) => ({
+    rel: toVaultRelative(path, engine.getConfig().vaultPath),
+  }))
   // full-text ranking is the lib's searchVault; facets narrow by frontmatter
   // app-side (story 2.4). Wider limit so narrowing has material to work on.
   ipc.register('vault.search', ({ q, facets }) =>
@@ -806,6 +811,7 @@ export function registerCoreHandlers(
     acpPermission(sessionId, requestId, optionId),
   )
   ipc.register('acp.stop', ({ sessionId }) => acpStop(sessionId))
+  ipc.register('agent.setMode', ({ sessionId, modeId }) => acpSetMode(sessionId, modeId))
   ipc.register('home.brief', () => engine.homeBrief())
   ipc.register('settings.identity.get', () => {
     // no vault yet (first run, story 13.2) → no ambient default, NOT an error:

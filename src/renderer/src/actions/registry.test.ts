@@ -247,6 +247,19 @@ describe('agent panel actions (acp blueprint 2026-07-18)', () => {
     expect(useAgentPanel.getState().open).toBe(true)
     expect(actionItems('agent').some((i) => i.key === 'action:open-agent-here')).toBe(true)
   })
+
+  it('Add selection to chat carries ⇧⌘L and no-ops off the reader (A8)', () => {
+    useReader.setState({ selected: 'n.md', doc: { meta: {}, body: 'x' } as never })
+    useAgentPanel.setState({ open: false, draft: '' })
+    const action = appActions().find((a) => a.id === 'action:add-selection-to-chat')
+    expect(action?.shortcut).toBe('⇧⌘L')
+    expect(action?.combo).toEqual({ key: 'l', meta: true, shift: true })
+    // off the reader → guarded no-op (never throws, never opens, never stages)
+    useApp.setState({ view: 'home' })
+    action?.run()
+    expect(useAgentPanel.getState()).toMatchObject({ open: false, draft: '' })
+    useReader.setState({ selected: null, doc: null })
+  })
 })
 
 describe('D1a3 find bar: ⌘F opens Read-mode find (story 17.3)', () => {

@@ -22,9 +22,10 @@ import { EditorState, Prec } from '@codemirror/state'
 import { drawSelection, EditorView, highlightActiveLine, keymap } from '@codemirror/view'
 import type { Doc } from '../../../../shared/ipc-contract'
 import type { Identity } from '../../../../shared/types'
+import { useAgentPanel } from '../../stores/agentPanel'
 import { useApp } from '../../stores/app'
 import { useEditor } from '../../stores/editor'
-import { actionCommand, applyAction, type ToolbarAction } from './editorCommands'
+import { actionCommand, applyAction, selectionText, type ToolbarAction } from './editorCommands'
 import { EDITOR_V2_CSS, editorChrome, markdownHighlight } from './editorTheme'
 import { FrontmatterPanel } from './NoteView'
 
@@ -141,6 +142,18 @@ export function NoteEditor({
             { key: 'Mod-b', run: actionCommand('bold') },
             { key: 'Mod-i', run: actionCommand('italic') },
             { key: 'Mod-k', run: actionCommand('link') },
+            {
+              // A8: ⇧⌘L stages the CM selection in the agent panel (same chord
+              // the read-mode registry action uses; handling it here stops the
+              // global one double-firing). No selection → let it fall through.
+              key: 'Mod-Shift-l',
+              run: (view) => {
+                const text = selectionText(view.state)
+                if (!text.trim()) return false
+                useAgentPanel.getState().addContext(text, selected)
+                return true
+              },
+            },
           ]),
         ),
         // markdownKeymap first: Enter continues lists/quotes, Backspace

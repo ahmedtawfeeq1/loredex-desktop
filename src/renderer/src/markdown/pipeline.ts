@@ -17,8 +17,10 @@ import { remarkShaLinks } from './shaLinks'
 import { remarkTaskIndexes } from './tasks'
 import { remarkWikilinks } from './wikilinks'
 
-/** defaultSchema + the wikilink carrier attributes (story 2.2) + task indexes. */
-const schema = {
+/** defaultSchema + the wikilink carrier attributes (story 2.2) + task indexes.
+ *  Exported so the panel-local agent processor (agent/agentMarkdown.tsx) can
+ *  reuse the SAME sanitize allowlist rather than re-derive it. */
+export const schema: typeof defaultSchema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
@@ -28,7 +30,7 @@ const schema = {
   },
 }
 
-const options: RehypeReactOptions = {
+export const options: RehypeReactOptions = {
   Fragment,
   jsx,
   jsxs,

@@ -7,8 +7,10 @@
  * remembered choice.
  */
 import { useEffect } from 'react'
+import type { AcpToolContent } from '../../../shared/ipc-contract'
 import { Button, type ButtonVariant } from '../components/Button'
 import { useAgentPanel } from '../stores/agentPanel'
+import { ToolDiff } from './ToolCallRow'
 
 /** allow_once → primary is applied to the FIRST such option only (one cobalt
  *  primary per view); any duplicate allow_once falls back to secondary. */
@@ -47,6 +49,11 @@ export function AgentPermissionModal(): React.JSX.Element | null {
   if (!permission) return null
   const session = sessions.find((v) => v.sessionId === permission.sessionId)
   const firstAllowOnce = permission.options.findIndex((o) => o.kind === 'allow_once')
+  // the proposed change the adapter attached — surface the before/after diff so
+  // the user reviews the edit before allowing it (A3). Reuses the A2 ToolDiff.
+  const diffs = (permission.content ?? []).filter(
+    (c): c is Extract<AcpToolContent, { kind: 'diff' }> => c.kind === 'diff',
+  )
 
   return (
     // biome-ignore lint: backdrop click dismisses = rejects; keyboard path is Esc
@@ -91,6 +98,15 @@ export function AgentPermissionModal(): React.JSX.Element | null {
               : permission.sessionId.slice(0, 8)}
           </span>
         </div>
+        {diffs.length > 0 && (
+          <div className="modal-row agent-perm-diff">
+            <span className="modal-label">Proposed change</span>
+            {diffs.map((d, i) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: diff content is positional, append-only
+              <ToolDiff key={i} diff={d} />
+            ))}
+          </div>
+        )}
         <div className="modal-footer">
           {permission.options.map((o, i) => (
             <Button

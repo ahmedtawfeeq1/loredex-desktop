@@ -15,6 +15,7 @@ import type { NoteComment } from '../../../../shared/types'
 import { BrandMark } from '../../components/BrandMark'
 import { DriftBadge } from '../../components/DriftBadge'
 import { TasksContext } from '../../components/TaskCheckbox'
+import { useAgentPanel } from '../../stores/agentPanel'
 import { humanizeTitle, noteDate } from '../../humanize'
 import { renderMarkdown } from '../../markdown/pipeline'
 import { useComments } from '../../stores/comments'
@@ -372,18 +373,32 @@ export function NoteArticle({
         <OrphanedComments comments={orphaned} />
       </article>
       {chip && (
-        <button
-          type="button"
-          className="comment-chip"
-          style={{ left: chip.x, top: chip.y }}
-          onClick={() => {
-            useComments.getState().openComposer(chip.anchor)
-            setChip(null)
-            window.getSelection()?.removeAllRanges()
-          }}
-        >
-          Comment
-        </button>
+        // read-mode selection chip: Comment (margin composer) + Add to chat
+        // (stage the excerpt in the agent panel — A8). Both clear the chip.
+        <div className="selection-chip" style={{ left: chip.x, top: chip.y }}>
+          <button
+            type="button"
+            className="selection-chip-btn"
+            onClick={() => {
+              useComments.getState().openComposer(chip.anchor)
+              setChip(null)
+              window.getSelection()?.removeAllRanges()
+            }}
+          >
+            Comment
+          </button>
+          <button
+            type="button"
+            className="selection-chip-btn"
+            onClick={() => {
+              useAgentPanel.getState().addContext(chip.anchor, selected)
+              setChip(null)
+              window.getSelection()?.removeAllRanges()
+            }}
+          >
+            Add to chat
+          </button>
+        </div>
       )}
       {popover && (
         <CommentPopover

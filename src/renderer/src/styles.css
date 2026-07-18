@@ -5893,22 +5893,38 @@ a.commit-chip-sha:hover {
   border-color: var(--accent);
 }
 
-.comment-chip {
+/* read-mode selection chip — a pill of one-or-more actions (Comment · Add to
+   chat, A8). The wrapper is positioned; each action is a borderless text
+   button divided by a 1px hairline. */
+.selection-chip {
   position: absolute;
   transform: translate(-50%, -100%) translateY(-6px);
   z-index: 30;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 12px;
+  display: flex;
+  align-items: stretch;
   border-radius: 999px;
   border: 1px solid var(--hairline);
   background: var(--bg-card);
-  color: var(--text-1);
   box-shadow: var(--shadow-card);
-  cursor: pointer;
+  overflow: hidden;
 }
 
-.comment-chip:hover {
+.selection-chip-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.selection-chip-btn + .selection-chip-btn {
+  border-left: 1px solid var(--hairline);
+}
+
+.selection-chip-btn:hover {
   color: var(--accent);
 }
 
@@ -7699,9 +7715,10 @@ a.button-primary {
    Docks right inside .app (a flex row) across every view. All colors ride
    the v3 tokens (both themes free); hairlines only, no gradients; Geist Mono
    for machine facts (session rows, tool lines, plan, chips). Width comes
-   from an inline style (fixed 340 in v1 — drag deferred). */
+   from an inline style, dragged 280–480 via .agent-resize-handle. */
 
 .agent-panel {
+  position: relative; /* anchors the absolutely-pinned .agent-resize-handle */
   flex: 0 0 auto;
   min-width: 0;
   min-height: 0;
@@ -7753,6 +7770,32 @@ a.button-primary {
 .agent-head-seg .seg-option {
   padding: 2px 9px;
   font-size: 10.5px;
+}
+
+/* login-state dot on a provider chip: glyph shape carries the state (never
+   color alone — see AUTH_DOT); color reinforces via the shared status tokens */
+.agent-provider-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.agent-auth-dot {
+  font-size: 9px;
+  line-height: 1;
+}
+
+.agent-auth-dot.is-ok {
+  color: var(--ok);
+}
+
+.agent-auth-dot.is-warn {
+  color: var(--warn);
+}
+
+.agent-auth-dot.is-off {
+  color: var(--text-3);
 }
 
 .agent-head-btn {
@@ -7892,6 +7935,169 @@ a.button-primary {
   font-size: 11.5px;
 }
 
+/* thinking: dimmed, collapsed-by-default disclosure (glyph marker + label) */
+.agent-thought {
+  padding: 0;
+}
+.agent-thought-summary {
+  font: 10px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+  cursor: pointer;
+  list-style: none;
+}
+.agent-thought-summary::-webkit-details-marker {
+  display: none;
+}
+.agent-thought-summary::before {
+  content: '▸ ';
+  color: var(--text-4);
+}
+.agent-thought[open] .agent-thought-summary::before {
+  content: '▾ ';
+}
+.agent-thought[open] .agent-thought-summary {
+  margin-bottom: 4px;
+}
+
+/* markdown-in-bubble: the sanctioned pipeline's block elements, sized for chat.
+   Tokens only (both themes auto-flip); 1px hairlines; no gradients. */
+.agent-md {
+  white-space: normal;
+}
+.agent-md > :first-child {
+  margin-top: 0;
+}
+.agent-md > :last-child {
+  margin-bottom: 0;
+}
+.agent-md p {
+  margin: 0 0 8px;
+}
+.agent-md ul,
+.agent-md ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.agent-md li {
+  margin: 2px 0;
+}
+.agent-md h1,
+.agent-md h2,
+.agent-md h3,
+.agent-md h4,
+.agent-md h5,
+.agent-md h6 {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.agent-md a {
+  color: var(--link);
+  text-decoration: underline;
+}
+.agent-md blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--hairline);
+  color: var(--text-2);
+}
+/* inline code (not the fenced block's <code>) */
+.agent-md :not(pre) > code {
+  font: 11.5px var(--font-mono);
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.agent-md pre {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.agent-md pre code {
+  font: 11.5px/1.55 var(--font-mono);
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-1);
+}
+.agent-md table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0 0 8px;
+  font-size: 11.5px;
+}
+.agent-md th,
+.agent-md td {
+  border: 1px solid var(--hairline);
+  padding: 3px 8px;
+  text-align: left;
+}
+.agent-md th {
+  background: var(--bg-hover);
+  font-weight: 600;
+}
+
+/* fenced-code syntax colour (rehype-highlight → highlight.js token classes),
+   mapped to the sanctioned status palette only — no cobalt, no off-palette
+   hues; every token is a design var so it flips with the theme. */
+.agent-md .hljs-comment,
+.agent-md .hljs-quote {
+  color: var(--text-3);
+  font-style: italic;
+}
+.agent-md .hljs-keyword,
+.agent-md .hljs-selector-tag,
+.agent-md .hljs-built_in,
+.agent-md .hljs-name,
+.agent-md .hljs-tag,
+.agent-md .hljs-type,
+.agent-md .hljs-literal {
+  color: var(--info);
+}
+.agent-md .hljs-string,
+.agent-md .hljs-attr,
+.agent-md .hljs-symbol,
+.agent-md .hljs-bullet,
+.agent-md .hljs-addition,
+.agent-md .hljs-selector-attr,
+.agent-md .hljs-selector-pseudo {
+  color: var(--ok);
+}
+.agent-md .hljs-number,
+.agent-md .hljs-meta,
+.agent-md .hljs-regexp,
+.agent-md .hljs-link {
+  color: var(--warn);
+}
+.agent-md .hljs-title,
+.agent-md .hljs-title.function_,
+.agent-md .hljs-section,
+.agent-md .hljs-attribute,
+.agent-md .hljs-variable,
+.agent-md .hljs-template-variable {
+  color: var(--text-1);
+  font-weight: 600;
+}
+.agent-md .hljs-deletion {
+  color: var(--rust);
+}
+.agent-md .hljs-emphasis {
+  font-style: italic;
+}
+.agent-md .hljs-strong {
+  font-weight: 700;
+}
+
 /* tool rows: mono machine line — tool TITLES only, never raw adapter output */
 .agent-tool-line {
   font: 11px/1.8 var(--font-mono);
@@ -7903,6 +8109,106 @@ a.button-primary {
 
 .agent-tool-line .agent-state-chip {
   margin-right: 6px;
+}
+
+/* A2: a tool row with output collapses into <details> — the summary IS the mono
+   line; the body shows before/after diffs + touched files. Tokens only, 1px
+   hairlines, no gradients (design law). */
+.agent-tool {
+  min-width: 0;
+}
+
+.agent-tool-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.agent-tool-summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-tool-summary::before {
+  content: '▸ ';
+  color: var(--text-4);
+}
+
+.agent-tool[open] .agent-tool-summary::before {
+  content: '▾ ';
+}
+
+.agent-tool-body {
+  margin: 5px 0 3px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* before/after side-by-side — the DiffView palette (--rust before, --ok after),
+   each column scrolls in its own box so the panel body never scrolls sideways */
+.tool-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--hairline);
+  overflow: hidden;
+}
+
+.tool-diff-col {
+  margin: 0;
+  overflow-x: auto;
+  font: 11px/1.5 var(--font-mono);
+  padding: 6px 8px;
+  white-space: pre;
+  user-select: text;
+}
+
+.tool-diff-old {
+  color: var(--rust);
+  background: color-mix(in srgb, var(--rust) 10%, var(--bg-inset));
+}
+
+.tool-diff-new {
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 10%, var(--bg-inset));
+}
+
+.agent-tool-text {
+  margin: 0;
+  font: 11px/1.5 var(--font-mono);
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  max-height: 160px;
+  overflow-y: auto;
+  user-select: text;
+}
+
+.agent-tool-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.agent-tool-ref {
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--bg-inset);
+  color: var(--link);
+  font: 11px var(--font-mono);
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.agent-tool-ref:hover:not(:disabled) {
+  background: var(--bg-hover);
+  text-decoration: underline;
+}
+
+.agent-tool-ref:disabled {
+  color: var(--text-3);
+  cursor: default;
 }
 
 /* graceful auth_required / error card — warm-tint hairline (chip-open rgbas) */
@@ -7966,6 +8272,216 @@ a.button-primary {
   color: var(--text-4);
 }
 
+/* ── A4: usage + context-window meter ──────────────────────────────────────
+   A slim per-session telemetry strip under the session list: a context-window
+   fill meter + a cumulative token/cost line. The glyph + numeric label carry
+   the signal (never color alone); the bar is a redundant visual. Neutral
+   --info fill so the panel's one cobalt primary stays the Send button. Machine
+   facts ride Geist Mono; both themes flip via the tokens. */
+.agent-usage {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+
+.agent-usage-meter,
+.agent-usage-turn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.agent-usage-turn {
+  flex-wrap: wrap;
+}
+
+.agent-usage-glyph {
+  color: var(--text-3);
+}
+
+.agent-usage-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+
+.agent-usage-track {
+  flex: 1;
+  min-width: 32px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-inset);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+
+.agent-usage-fill {
+  display: block;
+  height: 100%;
+  background: var(--info);
+  transition: width 160ms ease-out;
+}
+
+.agent-usage-num {
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.agent-usage-pct,
+.agent-usage-tok,
+.agent-usage-cost {
+  white-space: nowrap;
+}
+
+.agent-usage-cost {
+  color: var(--text-1);
+}
+
+/* ── A7: session info (commands / mode / MCP) ──────────────────────────────
+   A collapsed-by-default disclosure under the usage strip: the agent's
+   advertised slash-commands, its current mode + a switcher, and the attached
+   MCP servers (name/url only — the per-session bearer token never reaches the
+   renderer). Tokens only, 1px hairlines, no gradients; the mode switcher
+   reuses the seg-control pressed-glass so no second cobalt enters the view.
+   Both themes flip via the CSS vars. */
+.agent-info {
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--hairline);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.agent-info-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  min-width: 0;
+}
+
+.agent-info-summary::-webkit-details-marker {
+  display: none;
+}
+
+.agent-info-summary::before {
+  content: '▸ ';
+  color: var(--text-4);
+}
+
+.agent-info[open] .agent-info-summary::before {
+  content: '▾ ';
+}
+
+.agent-info-summary-label {
+  flex: 0 0 auto;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+
+.agent-info-summary-count {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+}
+
+.agent-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 12px 10px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.agent-info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.agent-info-head {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-3);
+}
+
+/* mode switcher: the seg-control pressed-glass, wrapped for narrow panels */
+.agent-info-modes {
+  flex-wrap: wrap;
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.agent-info-mode {
+  font-size: 11px;
+  padding: 3px 9px;
+}
+
+.agent-info-cmds,
+.agent-info-mcps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-info-cmd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.agent-info-cmd-name {
+  color: var(--text-1);
+}
+
+.agent-info-cmd-desc {
+  color: var(--text-2);
+}
+
+.agent-info-cmd-hint {
+  color: var(--text-3);
+  font-style: italic;
+}
+
+.agent-info-mcp {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.agent-info-mcp-name {
+  flex: 0 0 auto;
+  color: var(--text-1);
+}
+
+.agent-info-mcp-url {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+}
+
 .agent-input {
   flex: 0 0 auto;
   display: flex;
@@ -8018,4 +8534,11 @@ a.button-primary {
   font: 12px var(--font-mono);
   color: var(--text-1);
   overflow-wrap: break-word;
+}
+
+/* A3: the proposed change (reused .tool-diff) — cap tall diffs so the footer
+   buttons stay reachable; each column already scrolls sideways on its own */
+.agent-perm-diff .tool-diff {
+  max-height: 320px;
+  overflow-y: auto;
 }

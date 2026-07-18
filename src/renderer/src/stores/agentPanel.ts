@@ -2,8 +2,8 @@
  * Agent panel store (acp blueprint 2026-07-18): right-dock panel open/width,
  * the ACP sessions with their chat threads, and the permission FIFO — all fed
  * by the acp.* CoreEvents. Rails-pattern persistence: {open, width} ride the
- * per-vault `agentPanel` app_settings row (width is fixed 340 in v1 — the
- * field persists so drag is additive later). Unlike pty output, chat text
+ * per-vault `agentPanel` app_settings row (width drags 280–480 via the
+ * left-edge handle, mirroring the reader list pane). Unlike pty output, chat text
  * lives IN state; chunks batch through a module-scope sink and one
  * rAF-coalesced commit so React renders at frame rate, not per event
  * (core already batches at 8ms).
@@ -12,19 +12,37 @@ import { create } from 'zustand'
 import {
   isErrEnvelope,
   type AcpAgent,
+  type AcpCommand,
+  type AcpMcpServer,
+  type AcpMode,
   type AcpPermissionOption,
   type AcpPlanEntry,
   type AcpSessionState,
+  type AcpToolContent,
+  type AcpToolLocation,
 } from '../../../shared/ipc-contract'
+import { clampPanelWidth, DEFAULT_PANEL_WIDTH } from '../agent/panelWidth'
 import { invoke, onEvent } from '../api'
 
-export const DEFAULT_PANEL_WIDTH = 340
+// re-exported so existing importers (store test) keep their one entry point;
+// the source of truth is agent/panelWidth.ts (clone of listPaneWidth.ts)
+export { DEFAULT_PANEL_WIDTH } from '../agent/panelWidth'
 
 export type AcpChatItem =
   | { type: 'user'; text: string }
   | { type: 'agent'; text: string } // grows in place while streaming
   | { type: 'thought'; text: string }
-  | { type: 'tool'; toolCallId: string; title: string; toolKind?: string; status: string }
+  | {
+      type: 'tool'
+      toolCallId: string
+      title: string
+      toolKind?: string
+      status: string
+      /** the adapter's tool output — before/after diffs + text (A2) */
+      content?: AcpToolContent[]
+      /** files this tool touched — ABSOLUTE paths, relativized before open (A2) */
+      locations?: AcpToolLocation[]
+    }
 
 export interface AcpSessionView {
   sessionId: string
@@ -37,6 +55,22 @@ export interface AcpSessionView {
   items: AcpChatItem[]
   /** latest plan replaces, never appends */
   plan: AcpPlanEntry[]
+  /** best-effort token telemetry (A4) — absent until an acp.usage lands (codex
+   *  may emit nothing). All three (`context`/`cost`/`turn`) REPLACE (latest
+   *  wins); `turn` is a cumulative session snapshot, not a per-turn delta. */
+  usage?: {
+    context?: { used: number; size: number }
+    cost?: { amount: number; currency: string }
+    turn?: { total: number; input: number; output: number; cached?: number; thought?: number }
+  }
+  /** slash-commands the agent advertises (A7) — REPLACED on each acp.commands. */
+  commands?: AcpCommand[]
+  /** current session mode + the full set (A7): the initial acp.mode carries
+   *  availableModes, later current_mode_update events carry only currentModeId
+   *  (the set is kept). Absent until a mode-capable agent reports one. */
+  mode?: { currentModeId: string; availableModes?: AcpMode[] }
+  /** MCP servers attached on ready (A7) — name/url only, never the token. */
+  mcpServers?: AcpMcpServer[]
 }
 
 export interface AcpPermissionView {
@@ -45,25 +79,92 @@ export interface AcpPermissionView {
   title: string
   toolKind?: string
   options: AcpPermissionOption[]
+  /** the proposed change — same diff/text shapes a tool row renders (A3) */
+  content?: AcpToolContent[]
+  locations?: AcpToolLocation[]
+}
+
+/** Per-provider login state (A6): 'unknown' until a session for that provider
+ *  reports in; 'ok' once one reaches ready; 'auth_required' when one asks to
+ *  sign in. Drives the auth dot on each provider chip. */
+export type ProviderAuth = 'unknown' | 'ok' | 'auth_required'
+
+/** Fresh default map — a Record over the AcpAgent union, so a Phase-2 provider
+ *  (gemini) is a compile error here until it's listed (no silent gap). */
+const defaultProviderAuth = (): Record<AcpAgent, ProviderAuth> => ({
+  claude: 'unknown',
+  codex: 'unknown',
+})
+
+/** The session list the panel shows for a filter (A6): 'all' shows every
+ *  session; a specific agent narrows to that provider's sessions. Exported so
+ *  the panel and its test share one derivation. */
+export function visibleSessions(
+  sessions: AcpSessionView[],
+  filter: AcpAgent | 'all',
+): AcpSessionView[] {
+  return filter === 'all' ? sessions : sessions.filter((v) => v.agent === filter)
+}
+
+/** Add-to-chat (A8): format a note excerpt as a source-attributed markdown
+ *  blockquote, e.g.
+ *    > from [notes/x.md]: first selected line
+ *    > second selected line
+ *  Every line is quoted so a multi-line selection stays valid markdown; the
+ *  trailing newline drops the composer cursor onto a fresh line for the prompt. */
+export function quoteForChat(text: string, path: string): string {
+  const [first = '', ...rest] = text.trim().split('\n')
+  const head = `> from [${path}]: ${first}`
+  const body = rest.map((l) => `> ${l}`).join('\n')
+  return (rest.length ? `${head}\n${body}` : head) + '\n'
 }
 
 interface AgentPanelState {
   open: boolean
   width: number
+  /** true while the left-edge divider is being dragged — session-only, never
+   *  persisted (mirrors rails.resizing) */
+  resizing: boolean
   /** what openHere() STARTS — running sessions keep their agent */
   agent: AcpAgent
+  /** which provider's sessions the list shows ('all' = every provider) — a
+   *  view filter only, never touches which sessions are alive (A6) */
+  filter: AcpAgent | 'all'
+  /** per-provider login state, updated from acp.session (A6) */
+  providerAuth: Record<AcpAgent, ProviderAuth>
   sessions: AcpSessionView[]
   activeId: string | null
   /** the surfaced permission request; more queue module-side (FIFO) */
   permission: AcpPermissionView | null
+  /** the composer draft — lifted into the store (A8) so addContext can
+   *  pre-fill it from a note selection; the panel textarea is controlled by it */
+  draft: string
   load(): Promise<void>
   /** open/close + persist — no session spawn (unlike the terminal toggle) */
   toggle(): void
+  /** live drag — clamps and applies WITHOUT persisting (many events per drag) */
+  dragWidth(px: number): void
+  /** persist the current width — drag-end (pointerup); rides the existing
+   *  settings.agentPanel.set (width already on that row — no new IPC) */
+  commitWidth(): void
+  /** double-click the divider → back to the 340px default, persisted */
+  resetWidth(): void
+  setResizing(resizing: boolean): void
   setAgent(a: AcpAgent): void
+  /** narrow the visible session list to one provider (or 'all') — A6 */
+  setFilter(f: AcpAgent | 'all'): void
   /** open the panel + acp.start + select the new session */
   openHere(cwd?: string): Promise<void>
   select(id: string): void
+  /** controlled-input setter for the composer textarea (A8) */
+  setDraft(text: string): void
+  /** add-to-chat (A8): open the panel and pre-fill the composer with a
+   *  quoted, source-attributed excerpt from a note — never auto-sends. Stacks
+   *  onto an existing draft (blank-line separated) so several excerpts gather. */
+  addContext(text: string, path: string): void
   send(text: string): Promise<void>
+  /** switch a session's mode (A7) — optimistic, reverts if agent.setMode fails */
+  setMode(sessionId: string, modeId: string): Promise<void>
   cancel(): void
   respondPermission(optionId: string | null): void
   closeSession(id: string): Promise<void>
@@ -146,15 +247,19 @@ function patchSession(id: string, patch: Partial<AcpSessionView>): void {
 export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   open: false,
   width: DEFAULT_PANEL_WIDTH,
+  resizing: false,
   agent: 'claude',
+  filter: 'all',
+  providerAuth: defaultProviderAuth(),
   sessions: [],
   activeId: null,
   permission: null,
+  draft: '',
 
   async load() {
     try {
       const stored = await invoke('settings.agentPanel.get', undefined)
-      set({ open: stored.open, width: stored.width })
+      set({ open: stored.open, width: clampPanelWidth(stored.width) })
     } catch (e) {
       // first-attach port swap drops early invokes — retry once (app.init pattern)
       if (isErrEnvelope(e) && e.code === 'PORT_SWAPPED') return get().load()
@@ -167,8 +272,29 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     persist()
   },
 
+  dragWidth(px) {
+    set({ width: clampPanelWidth(px) })
+  },
+
+  commitWidth() {
+    persist()
+  },
+
+  resetWidth() {
+    set({ width: DEFAULT_PANEL_WIDTH })
+    persist()
+  },
+
+  setResizing(resizing) {
+    set({ resizing })
+  },
+
   setAgent(agent) {
     set({ agent })
+  },
+
+  setFilter(filter) {
+    set({ filter })
   },
 
   async openHere(cwd) {
@@ -214,6 +340,20 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     set({ activeId: id })
   },
 
+  setDraft(text) {
+    set({ draft: text })
+  },
+
+  addContext(text, path) {
+    if (!text.trim()) return // an empty selection has nothing to quote
+    const block = quoteForChat(text, path)
+    set((s) => ({
+      open: true, // surface the panel so the user sees the staged excerpt
+      draft: s.draft.trim() ? `${s.draft.replace(/\s+$/, '')}\n\n${block}` : block,
+    }))
+    persist() // opening rides the same {open,width} row as toggle()
+  },
+
   async send(text) {
     if (!text.trim()) return
     const { activeId, sessions } = get()
@@ -237,6 +377,23 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     } catch (e) {
       // ACP_BUSY / dead core: revert busy, surface the envelope as detail
       patchSession(id, { busy: false, detail: isErrEnvelope(e) ? e.message : String(e) })
+    }
+  },
+
+  async setMode(sessionId, modeId) {
+    const session = get().sessions.find((v) => v.sessionId === sessionId)
+    // no modes to switch, or already on it — nothing to do
+    if (!session?.mode || session.mode.currentModeId === modeId) return
+    const prevMode = session.mode
+    // optimistic: an adapter may not echo a current_mode_update after set_mode,
+    // so reflect the switch immediately; a real acp.mode later is idempotent
+    patchSession(sessionId, { mode: { ...prevMode, currentModeId: modeId } })
+    try {
+      await invoke('agent.setMode', { sessionId, modeId })
+    } catch {
+      // rejected (not-ready / dead core) — restore the prior mode so the
+      // switcher never lies about the live mode
+      patchSession(sessionId, { mode: prevMode })
     }
   },
 
@@ -302,10 +459,14 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     set({
       open: false,
       width: DEFAULT_PANEL_WIDTH,
+      resizing: false,
       agent: 'claude',
+      filter: 'all',
+      providerAuth: defaultProviderAuth(),
       sessions: [],
       activeId: null,
       permission: null,
+      draft: '',
     })
   },
 }))
@@ -338,6 +499,9 @@ if (typeof window !== 'undefined' && window.loredex) {
                   state: e.state,
                   detail: e.detail,
                   busy: e.state === 'ready' ? v.busy : false,
+                  // MCP list rides the ready event only (A7) — keep it across
+                  // later non-ready transitions
+                  mcpServers: e.mcpServers ?? v.mcpServers,
                 }
               : v,
           ),
@@ -345,6 +509,13 @@ if (typeof window !== 'undefined' && window.loredex) {
             e.state !== 'ready' && s.permission?.sessionId === e.sessionId
               ? (permissionQueue.shift() ?? null)
               : s.permission,
+          // login-state chip (A6): a ready session proves the provider is signed
+          // in; auth_required flags it needs login. Other states (starting /
+          // error / exited) say nothing about auth — leave the last verdict.
+          providerAuth:
+            e.state === 'ready' || e.state === 'auth_required'
+              ? { ...s.providerAuth, [e.agent]: e.state === 'ready' ? 'ok' : 'auth_required' }
+              : s.providerAuth,
         }))
         return
       }
@@ -372,6 +543,10 @@ if (typeof window !== 'undefined' && window.loredex) {
                       title: e.title ?? i.title,
                       toolKind: e.toolKind ?? i.toolKind,
                       status: e.status ?? i.status,
+                      // sparse-merge: content/locations arrive on the update, not
+                      // always the initial call — keep what we had if absent
+                      content: e.content ?? i.content,
+                      locations: e.locations ?? i.locations,
                     }
                   : i,
               )
@@ -387,6 +562,8 @@ if (typeof window !== 'undefined' && window.loredex) {
                   title: e.title ?? 'Tool call',
                   toolKind: e.toolKind,
                   status: e.status ?? 'pending',
+                  content: e.content,
+                  locations: e.locations,
                 },
               ],
             }
@@ -413,9 +590,63 @@ if (typeof window !== 'undefined' && window.loredex) {
           title: e.title,
           toolKind: e.toolKind,
           options: e.options,
+          content: e.content,
+          locations: e.locations,
         }
         if (state.permission === null) useAgentPanel.setState({ permission: view })
         else permissionQueue.push(view)
+        return
+      }
+      case 'acp.commands': {
+        // pure session metadata (never touches items) → no chunk flush needed.
+        // REPLACES wholesale; ignored for unknown sessions (no map match).
+        useAgentPanel.setState((s) => ({
+          sessions: s.sessions.map((v) =>
+            v.sessionId === e.sessionId ? { ...v, commands: e.commands } : v,
+          ),
+        }))
+        return
+      }
+      case 'acp.mode': {
+        // session metadata (no items) → no chunk flush. The initial event
+        // carries availableModes (the full set); a later current_mode_update
+        // carries only currentModeId — keep the prior set. Unknown session: no
+        // map match, ignored.
+        useAgentPanel.setState((s) => ({
+          sessions: s.sessions.map((v) =>
+            v.sessionId === e.sessionId
+              ? {
+                  ...v,
+                  mode: {
+                    currentModeId: e.currentModeId,
+                    availableModes: e.availableModes ?? v.mode?.availableModes,
+                  },
+                }
+              : v,
+          ),
+        }))
+        return
+      }
+      case 'acp.usage': {
+        // pure session metadata (never touches items) → no chunk flush needed.
+        // context/cost/turn all REPLACE (an absent half keeps the prior value).
+        // The turn half is a CUMULATIVE session snapshot (SDK Usage docstrings:
+        // "across session" / "across all turns"), not a per-turn delta — summing
+        // it would over-count quadratically. Ignored for unknown sessions.
+        useAgentPanel.setState((s) => ({
+          sessions: s.sessions.map((v) => {
+            if (v.sessionId !== e.sessionId) return v
+            const prev = v.usage
+            return {
+              ...v,
+              usage: {
+                context: e.context ?? prev?.context,
+                cost: e.cost ?? prev?.cost,
+                turn: e.turn ?? prev?.turn,
+              },
+            }
+          }),
+        }))
         return
       }
       case 'acp.turnEnd': {

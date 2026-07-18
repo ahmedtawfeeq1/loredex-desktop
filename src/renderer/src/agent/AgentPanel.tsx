@@ -2,14 +2,26 @@
  * Right-dock agent panel (acp blueprint 2026-07-18): mounted as the last
  * child inside div.app — the row-axis analog of the terminal drawer's
  * column-axis mount — so the aside docks right across every view. Chat
- * chunks render as plain pre-wrap text (markdown deferred); tool rows are
- * mono machine lines showing tool TITLES only, never raw adapter output.
- * Width is fixed 340 in v1 (persisted field exists, drag deferred).
+ * bubbles render sanitized, syntax-highlighted markdown (agent/agentMarkdown);
+ * thinking is a dimmed collapsible; tool rows are mono machine lines (ToolCallRow)
+ * that expand to before/after diffs + clickable file-refs when output arrives.
+ * Width drags 280–480 via the left-edge PanelResizeHandle (persisted).
  */
-import { useEffect, useRef, useState } from 'react'
-import type { AcpSessionState } from '../../../shared/ipc-contract'
+import { memo, useEffect, useRef } from 'react'
+import type { AcpAgent, AcpSessionState } from '../../../shared/ipc-contract'
 import { Button } from '../components/Button'
-import { useAgentPanel, type AcpChatItem, type AcpSessionView } from '../stores/agentPanel'
+import {
+  useAgentPanel,
+  visibleSessions,
+  type AcpChatItem,
+  type AcpSessionView,
+  type ProviderAuth,
+} from '../stores/agentPanel'
+import { renderAgentMarkdown } from './agentMarkdown'
+import { PanelResizeHandle } from './PanelResizeHandle'
+import { SessionInfoPanel } from './SessionInfoPanel'
+import { ToolCallRow } from './ToolCallRow'
+import { UsageBar } from './UsageBar'
 
 /** Status = glyph + label, never color alone (design-fidelity law). */
 const STATE_CHIP: Record<AcpSessionState, { glyph: string; label: string; cls: string }> = {
@@ -20,15 +32,27 @@ const STATE_CHIP: Record<AcpSessionState, { glyph: string; label: string; cls: s
   exited: { glyph: '○', label: 'exited', cls: 'is-off' },
 }
 
-const TOOL_CHIP: Record<string, { glyph: string; label: string; cls: string }> = {
-  pending: { glyph: '·', label: 'pending', cls: 'is-start' },
-  in_progress: { glyph: '▸', label: 'running', cls: 'is-ok' },
-  completed: { glyph: '✓', label: 'done', cls: 'is-ok' },
-  failed: { glyph: '✕', label: 'failed', cls: 'is-err' },
+/** Per-provider display metadata. A Record over the AcpAgent union — the ONE
+ *  place providers are enumerated for the UI, so a Phase-2 provider (gemini)
+ *  is a compile error until listed and then rides the picker automatically
+ *  (no literal ['claude','codex'] tuple to forget). */
+const AGENT_META: Record<AcpAgent, { label: string; tag: string }> = {
+  claude: { label: 'Claude', tag: 'CC' },
+  codex: { label: 'Codex', tag: 'CX' },
+}
+const AGENTS = Object.keys(AGENT_META) as AcpAgent[]
+
+/** Login-state auth dot — glyph shape differs per state (never color alone):
+ *  ○ not started · ● signed in · ⚠ needs login. Full label rides the chip's
+ *  accessible name + tooltip. */
+const AUTH_DOT: Record<ProviderAuth, { glyph: string; label: string; cls: string }> = {
+  unknown: { glyph: '○', label: 'not started', cls: 'is-off' },
+  ok: { glyph: '●', label: 'signed in', cls: 'is-ok' },
+  auth_required: { glyph: '⚠', label: 'needs login', cls: 'is-warn' },
 }
 
-function agentTag(agent: 'claude' | 'codex'): string {
-  return agent === 'claude' ? 'CC' : 'CX'
+function agentTag(agent: AcpAgent): string {
+  return AGENT_META[agent].tag
 }
 
 function SessionRow({ s, active }: { s: AcpSessionView; active: boolean }): React.JSX.Element {
@@ -59,26 +83,29 @@ function SessionRow({ s, active }: { s: AcpSessionView; active: boolean }): Reac
   )
 }
 
-function ThreadItem({ item }: { item: AcpChatItem }): React.JSX.Element {
+/** One thread bubble. Memoized because commitChunks preserves the object
+ *  reference of every SETTLED item and only replaces the growing last one, so
+ *  memo skips re-parsing markdown for the whole backlog on each streaming rAF
+ *  frame — only the live bubble re-renders (the plan's per-item memo, achieved
+ *  by reference equality instead of a hand-rolled key). */
+export const ThreadItem = memo(function ThreadItem({ item }: { item: AcpChatItem }): React.JSX.Element {
   if (item.type === 'tool') {
-    const chip = TOOL_CHIP[item.status] ?? TOOL_CHIP.pending
+    return <ToolCallRow item={item} />
+  }
+  // thinking: dimmed, collapsed by default — reasoning shouldn't crowd the reply
+  if (item.type === 'thought') {
     return (
-      <div className="agent-tool-line" title={item.title}>
-        <span className={`agent-state-chip ${chip.cls}`}>
-          {chip.glyph} {chip.label}
-        </span>
-        {item.title}
-      </div>
+      <details className="agent-msg agent-msg-thought agent-thought">
+        <summary className="agent-thought-summary">Thinking</summary>
+        <div className="agent-md">{renderAgentMarkdown(item.text)}</div>
+      </details>
     )
   }
+  // user + agent bubbles: sanitized, syntax-highlighted markdown
   const cls =
-    item.type === 'user'
-      ? 'agent-msg agent-msg-user'
-      : item.type === 'thought'
-        ? 'agent-msg agent-msg-thought'
-        : 'agent-msg agent-msg-agent'
-  return <div className={cls}>{item.text}</div>
-}
+    item.type === 'user' ? 'agent-msg agent-msg-user agent-md' : 'agent-msg agent-msg-agent agent-md'
+  return <div className={cls}>{renderAgentMarkdown(item.text)}</div>
+})
 
 /** Inline auth/error card — graceful, never a crash or modal. */
 function StateNote({ s }: { s: AcpSessionView }): React.JSX.Element {
@@ -99,12 +126,17 @@ function StateNote({ s }: { s: AcpSessionView }): React.JSX.Element {
 export function AgentPanel(): React.JSX.Element | null {
   const open = useAgentPanel((s) => s.open)
   const width = useAgentPanel((s) => s.width)
-  const agent = useAgentPanel((s) => s.agent)
+  const filter = useAgentPanel((s) => s.filter)
+  const providerAuth = useAgentPanel((s) => s.providerAuth)
   const sessions = useAgentPanel((s) => s.sessions)
   const activeId = useAgentPanel((s) => s.activeId)
   const active = sessions.find((v) => v.sessionId === activeId) ?? null
+  // filter narrows only the list; the active thread below is found from the
+  // full list, so a filtered-out active session still shows its conversation
+  const shown = visibleSessions(sessions, filter)
 
-  const [draft, setDraft] = useState('')
+  // draft lives in the store (A8) so addContext (add-to-chat) can pre-fill it
+  const draft = useAgentPanel((s) => s.draft)
   const threadRef = useRef<HTMLDivElement>(null)
   // auto-scroll only while the user is already at the bottom — never yank
   // someone who scrolled up to read
@@ -138,26 +170,55 @@ export function AgentPanel(): React.JSX.Element | null {
   function submit(): void {
     if (!canSend || !draft.trim()) return
     const text = draft
-    setDraft('')
+    useAgentPanel.getState().setDraft('')
     void useAgentPanel.getState().send(text)
   }
 
   return (
     <aside className="agent-panel" style={{ width }} aria-label="Agent panel">
+      <PanelResizeHandle />
       <div className="agent-head">
         <span className="rail-label agent-head-label">AGENT</span>
-        <div className="seg-control agent-head-seg" role="group" aria-label="Agent to start">
-          {(['claude', 'codex'] as const).map((a) => (
-            <button
-              key={a}
-              type="button"
-              className="seg-option"
-              aria-pressed={agent === a}
-              onClick={() => useAgentPanel.getState().setAgent(a)}
-            >
-              {a === 'claude' ? 'Claude' : 'Codex'}
-            </button>
-          ))}
+        <div
+          className="seg-control agent-head-seg"
+          role="group"
+          aria-label="Filter sessions and pick the agent to start"
+        >
+          <button
+            type="button"
+            className="seg-option"
+            aria-pressed={filter === 'all'}
+            title="Show every provider's sessions"
+            onClick={() => useAgentPanel.getState().setFilter('all')}
+          >
+            All
+          </button>
+          {AGENTS.map((a) => {
+            // one chip per provider (union-driven — gemini drops in for free):
+            // picking it filters the list to that provider AND makes it the
+            // agent the + button starts. The auth dot shows its login state.
+            const dot = AUTH_DOT[providerAuth[a]]
+            return (
+              <button
+                key={a}
+                type="button"
+                className="seg-option agent-provider-opt"
+                aria-pressed={filter === a}
+                aria-label={`${AGENT_META[a].label} — ${dot.label}`}
+                title={`${AGENT_META[a].label} — ${dot.label}`}
+                onClick={() => {
+                  const st = useAgentPanel.getState()
+                  st.setFilter(a)
+                  st.setAgent(a)
+                }}
+              >
+                <span className={`agent-auth-dot ${dot.cls}`} aria-hidden="true">
+                  {dot.glyph}
+                </span>
+                {AGENT_META[a].label}
+              </button>
+            )
+          })}
         </div>
         <button
           type="button"
@@ -178,13 +239,15 @@ export function AgentPanel(): React.JSX.Element | null {
           ›
         </button>
       </div>
-      {sessions.length > 0 && (
+      {shown.length > 0 && (
         <div className="agent-sessions">
-          {sessions.map((s) => (
+          {shown.map((s) => (
             <SessionRow key={s.sessionId} s={s} active={s.sessionId === activeId} />
           ))}
         </div>
       )}
+      {active !== null && <UsageBar usage={active.usage} />}
+      {active !== null && <SessionInfoPanel session={active} />}
       <div
         className="agent-thread"
         ref={threadRef}
@@ -226,7 +289,7 @@ export function AgentPanel(): React.JSX.Element | null {
           placeholder={canSend ? 'Message the agent…' : 'Needs a ready session'}
           value={draft}
           disabled={!canSend}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => useAgentPanel.getState().setDraft(e.target.value)}
           onKeyDown={(e) => {
             // ⌘↵ sends (Modal.tsx convention); Enter inserts a newline
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {

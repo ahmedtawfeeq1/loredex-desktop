@@ -283,6 +283,25 @@ export function appActions(): AppAction[] {
       run: () => void useAgentPanel.getState().openHere(),
     },
     {
+      // A8 add-to-chat: ⇧⌘L stages the Read-mode note selection into the agent
+      // panel (⌘F precedent — guards to the reader; Edit mode is handled by the
+      // CM keymap on the same chord, so this no-ops there). 'l' is free in the
+      // registry; the read-mode chip is the pointer twin of this shortcut.
+      id: 'action:add-selection-to-chat',
+      title: 'Add selection to chat',
+      shortcut: '⇧⌘L',
+      combo: { key: 'l', meta: true, shift: true },
+      run: () => {
+        const { selected } = useReader.getState()
+        const editor = useEditor.getState()
+        if (useApp.getState().view !== 'reader' || !selected) return
+        if (editor.editing && editor.path === selected) return // Edit → CM keymap
+        const text = typeof window !== 'undefined' ? (window.getSelection()?.toString() ?? '') : ''
+        if (!text.trim()) return
+        useAgentPanel.getState().addContext(text, selected)
+      },
+    },
+    {
       // Addendum D1 edit mode (story 16.4): Read ⇄ Edit for the open note.
       // Only acts from the reader with a note open — a no-op elsewhere.
       id: 'action:edit-note',

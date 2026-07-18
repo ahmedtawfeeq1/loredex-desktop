@@ -208,6 +208,14 @@ export function applyAction(state: EditorState, action: ToolbarAction): Transact
   }
 }
 
+/** Add-to-chat (A8): the main selection's text, read straight off CM's
+ *  state.selection so edit-mode "Add to chat" quotes exactly what's selected.
+ *  Empty when the selection is collapsed (a bare cursor) — the caller no-ops. */
+export function selectionText(state: EditorState): string {
+  const { from, to } = state.selection.main
+  return state.sliceDoc(from, to)
+}
+
 /** Keymap adapter (⌘B/⌘I/⌘K inside the editor). */
 export function actionCommand(action: ToolbarAction): StateCommand {
   return ({ state, dispatch }) => {

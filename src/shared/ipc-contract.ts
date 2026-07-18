@@ -85,6 +85,43 @@ export interface AcpPlanEntry {
   priority: 'high' | 'medium' | 'low'
   status: 'pending' | 'in_progress' | 'completed'
 }
+/** Tool-call output the adapter already sends (sdk ToolCallContent). Diffs ride
+ *  here — no `fs` capability needed (paths are ABSOLUTE, relativize to open). */
+export type AcpToolContent =
+  | { kind: 'diff'; path: string; oldText?: string; newText: string }
+  | { kind: 'text'; text: string }
+/** A file the tool touched (sdk ToolCallLocation) — path ABSOLUTE, optional line. */
+export interface AcpToolLocation {
+  path: string
+  line?: number
+}
+/** Captured from InitializeResponse.authMethods for the Phase-2 login UI — we
+ *  only capture now, no login flow is built. `type` is 'env_var' | 'terminal' |
+ *  undefined (agent-handled, the default method has no discriminator). */
+export interface AcpAuthMethod {
+  id: string
+  name: string
+  description?: string
+  type?: string
+}
+/** A slash-command the agent advertises (sdk AvailableCommand). */
+export interface AcpCommand {
+  name: string
+  description: string
+  hint?: string
+}
+/** A session mode the agent can operate in (sdk SessionMode). */
+export interface AcpMode {
+  id: string
+  name: string
+  description?: string
+}
+/** An MCP server attached to a session, surfaced to the renderer as name/url
+ *  ONLY (the per-session bearer token never crosses this seam — A7). */
+export interface AcpMcpServer {
+  name: string
+  url?: string
+}
 
 // ── CoreApi map: renderer → core (request/response) ─────────────────────────
 
@@ -171,6 +208,10 @@ export interface CoreApi {
    *  the payload (F7). Guarded per-path through resolveNoteInsideVault. */
   'vault.dedupe': { in: { paths: string[]; identity: Identity }; out: { removed: string[] } }
   'vault.resolveLink': { in: { link: string; from: string }; out: LinkResolution }
+  /** ACP file-refs (acp Phase 1 A2): agent tool paths are ABSOLUTE (Diff.path,
+   *  ToolCallLocation.path); the renderer needs a vault-relative path to open()
+   *  the note. Pure — mirrors the core-side toVaultRelative. */
+  'vault.relativize': { in: { path: string }; out: { rel: string } }
   /** archive (→ _archive/), unarchive (back home), or delete — one commit */
   'vault.removeNote': {
     in: { path: string; mode: 'delete' | 'archive' | 'unarchive'; identity: Identity }
@@ -364,6 +405,10 @@ export interface CoreApi {
     out: void
   }
   'acp.stop': { in: { sessionId: string }; out: void }
+  /** switch the agent's operating mode (session/set_mode, A7). The adapter may
+   *  confirm via current_mode_update → acp.mode; the renderer also patches the
+   *  current mode optimistically and reverts if this rejects. */
+  'agent.setMode': { in: { sessionId: string; modeId: string }; out: void }
   /** Per-vault panel prefs (settings.terminal pattern): app.db app_settings
    *  row `agentPanel`; get degrades to closed/340 while no vault/db is open. */
   'settings.agentPanel.get': { in: void; out: { open: boolean; width: number } }
@@ -495,6 +540,11 @@ export type CoreEvent =
       agent: AcpAgent
       state: AcpSessionState
       detail?: string
+      /** captured on the auth_required path — Phase-2 login UI reads it (A0) */
+      authMethods?: AcpAuthMethod[]
+      /** MCP servers attached to the session, surfaced ONCE on ready — names/
+       *  urls only, NEVER the bearer token (A7) */
+      mcpServers?: AcpMcpServer[]
     }
   | { kind: 'acp.chunk'; sessionId: string; role: 'agent' | 'thought'; text: string }
   | {
@@ -504,6 +554,10 @@ export type CoreEvent =
       title?: string
       toolKind?: string
       status?: 'pending' | 'in_progress' | 'completed' | 'failed'
+      /** the adapter's tool output — diffs + text (terminal/other dropped) */
+      content?: AcpToolContent[]
+      /** files this tool touched — ABSOLUTE paths (relativize to open) */
+      locations?: AcpToolLocation[]
     }
   | { kind: 'acp.plan'; sessionId: string; entries: AcpPlanEntry[] }
   | {
@@ -513,6 +567,29 @@ export type CoreEvent =
       title: string
       toolKind?: string
       options: AcpPermissionOption[]
+      /** the proposed change — same diff/text the tool row renders (A3) */
+      content?: AcpToolContent[]
+      locations?: AcpToolLocation[]
+    }
+  /** best-effort token telemetry (both halves @experimental, codex may emit
+   *  neither): `context`+`cost` from UsageUpdate (replaces), `turn` from
+   *  PromptResponse.usage (accumulates). One event kind, either half present. */
+  | {
+      kind: 'acp.usage'
+      sessionId: string
+      context?: { used: number; size: number }
+      cost?: { amount: number; currency: string }
+      turn?: { total: number; input: number; output: number; cached?: number; thought?: number }
+    }
+  /** slash-commands the agent advertises (available_commands_update) */
+  | { kind: 'acp.commands'; sessionId: string; commands: AcpCommand[] }
+  /** current session mode (+ the full set on the initial event from
+   *  NewSessionResponse.modes; current_mode_update carries only the id) */
+  | {
+      kind: 'acp.mode'
+      sessionId: string
+      currentModeId: string
+      availableModes?: AcpMode[]
     }
   | { kind: 'acp.turnEnd'; sessionId: string; stopReason: string }
 
@@ -579,6 +656,9 @@ export type IpcCode =
   | 'ACP_UNKNOWN'
   | 'ACP_NOT_READY'
   | 'ACP_BUSY'
+  // ACP Phase 1 (A0): auth-method rejection + unknown conversation (Phase 2)
+  | 'ACP_AUTH_FAILED'
+  | 'ACP_CONV_UNKNOWN'
 
 export interface ErrEnvelope {
   code: IpcCode

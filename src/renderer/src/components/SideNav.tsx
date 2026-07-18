@@ -150,6 +150,9 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
   if (collapsed) {
     return (
       <>
+      <span className="side-rail-brand" aria-hidden="true">
+        <BrandMark size={22} />
+      </span>
       <button
         type="button"
         className="side-collapse side-reopen"

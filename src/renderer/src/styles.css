@@ -7395,3 +7395,4 @@ a.button-primary {
 
 /* expanded nav uses the SVG icon set (user request 2026-07-18) */
 .nav__item .nav-glyph svg { width: 15px; height: 15px; display: block; margin: 0 auto; }
+.side-rail-brand { display: flex; justify-content: center; padding: 10px 0 2px; }

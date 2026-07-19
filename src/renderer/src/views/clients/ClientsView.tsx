@@ -5,7 +5,9 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { ClientInfo } from '../../../../shared/ipc-contract'
+import { invoke } from '../../api'
 import { useDex } from '../../stores/dex'
+import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { sectionTint } from '../reader/sectionTint'
 import { AddClientModal } from './AddClientModal'
 import { ClientPage } from './ClientPage'
@@ -42,6 +44,7 @@ const CLIENTS_CSS = `
 .client-card-tags .client-tag-chip { padding: 1px 8px; }
 .client-card-errors { font-size: 11px; color: var(--rust, #a33f2e); font-weight: 600; }
 .clients-empty { color: var(--text-2); padding: 40px 0; }
+.clients-repair-msg { font-size: 12.5px; color: var(--text-2); margin: -6px 0 14px; }
 `
 
 function ClientCard({ info, onOpen }: { info: ClientInfo; onOpen: () => void }): React.JSX.Element {
@@ -93,6 +96,31 @@ export function ClientsView(): React.JSX.Element {
   const selectManager = useDex((s) => s.selectManager)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [normalizing, setNormalizing] = useState(false)
+  const [repairMsg, setRepairMsg] = useState<string | null>(null)
+  const identity = useIdentity((s) => effectiveIdentity(s))
+
+  async function normalizeFleet(): Promise<void> {
+    if (identity === null) {
+      setRepairMsg('Set your name and email in Settings first.')
+      return
+    }
+    setNormalizing(true)
+    setRepairMsg(null)
+    try {
+      const { normalized } = await invoke('clients.normalize', { identity })
+      await refreshFleet()
+      setRepairMsg(
+        normalized === 0
+          ? 'Every client already has the canonical structure.'
+          : `Repaired ${normalized} client${normalized === 1 ? '' : 's'}.`,
+      )
+    } catch (e) {
+      setRepairMsg(String((e as { message?: string }).message ?? e))
+    } finally {
+      setNormalizing(false)
+    }
+  }
 
   useEffect(() => {
     if (fleet === null) void refreshFleet()
@@ -130,11 +158,21 @@ export function ClientsView(): React.JSX.Element {
           {visible.length} client{visible.length === 1 ? '' : 's'}
         </span>
         <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="button-secondary"
+          disabled={normalizing}
+          title="Ensure every client has the same folder structure (folders, starter pipeline/stage/agent)"
+          onClick={() => void normalizeFleet()}
+        >
+          {normalizing ? 'Repairing…' : 'Repair structure'}
+        </button>
         <button type="button" className="button-emphasis" onClick={() => setAdding(true)}>
           ＋ Add client
         </button>
       </div>
       {adding && <AddClientModal onClose={() => setAdding(false)} />}
+      {repairMsg && <div className="clients-repair-msg">{repairMsg}</div>}
       {allTags.length > 0 && (
         <div className="clients-tags" role="group" aria-label="Filter by tag">
           {allTags.map((tag) => (

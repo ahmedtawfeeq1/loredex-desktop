@@ -250,6 +250,20 @@ export function registerCoreHandlers(
   )
   ipc.register('clients.connections', ({ client }) => engine.clientConnections(client))
   ipc.register('clients.standardTooling', () => engine.standardTooling())
+  ipc.register('clients.normalize', ({ client, identity }) =>
+    withWriteLock(() => {
+      if (!isValidIdentity(identity)) {
+        throw ipcError('INTERNAL', 'normalizing needs an identity — set name and email in Settings')
+      }
+      const result = engine.normalizeStructure(client, identity)
+      if (result.normalized > 0) {
+        invalidateAtlas()
+        ipc.emit({ kind: 'vault.changed', paths: client ? [`projects/${client}`] : ['projects'] })
+        notifier.refresh()
+      }
+      return result
+    }),
+  )
   // Post-hoc tooling copy: an existing client (created with an empty workspace)
   // gets the golden client's connections + tokens — no hand-edited YAML.
   ipc.register('clients.tooling.copy', ({ client, from, servers, tokens, identity }) =>

@@ -219,6 +219,13 @@ export interface CoreApi {
       env: Record<string, string>
     }>
   }
+  /** agent-ops: bring one client (or whole fleet if client omitted) up to the
+   *  canonical structure — folders, .gitkeep, starter pipeline/stage/agent —
+   *  one attributed commit. Idempotent. */
+  'clients.normalize': {
+    in: { client?: string; identity: Identity }
+    out: { normalized: number }
+  }
   /** agent-ops: the dex's standard tooling — deduped connection union across all
    *  tooled clients, each with its copy source. The UI asks for tokens only. */
   'clients.standardTooling': {

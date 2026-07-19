@@ -28,6 +28,7 @@ import {
   loadDexType,
   loadWorkspaceSpec,
   materializeWorkspace,
+  normalizeClient,
   productOf,
   scaffoldClient,
   scanFleet,
@@ -343,6 +344,36 @@ export function clientConnections(client: string): Array<{
 /** Absolute path of a client's directory — the Open-in-Terminal target. */
 export function clientDirAbs(client: string): string {
   return join(getConfig().vaultPath, 'projects', client)
+}
+
+/**
+ * Bring one client (or the whole fleet when `client` is omitted) up to the
+ * canonical structure — folders, .gitkeep, starter pipeline/stage/agent —
+ * then reindex + one attributed commit. Idempotent (lib normalizeClient).
+ */
+export function normalizeStructure(
+  client: string | undefined,
+  identity: Identity,
+): { normalized: number } {
+  const config = getConfig()
+  const targets = client ? [client] : listProjects(config.vaultPath)
+  let normalized = 0
+  for (const slug of targets) {
+    if (!normalizeClient(config.vaultPath, slug).alreadyCanonical) normalized++
+  }
+  if (normalized > 0) {
+    rebuildIndexes(config.vaultPath)
+    withGitIdentity(identity, () =>
+      gitAutoCommit(
+        config.vaultPath,
+        config,
+        client
+          ? `loredex: normalize client ${client} (${identity.name})`
+          : `loredex: normalize fleet structure — ${normalized} client(s) (${identity.name})`,
+      ),
+    )
+  }
+  return { normalized }
 }
 
 const RAW_EXTS = ['.yaml', '.yml', '.json', '.csv'] as const

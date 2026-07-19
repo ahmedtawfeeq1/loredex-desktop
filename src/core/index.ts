@@ -188,6 +188,8 @@ if (config && appDb && vid) {
       // off, ssh batch mode), on top of the stored-credential askpass.
       git: (args) =>
         gitAsync(vaultPath, args, { env: { ...NON_INTERACTIVE_GIT_ENV, ...gitCredentialEnv() } }),
+      // WP-E: auto-push is agent-ops only — research dexes keep pull-only sync
+      isAgentOps: () => engine.getDexType() === 'agent-ops',
       readLocalMeta: (relPath) => {
         try {
           return engine.noteMeta(join(vaultPath, relPath))

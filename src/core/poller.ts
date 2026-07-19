@@ -158,6 +158,10 @@ export interface PollerDeps {
   pullAndReconcile(): Promise<void>
   /** read-only lib syncStatus for sync.changed payloads */
   syncHealth(): SyncHealth
+  /** WP-E: auto-push is an agent-ops-only enhancement — a research dex must keep
+   *  its exact prior sync behavior (pull-only; push stays a manual Sync-now).
+   *  Absent ⇒ treated as false (never auto-push). */
+  isAgentOps?(): boolean
   /** story 9.3 seam: notification routing sees the parsed remote events */
   onRemoteEvents?(events: CoreEvent[]): void
 }
@@ -270,8 +274,14 @@ export function createPoller(deps: PollerDeps): Poller {
    */
   async function integrate(ref: string): Promise<void> {
     const behindRaw = Number((await deps.git(['rev-list', '--count', `HEAD..${ref}`])).trim())
-    const aheadRaw = Number((await deps.git(['rev-list', '--count', `${ref}..HEAD`])).trim())
     const behind = Number.isFinite(behindRaw) ? behindRaw : 0
+    // `ahead` is agent-ops-only — a research dex never runs the extra git query,
+    // never pushes, and never emits the ahead-triggered sync.changed, so its
+    // poller behavior is byte-identical to before WP-E.
+    const agentOps = deps.isAgentOps?.() ?? false
+    const aheadRaw = agentOps
+      ? Number((await deps.git(['rev-list', '--count', `${ref}..HEAD`])).trim())
+      : 0
     const ahead = Number.isFinite(aheadRaw) ? aheadRaw : 0
     if (behind === 0 && ahead === 0) return
 
@@ -291,12 +301,13 @@ export function createPoller(deps: PollerDeps): Poller {
       }
     }
 
-    // push (ahead) — only when NOT behind (a behind push would non-fast-forward
-    // reject) and once HEAD has settled past the debounce. Never holds the lock
-    // (push doesn't touch the worktree); a failure (offline/auth) is best-effort
-    // and re-tried next tick, surfaced by the tick's git.warning path.
+    // push (ahead) — agent-ops dexes only (a research dex keeps its exact prior
+    // pull-only behavior), only when NOT behind (a behind push would non-fast-
+    // forward reject) and once HEAD has settled past the debounce. Never holds
+    // the lock (push doesn't touch the worktree); a failure (offline/auth) is
+    // best-effort, re-tried next tick, surfaced by the tick's git.warning path.
     let pushed = false
-    if (ahead > 0 && behind === 0) {
+    if (ahead > 0 && behind === 0 && deps.isAgentOps?.()) {
       const headCt = Number((await deps.git(['log', '-1', '--format=%ct', 'HEAD'])).trim())
       const settled = Number.isFinite(headCt) && Date.now() / 1000 - headCt >= PUSH_DEBOUNCE_MS / 1000
       if (settled) {

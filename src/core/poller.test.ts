@@ -152,6 +152,8 @@ interface FakeWorld {
   ahead?: number
   /** WP-E: HEAD commit unix seconds for the debounce check (default: long ago) */
   headCt?: number
+  /** WP-E: dex type gate — default agent-ops (push enabled); false = research */
+  agentOps?: boolean
   dirty: boolean
   log: string
   show: Record<string, string>
@@ -223,6 +225,7 @@ function makeDeps(world: FakeWorld): {
       return Promise.resolve()
     },
     syncHealth: () => health,
+    isAgentOps: () => world.agentOps ?? true, // default: agent-ops (exercise the push path)
   }
   return { deps, events, cursorRef, locked, pulled, pushed }
 }
@@ -382,6 +385,29 @@ describe('poller tick', () => {
     await createPoller(deps).tick()
     expect(pushed.current).toBe(0) // deferred until a clean pull makes us fast-forward
     expect(pulled.current).toBe(1)
+  })
+
+  it('WP-E: a RESEARCH dex never pushes — pull-only, no ahead query, byte-identical', async () => {
+    const world: FakeWorld = {
+      remoteSha: 'sha-1',
+      behind: 0,
+      ahead: 5, // even with local commits ahead…
+      headCt: Math.floor(Date.now() / 1000) - 120,
+      agentOps: false, // …a research dex must not push
+      dirty: false,
+      log: '',
+      show: {},
+      calls: [],
+    }
+    const { deps, events, pushed, cursorRef } = makeDeps(world)
+    cursorRef.current = { branch: 'main', lastSeenSha: 'sha-1', lastFetchAt: null }
+    await createPoller(deps).tick()
+    expect(pushed.current).toBe(0)
+    expect(world.ahead).toBe(5) // untouched — no push happened
+    // research is behind===0 & ahead-not-computed → early return → NO sync.changed
+    expect(events).toEqual([])
+    // the ahead-direction rev-list (`ref..HEAD`) is never even queried on research
+    expect(world.calls.some((c) => c.includes('..HEAD'))).toBe(false)
   })
 
   it('WP-E: even (0/0) is a clean no-op — no push, no events', async () => {

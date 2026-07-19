@@ -13,7 +13,12 @@ import { join } from 'node:path'
 import { DEFAULT_FONT_SETTINGS, isFontSettings, type FontSettings } from '../shared/font-settings'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting, type ThemeSetting } from '../shared/theme'
-import type { Identity, RailsCollapsed, TreeSectionsCollapsed } from '../shared/types'
+import type {
+  Identity,
+  PermissionRule,
+  RailsCollapsed,
+  TreeSectionsCollapsed,
+} from '../shared/types'
 import { appSettingGet, appSettingSet, getAppDb, metaGet, metaSet, type AppDb } from './db/index'
 
 /** In-memory fallback when no app.db is open (bare unit tests, no userData). */
@@ -119,6 +124,56 @@ export function saveRailsCollapsed(db: AppDb, vaultId: string, rails: RailsColla
     vaultId,
     'rails',
     JSON.stringify({ sidebar: rails.sidebar === true, list: rails.list === true }),
+  )
+}
+
+// ── WP-B: always-allow permission rules (per-vault, app_settings) ────────────
+
+/** All always-allow rules for this vault (malformed rows are dropped). */
+export function loadPermissionRules(db: AppDb, vaultId: string): PermissionRule[] {
+  const raw = appSettingGet(db, vaultId, 'agentPermissionRules')
+  if (raw === null) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (r): r is PermissionRule =>
+        typeof r?.client === 'string' && typeof r?.toolKind === 'string' && r?.decision === 'allow',
+    )
+  } catch {
+    return []
+  }
+}
+
+function savePermissionRules(db: AppDb, vaultId: string, rules: PermissionRule[]): void {
+  appSettingSet(db, vaultId, 'agentPermissionRules', JSON.stringify(rules))
+}
+
+/** Upsert one (client, toolKind) rule (idempotent on the pair). */
+export function setPermissionRule(
+  db: AppDb,
+  vaultId: string,
+  client: string,
+  toolKind: string,
+  decision: 'allow',
+): void {
+  const rules = loadPermissionRules(db, vaultId).filter(
+    (r) => !(r.client === client && r.toolKind === toolKind),
+  )
+  savePermissionRules(db, vaultId, [...rules, { client, toolKind, decision }])
+}
+
+/** Remove one (client, toolKind) rule (idempotent). */
+export function removePermissionRule(
+  db: AppDb,
+  vaultId: string,
+  client: string,
+  toolKind: string,
+): void {
+  savePermissionRules(
+    db,
+    vaultId,
+    loadPermissionRules(db, vaultId).filter((r) => !(r.client === client && r.toolKind === toolKind)),
   )
 }
 

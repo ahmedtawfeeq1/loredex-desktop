@@ -13,7 +13,9 @@ import { dotTone, useSync } from '../../stores/sync'
 import { type SettingsSection, useSettingsTab } from '../../stores/settingsTab'
 import { AgentTokensCard } from '../agents/AgentsView'
 import { SyncPanel } from '../sync/SyncPanel'
+import { useDex } from '../../stores/dex'
 import { AgentAuthSection } from './AgentAuthSection'
+import { AgentPermissionsSection } from './AgentPermissionsSection'
 import { ContractsSection } from './ContractsSection'
 import { DuplicatesSection } from './DuplicatesSection'
 import { GeneralSection } from './GeneralSection'
@@ -55,9 +57,14 @@ const GROUPS: ReadonlyArray<{ label: string; entries: Entry[] }> = [
       { id: 'sync-git', label: 'Sync & git' },
       { id: 'github', label: 'GitHub' },
       { id: 'agent-auth', label: 'AI providers' },
+      // WP-B: agent-ops only — filtered out on research dexes in SettingsView
+      { id: 'agent-permissions', label: 'Agent permissions' },
     ],
   },
 ]
+
+/** WP-B: the agent-permissions row exists only on agent-ops dexes. */
+const AGENT_OPS_ONLY: ReadonlySet<SettingsSection> = new Set(['agent-permissions'])
 
 const TITLES: Record<SettingsSection, string> = {
   general: 'General',
@@ -71,6 +78,7 @@ const TITLES: Record<SettingsSection, string> = {
   'sync-git': 'Sync & git',
   github: 'GitHub',
   'agent-auth': 'AI providers',
+  'agent-permissions': 'Agent permissions',
 }
 
 /** SYSTEM rows carry live dots: green healthy, rust broken, none elsewhere. */
@@ -102,14 +110,19 @@ export function SettingsView(): React.JSX.Element {
     if (!health) void load()
   }, [health, load])
 
+  const dexType = useDex((s) => s.type)
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return GROUPS
     return GROUPS.map((g) => ({
       ...g,
-      entries: g.entries.filter((e) => e.label.toLowerCase().includes(q)),
+      entries: g.entries.filter(
+        (e) =>
+          // agent-ops-only rows (WP-B) are hidden on research dexes
+          (dexType === 'agent-ops' || !AGENT_OPS_ONLY.has(e.id)) &&
+          (!q || e.label.toLowerCase().includes(q)),
+      ),
     })).filter((g) => g.entries.length > 0)
-  }, [query])
+  }, [query, dexType])
 
   return (
     <div className="settings-v3">
@@ -164,6 +177,7 @@ export function SettingsView(): React.JSX.Element {
         {section === 'sync-git' && <SyncPanel />}
         {section === 'github' && <GitHubSection />}
         {section === 'agent-auth' && <AgentAuthSection />}
+        {section === 'agent-permissions' && <AgentPermissionsSection />}
       </div>
     </div>
   )

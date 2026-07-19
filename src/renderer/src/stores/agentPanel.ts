@@ -116,6 +116,9 @@ export interface AcpPermissionView {
   /** the proposed change — same diff/text shapes a tool row renders (A3) */
   content?: AcpToolContent[]
   locations?: AcpToolLocation[]
+  /** WP-B: the session's client scope — drives the ◈ chip + the 'always allow
+   *  <kind> for <client>' toggle (only shown when this AND toolKind are set). */
+  clientSlug?: string | null
 }
 
 /** Per-provider login state (A6): 'unknown' until a session for that provider
@@ -198,6 +201,10 @@ interface AgentPanelState {
   activeId: string | null
   /** the surfaced permission request; more queue module-side (FIFO) */
   permission: AcpPermissionView | null
+  /** WP-B: total awaiting decisions (surfaced + queued) — DERIVED, recomputed on
+   *  every permission/queue change (never delta-mutated). Drives the TopBar
+   *  badge when the panel is closed. */
+  pendingPermissions: number
   /** the composer draft — lifted into the store (A8) so addContext can
    *  pre-fill it from a note selection; the panel textarea is controlled by it */
   draft: string
@@ -256,7 +263,9 @@ interface AgentPanelState {
   /** switch a session's mode (A7) — optimistic, reverts if agent.setMode fails */
   setMode(sessionId: string, modeId: string): Promise<void>
   cancel(): void
-  respondPermission(optionId: string | null): void
+  /** answer the surfaced request; `remember` persists an always-allow rule for
+   *  this (client, tool kind) when the answer is an allow and both are known. */
+  respondPermission(optionId: string | null, remember?: boolean): void
   closeSession(id: string): Promise<void>
   /** vault switch: acp.stop every session (old core may be dead), defaults */
   reset(): Promise<void>
@@ -271,6 +280,14 @@ let resetGen = 0
  *  can raise several across a turn, so the overflow queues here and advances
  *  on respondPermission. */
 let permissionQueue: AcpPermissionView[] = []
+
+/** WP-B: total awaiting decisions = the surfaced one + the queued overflow.
+ *  DERIVED from the current permission + the module queue — the badge is never
+ *  incremented/decremented, so a multi-purge (a dead session drops N queued
+ *  requests) can't desync it (risk #2). */
+function pendingCount(permission: AcpPermissionView | null): number {
+  return permissionQueue.length + (permission ? 1 : 0)
+}
 
 // ── chunk sink (module scope, NOT store methods): pending chunk runs per
 // session, drained into the store by one rAF-coalesced commit ───────────────
@@ -346,37 +363,43 @@ function applySessionEvent(e: AcpSessionEvent): void {
   }
   // any non-ready state also clears busy: a mid-turn death (adapter exit) emits
   // no turnEnd, and a stuck Stop button helps nobody.
-  useAgentPanel.setState((s) => ({
-    sessions: s.sessions.map((v) =>
-      v.sessionId === e.sessionId
-        ? {
-            ...v,
-            state: e.state,
-            detail: e.detail,
-            busy: e.state === 'ready' ? v.busy : false,
-            // MCP list rides the ready event only (A7) — keep it across later
-            // non-ready transitions
-            mcpServers: e.mcpServers ?? v.mcpServers,
-            authMode: e.authMode ?? v.authMode,
-            // image-input capability rides the ready event (B4) — keep it
-            imageInput: e.imageInput ?? v.imageInput,
-            // client scope rides the starting/ready event (WP-A) — keep it
-            clientSlug: e.clientSlug ?? v.clientSlug,
-          }
-        : v,
-    ),
-    permission:
+  useAgentPanel.setState((s) => {
+    // advance past a surfaced permission for a now-dead session (the queue was
+    // already purged of it above); recompute the badge from the result (risk #2)
+    const permission =
       e.state !== 'ready' && s.permission?.sessionId === e.sessionId
         ? (permissionQueue.shift() ?? null)
-        : s.permission,
-    // login-state chip (A6): a ready session proves the provider is signed in;
-    // auth_required flags it needs login. Other states (starting / error /
-    // exited) say nothing about auth — leave the last verdict.
-    providerAuth:
-      e.state === 'ready' || e.state === 'auth_required'
-        ? { ...s.providerAuth, [e.agent]: e.state === 'ready' ? 'ok' : 'auth_required' }
-        : s.providerAuth,
-  }))
+        : s.permission
+    return {
+      sessions: s.sessions.map((v) =>
+        v.sessionId === e.sessionId
+          ? {
+              ...v,
+              state: e.state,
+              detail: e.detail,
+              busy: e.state === 'ready' ? v.busy : false,
+              // MCP list rides the ready event only (A7) — keep it across later
+              // non-ready transitions
+              mcpServers: e.mcpServers ?? v.mcpServers,
+              authMode: e.authMode ?? v.authMode,
+              // image-input capability rides the ready event (B4) — keep it
+              imageInput: e.imageInput ?? v.imageInput,
+              // client scope rides the starting/ready event (WP-A) — keep it
+              clientSlug: e.clientSlug ?? v.clientSlug,
+            }
+          : v,
+      ),
+      permission,
+      pendingPermissions: pendingCount(permission),
+      // login-state chip (A6): a ready session proves the provider is signed in;
+      // auth_required flags it needs login. Other states (starting / error /
+      // exited) say nothing about auth — leave the last verdict.
+      providerAuth:
+        e.state === 'ready' || e.state === 'auth_required'
+          ? { ...s.providerAuth, [e.agent]: e.state === 'ready' ? 'ok' : 'auth_required' }
+          : s.providerAuth,
+    }
+  })
 }
 
 /** Replay buffered acp.session events for a just-registered session (fast-fail
@@ -516,6 +539,7 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   sessions: [],
   activeId: null,
   permission: null,
+  pendingPermissions: 0,
   draft: '',
   attachments: [],
 
@@ -779,7 +803,7 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     }
   },
 
-  respondPermission(optionId) {
+  respondPermission(optionId, remember) {
     const perm = get().permission
     if (!perm) return
     try {
@@ -789,10 +813,24 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
         requestId: perm.requestId,
         optionId,
       }).catch(() => {}) // turn may have been cancelled across the invoke — core no-ops
+      // WP-B: persist an always-allow rule when the user asked to remember AND
+      // this was an allow for a client-scoped, kind-known request. The chosen
+      // option's KIND decides — only an allow_* answer saves an allow rule.
+      if (remember && optionId && perm.clientSlug && perm.toolKind) {
+        const chosen = perm.options.find((o) => o.optionId === optionId)
+        if (chosen?.kind === 'allow_once' || chosen?.kind === 'allow_always') {
+          void invoke('agent.permissions.set', {
+            client: perm.clientSlug,
+            toolKind: perm.toolKind,
+            decision: 'allow',
+          }).catch(() => {})
+        }
+      }
     } catch {
       // no bridge (node tests)
     }
-    set({ permission: permissionQueue.shift() ?? null })
+    const next = permissionQueue.shift() ?? null
+    set({ permission: next, pendingPermissions: pendingCount(next) })
   },
 
   async closeSession(id) {
@@ -805,13 +843,15 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     permissionQueue = permissionQueue.filter((p) => p.sessionId !== id)
     set((s) => {
       const sessions = s.sessions.filter((v) => v.sessionId !== id)
+      // a surfaced permission for the closed session would hang the modal —
+      // core already answered it cancelled on stop; advance locally too
+      const permission =
+        s.permission?.sessionId === id ? (permissionQueue.shift() ?? null) : s.permission
       return {
         sessions,
         activeId: s.activeId === id ? (sessions[0]?.sessionId ?? null) : s.activeId,
-        // a surfaced permission for the closed session would hang the modal —
-        // core already answered it cancelled on stop; advance locally too
-        permission:
-          s.permission?.sessionId === id ? (permissionQueue.shift() ?? null) : s.permission,
+        permission,
+        pendingPermissions: pendingCount(permission),
       }
     })
   },
@@ -840,6 +880,7 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       sessions: [],
       activeId: null,
       permission: null,
+      pendingPermissions: 0,
       draft: '',
       attachments: [],
     })
@@ -942,9 +983,16 @@ if (typeof window !== 'undefined' && window.loredex) {
           options: e.options,
           content: e.content,
           locations: e.locations,
+          // WP-B: carry the session's client scope so the modal can offer the
+          // always-allow toggle + chip
+          clientSlug: state.sessions.find((v) => v.sessionId === e.sessionId)?.clientSlug ?? null,
         }
-        if (state.permission === null) useAgentPanel.setState({ permission: view })
-        else permissionQueue.push(view)
+        if (state.permission === null) {
+          useAgentPanel.setState({ permission: view, pendingPermissions: pendingCount(view) })
+        } else {
+          permissionQueue.push(view)
+          useAgentPanel.setState({ pendingPermissions: pendingCount(state.permission) })
+        }
         return
       }
       case 'acp.commands': {

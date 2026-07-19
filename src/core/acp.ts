@@ -54,7 +54,8 @@ import {
 import type { AppDb } from './db/index'
 import { readDiscovery } from './discovery'
 import { getMcpStatus } from './mcp-server'
-import { mintAgentToken, revokeAgentToken } from './settings'
+import { loadPermissionRules, mintAgentToken, revokeAgentToken } from './settings'
+import type { PermissionRule } from '../shared/types'
 
 /** Batch window for acp.chunk — the terminals.ts ~8ms precedent. */
 const FLUSH_MS = 8
@@ -889,9 +890,32 @@ export function mapPermissionEvent(
   }
 }
 
+/**
+ * WP-B: evaluate the always-allow rules for a permission request. Returns the
+ * response to auto-answer with (the request's OWN `allow_once` option — decision
+ * derived from the option KIND, never a synthesized id), or null to surface the
+ * modal. A rule needs a client scope AND a tool kind to match; a request with no
+ * kind (unstructured wire type) is never auto-answered. Pure — the test surface.
+ */
+export function evaluatePermission(
+  rules: readonly PermissionRule[],
+  clientSlug: string | null,
+  toolKind: string | undefined,
+  options: readonly { optionId: string; kind?: string }[],
+): RequestPermissionResponse | null {
+  if (!clientSlug || !toolKind) return null
+  const allowed = rules.some(
+    (r) => r.client === clientSlug && r.toolKind === toolKind && r.decision === 'allow',
+  )
+  if (!allowed) return null
+  const opt = options.find((o) => o.kind === 'allow_once')
+  if (!opt) return null // no allow_once option → surface, never auto-answer wrong
+  return { outcome: { outcome: 'selected', optionId: opt.optionId } }
+}
+
 /** session/request_permission — the returned Promise is held until the
  *  renderer answers via acp.permission (or the session dies → default
- *  reject). NO auto-allow of any kind. */
+ *  reject). Auto-answers only a stored always-allow rule (WP-B). */
 function routePermission(
   sessionId: string,
   params: RequestPermissionRequest,
@@ -904,6 +928,21 @@ function routePermission(
   // already Stopped — an ignored modal would block the turn forever. cancelling
   // is reset at the next acpPrompt, so a fresh turn surfaces normally.
   if (s.cancelling) return Promise.resolve(CANCELLED)
+  // WP-B: an always-allow rule for this (client, tool kind) auto-answers with the
+  // request's own allow_once option — no modal. Gated on a client-scoped,
+  // persisting session (research/vault-root sessions never auto-answer).
+  if (s.clientSlug && s.persist && params.toolCall.kind) {
+    const auto = evaluatePermission(
+      loadPermissionRules(s.persist.db, s.persist.vaultId),
+      s.clientSlug,
+      params.toolCall.kind,
+      params.options,
+    )
+    if (auto) {
+      flushChunks(sessionId) // ordering law: chunks land before we resolve the turn
+      return Promise.resolve(auto)
+    }
+  }
   const requestId = randomUUID()
   flushChunks(sessionId) // ordering law: chunks land BEFORE the request
   s.emit(mapPermissionEvent(sessionId, requestId, params))

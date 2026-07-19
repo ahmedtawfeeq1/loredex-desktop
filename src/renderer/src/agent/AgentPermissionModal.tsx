@@ -3,10 +3,14 @@
  * acp.permission CoreEvent, one button per option the adapter offered —
  * built the RecurateDialog way (raw modal classes, custom footer) because
  * the option set is dynamic. Dismissing (Esc / backdrop / ✕) is rejecting:
- * respondPermission(null) → the 'cancelled' outcome. NO default-allow, no
- * remembered choice.
+ * respondPermission(null) → the 'cancelled' outcome. NO default-allow.
+ *
+ * WP-B: for a client-scoped request with a known tool kind, an 'always allow
+ * <kind> for <client>' toggle persists a rule (allow_once semantics) so the same
+ * (client, kind) auto-answers next time — the native `allow_always` button, an
+ * ACP option, is left as-is and NOT reconciled with our rules (§5.4).
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { AcpToolContent } from '../../../shared/ipc-contract'
 import { Button, type ButtonVariant } from '../components/Button'
 import { useAgentPanel } from '../stores/agentPanel'
@@ -24,6 +28,14 @@ const KIND_VARIANT: Record<string, ButtonVariant> = {
 export function AgentPermissionModal(): React.JSX.Element | null {
   const permission = useAgentPanel((s) => s.permission)
   const sessions = useAgentPanel((s) => s.sessions)
+  const [remember, setRemember] = useState(false)
+  // the toggle only makes sense with a client scope AND a tool kind (the rule key)
+  const canRemember = Boolean(permission?.clientSlug && permission?.toolKind)
+
+  // a fresh request resets the toggle (never carries a remember across requests)
+  useEffect(() => {
+    setRemember(false)
+  }, [permission?.requestId])
 
   // Esc rejects; ⌘⏎ picks the first allow_once (mirrors Modal.tsx keys).
   // Capture phase beats App's global handler; App already suppresses registry
@@ -38,13 +50,13 @@ export function AgentPermissionModal(): React.JSX.Element | null {
         const allow = permission?.options.find((o) => o.kind === 'allow_once')
         if (allow) {
           e.preventDefault()
-          useAgentPanel.getState().respondPermission(allow.optionId)
+          useAgentPanel.getState().respondPermission(allow.optionId, remember)
         }
       }
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [permission])
+  }, [permission, remember])
 
   if (!permission) return null
   const session = sessions.find((v) => v.sessionId === permission.sessionId)
@@ -70,6 +82,11 @@ export function AgentPermissionModal(): React.JSX.Element | null {
       >
         <div className="modal-title agent-perm-title-row">
           Agent permission request
+          {permission.clientSlug && (
+            <span className="agent-client-chip" title={`Client: ${permission.clientSlug}`}>
+              ◈ {permission.clientSlug}
+            </span>
+          )}
           <button
             type="button"
             className="agent-perm-close"
@@ -107,6 +124,19 @@ export function AgentPermissionModal(): React.JSX.Element | null {
             ))}
           </div>
         )}
+        {canRemember && (
+          <label className="modal-row agent-perm-remember">
+            <input
+              type="checkbox"
+              role="switch"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
+            <span>
+              Always allow <b>{permission.toolKind}</b> for <b>{permission.clientSlug}</b>
+            </span>
+          </label>
+        )}
         <div className="modal-footer agent-perm-actions">
           {permission.options.map((o, i) => (
             <Button
@@ -115,7 +145,7 @@ export function AgentPermissionModal(): React.JSX.Element | null {
               variant={i === firstAllowOnce ? 'primary' : (KIND_VARIANT[o.kind] ?? 'quiet')}
               kbd={i === firstAllowOnce ? '⌘⏎' : undefined}
               title={o.name}
-              onClick={() => useAgentPanel.getState().respondPermission(o.optionId)}
+              onClick={() => useAgentPanel.getState().respondPermission(o.optionId, remember)}
             >
               {o.name}
             </Button>

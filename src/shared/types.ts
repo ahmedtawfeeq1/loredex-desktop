@@ -93,6 +93,16 @@ export interface VaultIdentity {
 }
 
 /** Vault markdown tree node (story 2.1) — read-only listing, core-host walk. */
+/** WP-B: an always-allow rule — auto-answers a permission request whose (client
+ *  slug, tool kind) matches, with the request's own `allow_once` option. v1 is
+ *  allow-only; `decision` is reserved so a future reject-remember never saves the
+ *  wrong verdict. */
+export interface PermissionRule {
+  client: string
+  toolKind: string
+  decision: 'allow'
+}
+
 export interface TreeNode {
   /** display name: file basename without .md (data files keep their extension), or folder name */
   name: string

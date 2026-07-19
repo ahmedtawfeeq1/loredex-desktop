@@ -68,6 +68,7 @@ export function TopBar(): React.JSX.Element {
   const terminalOpen = useTerminal((s) => s.open)
   const terminalDock = useTerminal((s) => s.dock)
   const agentOpen = useAgentPanel((s) => s.open)
+  const pendingPermissions = useAgentPanel((s) => s.pendingPermissions)
 
   useEffect(() => {
     if (!health) void loadSync()
@@ -123,12 +124,21 @@ export function TopBar(): React.JSX.Element {
         <button
           type="button"
           className={`topbar-icon${agentOpen ? ' is-on' : ''}`}
-          title="Toggle the agent panel"
+          title={
+            pendingPermissions > 0 && !agentOpen
+              ? `${pendingPermissions} agent permission request${pendingPermissions === 1 ? '' : 's'} waiting`
+              : 'Toggle the agent panel'
+          }
           aria-label="Toggle agent panel"
           aria-pressed={agentOpen}
           onClick={() => useAgentPanel.getState().toggle()}
         >
           <AgentPanelGlyph />
+          {pendingPermissions > 0 && !agentOpen && (
+            <span className="topbar-badge" aria-hidden>
+              ⏳ {pendingPermissions}
+            </span>
+          )}
         </button>
         <span className="topbar-sep" aria-hidden="true" />
         {unpushed > 0 && (

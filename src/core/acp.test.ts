@@ -16,6 +16,7 @@ vi.mock('./mcp-server', () => ({
 vi.mock('./settings', () => ({
   mintAgentToken: vi.fn(() => 'tok'),
   revokeAgentToken: vi.fn(),
+  loadPermissionRules: vi.fn(() => []),
 }))
 
 import {
@@ -23,11 +24,13 @@ import {
   buildPromptBlocks,
   canLoadSession,
   deriveClientSlug,
+  evaluatePermission,
   mapPermissionEvent,
   mapUpdate,
   resumeTargetSessionId,
   seedBlock,
 } from './acp'
+import type { PermissionRule } from '../shared/types'
 
 type Update = SessionNotification['update']
 
@@ -497,5 +500,39 @@ describe('deriveClientSlug', () => {
   it('returns null for a non-projects subtree (research dex layout)', () => {
     expect(deriveClientSlug(`${vault}/some_project/topic`, vault)).toBeNull()
     expect(deriveClientSlug(`${vault}/projects`, vault)).toBeNull() // no client segment
+  })
+})
+
+// WP-B: always-allow evaluation — auto-answer with the request's OWN allow_once
+// option, or null (surface the modal). Decision derived from option KIND.
+describe('evaluatePermission', () => {
+  const rules: PermissionRule[] = [{ client: 'acme', toolKind: 'edit', decision: 'allow' }]
+  const opts = [
+    { optionId: 'a', kind: 'allow_once' },
+    { optionId: 'b', kind: 'reject_once' },
+  ]
+  it('(a) auto-answers with the allow_once option when a rule matches', () => {
+    expect(evaluatePermission(rules, 'acme', 'edit', opts)).toEqual({
+      outcome: { outcome: 'selected', optionId: 'a' },
+    })
+  })
+  it('(b) surfaces (null) when no rule matches the client', () => {
+    expect(evaluatePermission(rules, 'other', 'edit', opts)).toBeNull()
+  })
+  it('(c) surfaces when the tool kind does not match', () => {
+    expect(evaluatePermission(rules, 'acme', 'bash', opts)).toBeNull()
+  })
+  it('(d) never auto-answers a session with no client scope', () => {
+    expect(evaluatePermission(rules, null, 'edit', opts)).toBeNull()
+  })
+  it('(e) never auto-answers a request with no tool kind', () => {
+    expect(evaluatePermission(rules, 'acme', undefined, opts)).toBeNull()
+  })
+  it('(f) surfaces when the request offers no allow_once option (never the wrong kind)', () => {
+    const noAllowOnce = [
+      { optionId: 'x', kind: 'allow_always' },
+      { optionId: 'y', kind: 'reject_once' },
+    ]
+    expect(evaluatePermission(rules, 'acme', 'edit', noAllowOnce)).toBeNull()
   })
 })

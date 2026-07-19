@@ -50,6 +50,7 @@ import type {
   LinkResolution,
   McpStatus,
   NoteComment,
+  PermissionRule,
   PrInfo,
   ProjectRootsMap,
   RailsCollapsed,
@@ -73,6 +74,7 @@ export type { ClientInfo, Config, Doc, LintFinding, ProductDashboard, SearchHit,
 export type { WorkItem, WorkPatch, WorkReceipt } from 'loredex'
 export type { SnapshotResult, SnapshotSummary } from 'loredex'
 export type { ClientWorkspaceStatus, CreateClientSpec } from './types'
+export type { PermissionRule } from './types'
 
 // ── ACP agent panels (acp blueprint 2026-07-18): shared types ───────────────
 
@@ -554,6 +556,11 @@ export interface CoreApi {
   'agent.auth.status': { in: void; out: { agent: AcpAgent; hasKey: boolean }[] }
   'agent.auth.setKey': { in: { agent: AcpAgent; key: string }; out: void }
   'agent.auth.clearKey': { in: { agent: AcpAgent }; out: void }
+  // ── WP-B: always-allow permission rules (per-vault; auto-answer a matching
+  //    (client, tool kind) request with its own allow_once option) ──
+  'agent.permissions.list': { in: void; out: PermissionRule[] }
+  'agent.permissions.set': { in: { client: string; toolKind: string; decision: 'allow' }; out: void }
+  'agent.permissions.remove': { in: { client: string; toolKind: string }; out: void }
   /** Per-vault panel prefs (settings.terminal pattern): app.db app_settings
    *  row `agentPanel`; get degrades to closed/340 while no vault/db is open. */
   'settings.agentPanel.get': { in: void; out: { open: boolean; width: number } }

@@ -11,9 +11,11 @@ import {
   loadFontSettings,
   loadIdentityProfile,
   loadListPaneWidth,
+  loadPermissionRules,
   loadRailsCollapsed,
   loadThemeSetting,
   loadTreeSectionsCollapsed,
+  removePermissionRule,
   saveAtlasLegendSeen,
   saveFontSettings,
   saveIdentityProfile,
@@ -21,6 +23,7 @@ import {
   saveRailsCollapsed,
   saveThemeSetting,
   saveTreeSectionsCollapsed,
+  setPermissionRule,
 } from './settings'
 
 function freshDir(): string {
@@ -263,5 +266,43 @@ describe('v0.1 settings.json shim migration (story 9.2 AC3)', () => {
     initAppDb(dir)
     initSettings(dir)
     expect(loadThemeSetting()).toBe('system')
+  })
+})
+
+describe('WP-B always-allow permission rules', () => {
+  it('round-trips per-vault; upsert is idempotent on the (client, kind) pair', () => {
+    freshDir()
+    const db = getAppDb() as AppDb
+    setPermissionRule(db, 'v1', 'acme', 'edit', 'allow')
+    setPermissionRule(db, 'v1', 'acme', 'edit', 'allow') // upsert — still one
+    setPermissionRule(db, 'v1', 'acme', 'bash', 'allow')
+    expect(loadPermissionRules(db, 'v1')).toEqual([
+      { client: 'acme', toolKind: 'edit', decision: 'allow' },
+      { client: 'acme', toolKind: 'bash', decision: 'allow' },
+    ])
+    // another vault is isolated
+    expect(loadPermissionRules(db, 'v2')).toEqual([])
+  })
+
+  it('remove drops one rule; a malformed row reads as []', () => {
+    freshDir()
+    const db = getAppDb() as AppDb
+    setPermissionRule(db, 'v1', 'acme', 'edit', 'allow')
+    setPermissionRule(db, 'v1', 'acme', 'bash', 'allow')
+    removePermissionRule(db, 'v1', 'acme', 'edit')
+    expect(loadPermissionRules(db, 'v1')).toEqual([
+      { client: 'acme', toolKind: 'bash', decision: 'allow' },
+    ])
+    appSettingSet(db, 'v1', 'agentPermissionRules', 'not json')
+    expect(loadPermissionRules(db, 'v1')).toEqual([])
+  })
+
+  it('leaves sibling settings untouched', () => {
+    freshDir()
+    const db = getAppDb() as AppDb
+    saveRailsCollapsed(db, 'v1', { sidebar: true, list: false })
+    setPermissionRule(db, 'v1', 'acme', 'edit', 'allow')
+    expect(loadRailsCollapsed(db, 'v1')).toEqual({ sidebar: true, list: false })
+    expect(loadPermissionRules(db, 'v1')).toHaveLength(1)
   })
 })

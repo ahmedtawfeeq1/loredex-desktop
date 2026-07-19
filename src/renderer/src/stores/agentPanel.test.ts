@@ -872,6 +872,38 @@ describe('permission FIFO', () => {
     useAgentPanel.getState().respondPermission('y')
     expect(useAgentPanel.getState().permission).toBeNull()
   })
+
+  it('WP-B: remember persists an always-allow rule for the (client, kind)', () => {
+    useAgentPanel.setState({ sessions: [session('s1', { clientSlug: 'acme' })], activeId: 's1' })
+    emit(perm('r1')) // toolKind 'edit'
+    // the modal's toggle threads remember=true into the allow answer
+    useAgentPanel.getState().respondPermission('y', true)
+    expect(invoke).toHaveBeenCalledWith('agent.permissions.set', {
+      client: 'acme',
+      toolKind: 'edit',
+      decision: 'allow',
+    })
+  })
+
+  it('WP-B: does NOT persist a rule without a client scope or on a reject', () => {
+    // no clientSlug on the session → no rule even with remember
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    emit(perm('r1'))
+    useAgentPanel.getState().respondPermission('y', true)
+    expect(invoke).not.toHaveBeenCalledWith('agent.permissions.set', expect.anything())
+  })
+
+  it('WP-B: the pending badge is DERIVED — a multi-purge can never desync it (risk #2)', () => {
+    // s1: 1 surfaced + 2 queued; s1 dies → ALL of s1's requests vanish → count 0
+    useAgentPanel.setState({ sessions: [session('s1'), session('s2')], activeId: 's1' })
+    emit(permFor('s1', 'r1')) // surfaces
+    emit(permFor('s1', 'r2')) // queues
+    emit(permFor('s1', 'r3')) // queues
+    expect(useAgentPanel.getState().pendingPermissions).toBe(3)
+    emit({ kind: 'acp.session', sessionId: 's1', agent: 'claude', state: 'exited' })
+    expect(useAgentPanel.getState().pendingPermissions).toBe(0)
+    expect(useAgentPanel.getState().permission).toBeNull()
+  })
 })
 
 describe('reset (vault switch)', () => {

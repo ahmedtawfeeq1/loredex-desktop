@@ -17,6 +17,7 @@ export type SettingsSection =
   | 'sync-git'
   | 'github'
   | 'agent-auth'
+  | 'agent-permissions'
 
 export type SettingsTab = 'Workspace' | 'Personal' | 'System'
 

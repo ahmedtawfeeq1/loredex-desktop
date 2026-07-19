@@ -108,6 +108,9 @@ import {
   saveMcpAutostart,
   saveMcpWriteTools,
   loadOrCreateMcpToken,
+  loadPermissionRules,
+  setPermissionRule,
+  removePermissionRule,
 } from './settings'
 import { termCreate, termInput, termKill, termResize } from './terminals'
 import { buildThread, collectComments } from './threads'
@@ -946,6 +949,22 @@ export function registerCoreHandlers(
   ipc.register('agent.auth.status', () => agentKeyStatus())
   ipc.register('agent.auth.setKey', ({ agent, key }) => storeAgentKey(agent, key))
   ipc.register('agent.auth.clearKey', ({ agent }) => clearAgentKey(agent))
+  // WP-B: always-allow permission rules (per-vault app.db; no vault/db → []/no-op).
+  ipc.register('agent.permissions.list', () => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    return db && vid ? loadPermissionRules(db, vid) : []
+  })
+  ipc.register('agent.permissions.set', ({ client, toolKind, decision }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (db && vid) setPermissionRule(db, vid, client, toolKind, decision)
+  })
+  ipc.register('agent.permissions.remove', ({ client, toolKind }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (db && vid) removePermissionRule(db, vid, client, toolKind)
+  })
   ipc.register('home.brief', () => engine.homeBrief())
   ipc.register('settings.identity.get', () => {
     // no vault yet (first run, story 13.2) → no ambient default, NOT an error:

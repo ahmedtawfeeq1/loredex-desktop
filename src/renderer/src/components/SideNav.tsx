@@ -180,8 +180,6 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
   const status = useApp((s) => s.status)
   const view = useApp((s) => s.view)
   const setView = useApp((s) => s.setView)
-  const vaultPath = useApp((s) => s.identity?.vaultPath ?? '')
-  const engine = useApp((s) => s.identity?.engineVersion ?? '')
   const cards = useHandoffs((s) => s.cards)
   const tree = useReader((s) => s.tree)
   const activity = useDashboardData((s) => s.activity)
@@ -196,7 +194,6 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
     [activity],
   )
   const shelves = useMemo(() => shelvesFrom(tree), [tree])
-  const dexName = vaultPath.split('/').filter(Boolean).pop() ?? 'dex'
 
   useEffect(() => {
     if (status === 'ready' && tree === null) void useReader.getState().loadTree()
@@ -246,9 +243,8 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
         <BrandMark size={32} />
         <div className="side-brand">
           <span className="side-brand-name">Loredex</span>
-          <span className="side-brand-dex" title={`${dexName}${engine ? ` · dex ${engine}` : ''}`}>
-            {dexName}
-            {engine ? ` · ${engine}` : ''}
+          <span className="side-brand-dex" title={`Loredex ${__APP_VERSION__}`}>
+            v{__APP_VERSION__}
           </span>
         </div>
         <button

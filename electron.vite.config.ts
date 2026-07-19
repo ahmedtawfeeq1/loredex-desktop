@@ -1,8 +1,15 @@
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 
 const root = import.meta.dirname
+
+// the app version, injected at build time so the header shows the exact build —
+// identical string across every OS installer (all built from this package.json)
+const { version: APP_VERSION } = JSON.parse(
+  readFileSync(resolve(root, 'package.json'), 'utf8'),
+) as { version: string }
 
 export default defineConfig({
   main: {
@@ -29,5 +36,8 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react()],
+    define: {
+      __APP_VERSION__: JSON.stringify(APP_VERSION),
+    },
   },
 })

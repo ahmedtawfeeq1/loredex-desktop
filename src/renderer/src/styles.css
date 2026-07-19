@@ -190,6 +190,32 @@ a:hover {
   -webkit-app-region: no-drag;
 }
 
+/* header quick-actions: toggle the terminal drawer / agent panel */
+.topbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--text-2);
+  transition: background 100ms ease-out, color 100ms ease-out;
+}
+.topbar-icon:hover {
+  background: var(--bg-inset);
+  color: var(--text-1);
+}
+.topbar-icon.is-on {
+  background: var(--bg-inset);
+  color: var(--accent);
+}
+.topbar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--hairline);
+  margin: 0 1px;
+}
+
 .sync-pill {
   display: inline-flex;
   align-items: center;

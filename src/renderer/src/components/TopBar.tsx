@@ -6,11 +6,33 @@
  * macOS (traffic lights sit over its left inset).
  */
 import { useEffect } from 'react'
+import { useAgentPanel } from '../stores/agentPanel'
 import { useApp } from '../stores/app'
 import { effectiveIdentity, useIdentity } from '../stores/identity'
 import { useSearch } from '../stores/search'
 import { dotTone, useSync } from '../stores/sync'
 import { useSettingsTab } from '../stores/settingsTab'
+import { useTerminal } from '../stores/terminal'
+
+/** panel-bottom glyph — the terminal drawer */
+function TerminalGlyph(): React.JSX.Element {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M1.75 10.25 H14.25" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  )
+}
+
+/** panel-right glyph — the agent side panel */
+function AgentPanelGlyph(): React.JSX.Element {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M10 2.75 V13.25" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  )
+}
 
 function relative(iso: string | null | undefined, nowMs: number): string {
   if (!iso) return ''
@@ -26,6 +48,8 @@ export function TopBar(): React.JSX.Element {
   const loadSync = useSync((s) => s.load)
   const identity = useIdentity((s) => effectiveIdentity(s))
   const setView = useApp((s) => s.setView)
+  const terminalOpen = useTerminal((s) => s.open)
+  const agentOpen = useAgentPanel((s) => s.open)
 
   useEffect(() => {
     if (!health) void loadSync()
@@ -53,6 +77,27 @@ export function TopBar(): React.JSX.Element {
         </button>
       </div>
       <div className="topbar-right">
+        <button
+          type="button"
+          className={`topbar-icon${terminalOpen ? ' is-on' : ''}`}
+          title="Toggle the terminal (⌃`)"
+          aria-label="Toggle terminal"
+          aria-pressed={terminalOpen}
+          onClick={() => void useTerminal.getState().toggle()}
+        >
+          <TerminalGlyph />
+        </button>
+        <button
+          type="button"
+          className={`topbar-icon${agentOpen ? ' is-on' : ''}`}
+          title="Toggle the agent panel"
+          aria-label="Toggle agent panel"
+          aria-pressed={agentOpen}
+          onClick={() => useAgentPanel.getState().toggle()}
+        >
+          <AgentPanelGlyph />
+        </button>
+        <span className="topbar-sep" aria-hidden="true" />
         <button
           type="button"
           className="sync-pill"

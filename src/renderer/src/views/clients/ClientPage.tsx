@@ -16,6 +16,7 @@ import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useReader } from '../../stores/reader'
+import { useTerminal } from '../../stores/terminal'
 import { sectionTint } from '../reader/sectionTint'
 import { buildClientPage, type UnitSection } from './client-page'
 
@@ -350,8 +351,12 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           type="button"
           className="button-secondary"
           disabled={!info.hasWorkspaceYml}
-          title="Open a terminal in this client's directory — then just type claude"
-          onClick={() => void invoke('clients.openTerminal', { client: info.slug }).catch(() => {})}
+          title="Open the in-app terminal in this client's folder — then just type claude"
+          onClick={() =>
+            void invoke('clients.dirAbs', { client: info.slug })
+              .then(({ dir }) => useTerminal.getState().openAt(dir))
+              .catch(() => {})
+          }
         >
           Open in Terminal
         </button>

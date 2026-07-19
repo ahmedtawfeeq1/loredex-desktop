@@ -3,10 +3,7 @@
  * Unregistered channels answer NOT_IMPLEMENTED from the dispatcher itself.
  */
 import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { isFontSettings } from '../shared/font-settings'
-
-const execFileAsync = promisify(execFile)
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting } from '../shared/theme'
@@ -351,18 +348,9 @@ export function registerCoreHandlers(
     })
   })
   // The terminal-free bridge: drop the teammate exactly where `claude` runs.
-  ipc.register('clients.openTerminal', async ({ client }) => {
-    const dir = engine.clientDirAbs(client)
-    if (process.platform === 'darwin') {
-      await execFileAsync('open', ['-a', 'Terminal', dir], { timeout: 5000 })
-      return { ok: true }
-    }
-    // linux/windows: no uniform terminal launcher — reveal the folder instead
-    await execFileAsync(process.platform === 'win32' ? 'explorer' : 'xdg-open', [dir], {
-      timeout: 5000,
-    })
-    return { ok: true }
-  })
+  // "Open in Terminal" opens the IN-APP terminal drawer at this dir (renderer
+  // side); the core just resolves the absolute path cross-platform.
+  ipc.register('clients.dirAbs', ({ client }) => ({ dir: engine.clientDirAbs(client) }))
   // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
   // same recomputed-cache tier as the link index (never authoritative).
   ipc.register('atlas.graph', ({ level, scope }) => atlasGraph(level, scope ?? {}))

@@ -251,9 +251,9 @@ export interface CoreApi {
     in: { client: string; server: string }
     out: { ok: boolean; detail: string }
   }
-  /** agent-ops: open the OS terminal in the client's directory (the terminal-free
-   *  bridge to `claude`) */
-  'clients.openTerminal': { in: { client: string }; out: { ok: boolean } }
+  /** agent-ops: the client's absolute directory — the in-app terminal's cwd for
+   *  "Open in Terminal" (so `claude` runs in that client's folder) */
+  'clients.dirAbs': { in: { client: string }; out: { dir: string } }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,
    *  aggregated core-side from vault frontmatter (memoized per mtime) */

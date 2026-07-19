@@ -236,9 +236,20 @@ a:hover {
   white-space: nowrap;
 }
 
+/* the brand mark must never be squeezed to 0 by the flex row — it's the fixed
+   Loredex logo, shown on every dex (agent-ops included), left of the dex name */
+.side-head > svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
 .side-dex {
   font-size: 13.5px;
   font-weight: 650;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .side-ver {

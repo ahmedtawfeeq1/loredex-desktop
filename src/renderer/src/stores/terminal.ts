@@ -51,6 +51,9 @@ interface TerminalState {
    *  so the user reuses the same subscription, no API key. Best-effort: no core
    *  / spawn refused → no-op, never throws. */
   runCommand(command: string): Promise<void>
+  /** open the drawer with a pty rooted at `cwd` — the client page's
+   *  "Open in Terminal" so `claude` runs in that client's folder, in-app. */
+  openAt(cwd: string): Promise<void>
   splitActive(dir: 'row' | 'column'): Promise<void>
   closePane(id: string): Promise<void>
   setActive(id: string): void
@@ -155,6 +158,55 @@ export const useTerminal = create<TerminalState>((set, get) => ({
       return
     }
     set({ open: !open })
+    persist()
+  },
+
+  async openAt(cwd) {
+    // no tree yet → first pane at cwd (mirrors toggle's first-open dance)
+    if (get().root === null) {
+      if (creating) {
+        set({ open: true })
+        return
+      }
+      set({ open: true })
+      creating = true
+      const gen = resetGen
+      let id: string
+      try {
+        ;({ id } = await invoke('term.create', { cwd, cols: 80, rows: 24 }))
+      } catch {
+        creating = false
+        set({ open: false })
+        return
+      }
+      creating = false
+      if (resetGen !== gen) {
+        void invoke('term.kill', { id }).catch(() => {})
+        return
+      }
+      set({ root: { kind: 'term', id }, activeId: id })
+      persist()
+      return
+    }
+    // a tree exists → add a fresh pane at cwd (each client gets its own terminal)
+    const target = get().activeId ?? firstTermId(get().root)
+    let id: string
+    try {
+      ;({ id } = await invoke('term.create', { cwd, cols: 80, rows: 24 }))
+    } catch {
+      set({ open: true })
+      persist()
+      return
+    }
+    const now = get().root
+    const next = now === null || target === null ? null : splitPane(now, target, 'row', id)
+    if (next === null || next === now) {
+      void invoke('term.kill', { id }).catch(() => {})
+      set({ open: true })
+      persist()
+      return
+    }
+    set({ root: next, activeId: id, open: true })
     persist()
   },
 

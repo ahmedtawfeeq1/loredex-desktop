@@ -44,19 +44,28 @@ export function isOpenableExt(p: string): boolean {
 }
 
 /**
- * Is `target` inside `root`? realpath both (so a symlink pointing out of the dex
- * fails), then a separator-anchored prefix test so `/vault-evil` is NOT "inside"
- * `/vault`. Equal paths (target IS the root) count as inside. A target that
- * can't be resolved (missing / unreadable) is treated as NOT contained.
+ * Resolve `target` to its REAL path if it lives inside `root`, else null.
+ * realpath both (so a symlink pointing out of the dex fails), then a
+ * separator-anchored prefix test so `/vault-evil` is NOT "inside" `/vault`.
+ * Returning the RESOLVED path is load-bearing: the caller must gate the launch
+ * allowlist + hand the OS the real target, never the symlink — otherwise an
+ * `invoice.pdf` symlinked to `payload.command` (both in-dex) would pass the .pdf
+ * allowlist yet launch the executable. A target that can't be resolved
+ * (missing / unreadable) is NOT contained.
  */
-export function isInsideVault(root: string, target: string): boolean {
+export function resolveInsideVault(root: string, target: string): string | null {
   let r: string
   let t: string
   try {
     r = realpathSync(root)
     t = realpathSync(target)
   } catch {
-    return false
+    return null
   }
-  return t === r || t.startsWith(r + sep)
+  return t === r || t.startsWith(r + sep) ? t : null
+}
+
+/** Boolean containment (the realpath'd target isn't needed). */
+export function isInsideVault(root: string, target: string): boolean {
+  return resolveInsideVault(root, target) !== null
 }

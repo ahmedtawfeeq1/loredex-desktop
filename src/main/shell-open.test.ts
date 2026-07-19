@@ -3,7 +3,7 @@
  * containment + allowlist run for real against a temp vault, so we assert the
  * exact shell call each request makes (launch vs reveal vs nothing).
  */
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -30,6 +30,12 @@ beforeAll(async () => {
   mkdirSync(join(vault, 'projects', 'acme', 'sub'), { recursive: true })
   writeFileSync(join(vault, 'projects', 'acme', 'report.pdf'), 'x')
   writeFileSync(join(vault, 'projects', 'acme', 'run.sh'), 'x')
+  // a teammate-committed symlink with an allowlisted NAME pointing at an in-vault
+  // executable — the allowlist bypass the audit caught
+  symlinkSync(
+    join(vault, 'projects', 'acme', 'run.sh'),
+    join(vault, 'projects', 'acme', 'invoice.pdf'),
+  )
   mkdirSync(join(sandbox, 'outside'), { recursive: true })
   writeFileSync(join(sandbox, 'outside', 'secret.pdf'), 'x')
 })
@@ -64,6 +70,15 @@ describe('registerShellOpen (trusted root)', () => {
   it('REVEALS (never launches) a directory', () => {
     wire(vault)
     expect(open('projects/acme/sub')).toEqual({ ok: true, revealed: true })
+    expect(shell.openPath).not.toHaveBeenCalled()
+    expect(shell.showItemInFolder).toHaveBeenCalledTimes(1)
+  })
+
+  it('REVEALS (never launches) an allowlisted-NAME symlink to an in-vault executable', () => {
+    wire(vault)
+    // invoice.pdf → run.sh: the allowlist runs on the RESOLVED target (run.sh),
+    // so this is revealed, not launched (the audit's ACE bypass, closed)
+    expect(open('projects/acme/invoice.pdf')).toEqual({ ok: true, revealed: true })
     expect(shell.openPath).not.toHaveBeenCalled()
     expect(shell.showItemInFolder).toHaveBeenCalledTimes(1)
   })

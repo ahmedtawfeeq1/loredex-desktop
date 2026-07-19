@@ -8,7 +8,7 @@
 import { statSync } from 'node:fs'
 import { join } from 'node:path'
 import { type BrowserWindow, ipcMain, shell } from 'electron'
-import { isInsideVault, isOpenableExt } from './path-containment'
+import { isOpenableExt, resolveInsideVault } from './path-containment'
 
 /**
  * Wire the reveal/open ipc handlers. `windowFor` maps the invoke to its window;
@@ -19,24 +19,26 @@ export function registerShellOpen(
   windowFor: (event: Electron.IpcMainInvokeEvent) => BrowserWindow | null,
   vaultRootFor: (win: BrowserWindow) => string | null,
 ): void {
+  // Resolves rel to the REAL target path inside the trusted root (null if it
+  // escapes / is missing). The allowlist + shell calls run against this resolved
+  // path, NEVER the symlink — an `x.pdf` symlinked to `y.command` resolves to
+  // `y.command` and is caught by the allowlist (reveal, not launch).
   const resolve = (
     event: Electron.IpcMainInvokeEvent,
     rel: unknown,
-  ): { abs: string } | null => {
+  ): { real: string } | null => {
     const win = windowFor(event)
     if (!win) return null
     const root = vaultRootFor(win)
     if (!root || typeof rel !== 'string' || !rel) return null
-    // join normalizes an absolute-looking rel under root; the containment check
-    // (realpath both) then rejects any `..`/symlink escape.
-    const abs = join(root, rel)
-    return isInsideVault(root, abs) ? { abs } : null
+    const real = resolveInsideVault(root, join(root, rel))
+    return real ? { real } : null
   }
 
   ipcMain.handle('loredex:reveal-path', (event, rel: unknown) => {
     const r = resolve(event, rel)
     if (!r) return { ok: false }
-    shell.showItemInFolder(r.abs)
+    shell.showItemInFolder(r.real)
     return { ok: true }
   })
 
@@ -45,16 +47,17 @@ export function registerShellOpen(
     if (!r) return { ok: false }
     let isDir = false
     try {
-      isDir = statSync(r.abs).isDirectory()
+      isDir = statSync(r.real).isDirectory()
     } catch {
       return { ok: false } // vanished between the tree walk and the click
     }
-    // reveal (never launch) a directory bundle or a non-allowlisted file
-    if (isDir || !isOpenableExt(r.abs)) {
-      shell.showItemInFolder(r.abs)
+    // reveal (never launch) a directory bundle or a non-allowlisted file — the
+    // check + launch both run on the RESOLVED target (symlink-safe)
+    if (isDir || !isOpenableExt(r.real)) {
+      shell.showItemInFolder(r.real)
       return { ok: true, revealed: true }
     }
-    void shell.openPath(r.abs)
+    void shell.openPath(r.real)
     return { ok: true }
   })
 }

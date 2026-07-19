@@ -259,6 +259,8 @@ describe('registration smoke over the seam', () => {
     await expect(client.invoke('settings.terminal.get', undefined)).resolves.toEqual({
       open: false,
       height: 280,
+      dock: 'bottom',
+      width: 380,
     })
     // explicit bad cwd travels the seam as a typed envelope (no engine needed)
     await expect(

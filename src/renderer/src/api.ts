@@ -21,6 +21,7 @@ declare global {
       listRecentVaults(): Promise<RecentVault[]>
       openInNewWindow(vaultPath?: string): Promise<null>
       openAgentWindow(vaultPath: string | null, conversationId: string): Promise<null>
+      openTerminalWindow(vaultPath: string | null): Promise<null>
       onJoinLink(cb: (url: string) => void): Unsubscribe
       onOpenAgent(cb: (conversationId: string) => void): Unsubscribe
       pathForFile(file: File): string
@@ -94,6 +95,18 @@ export function openInNewWindow(vaultPath?: string): Promise<null> {
  *  core host, same vault app.db → resumed from the persisted transcript). */
 export function openAgentWindow(vaultPath: string | null, conversationId: string): Promise<null> {
   return window.loredex.openAgentWindow(vaultPath, conversationId)
+}
+
+/** Terminal-only pop-out: a standalone window with just the terminal, full-window. */
+export function openTerminalWindow(vaultPath: string | null): Promise<null> {
+  return window.loredex.openTerminalWindow(vaultPath)
+}
+
+/** The pop-out mode of THIS window, read from the ?popout= URL query at load
+ *  (main sets it per createMainWindow). null for the normal full app window. */
+export function popoutMode(): 'chat' | 'terminal' | null {
+  const m = new URLSearchParams(window.location.search).get('popout')
+  return m === 'chat' || m === 'terminal' ? m : null
 }
 
 /** loredex://join deep link (story 13.2): raw URL, parsed by shared/join-link. */

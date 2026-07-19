@@ -10,7 +10,13 @@
 import { create } from 'zustand'
 import { isErrEnvelope } from '../../../shared/ipc-contract'
 import { invoke, onEvent } from '../api'
-import { clampTermHeight, DEFAULT_TERM_HEIGHT } from '../terminal/drawerHeight'
+import {
+  clampTermHeight,
+  clampTermWidth,
+  DEFAULT_TERM_HEIGHT,
+  DEFAULT_TERM_WIDTH,
+  type TermDock,
+} from '../terminal/drawerHeight'
 import {
   collectTermIds,
   firstTermId,
@@ -20,11 +26,16 @@ import {
   type Pane,
   type PanePath,
 } from '../terminal/paneTree'
-import { disposeAllTerms, disposeTerm, writeTerm } from '../terminal/xtermRegistry'
+import { disposeAllTerms, disposeTerm, fitTerm, writeTerm } from '../terminal/xtermRegistry'
 
 interface TerminalState {
   open: boolean
   height: number
+  /** where the terminal docks: a bottom horizontal drawer or a left vertical
+   *  panel (the VS Code move-panel choice). Persisted per vault. */
+  dock: TermDock
+  /** left-dock width (px) — the vertical-dock counterpart to `height`. */
+  width: number
   /** null until the first terminal spawns (the drawer renders nothing) */
   root: Pane | null
   /** focused pane; consumers fall back to firstTermId(root) when null */
@@ -51,6 +62,12 @@ interface TerminalState {
   commitHeight(): void
   /** double-click the handle → back to the 280px default, persisted */
   resetHeight(): void
+  /** left-dock width counterparts of the height drag trio */
+  dragWidth(px: number): void
+  commitWidth(): void
+  resetWidth(): void
+  /** switch bottom ↔ left dock, persisted; refits every pane after the reflow */
+  toggleDock(): void
   setResizing(v: boolean): void
   /** vault switch: kill this window's ptys, dispose xterms, defaults */
   reset(): Promise<void>
@@ -65,9 +82,9 @@ let creating = false
 let resetGen = 0
 
 function persist(): void {
-  const { open, height } = useTerminal.getState()
+  const { open, height, dock, width } = useTerminal.getState()
   try {
-    void invoke('settings.terminal.set', { open, height }).catch(() => {
+    void invoke('settings.terminal.set', { open, height, dock, width }).catch(() => {
       // stays applied for this session; next launch re-reads the stored value
     })
   } catch {
@@ -78,6 +95,8 @@ function persist(): void {
 export const useTerminal = create<TerminalState>((set, get) => ({
   open: false,
   height: DEFAULT_TERM_HEIGHT,
+  dock: 'bottom',
+  width: DEFAULT_TERM_WIDTH,
   root: null,
   activeId: null,
   resizing: false,
@@ -86,7 +105,12 @@ export const useTerminal = create<TerminalState>((set, get) => ({
   async load() {
     try {
       const stored = await invoke('settings.terminal.get', undefined)
-      set({ open: stored.open, height: clampTermHeight(stored.height) })
+      set({
+        open: stored.open,
+        height: clampTermHeight(stored.height),
+        dock: stored.dock === 'left' ? 'left' : 'bottom',
+        width: clampTermWidth(stored.width),
+      })
     } catch (e) {
       // first-attach port swap drops early invokes — retry once (app.init pattern)
       if (isErrEnvelope(e) && e.code === 'PORT_SWAPPED') return get().load()
@@ -216,6 +240,30 @@ export const useTerminal = create<TerminalState>((set, get) => ({
     persist()
   },
 
+  dragWidth(px) {
+    set({ width: clampTermWidth(px) })
+  },
+
+  commitWidth() {
+    persist()
+  },
+
+  resetWidth() {
+    set({ width: DEFAULT_TERM_WIDTH })
+    persist()
+  },
+
+  toggleDock() {
+    set({ dock: get().dock === 'bottom' ? 'left' : 'bottom' })
+    persist()
+    // the drawer reflows on the OTHER axis — refit every pane once the new size
+    // lands (fit is wrong until the DOM box changes)
+    const tree = get().root
+    if (tree) requestAnimationFrame(() => requestAnimationFrame(() => {
+      for (const id of collectTermIds(tree)) fitTerm(id)
+    }))
+  },
+
   setResizing(resizing) {
     set({ resizing })
   },
@@ -237,6 +285,8 @@ export const useTerminal = create<TerminalState>((set, get) => ({
     set({
       open: false,
       height: DEFAULT_TERM_HEIGHT,
+      dock: 'bottom',
+      width: DEFAULT_TERM_WIDTH,
       root: null,
       activeId: null,
       resizing: false,

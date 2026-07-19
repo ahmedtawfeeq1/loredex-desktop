@@ -1,13 +1,21 @@
 import { join } from 'node:path'
 import { BrowserWindow, shell } from 'electron'
 
+/** A standalone pop-out shows ONE panel filling the window (chat or terminal),
+ *  not the full app — signalled to the renderer via a `?popout=` URL query read
+ *  at first render (no full-app flash), and given a smaller frame. */
+export type PopoutMode = 'chat' | 'terminal'
+
 /** Main is logic-free: window creation + wiring only (architecture.md#process-model). */
-export function createMainWindow(): BrowserWindow {
+export function createMainWindow(popout?: PopoutMode): BrowserWindow {
+  const size =
+    popout === 'chat'
+      ? { width: 460, height: 800, minWidth: 360, minHeight: 420 }
+      : popout === 'terminal'
+        ? { width: 820, height: 520, minWidth: 480, minHeight: 300 }
+        : { width: 1100, height: 750, minWidth: 880, minHeight: 520 }
   const win = new BrowserWindow({
-    width: 1100,
-    height: 750,
-    minWidth: 880,
-    minHeight: 520,
+    ...size,
     show: false,
     // DESIGN.md layout: traffic lights over the translucent sidebar.
     titleBarStyle: 'hiddenInset',
@@ -41,8 +49,13 @@ export function createMainWindow(): BrowserWindow {
   })
 
   const devUrl = process.env.ELECTRON_RENDERER_URL
-  if (devUrl) void win.loadURL(devUrl)
-  else void win.loadFile(join(import.meta.dirname, '../renderer/index.html'))
+  const query = popout ? `popout=${popout}` : ''
+  if (devUrl) void win.loadURL(query ? `${devUrl}?${query}` : devUrl)
+  else
+    void win.loadFile(
+      join(import.meta.dirname, '../renderer/index.html'),
+      query ? { search: query } : undefined,
+    )
 
   return win
 }

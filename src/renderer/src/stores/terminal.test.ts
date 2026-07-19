@@ -12,6 +12,7 @@ vi.mock('../terminal/xtermRegistry', () => ({
   writeTerm: vi.fn(),
   disposeTerm: vi.fn(),
   disposeAllTerms: vi.fn(),
+  fitTerm: vi.fn(),
 }))
 
 import { disposeAllTerms, disposeTerm } from '../terminal/xtermRegistry'
@@ -26,6 +27,8 @@ beforeEach(() => {
   useTerminal.setState({
     open: false,
     height: 280,
+    dock: 'bottom',
+    width: 380,
     root: null,
     activeId: null,
     resizing: false,
@@ -67,7 +70,7 @@ describe('toggle (spawn-on-first-open)', () => {
     await useTerminal.getState().toggle()
     // exact arg — a cwd key here would break the "vault root by default" contract
     expect(invoke).toHaveBeenCalledWith('term.create', { cols: 80, rows: 24 })
-    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: true, height: 280 })
+    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: true, height: 280, dock: 'bottom', width: 380 })
     expect(useTerminal.getState()).toMatchObject({
       open: true,
       root: { kind: 'term', id: 't1' },
@@ -90,7 +93,7 @@ describe('toggle (spawn-on-first-open)', () => {
     expect(useTerminal.getState()).toMatchObject({ open: false, root: { kind: 'term', id: 't1' } })
     expect(invoke).not.toHaveBeenCalledWith('term.create', expect.anything())
     expect(invoke).not.toHaveBeenCalledWith('term.kill', expect.anything())
-    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: false, height: 280 })
+    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: false, height: 280, dock: 'bottom', width: 380 })
   })
 
   it('a second toggle while the first create is pending spawns NO second pty and means "close"', async () => {
@@ -234,7 +237,7 @@ describe('closePane', () => {
       activeId: null,
       exited: {},
     })
-    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: false, height: 280 })
+    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: false, height: 280, dock: 'bottom', width: 380 })
   })
 })
 
@@ -250,14 +253,14 @@ describe('drawer height (drag/commit/reset)', () => {
   it('commitHeight persists the current {open,height} (drag-end)', () => {
     useTerminal.getState().dragHeight(400)
     useTerminal.getState().commitHeight()
-    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: false, height: 400 })
+    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: false, height: 400, dock: 'bottom', width: 380 })
   })
 
   it('resetHeight returns to the 280 default and persists (double-click)', () => {
     useTerminal.setState({ height: 555 })
     useTerminal.getState().resetHeight()
     expect(useTerminal.getState().height).toBe(280)
-    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: false, height: 280 })
+    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', { open: false, height: 280, dock: 'bottom', width: 380 })
   })
 })
 
@@ -313,5 +316,44 @@ describe('runCommand (B1 one-click login)', () => {
     invoke.mockRejectedValue(new Error('no core'))
     await expect(useTerminal.getState().runCommand('claude /login')).resolves.toBeUndefined()
     expect(invoke).not.toHaveBeenCalledWith('term.input', expect.anything())
+  })
+})
+
+describe('dock + width — left dock (2026-07-19)', () => {
+  it('toggleDock flips bottom ↔ left and persists the new dock', () => {
+    expect(useTerminal.getState().dock).toBe('bottom')
+    useTerminal.getState().toggleDock()
+    expect(useTerminal.getState().dock).toBe('left')
+    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', {
+      open: false,
+      height: 280,
+      dock: 'left',
+      width: 380,
+    })
+    useTerminal.getState().toggleDock()
+    expect(useTerminal.getState().dock).toBe('bottom')
+  })
+
+  it('width drag clamps [240,760], persists only on commit, resets to 380', () => {
+    useTerminal.getState().dragWidth(50) // below min
+    expect(useTerminal.getState().width).toBe(240)
+    useTerminal.getState().dragWidth(9000) // above max
+    expect(useTerminal.getState().width).toBe(760)
+    expect(invoke).not.toHaveBeenCalledWith('settings.terminal.set', expect.anything())
+    useTerminal.getState().commitWidth()
+    expect(invoke).toHaveBeenCalledWith('settings.terminal.set', {
+      open: false,
+      height: 280,
+      dock: 'bottom',
+      width: 760,
+    })
+    useTerminal.getState().resetWidth()
+    expect(useTerminal.getState().width).toBe(380)
+  })
+
+  it('load hydrates dock + width from the stored prefs', async () => {
+    invoke.mockResolvedValue({ open: true, height: 300, dock: 'left', width: 500 })
+    await useTerminal.getState().load()
+    expect(useTerminal.getState()).toMatchObject({ dock: 'left', width: 500 })
   })
 })

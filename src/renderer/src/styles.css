@@ -103,9 +103,24 @@ a:hover {
   min-height: 0;
 }
 
-.app {
-  display: flex;
+/* app + terminal share a grid so ONE terminal element occupies either the
+   bottom row (full width) or the left column (full height) per its dock, and
+   the content (.app) is pushed the right way. Empty tracks (no terminal, or the
+   unused dock) collapse via `auto` → 0. */
+.app-main-grid {
   flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'termL main'
+    'termB termB';
+}
+.app {
+  grid-area: main;
+  display: flex;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -7531,18 +7546,87 @@ a.button-primary {
    ride the tokens. */
 
 .terminal-drawer {
-  flex: none;
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   background: var(--bg-inset);
+}
+
+/* bottom dock: full-width row, resized by height, top-edge handle */
+.terminal-drawer.dock-bottom {
+  grid-area: termB;
   border-top: 1px solid var(--hairline);
   transition: height 120ms ease;
+}
+
+/* left dock: full-height column, resized by width, right-edge handle */
+.terminal-drawer.dock-left {
+  grid-area: termL;
+  border-right: 1px solid var(--hairline);
+  transition: width 120ms ease;
 }
 
 /* mid-drag: the drawer tracks the cursor 1:1 (rails resizing pattern) */
 .terminal-drawer.term-resizing {
   transition: none;
+}
+
+/* right-edge width handle for the left dock — overlays the border */
+.term-width-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+  transition: background 100ms ease-out;
+  z-index: 2;
+}
+
+.term-width-handle:hover,
+.term-width-handle.dragging {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* ── Standalone pop-out window: ONE panel fills the window (chat / terminal),
+   no app shell. The top strip clears the traffic lights and drags the window. */
+.standalone-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-app);
+}
+.standalone-dragbar {
+  flex: none;
+  height: 28px;
+  -webkit-app-region: drag;
+}
+.standalone-shell .agent-panel,
+.standalone-shell .terminal-drawer {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: auto !important;
+  height: auto !important;
+  border: 0 !important;
+}
+/* the terminal IS the window here — never display:none it */
+.standalone-shell .terminal-drawer.terminal-drawer-hidden {
+  display: flex;
+}
+/* dock / resize / collapse chrome is meaningless in a one-panel window */
+.standalone-shell .agent-resize-handle,
+.standalone-shell .agent-panel-reopen,
+.standalone-shell .agent-panel .rail-collapse,
+.standalone-shell .term-width-handle,
+.standalone-shell .term-height-handle,
+.standalone-shell .terminal-drawer .term-hdr-btn[title*='Dock'] {
+  display: none;
 }
 
 /* closed = hidden, never unmounted — ptys survive a toggle (VS Code model) */

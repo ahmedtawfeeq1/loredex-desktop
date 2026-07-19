@@ -1067,7 +1067,9 @@ export function registerCoreHandlers(
   ipc.register('settings.terminal.get', () => {
     const db = getAppDb()
     const vid = currentVaultId()
-    return db && vid ? loadTerminalPrefs(db, vid) : { open: false, height: 280 }
+    return db && vid
+      ? loadTerminalPrefs(db, vid)
+      : { open: false, height: 280, dock: 'bottom' as const, width: 380 }
   })
   ipc.register('settings.terminal.set', (prefs) => {
     const { db, vid } = requireDb()

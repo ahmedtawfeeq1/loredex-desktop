@@ -162,39 +162,55 @@ export function saveListPaneWidth(db: AppDb, vaultId: string, width: number): vo
 const MIN_TERM_HEIGHT = 120
 const MAX_TERM_HEIGHT = 600
 const DEFAULT_TERM_HEIGHT = 280
+const MIN_TERM_WIDTH = 240
+const MAX_TERM_WIDTH = 760
+const DEFAULT_TERM_WIDTH = 380
 
 function clampTermHeight(px: number): number {
   if (!Number.isFinite(px)) return DEFAULT_TERM_HEIGHT
   return Math.min(MAX_TERM_HEIGHT, Math.max(MIN_TERM_HEIGHT, Math.round(px)))
 }
+function clampTermWidth(px: number): number {
+  if (!Number.isFinite(px)) return DEFAULT_TERM_WIDTH
+  return Math.min(MAX_TERM_WIDTH, Math.max(MIN_TERM_WIDTH, Math.round(px)))
+}
 
-export function loadTerminalPrefs(db: AppDb, vaultId: string): { open: boolean; height: number } {
+type TerminalPrefs = { open: boolean; height: number; dock: 'bottom' | 'left'; width: number }
+
+export function loadTerminalPrefs(db: AppDb, vaultId: string): TerminalPrefs {
   const raw = appSettingGet(db, vaultId, 'terminal')
   if (raw !== null) {
     try {
-      const parsed = JSON.parse(raw) as { open?: unknown; height?: unknown }
+      const p = JSON.parse(raw) as {
+        open?: unknown
+        height?: unknown
+        dock?: unknown
+        width?: unknown
+      }
       return {
-        open: parsed.open === true,
-        height:
-          typeof parsed.height === 'number' ? clampTermHeight(parsed.height) : DEFAULT_TERM_HEIGHT,
+        open: p.open === true,
+        height: typeof p.height === 'number' ? clampTermHeight(p.height) : DEFAULT_TERM_HEIGHT,
+        dock: p.dock === 'left' ? 'left' : 'bottom',
+        width: typeof p.width === 'number' ? clampTermWidth(p.width) : DEFAULT_TERM_WIDTH,
       }
     } catch {
       // malformed row — fall through to the closed default
     }
   }
-  return { open: false, height: DEFAULT_TERM_HEIGHT }
+  return { open: false, height: DEFAULT_TERM_HEIGHT, dock: 'bottom', width: DEFAULT_TERM_WIDTH }
 }
 
-export function saveTerminalPrefs(
-  db: AppDb,
-  vaultId: string,
-  prefs: { open: boolean; height: number },
-): void {
+export function saveTerminalPrefs(db: AppDb, vaultId: string, prefs: TerminalPrefs): void {
   appSettingSet(
     db,
     vaultId,
     'terminal',
-    JSON.stringify({ open: prefs.open === true, height: clampTermHeight(prefs.height) }),
+    JSON.stringify({
+      open: prefs.open === true,
+      height: clampTermHeight(prefs.height),
+      dock: prefs.dock === 'left' ? 'left' : 'bottom',
+      width: clampTermWidth(prefs.width),
+    }),
   )
 }
 

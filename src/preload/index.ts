@@ -55,6 +55,8 @@ contextBridge.exposeInMainWorld('loredex', {
   // own core host, same vault app.db → resumes from the persisted transcript)
   openAgentWindow: (vaultPath: string | null, conversationId: string): Promise<null> =>
     ipcRenderer.invoke('loredex:open-agent-window', { vaultPath, conversationId }),
+  openTerminalWindow: (vaultPath: string | null): Promise<null> =>
+    ipcRenderer.invoke('loredex:open-terminal-window', { vaultPath }),
   // story 10.7: atlas export — bytes rendered in the page, saved via a native panel
   saveExport: (defaultName: string, data: string | ArrayBuffer): Promise<string | null> =>
     ipcRenderer.invoke('loredex:save-export', defaultName, data),

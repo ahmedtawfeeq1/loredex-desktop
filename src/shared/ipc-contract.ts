@@ -438,8 +438,14 @@ export interface CoreApi {
   'term.kill': { in: { id: string }; out: void }
   /** Per-vault drawer prefs (rails pattern): app.db `app_settings` row
    *  `terminal`; get degrades to closed/280 while no vault/db is open. */
-  'settings.terminal.get': { in: void; out: { open: boolean; height: number } }
-  'settings.terminal.set': { in: { open: boolean; height: number }; out: void }
+  'settings.terminal.get': {
+    in: void
+    out: { open: boolean; height: number; dock: 'bottom' | 'left'; width: number }
+  }
+  'settings.terminal.set': {
+    in: { open: boolean; height: number; dock: 'bottom' | 'left'; width: number }
+    out: void
+  }
   /** ACP agent panels (acp blueprint 2026-07-18): adapter processes live in the
    *  CORE HOST. All acp.* invokes are cheap — acp.start allocates the id and
    *  returns before the adapter finishes booting; a prompt turn is an

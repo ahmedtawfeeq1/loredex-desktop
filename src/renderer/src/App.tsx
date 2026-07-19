@@ -6,7 +6,7 @@
 import { Fragment, useEffect } from 'react'
 import { appActions, visibleViews } from './actions/registry'
 import { isTypingTarget, matchShortcut } from './actions/shortcuts'
-import { onEvent, onJoinLink, onOpenAgent, onOpenHandoff, onVaultChanged } from './api'
+import { onEvent, onJoinLink, onOpenAgent, onOpenHandoff, onVaultChanged, popoutMode } from './api'
 import { parseJoinLink } from '../../shared/join-link'
 import { AgentPanel } from './agent/AgentPanel'
 import { AgentPermissionModal } from './agent/AgentPermissionModal'
@@ -103,6 +103,18 @@ export default function App(): React.JSX.Element {
   // collapsible rails (story 16.2, Addendum D1) — per-vault, loaded with init
   const sidebarCollapsed = useRails((s) => s.sidebar)
   const listCollapsed = useRails((s) => s.list)
+
+  // pop-out windows (?popout=chat|terminal): this window mounts ONLY that panel,
+  // full-window, not the full app shell
+  const popout = popoutMode()
+  useEffect(() => {
+    if (popout === 'chat' && !useAgentPanel.getState().open) void useAgentPanel.getState().toggle()
+    // the terminal spawn needs the core host — wait until the window reports
+    // ready (mount fires before the core port is brokered). toggle() from
+    // root===null opens AND spawns the shell at the vault root.
+    if (popout === 'terminal' && status === 'ready' && useTerminal.getState().root === null)
+      void useTerminal.getState().toggle()
+  }, [popout, status])
 
   // dex-type boot race: the first load() can beat the core host and fail; once
   // the app reports ready, resolve the type for real (null = still unknown)
@@ -225,9 +237,29 @@ export default function App(): React.JSX.Element {
     [setView],
   )
 
+  // Standalone pop-out: just the one panel, filling the window (no app shell).
+  // A thin top strip clears the macOS traffic lights and drags the window.
+  if (popout) {
+    return (
+      <div className={`standalone-shell popout-${popout}`}>
+        <div className="standalone-dragbar" />
+        {popout === 'chat' ? (
+          <>
+            <AgentPanel />
+            <AgentPermissionModal />
+          </>
+        ) : (
+          <TerminalDrawer />
+        )}
+        <ToastStack />
+      </div>
+    )
+  }
+
   return (
     <div className="app-shell">
       <TopBar />
+      <div className="app-main-grid">
       <div className="app">
       <aside className={sidebarCollapsed ? 'sidebar rail-collapsed' : 'sidebar'}>
         <SideNav collapsed={sidebarCollapsed} />
@@ -328,10 +360,12 @@ export default function App(): React.JSX.Element {
           the terminal drawer's column-axis mount below */}
       <AgentPanel />
       </div>
-      {/* terminal-splits blueprint: the drawer stacks full-width under
-          sidebar+content (.app-shell is flex-column) and exists across all
-          views; it renders nothing until the first terminal spawns */}
+      {/* terminal-splits: the drawer lives in the app-main-grid so a single
+          instance sits in the bottom row (full width) OR the left column (full
+          height) per its dock — no duplicate xterms; renders nothing until the
+          first terminal spawns */}
       <TerminalDrawer />
+      </div>
     </div>
   )
 }

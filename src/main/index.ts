@@ -27,7 +27,7 @@ import {
   saveVaultPath,
 } from './dialogs'
 import { handleCoreMessage } from './notifications'
-import { createMainWindow } from './windows'
+import { createMainWindow, type PopoutMode } from './windows'
 
 // Parity harness (docs/design/reference): LOREDEX_DEBUG_PORT exposes CDP so
 // the reference screenshot loop can drive the real app. Dev tooling only —
@@ -134,8 +134,8 @@ function bootWindowCore(win: BrowserWindow, vaultPath: string | null): void {
 }
 
 /** Open a brand-new window bound to `vaultPath` (its own core host). */
-function openWindow(vaultPath: string | null): BrowserWindow {
-  const win = createMainWindow()
+function openWindow(vaultPath: string | null, popout?: PopoutMode): BrowserWindow {
+  const win = createMainWindow(popout)
   bootWindowCore(win, vaultPath)
   return win
 }
@@ -248,7 +248,9 @@ app.whenReady().then(() => {
     (_event, arg: { vaultPath?: string | null; conversationId: string }) => {
       const vaultPath =
         typeof arg?.vaultPath === 'string' && arg.vaultPath ? arg.vaultPath : loadVaultPath()
-      const win = openWindow(vaultPath)
+      // chat-only pop-out: the renderer reads ?popout=chat and mounts just the
+      // agent panel, full-window
+      const win = openWindow(vaultPath, 'chat')
       const conversationId = arg?.conversationId
       // Hand the conversation id to the fresh renderer once it has loaded. The
       // core port is brokered in bootWindowCore's own did-finish-load handler,
@@ -258,6 +260,19 @@ app.whenReady().then(() => {
       win.webContents.once('did-finish-load', () => {
         win.webContents.send('open-agent', conversationId)
       })
+      return null
+    },
+  )
+
+  // Terminal-only pop-out: a standalone window that mounts just the terminal,
+  // full-window (?popout=terminal). No conversation id — the renderer spawns a
+  // fresh shell at the vault root on load.
+  ipcMain.handle(
+    'loredex:open-terminal-window',
+    (_event, arg: { vaultPath?: string | null }) => {
+      const vaultPath =
+        typeof arg?.vaultPath === 'string' && arg.vaultPath ? arg.vaultPath : loadVaultPath()
+      openWindow(vaultPath, 'terminal')
       return null
     },
   )

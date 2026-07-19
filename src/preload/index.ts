@@ -61,6 +61,13 @@ contextBridge.exposeInMainWorld('loredex', {
   saveExport: (defaultName: string, data: string | ArrayBuffer): Promise<string | null> =>
     ipcRenderer.invoke('loredex:save-export', defaultName, data),
   pathForFile: (file: File): string => webUtils.getPathForFile(file),
+  // WP-F: reveal in the OS file manager / open in the default app. The path is
+  // vault-RELATIVE; main resolves + containment-checks it against the trusted root.
+  revealPath: (relPath: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('loredex:reveal-path', relPath),
+  openPath: (relPath: string): Promise<{ ok: boolean; revealed?: boolean }> =>
+    ipcRenderer.invoke('loredex:open-path', relPath),
+  platform: process.platform,
   onVaultChanged: (cb: (vaultPath: string) => void): (() => void) => {
     const listener = (_e: unknown, vaultPath: string): void => cb(vaultPath)
     ipcRenderer.on('vault-changed', listener)

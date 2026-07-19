@@ -27,6 +27,7 @@ import {
   saveVaultPath,
 } from './dialogs'
 import { handleCoreMessage } from './notifications'
+import { registerShellOpen } from './shell-open'
 import { createMainWindow, type PopoutMode } from './windows'
 
 // Parity harness (docs/design/reference): LOREDEX_DEBUG_PORT exposes CDP so
@@ -46,6 +47,16 @@ interface WinCore {
 /** window.id → its dedicated core host + bound vault. */
 const winCores = new Map<number, WinCore>()
 let quitting = false
+
+/** WP-F: the core's one-shot vault report (trusted reveal/open root). */
+function isVaultReport(msg: unknown): msg is { t: 'vault'; path: string } {
+  return (
+    typeof msg === 'object' &&
+    msg !== null &&
+    (msg as { t?: unknown }).t === 'vault' &&
+    typeof (msg as { path?: unknown }).path === 'string'
+  )
+}
 
 // ── loredex:// deep links (story 13.2): main only REGISTERS and FORWARDS the
 //    raw URL — parsing lives renderer-side (shared/join-link.ts). open-url can
@@ -82,8 +93,18 @@ function forkCoreHostFor(win: BrowserWindow): void {
     serviceName: 'loredex-core',
   })
   wc.core = core
-  // story 3.7: notification/badge requests route to THIS window (its vault)
-  core.on('message', (msg) => handleCoreMessage(msg, win))
+  // story 3.7: notification/badge requests route to THIS window (its vault).
+  // WP-F: intercept the core's vault report FIRST — it establishes the trusted
+  // reveal/open root on a CLI-first-run (no --vault arg), and must never reach
+  // handleCoreMessage (a blank notification).
+  core.on('message', (msg) => {
+    if (isVaultReport(msg)) {
+      const cur = winCores.get(win.id)
+      if (cur) cur.vaultPath = msg.path
+      return
+    }
+    handleCoreMessage(msg, win)
+  })
   core.on('exit', (code) => {
     wc.core = null
     if (quitting || win.isDestroyed()) return
@@ -223,6 +244,8 @@ app.whenReady().then(() => {
   )
   const windowFor = (event: Electron.IpcMainInvokeEvent): BrowserWindow | null =>
     BrowserWindow.fromWebContents(event.sender)
+  // WP-F: reveal/open handlers, rooted at each window's TRUSTED vault path
+  registerShellOpen(windowFor, (win) => winCores.get(win.id)?.vaultPath ?? null)
   ipcMain.handle('loredex:pick-vault', (event) => pickVault(windowFor(event)))
   // story 23.1: pick a vault folder WITHOUT side effects — the renderer menu
   // then decides (switch in place vs open in new window)

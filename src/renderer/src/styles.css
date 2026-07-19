@@ -230,6 +230,37 @@ a:hover {
   border-radius: 50%;
 }
 
+/* WP-F: unsupported (binary/document) file card in the reader */
+.unsupported-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 40px;
+  text-align: center;
+}
+.unsupported-file-icon {
+  font-size: 40px;
+  color: var(--text-3);
+}
+.unsupported-file-name {
+  font: 15px var(--font-mono);
+  color: var(--text-1);
+  word-break: break-all;
+}
+.unsupported-file-hint {
+  font-size: 12.5px;
+  color: var(--text-2);
+  max-width: 42ch;
+}
+.unsupported-file-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
 /* WP-E: unpushed-commits pill — amber, glyph + count (never colour alone) */
 .unpushed-pill {
   display: inline-flex;

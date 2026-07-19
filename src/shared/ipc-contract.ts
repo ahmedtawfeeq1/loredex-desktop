@@ -757,6 +757,10 @@ export type CoreEvent =
 export type MainControlMessage =
   | { t: 'notify'; title: string; body: string; relPath: string }
   | { t: 'badge'; count: number }
+  /** WP-F: the core reports its config-resolved vault path once, so main knows
+   *  the TRUSTED root for reveal/open even on a CLI-first-run (no --vault arg,
+   *  no picker). Intercepted in main; never forwarded to notifications. */
+  | { t: 'vault'; path: string }
 
 /** Main → core over the same fork channel: brokered ports (story 1.1) and
  *  window focus state driving the poller cadence (story 9.1). */
@@ -769,6 +773,7 @@ export function isMainControlMessage(v: unknown): v is MainControlMessage {
     return typeof m.title === 'string' && typeof m.body === 'string' && typeof m.relPath === 'string'
   }
   if (m.t === 'badge') return typeof m.count === 'number'
+  if (m.t === 'vault') return typeof m.path === 'string'
   return false
 }
 

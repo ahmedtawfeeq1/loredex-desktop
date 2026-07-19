@@ -20,6 +20,9 @@ interface ReaderState {
   doc: Doc | null
   /** raw data file (agent-ops yaml/json/csv) — mutually exclusive with doc */
   raw: { raw: string; fileType: 'yaml' | 'json' | 'csv' } | null
+  /** WP-F: a binary/document file (pdf/xlsx/png/…) that renders in the OS app,
+   *  not the in-app reader — shown as a reveal/open card. Mutually exclusive. */
+  unsupported: { path: string } | null
   docError: string | null
   /** wikilink targets to render inline beneath the note — set when a handoff
    *  brief is opened from the board (story 3.2, F5 reading order) */
@@ -45,6 +48,7 @@ export const useReader = create<ReaderState>((set, get) => ({
   selected: null,
   doc: null,
   raw: null,
+  unsupported: null,
   docError: null,
   readingOrder: [],
 
@@ -60,18 +64,24 @@ export const useReader = create<ReaderState>((set, get) => ({
   },
 
   async open(path, readingOrder = [], retriedStale = false) {
-    set({ selected: path, docError: null, readingOrder })
+    set({ selected: path, docError: null, unsupported: null, readingOrder })
     useDiagnostics.getState().clearNote(path) // re-fed as the note re-renders
     try {
       // agent-ops data files (yaml/json/csv) render read-only via vault.readRaw
       if (/\.(ya?ml|json|csv)$/.test(path)) {
         const raw = await invoke('vault.readRaw', { path })
-        startTransition(() => set({ raw, doc: null }))
+        startTransition(() => set({ raw, doc: null, unsupported: null }))
+        return
+      }
+      // WP-F: a non-note, non-data file (pdf/xlsx/png/…) can't render here —
+      // offer Reveal / Open in the OS default app instead of failing to parse it
+      if (!/\.md$/.test(path)) {
+        set({ unsupported: { path }, doc: null, raw: null })
         return
       }
       const doc = await invoke('vault.readNote', { path })
       // keep the tree responsive while a large note (≤1 MB) renders
-      startTransition(() => set({ doc, raw: null }))
+      startTransition(() => set({ doc, raw: null, unsupported: null }))
     } catch (e) {
       // stale tree (a pull moved/removed the note after it was walked): re-walk
       // once so disk truth returns, then show a plain message instead of the
@@ -107,6 +117,7 @@ export const useReader = create<ReaderState>((set, get) => ({
       selected: null,
       doc: null,
       raw: null,
+      unsupported: null,
       docError: null,
       readingOrder: [],
     })

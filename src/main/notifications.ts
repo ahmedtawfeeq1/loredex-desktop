@@ -28,6 +28,9 @@ export function handleCoreMessage(msg: unknown, win?: BrowserWindow): void {
     app.setBadgeCount(msg.count)
     return
   }
+  // WP-F: the vault report is intercepted in index.ts before it reaches here;
+  // guard anyway so it never surfaces as a blank notification (belt-and-suspenders).
+  if (msg.t === 'vault') return
   if (!Notification.isSupported()) return
   // Sound + banner on arrival (handoffs from other teams land while you work).
   // silent:false so the OS plays a sound even if the user muted app defaults;

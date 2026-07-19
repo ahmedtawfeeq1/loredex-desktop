@@ -40,6 +40,9 @@ import { writeLock } from './write-lock'
 const vaultFlag = process.argv.indexOf('--vault')
 const vaultOverride = vaultFlag !== -1 ? process.argv[vaultFlag + 1] : undefined
 const config = engine.initEngine(vaultOverride)
+// WP-F: report the config-resolved vault to main so reveal/open has a trusted
+// root even when no --vault arg was passed (CLI-first-run, config-picked vault).
+if (config?.vaultPath) process.parentPort.postMessage({ t: 'vault', path: config.vaultPath })
 // app.db opens FIRST (story 9.2 — the core host is the sole opener); settings
 // then live in its meta table, importing the v0.1 settings.json shim once.
 const userDataFlag = process.argv.indexOf('--user-data')

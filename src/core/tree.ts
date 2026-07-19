@@ -11,6 +11,8 @@ import { join } from 'node:path'
 import type { TreeNode } from '../shared/types'
 
 const DATA_EXTS = ['.yaml', '.yml', '.json', '.csv'] as const
+// WP-F: documents/images the tree surfaces as OS-openable rows (agent-ops only).
+const BINARY_EXTS = ['.pdf', '.xlsx', '.xls', '.docx', '.pptx', '.png'] as const
 
 export interface WalkOptions {
   dataFiles?: boolean
@@ -44,6 +46,13 @@ export function walkVault(root: string, rel = '', opts: WalkOptions = {}): TreeN
     ) {
       // data files keep their extension in the label — the type is the point
       nodes.push({ name: entry.name, path, kind: 'file', fileType: dataFileType(entry.name) })
+    } else if (
+      opts.dataFiles &&
+      entry.isFile() &&
+      BINARY_EXTS.some((ext) => entry.name.toLowerCase().endsWith(ext))
+    ) {
+      // WP-F: binary docs/images — opened in the OS default app, not the reader
+      nodes.push({ name: entry.name, path, kind: 'file', fileType: 'binary' })
     }
   }
   // dirs first, then case-insensitive alpha — stable catalog order

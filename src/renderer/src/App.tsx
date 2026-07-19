@@ -56,6 +56,7 @@ import { TodayView } from './views/today/TodayView'
 import { RouteConfirmCard } from './views/routes/RouteConfirmCard'
 import { SyncPanel } from './views/sync/SyncPanel'
 import { DataFileView } from './views/reader/DataFileView'
+import { UnsupportedFileView } from './views/reader/UnsupportedFileView'
 import { Diagnostics } from './views/reader/Diagnostics'
 import { ListResizeHandle } from './views/reader/ListResizeHandle'
 import { NoteView } from './views/reader/NoteView'
@@ -72,7 +73,11 @@ import { JoinVaultWizard } from './views/wizard/JoinVaultWizard'
  *  DataFileView; everything else is the markdown NoteView. */
 function ReaderSurface(): React.JSX.Element {
   const raw = useReader((s) => s.raw)
+  const unsupported = useReader((s) => s.unsupported)
   const selected = useReader((s) => s.selected)
+  if (unsupported) {
+    return <UnsupportedFileView path={unsupported.path} />
+  }
   if (raw && selected) {
     return <DataFileView path={selected} raw={raw.raw} fileType={raw.fileType} />
   }

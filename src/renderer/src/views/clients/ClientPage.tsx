@@ -14,7 +14,7 @@ import type {
   WorkspaceResult,
 } from '../../../../shared/ipc-contract'
 import type { Identity } from '../../../../shared/types'
-import { invoke } from '../../api'
+import { invoke, revealPath } from '../../api'
 import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
@@ -950,7 +950,17 @@ export function ClientPage({
       )}
 
       <section className="cp-section">
-        <div className="cp-section-title">Knowledge tables</div>
+        <div className="cp-section-title">
+          Knowledge tables
+          <button
+            type="button"
+            className="cp-cred-add"
+            title="Reveal the knowledge_tables/ folder in your file manager (drop CSVs in)"
+            onClick={() => void revealPath(`${info.dir}/knowledge_tables`)}
+          >
+            Reveal Folder
+          </button>
+        </div>
         {page.tables.length === 0 ? (
           <div className="cp-empty">No tables — the AI has nothing to be grounded on yet.</div>
         ) : (

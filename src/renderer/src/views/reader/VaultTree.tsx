@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import type { SearchHit } from '../../../../shared/ipc-contract'
 import type { TreeNode } from '../../../../shared/types'
-import { invoke, openInNewWindow } from '../../api'
+import { invoke, openInNewWindow, openPath } from '../../api'
 import { RailChevron } from '../../components/NavIcon'
 import { humanizeTitle, noteDate } from '../../humanize'
 import { useDex } from '../../stores/dex'
@@ -228,7 +228,11 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
         className={inProject ? 'tree-file tree-file-project' : 'tree-file'}
         aria-current={selected === node.path}
         title={node.path}
-        onClick={() => void open(node.path)}
+        onClick={() =>
+          // WP-F: binary docs/images open in the OS default app; everything
+          // else opens in the in-app reader
+          node.fileType === 'binary' ? void openPath(node.path) : void open(node.path)
+        }
       >
         <span className="tree-file-name">{isData ? node.name : humanizeTitle(node.name)}</span>
         {isData ? (

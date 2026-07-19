@@ -99,8 +99,9 @@ export interface TreeNode {
   /** vault-relative path (posix separators) */
   path: string
   kind: 'dir' | 'file'
-  /** set on files; data types only appear on agent-ops dexes */
-  fileType?: 'md' | 'yaml' | 'json' | 'csv'
+  /** set on files; data + binary types only appear on agent-ops dexes. 'binary'
+   *  = a document/image opened in the OS default app, not the in-app reader (WP-F) */
+  fileType?: 'md' | 'yaml' | 'json' | 'csv' | 'binary'
   children?: TreeNode[]
 }
 

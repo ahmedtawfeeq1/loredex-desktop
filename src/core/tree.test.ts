@@ -76,6 +76,7 @@ describe('walkVault dataFiles mode (agent-ops)', () => {
     put('projects/brightsmile-dental/knowledge_tables/patients.csv', 'a,b\n1,2\n')
     put('projects/brightsmile-dental/automation_workflows/flow.json', '{}')
     put('projects/brightsmile-dental/workspace.yml', '# ws\n')
+    put('projects/brightsmile-dental/knowledge_tables/export.XLSX', 'x') // WP-F binary
     mkdirSync(join(opsVault, 'projects/brightsmile-dental/_inbox'), { recursive: true })
   })
 
@@ -97,10 +98,13 @@ describe('walkVault dataFiles mode (agent-ops)', () => {
       'workspace.yml',
     ])
     const tables = client?.children?.find((n) => n.name === 'knowledge_tables')
-    const csv = tables?.children?.[0]
+    const csv = tables?.children?.find((n) => n.name === 'patients.csv')
     expect(csv?.name).toBe('patients.csv') // data files keep their extension
     expect(csv?.fileType).toBe('csv')
     expect(csv?.path).toBe('projects/brightsmile-dental/knowledge_tables/patients.csv')
+    // WP-F: a binary export appears as an OS-openable 'binary' row (case-insensitive ext)
+    const xlsx = tables?.children?.find((n) => n.name === 'export.XLSX')
+    expect(xlsx?.fileType).toBe('binary')
     const booking = client?.children
       ?.find((n) => n.name === 'pipelines')
       ?.children?.find((n) => n.name === 'booking')

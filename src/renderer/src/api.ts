@@ -26,8 +26,23 @@ declare global {
       onOpenAgent(cb: (conversationId: string) => void): Unsubscribe
       pathForFile(file: File): string
       saveExport(defaultName: string, data: string | ArrayBuffer): Promise<string | null>
+      // WP-F: reveal in the OS file manager / open in the default app (vault-relative path)
+      revealPath(relPath: string): Promise<{ ok: boolean }>
+      openPath(relPath: string): Promise<{ ok: boolean; revealed?: boolean }>
+      platform: string
     }
   }
+}
+
+/** WP-F: reveal a vault-relative path in the OS file manager (best-effort). */
+export function revealPath(relPath: string): Promise<{ ok: boolean }> {
+  return window.loredex.revealPath(relPath)
+}
+
+/** WP-F: open a vault-relative path in the OS default app (reveal-fallback for
+ *  non-allowlisted files / directories). */
+export function openPath(relPath: string): Promise<{ ok: boolean; revealed?: boolean }> {
+  return window.loredex.openPath(relPath)
 }
 
 export function invoke<K extends keyof CoreApi>(

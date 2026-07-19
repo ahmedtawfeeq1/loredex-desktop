@@ -7,6 +7,7 @@ import type {
   ClientInfo,
   Config,
   Doc,
+  InboxItem,
   LintFinding,
   ProductDashboard,
   SearchHit,
@@ -73,6 +74,7 @@ import type {
 export type { ClientInfo, Config, Doc, LintFinding, ProductDashboard, SearchHit, WorkspaceResult }
 export type { WorkItem, WorkPatch, WorkReceipt } from 'loredex'
 export type { SnapshotResult, SnapshotSummary } from 'loredex'
+export type { InboxItem } from 'loredex'
 export type { ClientWorkspaceStatus, CreateClientSpec } from './types'
 export type { PermissionRule } from './types'
 
@@ -284,6 +286,35 @@ export interface CoreApi {
   }
   /** agent-ops: list a client's snapshots (all units), newest stamp first. */
   'clients.snapshot.list': { in: { client: string }; out: SnapshotSummary[] }
+  // ── WP-G: scaffold new units + inbox consumption (one attributed commit each) ──
+  'clients.scaffold.pipeline': {
+    in: { client: string; name: string; identity: Identity }
+    out: { dir: string }
+  }
+  'clients.scaffold.agent': {
+    in: { client: string; name: string; identity: Identity }
+    out: { dir: string }
+  }
+  'clients.scaffold.stage': {
+    in: {
+      client: string
+      pipeline: string
+      name: string
+      before?: string
+      after?: string
+      identity: Identity
+    }
+    out: { dir: string; renumbered: Array<{ from: string; to: string }> }
+  }
+  'clients.inbox.list': { in: { client: string }; out: InboxItem[] }
+  'clients.inbox.toRandoms': {
+    in: { client: string; name: string; identity: Identity }
+    out: { moved: string }
+  }
+  'clients.inbox.delete': {
+    in: { client: string; name: string; identity: Identity }
+    out: { deleted: string }
+  }
   // ── WP-D: per-client login credentials (machine-local keychain, never the dex) ──
   /** metadata only — never a secret; the card lists logins from this. */
   'clients.credentials.list': { in: { client: string }; out: ClientCredential[] }

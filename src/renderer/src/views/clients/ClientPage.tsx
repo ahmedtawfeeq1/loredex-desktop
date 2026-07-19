@@ -10,6 +10,7 @@ import type {
   ClientCredential,
   ClientInfo,
   ClientWorkspaceStatus,
+  InboxItem,
   SnapshotSummary,
   WorkspaceResult,
 } from '../../../../shared/ipc-contract'
@@ -82,6 +83,12 @@ const PAGE_CSS = `
 .cp-cred-actions { display: flex; gap: 4px; margin-left: auto; }
 .cp-cred-actions button { font-size: 11px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 6px; padding: 1px 7px; cursor: pointer; }
 .cp-cred-actions button:hover { color: var(--text-1); border-color: var(--text-2); }
+.cp-inbox-head { font-weight: 600; margin-bottom: 6px; }
+.cp-seg { display: flex; align-items: center; gap: 6px; }
+.cp-seg-btn { font-size: 12px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.cp-seg-btn.is-on { color: var(--text-1); border-color: var(--accent-hi); background: var(--bg-inset); }
+.cp-seg-btn:disabled { opacity: 0.4; cursor: default; }
+.cp-seg-anchor { font-size: 12px; padding: 3px 6px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--bg-inset); color: var(--text-1); }
 .cp-ws { border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; background: var(--bg-card); }
 .cp-ws-conn { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); }
 .cp-ws-row { display: flex; align-items: center; gap: 10px; }
@@ -117,9 +124,11 @@ function openNote(path: string): void {
 function Unit({
   unit,
   onSnapshot,
+  onAddStage,
 }: {
   unit: UnitSection
   onSnapshot: (name: string) => void
+  onAddStage: (pipeline: string) => void
 }): React.JSX.Element {
   return (
     <div className="cp-unit">
@@ -127,6 +136,16 @@ function Unit({
         <span className="cp-unit-name">{unit.name}</span>
         <span className="cp-unit-kind">{unit.kind}</span>
         <span style={{ flex: 1 }} />
+        {unit.kind === 'pipeline' && (
+          <button
+            type="button"
+            className="cp-unit-snapshot"
+            title="Add a stage to this pipeline (renumbers if inserted)"
+            onClick={() => onAddStage(unit.name)}
+          >
+            + Stage
+          </button>
+        )}
         <button
           type="button"
           className="cp-unit-snapshot"
@@ -838,6 +857,276 @@ function CredentialsSection({ client }: { client: string }): React.JSX.Element {
   )
 }
 
+/** WP-G: create a new pipeline or agent (just a name → one scaffold commit). */
+function NewUnitModal({
+  client,
+  kind,
+  identity,
+  onClose,
+  onDone,
+}: {
+  client: string
+  kind: 'pipeline' | 'agent'
+  identity: Identity | null
+  onClose: () => void
+  onDone: () => void
+}): React.JSX.Element {
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function create(): Promise<void> {
+    if (!identity) {
+      setError('Set your name and email in Settings first (commit attribution).')
+      return
+    }
+    if (!name.trim()) {
+      setError('Give it a name.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await invoke(kind === 'pipeline' ? 'clients.scaffold.pipeline' : 'clients.scaffold.agent', {
+        client,
+        name: name.trim(),
+        identity,
+      })
+      useToasts.getState().push(`${kind === 'pipeline' ? 'Pipeline' : 'Agent'} created`, name.trim())
+      onDone()
+    } catch (e) {
+      setError(String((e as { message?: string }).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is a mouse affordance
+    <div className="cp-modal-backdrop" onClick={onClose}>
+      <div
+        className="cp-modal"
+        role="dialog"
+        aria-modal="true"
+        // biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation guard
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cp-modal-title">New {kind}</div>
+        <label className="cp-modal-field">
+          Name
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={kind === 'pipeline' ? 'e.g. lead reactivation' : 'e.g. front desk'}
+            onKeyDown={(e) => e.key === 'Enter' && void create()}
+            // biome-ignore lint/a11y/noAutofocus: single-field modal
+            autoFocus
+          />
+        </label>
+        {error && <div className="cp-modal-error">{error}</div>}
+        <div className="cp-modal-actions">
+          <button type="button" className="button-quiet" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="button-emphasis"
+            onClick={() => void create()}
+            disabled={busy}
+          >
+            {busy ? 'Creating…' : `Create ${kind}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** WP-G: add a stage — name + where (End / Before NN / After NN, seeded from the
+ *  pipeline's current stages). Inserting renumbers the later stages. */
+function NewStageModal({
+  client,
+  pipeline,
+  stages,
+  identity,
+  onClose,
+  onDone,
+}: {
+  client: string
+  pipeline: string
+  stages: string[] // existing NN values, in order
+  identity: Identity | null
+  onClose: () => void
+  onDone: () => void
+}): React.JSX.Element {
+  const [name, setName] = useState('')
+  const [where, setWhere] = useState<'end' | 'before' | 'after'>('end')
+  const [anchor, setAnchor] = useState(stages[0] ?? '01')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function create(): Promise<void> {
+    if (!identity) {
+      setError('Set your name and email in Settings first.')
+      return
+    }
+    if (!name.trim()) {
+      setError('Give the stage a name.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await invoke('clients.scaffold.stage', {
+        client,
+        pipeline,
+        name: name.trim(),
+        ...(where === 'before' ? { before: anchor } : {}),
+        ...(where === 'after' ? { after: anchor } : {}),
+        identity,
+      })
+      const moved = r.renumbered.length
+      useToasts.getState().push('Stage added', moved > 0 ? `${name.trim()} · renumbered ${moved} stage(s)` : name.trim())
+      onDone()
+    } catch (e) {
+      setError(String((e as { message?: string }).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is a mouse affordance
+    <div className="cp-modal-backdrop" onClick={onClose}>
+      <div
+        className="cp-modal"
+        role="dialog"
+        aria-modal="true"
+        // biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation guard
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cp-modal-title">New stage in {pipeline}</div>
+        <label className="cp-modal-field">
+          Name
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. qualify"
+            // biome-ignore lint/a11y/noAutofocus: first field
+            autoFocus
+          />
+        </label>
+        <div className="cp-modal-field">
+          Where
+          <div className="cp-seg">
+            {(['end', 'before', 'after'] as const).map((w) => (
+              <button
+                key={w}
+                type="button"
+                className={where === w ? 'cp-seg-btn is-on' : 'cp-seg-btn'}
+                onClick={() => setWhere(w)}
+                disabled={w !== 'end' && stages.length === 0}
+              >
+                {w === 'end' ? 'At end' : w === 'before' ? 'Before' : 'After'}
+              </button>
+            ))}
+            {where !== 'end' && stages.length > 0 && (
+              <select
+                className="cp-seg-anchor"
+                value={anchor}
+                onChange={(e) => setAnchor(e.target.value)}
+              >
+                {stages.map((nn) => (
+                  <option key={nn} value={nn}>
+                    {nn}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+        {error && <div className="cp-modal-error">{error}</div>}
+        <div className="cp-modal-actions">
+          <button type="button" className="button-quiet" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="button-emphasis"
+            onClick={() => void create()}
+            disabled={busy}
+          >
+            {busy ? 'Adding…' : 'Add stage'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** WP-G: the client's intake queue — each item consumed by moving it to
+ *  _randoms/ or deleting it (one commit each; the tree/badge auto-refresh). */
+function InboxPanel({
+  client,
+  identity,
+}: {
+  client: string
+  identity: Identity | null
+}): React.JSX.Element | null {
+  const [items, setItems] = useState<InboxItem[]>([])
+  const [refresh, setRefresh] = useState(0)
+
+  useEffect(() => {
+    void invoke('clients.inbox.list', { client })
+      .then(setItems)
+      .catch(() => setItems([]))
+  }, [client, refresh])
+
+  async function act(
+    channel: 'clients.inbox.toRandoms' | 'clients.inbox.delete',
+    name: string,
+  ): Promise<void> {
+    if (!identity) return
+    try {
+      await invoke(channel, { client, name, identity })
+      setRefresh((n) => n + 1)
+    } catch {
+      // best-effort
+    }
+  }
+
+  if (items.length === 0) return null
+  return (
+    <div className="cp-attention">
+      <div className="cp-inbox-head">
+        ⚠ {items.length} inbox item(s) pending consumption
+      </div>
+      <div className="cp-rows">
+        {items.map((it) => (
+          <div key={it.rel} className="cp-cred-row">
+            <span className="cp-cred-label">{it.name}</span>
+            <div className="cp-cred-actions">
+              <button
+                type="button"
+                onClick={() => openNote(it.rel)}
+                title="Open this intake file"
+              >
+                Open
+              </button>
+              <button type="button" onClick={() => void act('clients.inbox.toRandoms', it.name)}>
+                Keep → randoms
+              </button>
+              <button type="button" onClick={() => void act('clients.inbox.delete', it.name)}>
+                Delete
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function ClientPage({
   info,
   onBack,
@@ -848,9 +1137,6 @@ export function ClientPage({
   const lints = useDex((s) => s.lints) ?? []
   const page = buildClientPage(info, lints)
   const identity = useIdentity((s) => effectiveIdentity(s))
-  const oldestDays = page.inbox.oldestMs
-    ? Math.floor((Date.now() - page.inbox.oldestMs) / 86_400_000)
-    : 0
 
   // WP-C: snapshot modal target (unit name) + the Versions list
   const [snapUnit, setSnapUnit] = useState<string | null>(null)
@@ -861,6 +1147,12 @@ export function ClientPage({
       .then(setSnapshots)
       .catch(() => setSnapshots([]))
   }, [info.slug, snapRefresh])
+
+  // WP-G: new-pipeline/agent modal + new-stage modal (pipeline it targets)
+  const [newUnit, setNewUnit] = useState<'pipeline' | 'agent' | null>(null)
+  const [stageFor, setStageFor] = useState<string | null>(null)
+  const stagesOf = (pipeline: string): string[] =>
+    page.pipelines.find((p) => p.name === pipeline)?.stages.map((s) => s.nn) ?? []
 
   return (
     <div
@@ -895,31 +1187,51 @@ export function ClientPage({
         )}
       </div>
 
-      {page.inbox.count > 0 && (
-        <div className="cp-attention">
-          ⚠ {page.inbox.count} inbox item(s) pending consumption
-          {oldestDays > 0 ? ` — oldest ${oldestDays}d` : ''}. Consume by moving each file to its
-          proper home.
+      {/* WP-G: the inbox queue with per-item consume actions (self-hides when empty) */}
+      <InboxPanel client={info.slug} identity={identity} />
+
+      {/* WP-G: headers always render so an empty client can create its first unit */}
+      <section className="cp-section">
+        <div className="cp-section-title">
+          Pipelines
+          <button type="button" className="cp-cred-add" onClick={() => setNewUnit('pipeline')}>
+            + Pipeline
+          </button>
         </div>
-      )}
+        {page.pipelines.length === 0 ? (
+          <div className="cp-empty">No pipelines yet.</div>
+        ) : (
+          page.pipelines.map((unit) => (
+            <Unit
+              key={unit.name}
+              unit={unit}
+              onSnapshot={setSnapUnit}
+              onAddStage={setStageFor}
+            />
+          ))
+        )}
+      </section>
 
-      {page.pipelines.length > 0 && (
-        <section className="cp-section">
-          <div className="cp-section-title">Pipelines</div>
-          {page.pipelines.map((unit) => (
-            <Unit key={unit.name} unit={unit} onSnapshot={setSnapUnit} />
-          ))}
-        </section>
-      )}
-
-      {page.agents.length > 0 && (
-        <section className="cp-section">
-          <div className="cp-section-title">Agents</div>
-          {page.agents.map((unit) => (
-            <Unit key={unit.name} unit={unit} onSnapshot={setSnapUnit} />
-          ))}
-        </section>
-      )}
+      <section className="cp-section">
+        <div className="cp-section-title">
+          Agents
+          <button type="button" className="cp-cred-add" onClick={() => setNewUnit('agent')}>
+            + Agent
+          </button>
+        </div>
+        {page.agents.length === 0 ? (
+          <div className="cp-empty">No agents yet.</div>
+        ) : (
+          page.agents.map((unit) => (
+            <Unit
+              key={unit.name}
+              unit={unit}
+              onSnapshot={setSnapUnit}
+              onAddStage={setStageFor}
+            />
+          ))
+        )}
+      </section>
 
       {snapshots.length > 0 && (
         <section className="cp-section">
@@ -1006,6 +1318,25 @@ export function ClientPage({
             setSnapUnit(null)
             setSnapRefresh((n) => n + 1)
           }}
+        />
+      )}
+      {newUnit !== null && (
+        <NewUnitModal
+          client={info.slug}
+          kind={newUnit}
+          identity={identity}
+          onClose={() => setNewUnit(null)}
+          onDone={() => setNewUnit(null)}
+        />
+      )}
+      {stageFor !== null && (
+        <NewStageModal
+          client={info.slug}
+          pipeline={stageFor}
+          stages={stagesOf(stageFor)}
+          identity={identity}
+          onClose={() => setStageFor(null)}
+          onDone={() => setStageFor(null)}
         />
       )}
     </div>

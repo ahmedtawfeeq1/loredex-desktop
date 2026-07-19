@@ -98,6 +98,12 @@ import {
   type SnapshotResult,
   type SnapshotSummary,
   type SnapshotOptions,
+  // WP-G: agent-ops scaffolding + inbox (aliased — engine wraps with commit/containment)
+  scaffoldPipeline as scaffoldPipelineLib,
+  scaffoldAgent as scaffoldAgentLib,
+  scaffoldStage as scaffoldStageLib,
+  listClientInbox as listClientInboxLib,
+  type InboxItem,
 } from 'loredex'
 import { abbreviatePath } from '../shared/identity'
 import { type DuplicateGroup, findDuplicates, type NoteRecord } from './duplicates'
@@ -415,6 +421,127 @@ export function createSnapshot(
 /** WP-C: list snapshots for a client (all units, or one) — read-only, no commit. */
 export function listSnapshotsFor(client: string, unit?: string): SnapshotSummary[] {
   return listSnapshotsLib(getConfig().vaultPath, client, unit)
+}
+
+// ── WP-G: scaffold + inbox (agent-ops; each write = reindex + one commit) ────
+
+/** Scaffold a new pipeline under a client — the four `_` files, one commit. */
+export function scaffoldPipelineUnit(
+  client: string,
+  name: string,
+  identity: Identity,
+): { dir: string } {
+  const config = getConfig()
+  const r = scaffoldPipelineLib(config.vaultPath, client, name)
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(config.vaultPath, config, `loredex: new pipeline ${basename(r.dir)} (${identity.name})`),
+  )
+  return r
+}
+
+/** Scaffold a new stage-less agent under a client — one commit. */
+export function scaffoldAgentUnit(
+  client: string,
+  name: string,
+  identity: Identity,
+): { dir: string } {
+  const config = getConfig()
+  const r = scaffoldAgentLib(config.vaultPath, client, name)
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(config.vaultPath, config, `loredex: new agent ${basename(r.dir)} (${identity.name})`),
+  )
+  return r
+}
+
+/** Scaffold a new stage (optionally --before/--after NN, renumbering later
+ *  stages), one commit. Returns the renumber map for the toast. */
+export function scaffoldStageUnit(
+  client: string,
+  pipeline: string,
+  name: string,
+  opts: { before?: string; after?: string },
+  identity: Identity,
+): { dir: string; renumbered: Array<{ from: string; to: string }> } {
+  const config = getConfig()
+  const r = scaffoldStageLib(config.vaultPath, client, pipeline, name, opts)
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(config.vaultPath, config, `loredex: new stage ${basename(r.dir)} (${identity.name})`),
+  )
+  return r
+}
+
+/** WP-G: a client's intake queue (read-only). */
+export function clientInbox(client: string): InboxItem[] {
+  return listClientInboxLib(getConfig().vaultPath, client)
+}
+
+/**
+ * Resolve an inbox item's absolute path, refusing anything whose real parent is
+ * not the client's real `_inbox/` (defeats a `../` in `name`, a symlink out).
+ */
+function resolveInboxItem(vaultPath: string, client: string, name: string): string {
+  const inboxDir = join(vaultPath, 'projects', slugify(client), '_inbox')
+  const abs = join(inboxDir, name)
+  let realParent: string
+  let realInbox: string
+  try {
+    realParent = realpathSync(dirname(abs))
+    realInbox = realpathSync(inboxDir)
+  } catch {
+    throw ipcError('INTERNAL', `no inbox item "${name}"`)
+  }
+  if (realParent !== realInbox) throw ipcError('INTERNAL', `"${name}" is not an inbox item`)
+  return abs
+}
+
+/** A collision-free destination path (`name`, then `name (1)`, `name (2)`…). */
+function uniquePath(dir: string, name: string): string {
+  let candidate = join(dir, name)
+  if (!existsSync(candidate)) return candidate
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')) : ''
+  const stem = ext ? name.slice(0, -ext.length) : name
+  for (let n = 1; ; n++) {
+    candidate = join(dir, `${stem} (${n})${ext}`)
+    if (!existsSync(candidate)) return candidate
+  }
+}
+
+/** Consume an inbox item by moving it to `_randoms/` (keep-anyway), one commit. */
+export function moveInboxToRandoms(
+  client: string,
+  name: string,
+  identity: Identity,
+): { moved: string } {
+  const config = getConfig()
+  const src = resolveInboxItem(config.vaultPath, client, name)
+  const randomsDir = join(config.vaultPath, 'projects', slugify(client), '_randoms')
+  mkdirSync(randomsDir, { recursive: true })
+  const dest = uniquePath(randomsDir, name) // _randoms also holds routed notes — never overwrite
+  renameSync(src, dest)
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(config.vaultPath, config, `loredex: consume inbox ${name} → _randoms (${identity.name})`),
+  )
+  return { moved: basename(dest) }
+}
+
+/** Delete an inbox item outright, one commit. */
+export function deleteInboxItem(
+  client: string,
+  name: string,
+  identity: Identity,
+): { deleted: string } {
+  const config = getConfig()
+  const abs = resolveInboxItem(config.vaultPath, client, name)
+  rmSync(abs, { recursive: true, force: true })
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(config.vaultPath, config, `loredex: delete inbox ${name} (${identity.name})`),
+  )
+  return { deleted: name }
 }
 
 const RAW_EXTS = ['.yaml', '.yml', '.json', '.csv'] as const

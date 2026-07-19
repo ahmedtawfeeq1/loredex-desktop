@@ -410,6 +410,39 @@ export function registerCoreHandlers(
   )
   ipc.register('clients.credentials.delete', ({ client, id }) => deleteCredential(client, id))
   ipc.register('clients.credentials.reveal', ({ client, id }) => revealCredential(client, id))
+  // WP-G: scaffold new units + consume the inbox — each write clones the
+  // clients.normalize discipline (lock + identity + atlas + vault.changed +
+  // notifier); inbox.list is a bare read.
+  const scaffold =
+    <T>(client: string, identity: Identity, run: () => T): Promise<T> =>
+      withWriteLock(() => {
+        if (!isValidIdentity(identity)) {
+          throw ipcError('INTERNAL', 'this needs an identity — set name and email in Settings')
+        }
+        const result = run()
+        invalidateAtlas()
+        ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
+        notifier.refresh()
+        return result
+      })
+  ipc.register('clients.scaffold.pipeline', ({ client, name, identity }) =>
+    scaffold(client, identity, () => engine.scaffoldPipelineUnit(client, name, identity)),
+  )
+  ipc.register('clients.scaffold.agent', ({ client, name, identity }) =>
+    scaffold(client, identity, () => engine.scaffoldAgentUnit(client, name, identity)),
+  )
+  ipc.register('clients.scaffold.stage', ({ client, pipeline, name, before, after, identity }) =>
+    scaffold(client, identity, () =>
+      engine.scaffoldStageUnit(client, pipeline, name, { before, after }, identity),
+    ),
+  )
+  ipc.register('clients.inbox.list', ({ client }) => engine.clientInbox(client))
+  ipc.register('clients.inbox.toRandoms', ({ client, name, identity }) =>
+    scaffold(client, identity, () => engine.moveInboxToRandoms(client, name, identity)),
+  )
+  ipc.register('clients.inbox.delete', ({ client, name, identity }) =>
+    scaffold(client, identity, () => engine.deleteInboxItem(client, name, identity)),
+  )
   // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
   // same recomputed-cache tier as the link index (never authoritative).
   ipc.register('atlas.graph', ({ level, scope }) => atlasGraph(level, scope ?? {}))

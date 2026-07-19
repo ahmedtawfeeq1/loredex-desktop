@@ -350,7 +350,11 @@ export const useTerminal = create<TerminalState>((set, get) => ({
 }))
 
 if (typeof window !== 'undefined' && window.loredex) {
-  onEvent((e) => {
+  // ONE term.data → writeTerm subscription for the module's lifetime. Under HMR
+  // the module re-evaluates; without disposing the old listener each keystroke's
+  // echo would be written N times (the "types everything twice" bug). dispose()
+  // is a no-op in production (single eval, single subscriber).
+  const unsub = onEvent((e) => {
     // pty output/exit ride CoreEvents (never invokes). A late term.exit for a
     // pane the user already closed carries an id no longer in the tree — ignored.
     if (e.kind === 'term.data') writeTerm(e.id, e.data)
@@ -361,6 +365,8 @@ if (typeof window !== 'undefined' && window.loredex) {
       }
     }
   })
+  const hot = (import.meta as ImportMeta & { hot?: { dispose(cb: () => void): void } }).hot
+  if (hot) hot.dispose(() => unsub())
   // devtools/CDP verifier handle: window.__loredexTerminal.getState() to
   // inspect { open, height, root, activeId, exited }; .getState().toggle()
   // to drive the drawer programmatically

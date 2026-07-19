@@ -243,9 +243,14 @@ export function SideNav({ collapsed }: { collapsed: boolean }): React.JSX.Elemen
   return (
     <>
       <div className="side-head">
-        <BrandMark size={18} />
-        <span className="side-dex">{dexName}</span>
-        <span className="side-ver">{engine ? `dex ${engine}` : 'dex'}</span>
+        <BrandMark size={32} />
+        <div className="side-brand">
+          <span className="side-brand-name">Loredex</span>
+          <span className="side-brand-dex" title={`${dexName}${engine ? ` · dex ${engine}` : ''}`}>
+            {dexName}
+            {engine ? ` · ${engine}` : ''}
+          </span>
+        </div>
         <button
           type="button"
           className="side-collapse"

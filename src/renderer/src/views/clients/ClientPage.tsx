@@ -9,8 +9,10 @@ import { useEffect, useState } from 'react'
 import type {
   ClientInfo,
   ClientWorkspaceStatus,
+  SnapshotSummary,
   WorkspaceResult,
 } from '../../../../shared/ipc-contract'
+import type { Identity } from '../../../../shared/types'
 import { invoke } from '../../api'
 import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
@@ -18,6 +20,7 @@ import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useAgentPanel } from '../../stores/agentPanel'
 import { useReader } from '../../stores/reader'
 import { useTerminal } from '../../stores/terminal'
+import { useToasts } from '../../stores/toasts'
 import { sectionTint } from '../reader/sectionTint'
 import { buildClientPage, type UnitSection } from './client-page'
 
@@ -39,7 +42,9 @@ const PAGE_CSS = `
 .cp-section { margin-bottom: 22px; }
 .cp-section-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); margin-bottom: 8px; }
 .cp-unit { border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--bg-card); }
-.cp-unit-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.cp-unit-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.cp-unit-snapshot { font-size: 11px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 6px; padding: 2px 9px; cursor: pointer; white-space: nowrap; }
+.cp-unit-snapshot:hover { color: var(--text-1); border-color: var(--accent-hi); }
 .cp-unit-name { font-weight: 650; color: var(--text-1); }
 .cp-unit-kind { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
 .cp-unit-files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
@@ -56,6 +61,17 @@ const PAGE_CSS = `
 .cp-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-1); cursor: pointer; padding: 3px 6px; border-radius: 6px; text-align: left; }
 .cp-row:hover { background: var(--bg-inset); }
 .cp-row-type { font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 4px; padding: 0 5px; }
+.cp-versions-unit { margin-bottom: 10px; }
+.cp-versions-unit-name { font-size: 12px; font-weight: 650; color: var(--text-1); margin-bottom: 4px; }
+.cp-versions-empty { font-size: 12.5px; color: var(--text-2); }
+.cp-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; z-index: 40; }
+.cp-modal { width: min(440px, 92vw); background: var(--bg-card); border: 1px solid var(--hairline); border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.cp-modal-title { font-size: 15px; font-weight: 650; color: var(--text-1); }
+.cp-modal-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-2); }
+.cp-modal-field input { font-size: 13px; padding: 6px 8px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--bg-inset); color: var(--text-1); }
+.cp-modal-check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-1); }
+.cp-modal-error { font-size: 12px; color: var(--rust, #a33f2e); }
+.cp-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .cp-ws { border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; background: var(--bg-card); }
 .cp-ws-conn { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); }
 .cp-ws-row { display: flex; align-items: center; gap: 10px; }
@@ -88,12 +104,27 @@ function openNote(path: string): void {
   void useReader.getState().open(path)
 }
 
-function Unit({ unit }: { unit: UnitSection }): React.JSX.Element {
+function Unit({
+  unit,
+  onSnapshot,
+}: {
+  unit: UnitSection
+  onSnapshot: (name: string) => void
+}): React.JSX.Element {
   return (
     <div className="cp-unit">
       <div className="cp-unit-head">
         <span className="cp-unit-name">{unit.name}</span>
         <span className="cp-unit-kind">{unit.kind}</span>
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="cp-unit-snapshot"
+          title="Version this unit's definition files into _versions/ (committed)"
+          onClick={() => onSnapshot(unit.name)}
+        >
+          ⧉ Snapshot
+        </button>
       </div>
       <div className="cp-unit-files">
         {(
@@ -488,6 +519,101 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   )
 }
 
+/** WP-C: snapshot dialog — optional note + include-tables, one Create action.
+ *  ClientPage owns which unit is targeted; identity comes from the parent. */
+function SnapshotModal({
+  client,
+  unit,
+  identity,
+  onClose,
+  onDone,
+}: {
+  client: string
+  unit: string
+  identity: Identity | null
+  onClose: () => void
+  onDone: () => void
+}): React.JSX.Element {
+  const [note, setNote] = useState('')
+  const [tables, setTables] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function create(): Promise<void> {
+    if (!identity) {
+      setError('Set your name and email in Settings before snapshotting (commit attribution).')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await invoke('clients.snapshot.create', {
+        client,
+        unit,
+        tables,
+        note: note.trim() || undefined,
+        identity,
+      })
+      useToasts.getState().push('Snapshot created', `${r.unit} · ${r.stamp} · ${r.files.length} file(s)`)
+      onDone()
+    } catch (e) {
+      setError(String((e as { message?: string }).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is a mouse affordance; Cancel button + Esc-free modal
+    <div className="cp-modal-backdrop" onClick={onClose}>
+      <div
+        className="cp-modal"
+        role="dialog"
+        aria-modal="true"
+        // biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation guard, not an interactive control
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cp-modal-title">Snapshot {unit}</div>
+        <label className="cp-modal-field">
+          Note (optional)
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="what changed / why"
+            // biome-ignore lint/a11y/noAutofocus: single-field modal
+            autoFocus
+          />
+        </label>
+        <label className="cp-modal-check">
+          <input type="checkbox" checked={tables} onChange={(e) => setTables(e.target.checked)} />
+          Also snapshot this client's knowledge_tables/
+        </label>
+        {error && <div className="cp-modal-error">{error}</div>}
+        <div className="cp-modal-actions">
+          <button type="button" className="button-quiet" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="button-emphasis"
+            onClick={() => void create()}
+            disabled={busy}
+          >
+            {busy ? 'Snapshotting…' : 'Create snapshot'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Group snapshots by unit, preserving the newest-first order from the lib. */
+function groupSnapshotsByUnit(snaps: SnapshotSummary[]): Array<[string, SnapshotSummary[]]> {
+  const byUnit = new Map<string, SnapshotSummary[]>()
+  for (const s of snaps) byUnit.set(s.unit, [...(byUnit.get(s.unit) ?? []), s])
+  return [...byUnit.entries()]
+}
+
 export function ClientPage({
   info,
   onBack,
@@ -497,9 +623,20 @@ export function ClientPage({
 }): React.JSX.Element {
   const lints = useDex((s) => s.lints) ?? []
   const page = buildClientPage(info, lints)
+  const identity = useIdentity((s) => effectiveIdentity(s))
   const oldestDays = page.inbox.oldestMs
     ? Math.floor((Date.now() - page.inbox.oldestMs) / 86_400_000)
     : 0
+
+  // WP-C: snapshot modal target (unit name) + the Versions list
+  const [snapUnit, setSnapUnit] = useState<string | null>(null)
+  const [snapshots, setSnapshots] = useState<SnapshotSummary[]>([])
+  const [snapRefresh, setSnapRefresh] = useState(0)
+  useEffect(() => {
+    void invoke('clients.snapshot.list', { client: info.slug })
+      .then(setSnapshots)
+      .catch(() => setSnapshots([]))
+  }, [info.slug, snapRefresh])
 
   return (
     <div
@@ -546,7 +683,7 @@ export function ClientPage({
         <section className="cp-section">
           <div className="cp-section-title">Pipelines</div>
           {page.pipelines.map((unit) => (
-            <Unit key={unit.name} unit={unit} />
+            <Unit key={unit.name} unit={unit} onSnapshot={setSnapUnit} />
           ))}
         </section>
       )}
@@ -555,7 +692,35 @@ export function ClientPage({
         <section className="cp-section">
           <div className="cp-section-title">Agents</div>
           {page.agents.map((unit) => (
-            <Unit key={unit.name} unit={unit} />
+            <Unit key={unit.name} unit={unit} onSnapshot={setSnapUnit} />
+          ))}
+        </section>
+      )}
+
+      {snapshots.length > 0 && (
+        <section className="cp-section">
+          <div className="cp-section-title">Versions</div>
+          {groupSnapshotsByUnit(snapshots).map(([unit, snaps]) => (
+            <div key={unit} className="cp-versions-unit">
+              <div className="cp-versions-unit-name">{unit}</div>
+              <div className="cp-rows">
+                {snaps.map((s) => (
+                  <button
+                    key={s.stamp}
+                    type="button"
+                    className="cp-row"
+                    title={s.note ?? 'Open the snapshot manifest'}
+                    onClick={() =>
+                      openNote(`${info.dir}/_versions/${s.unit}/${s.stamp}/manifest.json`)
+                    }
+                  >
+                    <span className="cp-row-type">{s.fileCount}f</span>
+                    {s.stamp}
+                    {s.note ? ` — ${s.note}` : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </section>
       )}
@@ -594,6 +759,19 @@ export function ClientPage({
         <div className="cp-section-title">Agent tooling</div>
         <WorkspacePanel info={info} />
       </section>
+
+      {snapUnit !== null && (
+        <SnapshotModal
+          client={info.slug}
+          unit={snapUnit}
+          identity={identity}
+          onClose={() => setSnapUnit(null)}
+          onDone={() => {
+            setSnapUnit(null)
+            setSnapRefresh((n) => n + 1)
+          }}
+        />
+      )}
     </div>
   )
 }

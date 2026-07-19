@@ -115,6 +115,16 @@ import { groupProjectsInTree, listMarkdownFiles, walkVault } from './tree'
 import { createVault, joinVault, validateRemote, type WizardDeps } from './wizard'
 import { withWriteLock } from './write-lock'
 
+/** WP-C: `YYYY-MM-DD_HHMMSS` local-time stamp = the snapshot dir name. The clock
+ *  lives host-side (`stampNow` isn't lib-exported; handlers never import loredex). */
+function stampNow(): string {
+  const d = new Date()
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(
+    d.getMinutes(),
+  )}${p(d.getSeconds())}`
+}
+
 /**
  * Story 12.2 (AC3): evaluate freshly-scanned contract changes for status
  * suggestions — both scan paths feed it (the on-demand contracts.timeline
@@ -365,6 +375,24 @@ export function registerCoreHandlers(
   // "Open in Terminal" opens the IN-APP terminal drawer at this dir (renderer
   // side); the core just resolves the absolute path cross-platform.
   ipc.register('clients.dirAbs', ({ client }) => ({ dir: engine.clientDirAbs(client) }))
+  // WP-C: snapshot a pipeline/agent into _versions/<unit>/<stamp>/ (agent-ops).
+  // One attributed commit under the write lock; the stamp is minted here (the
+  // clock lives host-side, not in the lib). A fresh Versions list is the
+  // renderer's cue to refetch.
+  ipc.register('clients.snapshot.create', ({ client, unit, tables, note, identity }) =>
+    withWriteLock(() => {
+      if (!isValidIdentity(identity)) {
+        throw ipcError('INTERNAL', 'a snapshot commit needs an identity — set name and email in Settings')
+      }
+      const result = engine.createSnapshot(client, unit, stampNow(), identity, {
+        includeTables: tables,
+        note,
+      })
+      ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
+      return result
+    }),
+  )
+  ipc.register('clients.snapshot.list', ({ client }) => engine.listSnapshotsFor(client))
   // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
   // same recomputed-cache tier as the link index (never authoritative).
   ipc.register('atlas.graph', ({ level, scope }) => atlasGraph(level, scope ?? {}))

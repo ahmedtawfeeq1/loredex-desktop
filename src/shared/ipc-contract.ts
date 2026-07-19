@@ -10,6 +10,8 @@ import type {
   LintFinding,
   ProductDashboard,
   SearchHit,
+  SnapshotResult,
+  SnapshotSummary,
   WorkspaceResult,
   WorkItem,
   WorkPatch,
@@ -69,6 +71,7 @@ import type {
 // Payload types that exist in the pinned loredex are imported, never redefined.
 export type { ClientInfo, Config, Doc, LintFinding, ProductDashboard, SearchHit, WorkspaceResult }
 export type { WorkItem, WorkPatch, WorkReceipt } from 'loredex'
+export type { SnapshotResult, SnapshotSummary } from 'loredex'
 export type { ClientWorkspaceStatus, CreateClientSpec } from './types'
 
 // ── ACP agent panels (acp blueprint 2026-07-18): shared types ───────────────
@@ -260,6 +263,15 @@ export interface CoreApi {
   /** agent-ops: the client's absolute directory — the in-app terminal's cwd for
    *  "Open in Terminal" (so `claude` runs in that client's folder) */
   'clients.dirAbs': { in: { client: string }; out: { dir: string } }
+  // ── WP-C: snapshots ──
+  /** agent-ops: version one pipeline/agent into _versions/<unit>/<stamp>/ — copies
+   *  the definition files (+ optional knowledge tables), one attributed commit. */
+  'clients.snapshot.create': {
+    in: { client: string; unit: string; tables?: boolean; note?: string; identity: Identity }
+    out: SnapshotResult
+  }
+  /** agent-ops: list a client's snapshots (all units), newest stamp first. */
+  'clients.snapshot.list': { in: { client: string }; out: SnapshotSummary[] }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,
    *  aggregated core-side from vault frontmatter (memoized per mtime) */

@@ -92,6 +92,12 @@ import {
   type WorkItem,
   type WorkPatch,
   type WorkReceipt,
+  // WP-C: agent-ops snapshots (aliased — engine exposes createSnapshot/listSnapshotsFor)
+  snapshotUnit as snapshotUnitLib,
+  listSnapshots as listSnapshotsLib,
+  type SnapshotResult,
+  type SnapshotSummary,
+  type SnapshotOptions,
 } from 'loredex'
 import { abbreviatePath } from '../shared/identity'
 import { type DuplicateGroup, findDuplicates, type NoteRecord } from './duplicates'
@@ -378,6 +384,37 @@ export function normalizeStructure(
     )
   }
   return { normalized }
+}
+
+/**
+ * WP-C: snapshot one agent-ops unit into `_versions/<unit>/<stamp>/` — lib copy,
+ * reindex, then one attributed commit (the snapshot IS the durability). The
+ * caller supplies the stamp (handlers own the clock) and identity for author
+ * attribution. `opts` carries include-tables / note / live platform data.
+ */
+export function createSnapshot(
+  client: string,
+  unit: string,
+  stamp: string,
+  identity: Identity,
+  opts?: SnapshotOptions,
+): SnapshotResult {
+  const config = getConfig()
+  const result = snapshotUnitLib(config.vaultPath, client, unit, stamp, opts)
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(
+      config.vaultPath,
+      config,
+      `loredex: snapshot ${result.unit} ${result.stamp} (${identity.name})`,
+    ),
+  )
+  return result
+}
+
+/** WP-C: list snapshots for a client (all units, or one) — read-only, no commit. */
+export function listSnapshotsFor(client: string, unit?: string): SnapshotSummary[] {
+  return listSnapshotsLib(getConfig().vaultPath, client, unit)
 }
 
 const RAW_EXTS = ['.yaml', '.yml', '.json', '.csv'] as const

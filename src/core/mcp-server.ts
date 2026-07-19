@@ -256,6 +256,18 @@ export async function bootMcpServer(
   return status
 }
 
+/**
+ * Stop the current host (if any) and boot again with fresh opts — the Settings
+ * "Apply & retry" path. Lets a user rebind after a port conflict clears, or
+ * move to a new port, without relaunching the app.
+ */
+export async function restartMcpServer(
+  opts: McpHostOptions & { portOverride?: number | null; onWarning?: (text: string) => void },
+): Promise<McpStatus> {
+  await stopMcpServer()
+  return bootMcpServer(opts)
+}
+
 /** Clean shutdown: close the listener and remove the discovery file. */
 export async function stopMcpServer(): Promise<void> {
   const server = http

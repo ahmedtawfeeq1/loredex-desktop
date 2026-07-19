@@ -48,8 +48,9 @@ export function McpServerSection(): React.JSX.Element {
   const [mcp, setMcp] = useState<McpStatus | null>(null)
   const [log, setLog] = useState<McpLogEntry[]>([])
   const [settings, setSettings] = useState<{ autostart: boolean; writeTools: boolean } | null>(null)
-  const [port, setPort] = useState('')
+  const [port, setPort] = useState<string>('')
   const [copied, setCopied] = useState(false)
+  const [restarting, setRestarting] = useState(false)
   const setView = useApp((s) => s.setView)
 
   useEffect(() => {
@@ -72,6 +73,28 @@ export function McpServerSection(): React.JSX.Element {
     void invoke('mcp.settings.set', patch).catch(() => {})
   }
 
+  // Apply & retry: rebind the host now. `port === undefined` retries on the
+  // current port (clears a stale conflict); a value moves + rebinds.
+  async function restart(nextPort?: number | null): Promise<void> {
+    setRestarting(true)
+    try {
+      const status = await invoke('mcp.restart', nextPort === undefined ? {} : { port: nextPort })
+      setMcp(status)
+    } catch {
+      // the returned status already carries a conflict/error message; ignore throw
+    } finally {
+      setRestarting(false)
+    }
+  }
+  const portChanged = port.trim() !== '' && port.trim() !== String(mcp?.portOverride ?? '')
+  // empty field → clear the override (back to the preferred port); else the number
+  const applyPort = (): number | null => {
+    const t = port.trim()
+    if (t === '') return null
+    const n = Number(t)
+    return Number.isInteger(n) ? n : null
+  }
+
   return (
     <>
       <div className={`mcp-card${running ? ' is-ok' : ' is-bad'}`}>
@@ -91,6 +114,16 @@ export function McpServerSection(): React.JSX.Element {
           )}
         </div>
         <div className="mcp-card-actions">
+          {!running && (
+            <Button
+              variant="emphasis"
+              disabled={restarting}
+              title="Rebind the MCP host on the current port now"
+              onClick={() => void restart()}
+            >
+              {restarting ? 'Retrying…' : 'Retry now'}
+            </Button>
+          )}
           <Button
             className="mono-btn"
             title="Copy the .mcp.json server entry (includes this install's bearer token)"
@@ -113,19 +146,25 @@ export function McpServerSection(): React.JSX.Element {
       <div className="set-card">
         <div className="set-row">
           <span className="set-row-label">Port</span>
-          <span className="set-row-value">
+          <span className="set-row-value mcp-port-row">
             <input
               className="settings-input port-input"
+              inputMode="numeric"
               placeholder={String(mcp?.preferredPort ?? 52017)}
               defaultValue={mcp?.portOverride ?? ''}
               onChange={(e) => setPort(e.target.value)}
-              onBlur={() => {
-                const n = Number(port)
-                void invoke('settings.mcpPort.set', {
-                  port: Number.isInteger(n) && n > 1024 ? n : null,
-                }).catch(() => {})
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && portChanged) void restart(applyPort())
               }}
             />
+            <Button
+              variant="secondary"
+              disabled={restarting || !portChanged}
+              title="Save this port and rebind the MCP host now"
+              onClick={() => void restart(applyPort())}
+            >
+              {restarting ? 'Applying…' : 'Apply & retry'}
+            </Button>
           </span>
         </div>
         <div className="set-row">

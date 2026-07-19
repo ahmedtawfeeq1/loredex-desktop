@@ -52,7 +52,7 @@ import {
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { commentView } from './notes'
-import { getMcpStatus, mcpRequestLog } from './mcp-server'
+import { getMcpStatus, mcpRequestLog, PREFERRED_MCP_PORT, restartMcpServer } from './mcp-server'
 import {
   authStatus,
   createDexRepo,
@@ -92,6 +92,7 @@ import {
   mintAgentToken,
   revokeAgentToken,
   loadMcpAutostart,
+  loadMcpPortOverride,
   loadMcpWriteTools,
   saveMcpAutostart,
   saveMcpWriteTools,
@@ -1112,6 +1113,25 @@ export function registerCoreHandlers(
       throw ipcError('INTERNAL', 'MCP port must be an integer between 1024 and 65535')
     }
     saveMcpPortOverride(port)
+  })
+  // Apply & retry: persist the port, then rebind the in-app MCP host now —
+  // clears a stale port-conflict or moves to a new port without a relaunch.
+  ipc.register('mcp.restart', async ({ port }) => {
+    if (port !== undefined) {
+      if (port !== null && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
+        throw ipcError('INTERNAL', 'MCP port must be an integer between 1024 and 65535')
+      }
+      saveMcpPortOverride(port)
+    }
+    const portOverride = loadMcpPortOverride()
+    return restartMcpServer({
+      port: portOverride ?? PREFERRED_MCP_PORT,
+      portOverride,
+      token: loadOrCreateMcpToken(),
+      agentTokens: () => loadAgentTokens(),
+      writeTools: () => loadMcpWriteTools(),
+      onWarning: (text) => ipc.emit({ kind: 'git.warning', text }),
+    })
   })
 
   // M2 wizards (stories 13.1/13.2, m2 §7): core-host step sequences. They run

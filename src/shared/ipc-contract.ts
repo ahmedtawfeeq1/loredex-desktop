@@ -342,6 +342,9 @@ export interface CoreApi {
   'work.update': { in: { id: string; patch: WorkPatch; identity: Identity }; out: WorkReceipt }
   'dex.createRepo': { in: { name: string; isPrivate: boolean }; out: DexRepo }
   'settings.mcpPort.set': { in: { port: number | null }; out: void }
+  /** Apply & retry: (optionally) persist a new port, then rebind the in-app MCP
+   *  host now — clears a stale port-conflict without relaunching. */
+  'mcp.restart': { in: { port?: number | null }; out: McpStatus }
   /** app-local contract evolution (story 14.1): theme preference — per-user app
    *  state, persisted core-side (settings JSON → app.db seam, story 9.2) */
   'settings.theme.get': { in: void; out: ThemeSetting }

@@ -377,6 +377,11 @@ export function acpContinue(
     cwd: arg.cwd,
     conversationId: arg.conversationId,
     persist: arg.persist,
+    // WP-A/WP-B: carry the conversation's persisted client scope across a
+    // reopen / pop-out / provider switch — the ◈ chip reflects which client the
+    // THREAD is about (not the cwd), and the always-allow auto-answer keeps
+    // matching (routePermission gates on s.clientSlug).
+    clientSlug: loaded.clientSlug ?? null,
     resumeSessionId,
     // the seed is a fallback: boot drops it when a native session/load succeeds
     seed: seed ? SEED_PREFACE + seed : null,

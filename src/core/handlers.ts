@@ -124,6 +124,19 @@ import {
   setCredential,
 } from './client-credentials'
 
+/**
+ * Refuse an agent-ops-only write when the open dex isn't agent-ops (research).
+ * The renderer already gates these on ClientPage/ClientsView (agent-ops only),
+ * but a stale view after an in-place vault switch must never scaffold/normalize/
+ * snapshot onto a research dex — the hard research-dex-safety invariant. Core is
+ * the last line: throw before any lib call runs.
+ */
+function requireAgentOps(action: string): void {
+  if (engine.getDexType() !== 'agent-ops') {
+    throw ipcError('INTERNAL', `${action} applies to agent-ops dexes only`)
+  }
+}
+
 /** WP-C: `YYYY-MM-DD_HHMMSS` local-time stamp = the snapshot dir name. The clock
  *  lives host-side (`stampNow` isn't lib-exported; handlers never import loredex). */
 function stampNow(): string {
@@ -283,6 +296,7 @@ export function registerCoreHandlers(
   ipc.register('clients.standardTooling', () => engine.standardTooling())
   ipc.register('clients.normalize', ({ client, identity }) =>
     withWriteLock(() => {
+      requireAgentOps('normalize') // never scaffold client structure onto a research dex
       if (!isValidIdentity(identity)) {
         throw ipcError('INTERNAL', 'normalizing needs an identity — set name and email in Settings')
       }
@@ -390,6 +404,7 @@ export function registerCoreHandlers(
   // renderer's cue to refetch.
   ipc.register('clients.snapshot.create', ({ client, unit, tables, note, identity }) =>
     withWriteLock(() => {
+      requireAgentOps('snapshot')
       if (!isValidIdentity(identity)) {
         throw ipcError('INTERNAL', 'a snapshot commit needs an identity — set name and email in Settings')
       }
@@ -416,6 +431,7 @@ export function registerCoreHandlers(
   const scaffold =
     <T>(client: string, identity: Identity, run: () => T): Promise<T> =>
       withWriteLock(() => {
+        requireAgentOps('this')
         if (!isValidIdentity(identity)) {
           throw ipcError('INTERNAL', 'this needs an identity — set name and email in Settings')
         }

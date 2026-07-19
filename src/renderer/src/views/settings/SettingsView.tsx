@@ -177,7 +177,7 @@ export function SettingsView(): React.JSX.Element {
         {section === 'sync-git' && <SyncPanel />}
         {section === 'github' && <GitHubSection />}
         {section === 'agent-auth' && <AgentAuthSection />}
-        {section === 'agent-permissions' && <AgentPermissionsSection />}
+        {section === 'agent-permissions' && dexType === 'agent-ops' && <AgentPermissionsSection />}
       </div>
     </div>
   )

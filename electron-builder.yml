@@ -37,9 +37,9 @@ mac:
   category: public.app-category.developer-tools
   target:
     - target: dmg
-      arch: [arm64]
+      arch: [arm64, x64]
     - target: zip
-      arch: [arm64]
+      arch: [arm64, x64]
   minimumSystemVersion: '14.0'
 win:
   # electron-builder converts the 1024px PNG to the .ico Windows needs

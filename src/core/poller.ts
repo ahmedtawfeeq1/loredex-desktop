@@ -25,6 +25,13 @@ import type { PollCursor } from './db/index'
 export const FOCUSED_INTERVAL_MS = 60_000
 export const BLURRED_INTERVAL_MS = 300_000
 
+/**
+ * WP-E: auto-push debounce. Local commits (snapshot, scaffold, note-save via
+ * gitAutoCommit) are pushed only once HEAD has been settled this long — so a
+ * burst of edits publishes once, after it stops, not mid-work.
+ */
+export const PUSH_DEBOUNCE_MS = 30_000
+
 /** The poller only reacts to handoff notes (architecture-m2.md §4 scope). */
 export const HANDOFF_FILE_RE = /^projects\/[^/]+\/handoffs\/[^/]+\.md$/
 
@@ -255,25 +262,60 @@ export function createPoller(deps: PollerDeps): Poller {
     return ref
   }
 
-  /** gated pull: lock free (tryAcquire — skip if busy) AND clean worktree. */
+  /**
+   * Integrate the remote tip: pull when behind (gated on the lock + a clean
+   * worktree — user work always wins), and push when ahead (WP-E — debounced,
+   * outside the lock). Non-finite counts degrade to 0 so a garbled `rev-list`
+   * never triggers either path.
+   */
   async function integrate(ref: string): Promise<void> {
-    const behind = Number((await deps.git(['rev-list', '--count', `HEAD..${ref}`])).trim())
-    if (!Number.isFinite(behind) || behind === 0) return
-    const release = deps.tryLock()
+    const behindRaw = Number((await deps.git(['rev-list', '--count', `HEAD..${ref}`])).trim())
+    const aheadRaw = Number((await deps.git(['rev-list', '--count', `${ref}..HEAD`])).trim())
+    const behind = Number.isFinite(behindRaw) ? behindRaw : 0
+    const ahead = Number.isFinite(aheadRaw) ? aheadRaw : 0
+    if (behind === 0 && ahead === 0) return
+
+    // pull (behind) — under the lock, only on a clean tree; else defer to next tick
     let pulled = false
-    if (release) {
-      try {
-        if ((await deps.git(['status', '--porcelain'])).trim() === '') {
-          await deps.pullAndReconcile()
-          pulled = true
+    if (behind > 0) {
+      const release = deps.tryLock()
+      if (release) {
+        try {
+          if ((await deps.git(['status', '--porcelain'])).trim() === '') {
+            await deps.pullAndReconcile()
+            pulled = true
+          }
+        } finally {
+          release()
         }
-      } finally {
-        release()
       }
     }
+
+    // push (ahead) — only when NOT behind (a behind push would non-fast-forward
+    // reject) and once HEAD has settled past the debounce. Never holds the lock
+    // (push doesn't touch the worktree); a failure (offline/auth) is best-effort
+    // and re-tried next tick, surfaced by the tick's git.warning path.
+    let pushed = false
+    if (ahead > 0 && behind === 0) {
+      const headCt = Number((await deps.git(['log', '-1', '--format=%ct', 'HEAD'])).trim())
+      const settled = Number.isFinite(headCt) && Date.now() / 1000 - headCt >= PUSH_DEBOUNCE_MS / 1000
+      if (settled) {
+        try {
+          await deps.git(['push'])
+          pushed = true
+        } catch {
+          // offline / auth / non-fast-forward — retried next tick; the outer tick
+          // catch warns once on a persistent outage
+        }
+      }
+    }
+
     if (pulled) deps.emit({ kind: 'vault.changed', paths: [] }) // full refetch (F4)
-    // deferred → panel shows "behind N, integrating…"; pulled → fresh health
-    deps.emit({ kind: 'sync.changed', health: deps.syncHealth() })
+    // deferred → "behind N, integrating…"; pulled/pushed → fresh health; ahead
+    // (debounce not yet elapsed) → surface the unpushed count so the pill shows
+    if (pulled || pushed || behind > 0 || ahead > 0) {
+      deps.emit({ kind: 'sync.changed', health: deps.syncHealth() })
+    }
   }
 
   return {

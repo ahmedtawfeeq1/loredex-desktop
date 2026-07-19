@@ -148,6 +148,10 @@ describe('deriveRemoteEvent', () => {
 interface FakeWorld {
   remoteSha: string
   behind: number
+  /** WP-E: local commits ahead of the remote (default 0 = even) */
+  ahead?: number
+  /** WP-E: HEAD commit unix seconds for the debounce check (default: long ago) */
+  headCt?: number
   dirty: boolean
   log: string
   show: Record<string, string>
@@ -160,11 +164,13 @@ function makeDeps(world: FakeWorld): {
   cursorRef: { current: PollCursor | null }
   locked: { current: boolean }
   pulled: { current: number }
+  pushed: { current: number }
 } {
   const events: CoreEvent[] = []
   const cursorRef = { current: null as PollCursor | null }
   const locked = { current: false }
   const pulled = { current: 0 }
+  const pushed = { current: 0 }
   const health = { state: 'behind' } as SyncHealth
   const deps: PollerDeps = {
     vaultPath: '/v',
@@ -181,13 +187,27 @@ function makeDeps(world: FakeWorld): {
       if (cmd === 'rev-parse' && args[1] === '--abbrev-ref') return Promise.resolve('main\n')
       if (cmd === 'rev-parse') return Promise.resolve(`${world.remoteSha}\n`)
       if (cmd === 'fetch') return Promise.resolve('')
+      // WP-E: two `log` shapes — the head-count (`log -1 --format=%ct`) vs the
+      // name-status parse log; disambiguate on args[1]
+      if (cmd === 'log' && args[1] === '-1') {
+        return Promise.resolve(`${world.headCt ?? 1_000_000}\n`) // default: long-settled
+      }
       if (cmd === 'log') return Promise.resolve(world.log)
       if (cmd === 'show') {
         const path = (args[1] as string).split(':')[1] as string
         const raw = world.show[path]
         return raw === undefined ? Promise.reject(new Error('gone')) : Promise.resolve(raw)
       }
-      if (cmd === 'rev-list') return Promise.resolve(`${world.behind}\n`)
+      // WP-E: `HEAD..ref` = behind, `ref..HEAD` = ahead
+      if (cmd === 'rev-list') {
+        const range = args[2] as string
+        return Promise.resolve(`${range.endsWith('..HEAD') ? (world.ahead ?? 0) : world.behind}\n`)
+      }
+      if (cmd === 'push') {
+        pushed.current += 1
+        world.ahead = 0
+        return Promise.resolve('')
+      }
       if (cmd === 'status') return Promise.resolve(world.dirty ? ' M dirty.md\n' : '')
       return Promise.reject(new Error(`unexpected git ${args.join(' ')}`))
     },
@@ -204,7 +224,7 @@ function makeDeps(world: FakeWorld): {
     },
     syncHealth: () => health,
   }
-  return { deps, events, cursorRef, locked, pulled }
+  return { deps, events, cursorRef, locked, pulled, pushed }
 }
 
 const openNote = JSON.stringify({
@@ -305,6 +325,80 @@ describe('poller tick', () => {
         expect(events.map((e) => e.kind)).toEqual(['sync.changed'])
       }
     }
+  })
+
+  it('WP-E: pushes settled local commits when ahead and not behind', async () => {
+    const world: FakeWorld = {
+      remoteSha: 'sha-1',
+      behind: 0,
+      ahead: 2,
+      headCt: Math.floor(Date.now() / 1000) - 120, // 2 min old → past the 30s debounce
+      dirty: false,
+      log: '',
+      show: {},
+      calls: [],
+    }
+    const { deps, events, cursorRef, pushed } = makeDeps(world)
+    cursorRef.current = { branch: 'main', lastSeenSha: 'sha-1', lastFetchAt: null }
+    await createPoller(deps).tick()
+    expect(pushed.current).toBe(1)
+    expect(world.ahead).toBe(0)
+    // no pull (not behind) → no vault.changed; just fresh health
+    expect(events.map((e) => e.kind)).toEqual(['sync.changed'])
+  })
+
+  it('WP-E: holds an unsettled commit (within debounce) but still surfaces the count', async () => {
+    const world: FakeWorld = {
+      remoteSha: 'sha-1',
+      behind: 0,
+      ahead: 1,
+      headCt: Math.floor(Date.now() / 1000), // just committed → inside the debounce
+      dirty: false,
+      log: '',
+      show: {},
+      calls: [],
+    }
+    const { deps, events, pushed, cursorRef } = makeDeps(world)
+    cursorRef.current = { branch: 'main', lastSeenSha: 'sha-1', lastFetchAt: null }
+    await createPoller(deps).tick()
+    expect(pushed.current).toBe(0)
+    expect(world.ahead).toBe(1)
+    expect(events.map((e) => e.kind)).toEqual(['sync.changed']) // pill still updates
+  })
+
+  it('WP-E: does NOT push while behind (a non-fast-forward would reject)', async () => {
+    const world: FakeWorld = {
+      remoteSha: 'sha-1',
+      behind: 3,
+      ahead: 1,
+      headCt: Math.floor(Date.now() / 1000) - 120,
+      dirty: false,
+      log: '',
+      show: {},
+      calls: [],
+    }
+    const { deps, pushed, pulled, cursorRef } = makeDeps(world)
+    cursorRef.current = { branch: 'main', lastSeenSha: 'sha-1', lastFetchAt: null }
+    await createPoller(deps).tick()
+    expect(pushed.current).toBe(0) // deferred until a clean pull makes us fast-forward
+    expect(pulled.current).toBe(1)
+  })
+
+  it('WP-E: even (0/0) is a clean no-op — no push, no events', async () => {
+    const world: FakeWorld = {
+      remoteSha: 'sha-1',
+      behind: 0,
+      ahead: 0,
+      dirty: false,
+      log: '',
+      show: {},
+      calls: [],
+    }
+    const { deps, events, pushed, cursorRef } = makeDeps(world)
+    cursorRef.current = { branch: 'main', lastSeenSha: 'sha-1', lastFetchAt: null }
+    await createPoller(deps).tick()
+    expect(pushed.current).toBe(0)
+    expect(events).toEqual([])
   })
 
   it('a failing fetch warns once, not once per tick (F8 without spam)', async () => {

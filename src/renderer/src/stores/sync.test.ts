@@ -1,7 +1,7 @@
 /** Story 5.2: warning ring buffer + sync dot tone mapping (pure store logic). */
 import { describe, expect, it } from 'vitest'
 import type { SyncHealth } from '../../../shared/types'
-import { dotTone, expireBefore, pushWarning, WARNING_LOG_MAX } from './sync'
+import { dotTone, expireBefore, nextAheadSince, pushWarning, WARNING_LOG_MAX } from './sync'
 
 const entry = (text: string): { at: string; text: string } => ({
   at: '2026-07-09T12:00:00Z',
@@ -69,5 +69,20 @@ describe('expireBefore (warnings retire on a clean sync)', () => {
       { at: '2026-07-17T06:31:00Z', text: 'raced in after' },
     ])
     expect(expireBefore(log, '2026-07-17T07:00:00Z')).toEqual([])
+  })
+})
+
+describe('nextAheadSince (WP-E unpushed staleness clock)', () => {
+  it('stamps the 0→>0 edge, keeps it while ahead, clears on →0', () => {
+    // even → ahead: stamp now
+    expect(nextAheadSince(null, 0, 2, 1000)).toBe(1000)
+    // still ahead: keep the original stamp (count may change)
+    expect(nextAheadSince(1000, 2, 3, 5000)).toBe(1000)
+    // ahead → even: clear
+    expect(nextAheadSince(1000, 3, 0, 9000)).toBeNull()
+    // stays even: null
+    expect(nextAheadSince(null, 0, 0, 9000)).toBeNull()
+    // ahead but no prior stamp (fresh load already ahead): stamp now
+    expect(nextAheadSince(null, 5, 5, 7000)).toBe(7000)
   })
 })

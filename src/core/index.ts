@@ -12,7 +12,7 @@ import { invalidateAtlas } from './atlas'
 import { removeDiscovery } from './discovery'
 import * as engine from './engine'
 import { clearFacetCache } from './facets'
-import { gitCredentialEnv, gitAsync, withGitIdentity } from './git'
+import { gitCredentialEnv, gitAsync, NON_INTERACTIVE_GIT_ENV, withGitIdentity } from './git'
 import { initGhCapability } from './github'
 import { registerCoreHandlers, runSuggestionScan } from './handlers'
 import { createCoreIpc } from './ipc'
@@ -180,7 +180,11 @@ if (config && appDb && vid) {
       emit: (event) => ipc.emit(event),
       getCursor: () => getPollCursor(db, vid),
       setCursor: (cursor) => setPollCursor(db, vid, cursor),
-      git: (args) => gitAsync(vaultPath, args, { env: gitCredentialEnv() }),
+      // WP-E: non-interactive env is a MUST here — an auto-push must FAIL fast on
+      // a bad/unreachable remote, never freeze holding a slot (terminal prompt
+      // off, ssh batch mode), on top of the stored-credential askpass.
+      git: (args) =>
+        gitAsync(vaultPath, args, { env: { ...NON_INTERACTIVE_GIT_ENV, ...gitCredentialEnv() } }),
       readLocalMeta: (relPath) => {
         try {
           return engine.noteMeta(join(vaultPath, relPath))

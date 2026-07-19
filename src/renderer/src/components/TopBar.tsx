@@ -44,6 +44,11 @@ function AgentPanelGlyph(): React.JSX.Element {
   )
 }
 
+/** WP-E: how long local commits may sit unpushed before the 'N unpushed' pill
+ *  appears — past the 30s auto-push debounce, so it only shows when auto-push
+ *  isn't clearing them (offline / auth / no remote). */
+export const UNPUSHED_STALE_MS = 180_000
+
 function relative(iso: string | null | undefined, nowMs: number): string {
   if (!iso) return ''
   const mins = Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000))
@@ -55,7 +60,9 @@ function relative(iso: string | null | undefined, nowMs: number): string {
 
 export function TopBar(): React.JSX.Element {
   const health = useSync((s) => s.health)
+  const aheadSince = useSync((s) => s.aheadSince)
   const loadSync = useSync((s) => s.load)
+  const syncNow = useSync((s) => s.syncNow)
   const identity = useIdentity((s) => effectiveIdentity(s))
   const setView = useApp((s) => s.setView)
   const terminalOpen = useTerminal((s) => s.open)
@@ -71,6 +78,11 @@ export function TopBar(): React.JSX.Element {
   const label =
     tone === 'rust' ? 'sync error' : tone === 'amber' ? 'ahead' : 'synced'
   const initial = (identity?.name ?? '?').trim().charAt(0).toUpperCase() || '?'
+  // WP-E: surface unpushed local commits once auto-push has had its chance
+  const unpushed =
+    health && health.ahead > 0 && aheadSince != null && Date.now() - aheadSince > UNPUSHED_STALE_MS
+      ? health.ahead
+      : 0
 
   return (
     <div className="topbar">
@@ -119,6 +131,16 @@ export function TopBar(): React.JSX.Element {
           <AgentPanelGlyph />
         </button>
         <span className="topbar-sep" aria-hidden="true" />
+        {unpushed > 0 && (
+          <button
+            type="button"
+            className="unpushed-pill"
+            title="Local commits not yet pushed — click to sync now"
+            onClick={() => void syncNow()}
+          >
+            ↑ {unpushed} unpushed
+          </button>
+        )}
         <button
           type="button"
           className="sync-pill"

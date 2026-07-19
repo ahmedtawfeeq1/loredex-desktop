@@ -32,6 +32,23 @@ export function expireBefore(log: WarningEntry[], cleanAt: string): WarningEntry
   return log.filter((w) => w.at > cleanAt)
 }
 
+/**
+ * WP-E: when the vault first went ahead of the remote (ms). Set on the 0→>0
+ * edge, kept while ahead, cleared to null the moment ahead returns to 0 — the
+ * TopBar 'N unpushed' pill shows only after this has been stale a while (so a
+ * fresh local commit that auto-push will handle in ~30s doesn't flash a pill).
+ */
+export function nextAheadSince(
+  prevSince: number | null,
+  prevAhead: number,
+  nextAhead: number,
+  now: number,
+): number | null {
+  if (nextAhead <= 0) return null
+  if (prevAhead > 0 && prevSince != null) return prevSince
+  return now
+}
+
 /** DESIGN.md sync dot semantics: ink = clean, amber = ahead/behind, rust = error. */
 export function dotTone(health: SyncHealth | null): 'ink' | 'amber' | 'rust' {
   if (!health) return 'ink'
@@ -42,6 +59,8 @@ export function dotTone(health: SyncHealth | null): 'ink' | 'amber' | 'rust' {
 
 interface SyncState {
   health: SyncHealth | null
+  /** WP-E: ms since the vault first went ahead of the remote (null when even). */
+  aheadSince: number | null
   handshake: HandshakeStatus | null
   mcp: McpStatus | null
   report: SyncReport | null
@@ -55,6 +74,7 @@ interface SyncState {
 
 export const useSync = create<SyncState>((set, get) => ({
   health: null,
+  aheadSince: null,
   handshake: null,
   mcp: null,
   report: null,
@@ -66,7 +86,11 @@ export const useSync = create<SyncState>((set, get) => ({
     try {
       // health first (fast fail); handshake walks the vault; mcp is instant
       const health = await invoke('sync.status', undefined)
-      set({ health, error: null })
+      set((s) => ({
+        health,
+        aheadSince: nextAheadSince(s.aheadSince, s.health?.ahead ?? 0, health.ahead, Date.now()),
+        error: null,
+      }))
       const [handshake, mcp] = await Promise.all([
         invoke('sync.handshake', undefined),
         invoke('mcp.status', undefined),
@@ -96,6 +120,7 @@ export const useSync = create<SyncState>((set, get) => ({
   reset() {
     set({
       health: null,
+      aheadSince: null,
       handshake: null,
       mcp: null,
       report: null,
@@ -119,6 +144,12 @@ if (typeof window !== 'undefined' && window.loredex) {
       // the log shows only what happened since the last good sync
       useSync.setState((s) => ({
         health: e.health,
+        aheadSince: nextAheadSince(
+          s.aheadSince,
+          s.health?.ahead ?? 0,
+          e.health.ahead,
+          Date.now(),
+        ),
         warnings:
           dotTone(e.health) === 'ink'
             ? expireBefore(s.warnings, new Date().toISOString())

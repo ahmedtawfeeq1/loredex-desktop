@@ -300,8 +300,11 @@ export function registerCoreHandlers(
     if (unexpanded.length > 0) {
       return { ok: false, detail: `missing token: ${unexpanded.join(', ')}` }
     }
+    // Windows can't spawn the npx shim directly (ENOENT) — same cmd /c wrap the
+    // generated .mcp.json uses, so the probe matches what `claude` will run.
+    const safe = engine.windowsSafeCommand(conn.command, conn.args)
     return await new Promise<{ ok: boolean; detail: string }>((resolve) => {
-      const child = execFile(conn.command, conn.args, {
+      const child = execFile(safe.command, safe.args, {
         env,
         cwd: engine.clientDirAbs(client),
         timeout: 9000,

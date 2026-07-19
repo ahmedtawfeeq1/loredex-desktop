@@ -32,6 +32,7 @@ import {
   productOf,
   scaffoldClient,
   scanFleet,
+  windowsSafeCommand,
   workspaceEnvRefs,
   type HandoffTransition,
   type ConsumeReceipt,
@@ -345,6 +346,9 @@ export function clientConnections(client: string): Array<{
 export function clientDirAbs(client: string): string {
   return join(getConfig().vaultPath, 'projects', client)
 }
+
+/** cmd /c wrapper for npx-family shims on Windows — re-exported for the probe. */
+export { windowsSafeCommand }
 
 /**
  * Bring one client (or the whole fleet when `client` is omitted) up to the

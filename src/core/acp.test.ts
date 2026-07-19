@@ -22,6 +22,7 @@ import {
   attachmentBlock,
   buildPromptBlocks,
   canLoadSession,
+  deriveClientSlug,
   mapPermissionEvent,
   mapUpdate,
   resumeTargetSessionId,
@@ -474,5 +475,27 @@ describe('mapPermissionEvent', () => {
     ) as Record<string, unknown>
     expect(e).not.toHaveProperty('content')
     expect(e).not.toHaveProperty('locations')
+  })
+})
+
+// WP-A: client slug from a session cwd (posix fixtures — the pure fn uses the
+// platform's path.relative, exercised on the CI/dev mac).
+describe('deriveClientSlug', () => {
+  const vault = '/Users/x/Loredex'
+  it('extracts the client from a projects/<client>/… cwd', () => {
+    expect(deriveClientSlug(`${vault}/projects/acme_dental`, vault)).toBe('acme_dental')
+    expect(deriveClientSlug(`${vault}/projects/acme_dental/pipelines/intake`, vault)).toBe(
+      'acme_dental',
+    )
+  })
+  it('returns null for the vault root itself', () => {
+    expect(deriveClientSlug(vault, vault)).toBeNull()
+  })
+  it('returns null outside the vault', () => {
+    expect(deriveClientSlug('/Users/x/Other/projects/acme', vault)).toBeNull()
+  })
+  it('returns null for a non-projects subtree (research dex layout)', () => {
+    expect(deriveClientSlug(`${vault}/some_project/topic`, vault)).toBeNull()
+    expect(deriveClientSlug(`${vault}/projects`, vault)).toBeNull() // no client segment
   })
 })

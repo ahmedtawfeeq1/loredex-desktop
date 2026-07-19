@@ -55,6 +55,12 @@ export const migrations: Array<(db: AppDb) => void> = [
                                          PRIMARY KEY (conv_id, seq));
     `)
   },
+  // 3 — WP-A: agent-ops client scope on a conversation (the ◈ chip). Nullable +
+  // additive: research/vault-root threads stay NULL, so the column is invisible
+  // to every existing dex.
+  (db) => {
+    db.exec(`ALTER TABLE agent_conversations ADD COLUMN client_slug TEXT;`)
+  },
 ]
 
 export function runMigrations(db: AppDb): void {

@@ -62,7 +62,16 @@ import {
   validateToken,
 } from './auth'
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
-import { acpCancel, acpContinue, acpPermission, acpPrompt, acpSetMode, acpStart, acpStop } from './acp'
+import {
+  acpCancel,
+  acpContinue,
+  acpPermission,
+  acpPrompt,
+  acpSetMode,
+  acpStart,
+  acpStop,
+  deriveClientSlug,
+} from './acp'
 import { agentKeyStatus, clearAgentKey, storeAgentKey } from './agent-keys'
 import {
   deleteConversation,
@@ -821,11 +830,16 @@ export function registerCoreHandlers(
     // null: the session runs, persistence is a clean no-op.
     const db = getAppDb()
     const vid = currentVaultId()
+    const vaultPath = engine.getConfig().vaultPath
+    const resolvedCwd = cwd ?? vaultPath
     return acpStart((e) => ipc.emit(e), {
       agent,
-      cwd: cwd ?? engine.getConfig().vaultPath,
+      cwd: resolvedCwd,
       conversationId,
       persist: db && vid ? { db, vaultId: vid } : null,
+      // WP-A: a `projects/<client>/…` cwd scopes the session to that client
+      // (◈ chip); a vault-root or research cwd derives null.
+      clientSlug: deriveClientSlug(resolvedCwd, vaultPath),
     })
   })
   // B0 transcript reads (vault-scoped, sole-opener). load scope-checks the

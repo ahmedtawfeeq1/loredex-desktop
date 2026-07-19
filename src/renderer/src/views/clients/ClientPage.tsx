@@ -15,6 +15,7 @@ import { invoke } from '../../api'
 import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
+import { useAgentPanel } from '../../stores/agentPanel'
 import { useReader } from '../../stores/reader'
 import { useTerminal } from '../../stores/terminal'
 import { sectionTint } from '../reader/sectionTint'
@@ -325,6 +326,21 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
     }
   }
 
+  // WP-A: open the agent chat panel in THIS client's folder (◈ scoped session).
+  // Materialize stale/absent tooling first so the client's own MCP servers
+  // attach to the session, then start the chat at the client dir.
+  async function chatHere(): Promise<void> {
+    try {
+      if (info.hasWorkspaceYml && status && (status.drift || !status.generated)) {
+        await rewire({})
+      }
+      const { dir } = await invoke('clients.dirAbs', { client: info.slug })
+      await useAgentPanel.getState().openHere(dir)
+    } catch {
+      // no bridge / start failed — best-effort, the panel just doesn't open
+    }
+  }
+
   const pastedReady = Object.entries(pasted).filter(([, v]) => v.trim())
   const PROBE_LABEL: Record<ProbeState['state'], string> = {
     testing: '◌ Testing…',
@@ -359,6 +375,14 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           }
         >
           Open in Terminal
+        </button>
+        <button
+          type="button"
+          className="button-secondary"
+          title="Open the agent chat panel scoped to this client (◈) — wires stale tooling first"
+          onClick={() => void chatHere()}
+        >
+          Chat Here
         </button>
         <span style={{ flex: 1 }} />
         <button

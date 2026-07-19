@@ -101,6 +101,10 @@ export interface AcpSessionView {
    *  event's promptCapabilities.image. Undefined until ready (attach allowed
    *  optimistically); explicit false blocks image attach with a composer notice. */
   imageInput?: boolean
+  /** WP-A: agent-ops client this session runs under (◈ chip on the session row).
+   *  Set from the starting/ready event's clientSlug; null for a vault-root or
+   *  research session. Kept across state transitions. */
+  clientSlug?: string | null
 }
 
 export interface AcpPermissionView {
@@ -356,6 +360,8 @@ function applySessionEvent(e: AcpSessionEvent): void {
             authMode: e.authMode ?? v.authMode,
             // image-input capability rides the ready event (B4) — keep it
             imageInput: e.imageInput ?? v.imageInput,
+            // client scope rides the starting/ready event (WP-A) — keep it
+            clientSlug: e.clientSlug ?? v.clientSlug,
           }
         : v,
     ),

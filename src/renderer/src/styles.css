@@ -8137,6 +8137,19 @@ a.button-primary {
   color: var(--info);
 }
 
+/* WP-A: client-scope chip — glyph + slug, tokened, quiet accent border */
+.agent-client-chip {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--accent-hi);
+  border-radius: 3px;
+  color: var(--accent-hi);
+  font: 10px var(--font-mono);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 /* status = glyph + label, never color alone (design-fidelity law) */
 .agent-state-chip {
   flex: 0 0 auto;

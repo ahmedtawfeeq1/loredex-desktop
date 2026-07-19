@@ -43,6 +43,42 @@ describe('createConversation + loadConversation', () => {
     expect(loadConversation(d, 'nope')).toBeNull()
     d.close()
   })
+
+  it('persists + round-trips the WP-A client slug (list + load)', () => {
+    const d = db()
+    const { id } = createConversation(d, 'v1', { agent: 'claude', clientSlug: 'acme_dental' })
+    expect(loadConversation(d, id)!.clientSlug).toBe('acme_dental')
+    expect(listConversations(d, 'v1')[0].clientSlug).toBe('acme_dental')
+    // a vault-root thread carries null
+    const bare = createConversation(d, 'v1', { agent: 'claude' })
+    expect(loadConversation(d, bare.id)!.clientSlug).toBeNull()
+    d.close()
+  })
+})
+
+describe('appendMessage — auto-title (#20)', () => {
+  it('titles the thread from the first user turn, once, leaving later/renamed titles alone', () => {
+    const d = db()
+    const { id } = createConversation(d, 'v1', { agent: 'claude' })
+    appendMessage(d, id, { role: 'user', text: 'Draft the lead reactivation follow-up' })
+    expect(loadConversation(d, id)!.title).toBe('Draft the lead reactivation follow-up')
+    appendMessage(d, id, { role: 'user', text: 'a totally different second question' })
+    expect(loadConversation(d, id)!.title).toBe('Draft the lead reactivation follow-up') // unchanged
+    d.close()
+  })
+
+  it('clips a long first turn on a word boundary with an ellipsis', () => {
+    const d = db()
+    const { id } = createConversation(d, 'v1', { agent: 'claude' })
+    appendMessage(d, id, {
+      role: 'user',
+      text: 'Please summarize every single knowledge table row for this client thoroughly',
+    })
+    const title = loadConversation(d, id)!.title!
+    expect(title.length).toBeLessThanOrEqual(49)
+    expect(title.endsWith('…')).toBe(true)
+    d.close()
+  })
 })
 
 describe('appendMessage — round-trip + merge rules', () => {
@@ -143,7 +179,8 @@ describe('listConversations', () => {
       appendMessage(d, a, { role: 'user', text: 'later' }) // touch a → most-recently-updated
       const list = listConversations(d, 'v1')
       expect(list.map((c) => c.id)).toEqual([a, b])
-      expect(list[0]).toMatchObject({ id: a, lastProvider: 'claude', title: null })
+      // the first user turn auto-titles the thread (#20)
+      expect(list[0]).toMatchObject({ id: a, lastProvider: 'claude', title: 'later' })
       // limit honored
       expect(listConversations(d, 'v1', 1).map((c) => c.id)).toEqual([a])
       d.close()

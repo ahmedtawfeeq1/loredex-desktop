@@ -38,14 +38,14 @@ type ToolMsg = NonNullable<AcpConvMessage['tool']>
 export function createConversation(
   db: AppDb,
   vaultId: string,
-  arg: { agent: AcpAgent; title?: string | null },
+  arg: { agent: AcpAgent; title?: string | null; clientSlug?: string | null },
 ): { id: string } {
   const id = randomUUID()
   const now = new Date().toISOString()
   db.prepare(
-    `INSERT INTO agent_conversations (vault_id, id, title, last_provider, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(vaultId, id, arg.title ?? null, arg.agent, now, now)
+    `INSERT INTO agent_conversations (vault_id, id, title, last_provider, client_slug, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(vaultId, id, arg.title ?? null, arg.agent, arg.clientSlug ?? null, now, now)
   return { id }
 }
 
@@ -54,6 +54,14 @@ export function createConversation(
  *  a db hiccup must never take down a live turn. */
 export function appendMessage(db: AppDb, convId: string, msg: AcpConvMessage): void {
   const now = new Date().toISOString()
+  // auto-title from the first user turn (WP-A/#20): the `title IS NULL` guard
+  // fires exactly once — a renamed or already-titled thread is untouched.
+  if (msg.role === 'user' && msg.text?.trim()) {
+    db.prepare('UPDATE agent_conversations SET title = ? WHERE id = ? AND title IS NULL').run(
+      autoTitle(msg.text),
+      convId,
+    )
+  }
   // agent/thought text grows the last row when it shares the role — one row per
   // contiguous run (the renderer's commitChunks), keeping renderSeed compact.
   if ((msg.role === 'agent' || msg.role === 'thought') && msg.text != null) {
@@ -129,10 +137,16 @@ export function setConvProviderSession(
 export function loadConversation(db: AppDb, convId: string): LoadedConversation | null {
   const conv = db
     .prepare(
-      'SELECT vault_id, id, title, last_provider FROM agent_conversations WHERE id = ?',
+      'SELECT vault_id, id, title, last_provider, client_slug FROM agent_conversations WHERE id = ?',
     )
     .get(convId) as
-    | { vault_id: string; id: string; title: string | null; last_provider: string }
+    | {
+        vault_id: string
+        id: string
+        title: string | null
+        last_provider: string
+        client_slug: string | null
+      }
     | undefined
   if (!conv) return null
   const provRows = db
@@ -146,6 +160,7 @@ export function loadConversation(db: AppDb, convId: string): LoadedConversation 
     vaultId: conv.vault_id,
     title: conv.title,
     lastProvider: conv.last_provider as AcpAgent,
+    clientSlug: conv.client_slug,
     providers: provRows.map((p) => ({
       provider: p.provider as AcpAgent,
       acpSessionId: p.acp_session_id,
@@ -195,13 +210,14 @@ export function deleteConversation(db: AppDb, vaultId: string, convId: string): 
 export function listConversations(db: AppDb, vaultId: string, limit = 50): AcpConvSummary[] {
   const rows = db
     .prepare(
-      `SELECT id, title, last_provider, created_at, updated_at FROM agent_conversations
+      `SELECT id, title, last_provider, client_slug, created_at, updated_at FROM agent_conversations
        WHERE vault_id = ? ORDER BY updated_at DESC, id DESC LIMIT ?`,
     )
     .all(vaultId, limit) as Array<{
     id: string
     title: string | null
     last_provider: string
+    client_slug: string | null
     created_at: string
     updated_at: string
   }>
@@ -209,6 +225,7 @@ export function listConversations(db: AppDb, vaultId: string, limit = 50): AcpCo
     id: r.id,
     title: r.title,
     lastProvider: r.last_provider as AcpAgent,
+    clientSlug: r.client_slug,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }))
@@ -240,6 +257,16 @@ export function renderSeed(db: AppDb, convId: string): string {
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────────
+
+/** First user turn → a short thread title: first line, collapsed whitespace,
+ *  clipped to ~48 chars on a word boundary (ellipsis when clipped). */
+function autoTitle(text: string): string {
+  const line = text.trim().split('\n')[0].replace(/\s+/g, ' ').trim()
+  if (line.length <= 48) return line
+  const clipped = line.slice(0, 48)
+  const lastSpace = clipped.lastIndexOf(' ')
+  return `${(lastSpace > 24 ? clipped.slice(0, lastSpace) : clipped).trimEnd()}…`
+}
 
 function touch(db: AppDb, convId: string, now: string): void {
   db.prepare('UPDATE agent_conversations SET updated_at = ? WHERE id = ?').run(now, convId)

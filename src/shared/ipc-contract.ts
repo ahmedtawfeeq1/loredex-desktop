@@ -158,6 +158,9 @@ export interface AcpConvSummary {
   id: string
   title: string | null
   lastProvider: AcpAgent
+  /** WP-A: agent-ops client this thread was started under (◈ chip in history) —
+   *  null for vault-root / research threads. */
+  clientSlug?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -169,6 +172,9 @@ export interface AcpConvLoad {
   id: string
   title: string | null
   lastProvider: AcpAgent
+  /** WP-A: agent-ops client this thread was started under — null for vault-root
+   *  / research threads. */
+  clientSlug?: string | null
   providers: { provider: AcpAgent; acpSessionId: string | null }[]
   messages: AcpConvMessage[]
 }
@@ -651,6 +657,10 @@ export type CoreEvent =
        *  promptCapabilities.image, captured at initialize). Surfaced on ready so
        *  the composer can drop pasted images with a notice when unsupported. */
       imageInput?: boolean
+      /** WP-A: agent-ops client slug for a `projects/<client>/…` cwd — surfaced
+       *  on 'starting' + 'ready' as the panel's ◈ chip; omitted for a vault-root
+       *  or research session. */
+      clientSlug?: string
     }
   | { kind: 'acp.chunk'; sessionId: string; role: 'agent' | 'thought'; text: string }
   | {

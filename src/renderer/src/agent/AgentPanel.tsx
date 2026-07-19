@@ -76,6 +76,17 @@ function ProviderMark({ agent, size = 13 }: { agent: AcpAgent; size?: number }):
   )
 }
 
+/** WP-A: the ◈ client-scope chip — shown when a session/conversation runs under
+ *  an agent-ops client (`projects/<slug>/`). Absent for vault-root/research. */
+function ClientChip({ slug }: { slug?: string | null }): React.JSX.Element | null {
+  if (!slug) return null
+  return (
+    <span className="agent-client-chip" title={`Client: ${slug}`}>
+      ◈ {slug}
+    </span>
+  )
+}
+
 function relTime(iso: string, nowMs: number): string {
   const mins = Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000))
   if (mins < 1) return 'now'
@@ -190,6 +201,7 @@ function ConvHistoryMenu(): React.JSX.Element {
                     >
                       <span className="agent-history-name">
                         {c.title ?? 'Untitled conversation'}
+                        <ClientChip slug={c.clientSlug} />
                       </span>
                       <span className="agent-history-time">{relTime(c.updatedAt, Date.now())}</span>
                     </button>
@@ -301,6 +313,7 @@ function SessionRow({ s, active }: { s: AcpSessionView; active: boolean }): Reac
       >
         <span className="agent-tag">[{agentTag(s.agent)}]</span> {s.title}
       </button>
+      <ClientChip slug={s.clientSlug} />
       <span className={`agent-state-chip ${chip.cls}`}>
         {chip.glyph} {chip.label}
       </span>

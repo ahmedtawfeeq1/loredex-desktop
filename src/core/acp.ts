@@ -11,7 +11,7 @@
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { basename } from 'node:path'
+import { basename, relative, sep } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import type {
@@ -58,6 +58,21 @@ import { mintAgentToken, revokeAgentToken } from './settings'
 
 /** Batch window for acp.chunk — the terminals.ts ~8ms precedent. */
 const FLUSH_MS = 8
+
+/**
+ * Client slug for a session's cwd inside an agent-ops dex:
+ * `<vault>/projects/<client>/…` → `<client>`. Returns null when cwd is the vault
+ * root, outside the vault, or not under `projects/` — so a research dex or a
+ * vault-root session carries no client scope (the wire field is then omitted and
+ * the panel shows no chip). Pure; both args are absolute paths.
+ */
+export function deriveClientSlug(cwd: string, vaultRoot: string): string | null {
+  const rel = relative(vaultRoot, cwd)
+  // '' = cwd is the root; '..'/leading-sep/drive-letter = outside the vault
+  if (!rel || rel.startsWith('..') || rel.startsWith(sep) || /^[A-Za-z]:/.test(rel)) return null
+  const segments = rel.split(sep)
+  return segments[0] === 'projects' && segments[1] ? segments[1] : null
+}
 /** ponytail ceiling: adapters are heavy — each carries a native CLI child. */
 const MAX_ACP_SESSIONS = 4
 
@@ -109,6 +124,9 @@ interface AcpSession {
   replaying: boolean
   /** transcript backend — null in a bare host (persistence degrades to no-op). */
   persist: ConvPersist | null
+  /** agent-ops client slug when the cwd is `projects/<client>/…` (WP-A) — null
+   *  for a vault-root or research-dex session; surfaced as the panel's ◈ chip. */
+  clientSlug: string | null
   state: AcpSessionState
   stderr: StderrRing
   turnActive: boolean
@@ -236,6 +254,9 @@ export function acpStart(
     /** B2: the target provider's own prior adapter session id — boot attempts a
      *  native session/load when the adapter advertises loadSession. */
     resumeSessionId?: string | null
+    /** WP-A: agent-ops client slug (from `deriveClientSlug`), or null/absent for
+     *  a vault-root or research session. Surfaced as the panel chip + persisted. */
+    clientSlug?: string | null
   },
 ): { sessionId: string; conversationId: string } {
   let isDir = false
@@ -255,9 +276,12 @@ export function acpStart(
   // resume an existing thread, else start a fresh one. With no db (bare host) an
   // ephemeral uuid keeps the contract's non-null conversationId — persistence
   // is simply a no-op for that session.
+  const clientSlug = arg.clientSlug ?? null
   const conversationId =
     arg.conversationId ??
-    (persist ? createConversation(persist.db, persist.vaultId, { agent: arg.agent }).id : randomUUID())
+    (persist
+      ? createConversation(persist.db, persist.vaultId, { agent: arg.agent, clientSlug }).id
+      : randomUUID())
   const sessionId = randomUUID()
   const s: AcpSession = {
     agent: arg.agent,
@@ -268,6 +292,7 @@ export function acpStart(
     conversationId,
     pendingSeed: arg.seed ?? null,
     resumeSessionId: arg.resumeSessionId ?? null,
+    clientSlug,
     embeddedContext: false,
     imageInput: false,
     replaying: false,
@@ -284,7 +309,13 @@ export function acpStart(
     emit,
   }
   sessions.set(sessionId, s)
-  emit({ kind: 'acp.session', sessionId, agent: arg.agent, state: 'starting' })
+  emit({
+    kind: 'acp.session',
+    sessionId,
+    agent: arg.agent,
+    state: 'starting',
+    ...(clientSlug ? { clientSlug } : {}),
+  })
   void boot(sessionId, arg.agent, arg.cwd).catch((err) => {
     const cur = sessions.get(sessionId)
     if (!cur) return // stopped/reaped across the async gap
@@ -556,6 +587,7 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
     agent,
     state: 'ready',
     ...(attachedMcp.length ? { mcpServers: attachedMcp } : {}),
+    ...(s.clientSlug ? { clientSlug: s.clientSlug } : {}),
     authMode: authMode(agent, agentKeyEnv()),
     imageInput: s.imageInput,
   })

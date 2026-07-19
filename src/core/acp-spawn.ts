@@ -6,8 +6,9 @@
  * surfaces as a 4-line tail on error, never wholesale.
  */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import type { AcpAgent } from '../shared/ipc-contract'
 
 /** How an adapter process comes to exist. `node-module` adapters ship in OUR
@@ -37,7 +38,15 @@ export function adapterEntry(agent: AcpAgent): string {
   const spec = ADAPTER[agent]
   if (spec.kind !== 'node-module') throw new Error(`${agent} is not a node-module adapter`)
   const pkgJson = createRequire(import.meta.url).resolve(`${spec.pkg}/package.json`)
-  return join(dirname(pkgJson), 'dist/index.js')
+  const entry = join(dirname(pkgJson), 'dist/index.js')
+  // Packaged: the resolver hands back an app.asar path, but the adapter + its
+  // native-binary deps are asarUnpacked. Run the entry from the UNPACKED tree so
+  // the adapter's OWN require.resolve stays under app.asar.unpacked — otherwise
+  // the claude/codex runtime it spawns resolves to a path INSIDE app.asar, which
+  // is not a real directory and cannot be exec'd ("Internal error" / -32603, the
+  // v0.9.1–0.9.2 packaged-provider failure). No-op in dev (no asar segment).
+  const unpacked = entry.replace(`${sep}app.asar${sep}`, `${sep}app.asar.unpacked${sep}`)
+  return unpacked !== entry && existsSync(unpacked) ? unpacked : entry
 }
 
 /** Shell-hygiene + credential-root keys every adapter needs. HOME is the

@@ -21,6 +21,7 @@ import type {
   ClientContext,
   ContentBlock,
   McpServer,
+  NewSessionResponse,
   RequestPermissionRequest,
   RequestPermissionResponse,
   SessionModeState,
@@ -487,10 +488,27 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
     }
   }
   if (acpSessionId === null) {
-    const created = await connection.agent.request(sdk.methods.agent.session.new, {
-      cwd,
-      mcpServers,
-    })
+    let created: NewSessionResponse
+    try {
+      created = (await connection.agent.request(sdk.methods.agent.session.new, {
+        cwd,
+        mcpServers,
+      })) as NewSessionResponse
+    } catch (err) {
+      if (errCode(err) === -32000) throw err // auth — boot's auth_required path owns it
+      if (!sessions.has(sessionId)) return
+      if (mcpServers.length === 0) throw err // no MCP to blame — a real failure
+      // MCP auto-attach failed (packaged builds: the adapter can't complete the
+      // loredex http MCP handshake). Don't brick the provider over a superpower —
+      // retry WITHOUT the MCP server so chat + the agent's own tools still work;
+      // the vault tools are just absent from this session.
+      revokeToken(s)
+      mcpServers = []
+      created = (await connection.agent.request(sdk.methods.agent.session.new, {
+        cwd,
+        mcpServers: [],
+      })) as NewSessionResponse
+    }
     if (!sessions.has(sessionId)) return
     acpSessionId = created.sessionId
     modes = created.modes

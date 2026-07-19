@@ -189,7 +189,9 @@ export const useTerminal = create<TerminalState>((set, get) => ({
       return
     }
     // a tree exists → add a fresh pane at cwd (each client gets its own terminal)
-    const target = get().activeId ?? firstTermId(get().root)
+    const existingRoot = get().root
+    if (existingRoot === null) return get().openAt(cwd) // raced to empty — restart
+    const target = get().activeId ?? firstTermId(existingRoot)
     let id: string
     try {
       ;({ id } = await invoke('term.create', { cwd, cols: 80, rows: 24 }))

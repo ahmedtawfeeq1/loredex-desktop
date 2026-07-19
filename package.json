@@ -1,6 +1,6 @@
 {
   "name": "loredex-desktop",
-  "version": "0.9.4-agentops.4",
+  "version": "0.9.4-agentops.5",
   "description": "Loredex Desktop — macOS reader and control surface for loredex vaults",
   "type": "module",
   "private": true,

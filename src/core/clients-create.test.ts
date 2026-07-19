@@ -19,9 +19,18 @@ import { registerCoreHandlers } from './handlers'
 import { createCoreIpc, type CoreIpc } from './ipc'
 import { initSettings } from './settings'
 
-// in-memory keychain — the real store is exercised by shipping auth.ts
+// in-memory keychain — the real store is exercised by shipping auth.ts. The
+// shared primitives (WP-D) are stubbed too so client-credentials.ts (pulled in
+// by handlers.ts) has a defined CRED_DIR + keychain helpers at module load.
 const heldTokens = new Map<string, string>()
+const encMaps = new Map<string, Record<string, string>>()
 vi.mock('./client-tokens', () => ({
+  CRED_DIR: '/tmp/loredex-test-creds',
+  keychainSet: async () => {},
+  keychainGet: async () => null,
+  keychainDelete: async () => {},
+  readEncMap: (file: string) => encMaps.get(file) ?? {},
+  writeEncMap: (file: string, map: Record<string, string>) => void encMaps.set(file, map),
   storeClientToken: async (ref: string, token: string) => void heldTokens.set(ref, token),
   readClientToken: async (ref: string) => heldTokens.get(ref) ?? null,
   readClientTokens: async (refs: string[]) => {

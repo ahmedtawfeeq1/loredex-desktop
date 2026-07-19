@@ -167,6 +167,16 @@ export interface AcpConvSummary {
   createdAt: string
   updatedAt: string
 }
+/** WP-D: one stored client login — metadata only, NEVER the secret (revealed
+ *  on demand via clients.credentials.reveal). */
+export interface ClientCredential {
+  id: string
+  label: string
+  username: string
+  url?: string
+  note?: string
+}
+
 /** agent.conv.load payload — the thread plus the per-provider adapter session
  *  ids (provider-scoped, for same-provider native resume). vault_id is scoped
  *  at the seam (unknown / cross-vault id → ACP_CONV_UNKNOWN) so it is not
@@ -272,6 +282,25 @@ export interface CoreApi {
   }
   /** agent-ops: list a client's snapshots (all units), newest stamp first. */
   'clients.snapshot.list': { in: { client: string }; out: SnapshotSummary[] }
+  // ── WP-D: per-client login credentials (machine-local keychain, never the dex) ──
+  /** metadata only — never a secret; the card lists logins from this. */
+  'clients.credentials.list': { in: { client: string }; out: ClientCredential[] }
+  /** create (no id) or edit (id) a login; secret optional on edit (keeps existing). */
+  'clients.credentials.set': {
+    in: {
+      client: string
+      id?: string
+      label: string
+      username: string
+      secret?: string
+      url?: string
+      note?: string
+    }
+    out: { id: string }
+  }
+  'clients.credentials.delete': { in: { client: string; id: string }; out: void }
+  /** reveal one secret on demand — the only path a secret leaves the store. */
+  'clients.credentials.reveal': { in: { client: string; id: string }; out: { secret: string } }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,
    *  aggregated core-side from vault frontmatter (memoized per mtime) */

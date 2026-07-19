@@ -7,6 +7,7 @@
  */
 import { useEffect, useState } from 'react'
 import type {
+  ClientCredential,
   ClientInfo,
   ClientWorkspaceStatus,
   SnapshotSummary,
@@ -72,6 +73,15 @@ const PAGE_CSS = `
 .cp-modal-check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-1); }
 .cp-modal-error { font-size: 12px; color: var(--rust, #a33f2e); }
 .cp-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.cp-cred-add { margin-left: 10px; font-size: 11px; font-weight: 600; color: var(--accent-hi); border: 1px solid var(--accent-hi); border-radius: 6px; padding: 1px 8px; cursor: pointer; text-transform: none; letter-spacing: 0; }
+.cp-cred-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--hairline); border-radius: 8px; }
+.cp-cred-label { font-weight: 650; color: var(--text-1); }
+.cp-cred-user { color: var(--text-2); }
+.cp-cred-secret { font-family: var(--font-mono, monospace); color: var(--text-2); letter-spacing: 1px; }
+.cp-cred-url { color: var(--text-3); font-size: 11.5px; }
+.cp-cred-actions { display: flex; gap: 4px; margin-left: auto; }
+.cp-cred-actions button { font-size: 11px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 6px; padding: 1px 7px; cursor: pointer; }
+.cp-cred-actions button:hover { color: var(--text-1); border-color: var(--text-2); }
 .cp-ws { border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 14px; background: var(--bg-card); }
 .cp-ws-conn { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); }
 .cp-ws-row { display: flex; align-items: center; gap: 10px; }
@@ -614,6 +624,220 @@ function groupSnapshotsByUnit(snaps: SnapshotSummary[]): Array<[string, Snapshot
   return [...byUnit.entries()]
 }
 
+/** WP-D: add/edit a client login. Secret is required for a new credential and
+ *  optional on edit (blank = keep the existing keychain value, §5.13). */
+function CredentialModal({
+  client,
+  existing,
+  onClose,
+  onDone,
+}: {
+  client: string
+  existing: ClientCredential | null
+  onClose: () => void
+  onDone: () => void
+}): React.JSX.Element {
+  const [label, setLabel] = useState(existing?.label ?? '')
+  const [username, setUsername] = useState(existing?.username ?? '')
+  const [secret, setSecret] = useState('')
+  const [url, setUrl] = useState(existing?.url ?? '')
+  const [note, setNote] = useState(existing?.note ?? '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save(): Promise<void> {
+    if (!label.trim() || !username.trim()) {
+      setError('Label and username are both required.')
+      return
+    }
+    if (!existing && !secret) {
+      setError('A new credential needs a password / secret.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await invoke('clients.credentials.set', {
+        client,
+        ...(existing ? { id: existing.id } : {}),
+        label: label.trim(),
+        username: username.trim(),
+        ...(secret ? { secret } : {}),
+        ...(url.trim() ? { url: url.trim() } : {}),
+        ...(note.trim() ? { note: note.trim() } : {}),
+      })
+      useToasts.getState().push(
+        existing ? 'Credential updated' : 'Credential saved',
+        `${label.trim()} · kept in your OS keychain, never in the dex`,
+      )
+      onDone()
+    } catch (e) {
+      setError(String((e as { message?: string }).message ?? e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is a mouse affordance
+    <div className="cp-modal-backdrop" onClick={onClose}>
+      <div
+        className="cp-modal"
+        role="dialog"
+        aria-modal="true"
+        // biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation guard, not a control
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="cp-modal-title">{existing ? 'Edit credential' : 'Add credential'}</div>
+        <label className="cp-modal-field">
+          Label
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="e.g. Platform console"
+            // biome-ignore lint/a11y/noAutofocus: first field of the modal
+            autoFocus
+          />
+        </label>
+        <label className="cp-modal-field">
+          Username
+          <input value={username} onChange={(e) => setUsername(e.target.value)} />
+        </label>
+        <label className="cp-modal-field">
+          Password / secret{existing ? ' (blank = keep current)' : ''}
+          <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} />
+        </label>
+        <label className="cp-modal-field">
+          URL (optional)
+          <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
+        </label>
+        <label className="cp-modal-field">
+          Note (optional)
+          <input value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>
+        {error && <div className="cp-modal-error">{error}</div>}
+        <div className="cp-modal-actions">
+          <button type="button" className="button-quiet" onClick={onClose} disabled={busy}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="button-emphasis"
+            onClick={() => void save()}
+            disabled={busy}
+          >
+            {busy ? 'Saving…' : existing ? 'Save changes' : 'Save credential'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** WP-D: the client's stored logins — masked rows with Reveal / Copy / Edit /
+ *  Delete, plus Add. Secrets live in the OS keychain, never in the dex. */
+function CredentialsSection({ client }: { client: string }): React.JSX.Element {
+  const [creds, setCreds] = useState<ClientCredential[]>([])
+  const [refresh, setRefresh] = useState(0)
+  const [editing, setEditing] = useState<ClientCredential | 'new' | null>(null)
+  const [revealed, setRevealed] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    void invoke('clients.credentials.list', { client })
+      .then(setCreds)
+      .catch(() => setCreds([]))
+  }, [client, refresh])
+
+  async function toggleReveal(id: string): Promise<void> {
+    if (revealed[id] !== undefined) {
+      setRevealed((r) => {
+        const next = { ...r }
+        delete next[id]
+        return next
+      })
+      return
+    }
+    try {
+      const { secret } = await invoke('clients.credentials.reveal', { client, id })
+      setRevealed((r) => ({ ...r, [id]: secret }))
+    } catch {
+      // no bridge / gone — leave masked
+    }
+  }
+
+  async function copySecret(id: string): Promise<void> {
+    try {
+      const { secret } = await invoke('clients.credentials.reveal', { client, id })
+      await navigator.clipboard.writeText(secret)
+      useToasts.getState().push('Password copied', 'Cleared from view — paste where you need it')
+    } catch {
+      // best-effort
+    }
+  }
+
+  async function remove(id: string): Promise<void> {
+    try {
+      await invoke('clients.credentials.delete', { client, id })
+      setRefresh((n) => n + 1)
+    } catch {
+      // best-effort
+    }
+  }
+
+  return (
+    <section className="cp-section">
+      <div className="cp-section-title">
+        Credentials
+        <button type="button" className="cp-cred-add" onClick={() => setEditing('new')}>
+          + Add
+        </button>
+      </div>
+      {creds.length === 0 ? (
+        <div className="cp-empty">
+          No stored logins. Keep this client's platform credentials here — held in your OS keychain,
+          never committed to the dex.
+        </div>
+      ) : (
+        <div className="cp-rows">
+          {creds.map((c) => (
+            <div key={c.id} className="cp-cred-row">
+              <span className="cp-cred-label">{c.label}</span>
+              <span className="cp-cred-user">{c.username}</span>
+              {c.url && <span className="cp-cred-url">{c.url}</span>}
+              <span className="cp-cred-secret">{revealed[c.id] ?? '••••••••'}</span>
+              <div className="cp-cred-actions">
+                <button type="button" onClick={() => void toggleReveal(c.id)}>
+                  {revealed[c.id] !== undefined ? 'Hide' : 'Reveal'}
+                </button>
+                <button type="button" onClick={() => void copySecret(c.id)}>
+                  Copy
+                </button>
+                <button type="button" onClick={() => setEditing(c)}>
+                  Edit
+                </button>
+                <button type="button" onClick={() => void remove(c.id)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {editing !== null && (
+        <CredentialModal
+          client={client}
+          existing={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onDone={() => {
+            setEditing(null)
+            setRefresh((n) => n + 1)
+          }}
+        />
+      )}
+    </section>
+  )
+}
+
 export function ClientPage({
   info,
   onBack,
@@ -754,6 +978,8 @@ export function ClientPage({
           </div>
         </section>
       )}
+
+      <CredentialsSection client={info.slug} />
 
       <section className="cp-section">
         <div className="cp-section-title">Agent tooling</div>

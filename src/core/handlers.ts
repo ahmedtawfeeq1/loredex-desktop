@@ -114,6 +114,12 @@ import { buildThread, collectComments } from './threads'
 import { groupProjectsInTree, listMarkdownFiles, walkVault } from './tree'
 import { createVault, joinVault, validateRemote, type WizardDeps } from './wizard'
 import { withWriteLock } from './write-lock'
+import {
+  deleteCredential,
+  listCredentials,
+  revealCredential,
+  setCredential,
+} from './client-credentials'
 
 /** WP-C: `YYYY-MM-DD_HHMMSS` local-time stamp = the snapshot dir name. The clock
  *  lives host-side (`stampNow` isn't lib-exported; handlers never import loredex). */
@@ -393,6 +399,14 @@ export function registerCoreHandlers(
     }),
   )
   ipc.register('clients.snapshot.list', ({ client }) => engine.listSnapshotsFor(client))
+  // WP-D: per-client login credentials — machine-local keychain only, never the
+  // dex/git. No write lock, no vault.changed (nothing in the vault changes).
+  ipc.register('clients.credentials.list', ({ client }) => listCredentials(client))
+  ipc.register('clients.credentials.set', ({ client, id, label, username, secret, url, note }) =>
+    setCredential(client, { id, label, username, secret, url, note }),
+  )
+  ipc.register('clients.credentials.delete', ({ client, id }) => deleteCredential(client, id))
+  ipc.register('clients.credentials.reveal', ({ client, id }) => revealCredential(client, id))
   // Vault Atlas (story 10.1): the whole derived graph, memoized core-side —
   // same recomputed-cache tier as the link index (never authoritative).
   ipc.register('atlas.graph', ({ level, scope }) => atlasGraph(level, scope ?? {}))

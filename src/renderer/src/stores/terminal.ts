@@ -71,6 +71,8 @@ interface TerminalState {
   resetWidth(): void
   /** switch bottom ↔ left dock, persisted; refits every pane after the reflow */
   toggleDock(): void
+  /** header buttons: open the drawer at a specific dock (bottom | left) */
+  openDock(dock: TermDock): Promise<void>
   setResizing(v: boolean): void
   /** vault switch: kill this window's ptys, dispose xterms, defaults */
   reset(): Promise<void>
@@ -305,6 +307,23 @@ export const useTerminal = create<TerminalState>((set, get) => ({
   resetWidth() {
     set({ width: DEFAULT_TERM_WIDTH })
     persist()
+  },
+
+  async openDock(dock) {
+    // header buttons: open the terminal at a SPECIFIC dock (bottom or left),
+    // switching an already-open drawer to that side. Spawns the first pane if
+    // none exists (via toggle's create dance), else just reveals + refits.
+    const needsSpawn = get().root === null
+    set({ dock, open: true })
+    persist()
+    if (needsSpawn) await get().toggle()
+    const tree = get().root
+    if (tree)
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          for (const id of collectTermIds(tree)) fitTerm(id)
+        }),
+      )
   },
 
   toggleDock() {

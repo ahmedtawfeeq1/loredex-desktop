@@ -52,6 +52,7 @@ import {
   setConvProviderSession,
 } from './agent-conversations'
 import type { AppDb } from './db/index'
+import { readDiscovery } from './discovery'
 import { getMcpStatus } from './mcp-server'
 import { mintAgentToken, revokeAgentToken } from './settings'
 
@@ -439,6 +440,8 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
   const mcp = getMcpStatus()
   let mcpServers: McpServer[] = []
   if (httpOk && mcp.state === 'running' && mcp.port !== null) {
+    // this window owns the MCP host — a per-session agent token (attributed in
+    // the Agents view; the token never crosses the renderer seam)
     s.tokenName = `acp:${agent}:${sessionId.slice(0, 8)}`
     mcpServers = [
       {
@@ -448,6 +451,22 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
         headers: [{ name: 'Authorization', value: `Bearer ${mintAgentToken(s.tokenName)}` }],
       },
     ]
+  } else if (httpOk) {
+    // a pop-out / secondary window can't bind the single MCP port — connect to
+    // the MAIN window's already-running host via its discovery file. Its `token`
+    // is the install bearer the host always accepts, so the pop-out gets the
+    // exact same loredex tools as the main window (not attributed per-session).
+    const disc = readDiscovery()
+    if (disc) {
+      mcpServers = [
+        {
+          type: 'http',
+          name: 'loredex',
+          url: `http://127.0.0.1:${disc.port}/`,
+          headers: [{ name: 'Authorization', value: `Bearer ${disc.token}` }],
+        },
+      ]
+    }
   }
   // B2 continuation: a same-provider resume (session/load, loadSession cap) lets
   // the adapter restore its OWN context by replaying the whole conversation — we

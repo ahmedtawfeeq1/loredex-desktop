@@ -14,12 +14,22 @@ import { dotTone, useSync } from '../stores/sync'
 import { useSettingsTab } from '../stores/settingsTab'
 import { useTerminal } from '../stores/terminal'
 
-/** panel-bottom glyph — the terminal drawer */
-function TerminalGlyph(): React.JSX.Element {
+/** panel-bottom glyph — terminal docked at the bottom */
+function TermBottomGlyph(): React.JSX.Element {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" stroke="currentColor" strokeWidth="1.3" />
       <path d="M1.75 10.25 H14.25" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  )
+}
+
+/** panel-left glyph — terminal docked on the left */
+function TermLeftGlyph(): React.JSX.Element {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6 2.75 V13.25" stroke="currentColor" strokeWidth="1.3" />
     </svg>
   )
 }
@@ -49,6 +59,7 @@ export function TopBar(): React.JSX.Element {
   const identity = useIdentity((s) => effectiveIdentity(s))
   const setView = useApp((s) => s.setView)
   const terminalOpen = useTerminal((s) => s.open)
+  const terminalDock = useTerminal((s) => s.dock)
   const agentOpen = useAgentPanel((s) => s.open)
 
   useEffect(() => {
@@ -79,13 +90,23 @@ export function TopBar(): React.JSX.Element {
       <div className="topbar-right">
         <button
           type="button"
-          className={`topbar-icon${terminalOpen ? ' is-on' : ''}`}
-          title="Toggle the terminal (⌃`)"
-          aria-label="Toggle terminal"
-          aria-pressed={terminalOpen}
-          onClick={() => void useTerminal.getState().toggle()}
+          className={`topbar-icon${terminalOpen && terminalDock === 'bottom' ? ' is-on' : ''}`}
+          title="Terminal — dock bottom"
+          aria-label="Open terminal at the bottom"
+          aria-pressed={terminalOpen && terminalDock === 'bottom'}
+          onClick={() => void useTerminal.getState().openDock('bottom')}
         >
-          <TerminalGlyph />
+          <TermBottomGlyph />
+        </button>
+        <button
+          type="button"
+          className={`topbar-icon${terminalOpen && terminalDock === 'left' ? ' is-on' : ''}`}
+          title="Terminal — dock left"
+          aria-label="Open terminal on the left"
+          aria-pressed={terminalOpen && terminalDock === 'left'}
+          onClick={() => void useTerminal.getState().openDock('left')}
+        >
+          <TermLeftGlyph />
         </button>
         <button
           type="button"

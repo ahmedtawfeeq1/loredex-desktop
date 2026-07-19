@@ -229,6 +229,10 @@ interface AgentPanelState {
    *  transcript. This window's core has no live session for it, so it reuses the
    *  B2 continuation (agent.continue) to seed a fresh session from the thread. */
   resumeConversation(conversationId: string): Promise<void>
+  /** History dropdown: reopen a persisted conversation IN THIS panel (not a
+   *  pop-out) — loads the transcript and seeds a fresh session on its last
+   *  provider, same continuation path as resume/pop-out. */
+  openConversation(conversationId: string): Promise<void>
   select(id: string): void
   /** controlled-input setter for the composer textarea (A8) */
   setDraft(text: string): void
@@ -648,6 +652,19 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     // provider (same-provider resumes natively via session/load — adapters
     // persist sessions to disk, so a fresh core can still load them).
     await startContinuation(conversationId, loaded.lastProvider, loaded.title ?? 'New session')
+  },
+
+  async openConversation(conversationId) {
+    // in-panel reopen (main window keeps the MCP port → no popout flag)
+    set({ open: true })
+    persist()
+    let loaded
+    try {
+      loaded = await invoke('agent.conv.load', { conversationId })
+    } catch {
+      return // unknown / cross-vault / no store — nothing to reopen
+    }
+    await startContinuation(conversationId, loaded.lastProvider, loaded.title ?? 'Conversation')
   },
 
   select(id) {

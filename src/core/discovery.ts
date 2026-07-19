@@ -4,7 +4,7 @@
  * after a successful listen, removed on clean shutdown (story 1.6).
  * Keep the JSON shape exactly {port, token, engineVersion, schemaVersion}.
  */
-import { chmodSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -34,4 +34,22 @@ export function removeDiscovery(dir?: string): void {
   } catch {
     // already gone — removal is idempotent
   }
+}
+
+/**
+ * Read the running host's discovery file — a secondary window (pop-out) whose
+ * own core can't claim the single MCP port uses this to reach the MAIN window's
+ * host: same 127.0.0.1:port, and `token` is the install bearer the host always
+ * accepts (resolveBearer). null when no host is running / the file is unreadable.
+ */
+export function readDiscovery(dir?: string): DiscoveryFile | null {
+  try {
+    const raw = JSON.parse(readFileSync(discoveryPath(dir), 'utf8')) as Partial<DiscoveryFile>
+    if (typeof raw.port === 'number' && typeof raw.token === 'string') {
+      return raw as DiscoveryFile
+    }
+  } catch {
+    // missing / malformed — no reachable host
+  }
+  return null
 }

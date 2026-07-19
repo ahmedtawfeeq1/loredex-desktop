@@ -489,6 +489,9 @@ export interface CoreApi {
    *  empty and load throws. */
   'agent.conv.list': { in: { limit?: number }; out: AcpConvSummary[] }
   'agent.conv.load': { in: { conversationId: string }; out: AcpConvLoad }
+  /** History dropdown: rename / delete a persisted conversation (vault-scoped) */
+  'agent.conv.rename': { in: { conversationId: string; title: string }; out: void }
+  'agent.conv.delete': { in: { conversationId: string }; out: void }
   /** B2 cross-provider continuation: start a new session on `provider` bound to
    *  an EXISTING conversation, carrying its transcript. Same-provider with the
    *  adapter's own session id + loadSession resumes natively; anything else

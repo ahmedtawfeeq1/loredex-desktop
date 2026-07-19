@@ -166,6 +166,31 @@ export function deleteConversationIfEmpty(db: AppDb, convId: string): void {
   db.prepare('DELETE FROM agent_conversations WHERE id = ?').run(convId)
 }
 
+/** Rename a thread (vault-scoped — a cross-vault id changes nothing). */
+export function renameConversation(
+  db: AppDb,
+  vaultId: string,
+  convId: string,
+  title: string,
+): void {
+  db.prepare('UPDATE agent_conversations SET title = ? WHERE id = ? AND vault_id = ?').run(
+    title.trim() || null,
+    convId,
+    vaultId,
+  )
+}
+
+/** Delete a thread and its messages/provider rows (vault-scoped). */
+export function deleteConversation(db: AppDb, vaultId: string, convId: string): void {
+  const row = db
+    .prepare('SELECT vault_id FROM agent_conversations WHERE id = ?')
+    .get(convId) as { vault_id: string } | undefined
+  if (!row || row.vault_id !== vaultId) return // unknown / another vault — no-op
+  db.prepare('DELETE FROM agent_messages WHERE conv_id = ?').run(convId)
+  db.prepare('DELETE FROM agent_conv_providers WHERE conv_id = ?').run(convId)
+  db.prepare('DELETE FROM agent_conversations WHERE id = ?').run(convId)
+}
+
 /** All threads for a vault, newest-updated first. */
 export function listConversations(db: AppDb, vaultId: string, limit = 50): AcpConvSummary[] {
   const rows = db

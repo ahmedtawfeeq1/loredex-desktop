@@ -8,8 +8,8 @@
  * Width drags 280–480 via the left-edge PanelResizeHandle (persisted).
  */
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
-import type { AcpAgent, AcpSessionState } from '../../../shared/ipc-contract'
-import { pathForFile } from '../api'
+import type { AcpAgent, AcpConvSummary, AcpSessionState } from '../../../shared/ipc-contract'
+import { invoke, pathForFile } from '../api'
 import { Button } from '../components/Button'
 import {
   lastUserText,
@@ -48,6 +48,188 @@ const AGENT_META: Record<AcpAgent, { label: string; tag: string }> = {
   gemini: { label: 'Gemini', tag: 'GM' },
 }
 const AGENTS = Object.keys(AGENT_META) as AcpAgent[]
+
+/** Small monochrome provider mark (currentColor, theme-safe): Claude = the
+ *  Anthropic burst, Codex = the OpenAI knot ring, Gemini = the 4-point spark. */
+function ProviderMark({ agent, size = 13 }: { agent: AcpAgent; size?: number }): React.JSX.Element {
+  const common = { width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true } as const
+  if (agent === 'claude') {
+    return (
+      <svg {...common} fill="currentColor">
+        <path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1M12 3.5l1.6 6.9 6.9 1.6-6.9 1.6L12 20.5l-1.6-6.9L3.5 12l6.9-1.6z" />
+      </svg>
+    )
+  }
+  if (agent === 'gemini') {
+    return (
+      <svg {...common} fill="currentColor">
+        <path d="M12 2c.6 5.2 4.8 9.4 10 10-5.2.6-9.4 4.8-10 10-.6-5.2-4.8-9.4-10-10 5.2-.6 9.4-4.8 10-10z" />
+      </svg>
+    )
+  }
+  // codex / OpenAI — a simple knotted ring approximation
+  return (
+    <svg {...common} fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 4v16M4 12h16" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+function relTime(iso: string, nowMs: number): string {
+  const mins = Math.max(0, Math.round((nowMs - Date.parse(iso)) / 60000))
+  if (mins < 1) return 'now'
+  if (mins < 60) return `${mins}m`
+  const h = Math.round(mins / 60)
+  if (h < 24) return `${h}h`
+  return `${Math.round(h / 24)}d`
+}
+
+/** History dropdown: the clock button + a menu of persisted conversations
+ *  (agent.conv.list, newest first). Persisted in the vault's app.db, so it
+ *  survives restarts. Click a row → reopen it in this panel. */
+function ConvHistoryMenu(): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const [convs, setConvs] = useState<AcpConvSummary[] | null>(null)
+  const [query, setQuery] = useState('')
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+
+  const refresh = (): void => {
+    setConvs(null)
+    void invoke('agent.conv.list', { limit: 200 })
+      .then(setConvs)
+      .catch(() => setConvs([]))
+  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload each open
+  useEffect(() => {
+    if (!open) {
+      setQuery('')
+      setRenaming(null)
+      setConfirmDel(null)
+      return
+    }
+    refresh()
+  }, [open])
+
+  const filtered = (convs ?? []).filter((c) =>
+    (c.title ?? 'Untitled conversation').toLowerCase().includes(query.trim().toLowerCase()),
+  )
+
+  async function rename(id: string, title: string): Promise<void> {
+    await invoke('agent.conv.rename', { conversationId: id, title }).catch(() => {})
+    setRenaming(null)
+    refresh()
+  }
+  async function del(id: string): Promise<void> {
+    await invoke('agent.conv.delete', { conversationId: id }).catch(() => {})
+    setConfirmDel(null)
+    refresh()
+  }
+
+  return (
+    <div className="agent-history">
+      <button
+        type="button"
+        className="agent-head-btn"
+        title="Conversation history"
+        aria-label="Conversation history"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {/* clock glyph */}
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M8 4.5V8l2.4 1.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+      </button>
+      {open && (
+        // biome-ignore lint/a11y: menu closes on backdrop click; rows are buttons
+        <>
+          <div className="agent-history-backdrop" onMouseDown={() => setOpen(false)} />
+          <div className="agent-history-menu" role="menu">
+            <div className="agent-history-title">History · this device</div>
+            <input
+              className="agent-history-search"
+              placeholder="Search conversations…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {convs === null ? (
+              <div className="agent-history-empty">Loading…</div>
+            ) : filtered.length === 0 ? (
+              <div className="agent-history-empty">
+                {convs.length === 0 ? 'No past conversations yet.' : 'No matches.'}
+              </div>
+            ) : (
+              filtered.map((c) => (
+                <div key={c.id} className="agent-history-row">
+                  <span className="agent-history-mark">
+                    <ProviderMark agent={c.lastProvider} size={12} />
+                  </span>
+                  {renaming === c.id ? (
+                    <input
+                      className="agent-history-rename"
+                      // biome-ignore lint/a11y/noAutofocus: inline rename field
+                      autoFocus
+                      defaultValue={c.title ?? ''}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void rename(c.id, (e.target as HTMLInputElement).value)
+                        if (e.key === 'Escape') setRenaming(null)
+                      }}
+                      onBlur={(e) => void rename(c.id, e.target.value)}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="agent-history-open"
+                      onClick={() => {
+                        setOpen(false)
+                        void useAgentPanel.getState().openConversation(c.id)
+                      }}
+                    >
+                      <span className="agent-history-name">
+                        {c.title ?? 'Untitled conversation'}
+                      </span>
+                      <span className="agent-history-time">{relTime(c.updatedAt, Date.now())}</span>
+                    </button>
+                  )}
+                  {renaming !== c.id && (
+                    <span className="agent-history-actions">
+                      <button
+                        type="button"
+                        className="agent-history-act"
+                        title="Rename"
+                        aria-label="Rename conversation"
+                        onClick={() => {
+                          setConfirmDel(null)
+                          setRenaming(c.id)
+                        }}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        className={`agent-history-act${confirmDel === c.id ? ' is-danger' : ''}`}
+                        title={confirmDel === c.id ? 'Click again to delete' : 'Delete'}
+                        aria-label="Delete conversation"
+                        onClick={() =>
+                          confirmDel === c.id ? void del(c.id) : setConfirmDel(c.id)
+                        }
+                      >
+                        🗑
+                      </button>
+                    </span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 /** Login-state auth dot — glyph shape differs per state (never color alone):
  *  ○ not started · ● signed in · ⚠ needs login. Full label rides the chip's
@@ -439,6 +621,9 @@ export function AgentPanel(): React.JSX.Element | null {
                   st.setAgent(a)
                 }}
               >
+                <span className="agent-provider-mark">
+                  <ProviderMark agent={a} size={13} />
+                </span>
                 <span className={`agent-auth-dot ${dot.cls}`} aria-hidden="true">
                   {dot.glyph}
                 </span>
@@ -447,11 +632,12 @@ export function AgentPanel(): React.JSX.Element | null {
             )
           })}
         </div>
+        <ConvHistoryMenu />
         <button
           type="button"
           className="agent-head-btn"
-          title="New agent session (vault root)"
-          aria-label="New agent session"
+          title="New conversation (vault root)"
+          aria-label="New conversation"
           onClick={() => void useAgentPanel.getState().openHere()}
         >
           +
@@ -481,12 +667,11 @@ export function AgentPanel(): React.JSX.Element | null {
         </button>
       </div>
       {popout && (
-        // B3 single-port limitation (see main/index.ts open-agent): this pop-out
-        // is a secondary window, so its core can't claim the one fixed in-app
-        // MCP port — the popped-out session runs without the loredex MCP tools.
+        // The pop-out core can't bind the single MCP port, but its agent
+        // sessions now connect to the MAIN window's running host via the
+        // discovery file — so this window has the full loredex toolset too.
         <div className="agent-popout-note" role="note">
-          ⧉ Popped-out window — the in-app MCP server binds one port claimed by the
-          main window, so this conversation has no loredex MCP tools here.
+          ⧉ Popped-out window — using the main window's loredex MCP server.
         </div>
       )}
       {shown.length > 0 && (

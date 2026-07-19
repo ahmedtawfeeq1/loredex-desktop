@@ -64,7 +64,12 @@ import {
 import { createHandoffNotifier, type HandoffNotifier } from './notify'
 import { acpCancel, acpContinue, acpPermission, acpPrompt, acpSetMode, acpStart, acpStop } from './acp'
 import { agentKeyStatus, clearAgentKey, storeAgentKey } from './agent-keys'
-import { listConversations, loadConversation } from './agent-conversations'
+import {
+  deleteConversation,
+  listConversations,
+  loadConversation,
+  renameConversation,
+} from './agent-conversations'
 import {
   loadAgentPanelPrefs,
   loadAtlasLegendSeen,
@@ -830,6 +835,18 @@ export function registerCoreHandlers(
     const db = getAppDb()
     const vid = currentVaultId()
     return db && vid ? listConversations(db, vid, limit) : []
+  })
+  // History dropdown row actions — both vault-scoped at the seam (a cross-vault
+  // id is a no-op, never touches another vault's thread).
+  ipc.register('agent.conv.rename', ({ conversationId, title }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (db && vid) renameConversation(db, vid, conversationId, title)
+  })
+  ipc.register('agent.conv.delete', ({ conversationId }) => {
+    const db = getAppDb()
+    const vid = currentVaultId()
+    if (db && vid) deleteConversation(db, vid, conversationId)
   })
   ipc.register('agent.conv.load', ({ conversationId }) => {
     const db = getAppDb()

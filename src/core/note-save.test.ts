@@ -94,6 +94,21 @@ describe('note.save — body-only, frontmatter byte-preserved (AC1)', () => {
     expect(readFileSync(join(vault, NOTE), 'utf8').endsWith('no newline\n')).toBe(true)
   })
 
+  it('edits a no-frontmatter note whole (agent-ops _persona/stage .md — #20)', async () => {
+    // agent-ops definition files carry no frontmatter; the whole file IS the body
+    const rel = 'projects/no-fm-note.md'
+    writeFileSync(join(vault, rel), 'original body\n')
+    const out = await client.invoke('note.save', {
+      path: rel,
+      body: '# Persona\n\nRewritten in the reader.',
+      identity: dana,
+    })
+    expect(out.path).toBe(rel)
+    // no frontmatter to preserve → the file is exactly the new body (+ trailing NL)
+    expect(readFileSync(join(vault, rel), 'utf8')).toBe('# Persona\n\nRewritten in the reader.\n')
+    expect(events).toContainEqual({ kind: 'vault.changed', paths: [rel] })
+  })
+
   it('rejects traversal and outside-vault paths with VAULT_OUTSIDE_PATH', async () => {
     for (const path of ['../evil.md', '/etc/hosts.md', 'projects/../../evil.md']) {
       await expect(

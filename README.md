@@ -94,7 +94,7 @@ No Terminal? Right-click the app → **Open** → **Open**, or System Settings �
 
 **Git** is required (vault sync + history); on Windows install [Git for Windows](https://git-scm.com/download/win). On first launch: create a vault, join your team's vault by pasting its git URL, or open an existing loredex folder (**File → Open Vault…**, ⌘/Ctrl+O).
 
-No auto-update yet — new versions are a re-download; your vault and settings are untouched. Full per-OS walkthrough: [docs/USER-GUIDE.md](docs/USER-GUIDE.md) · [loredex install guide](https://github.com/ahmedtawfeeq1/loredex/blob/main/docs/DESKTOP.md).
+No auto-update — that needs a code-signed app, and these builds are unsigned. Instead the top bar **tells you when a newer release exists** and links to the download; installing it is a re-download, and your vault and settings are untouched (settings live in `app.db` outside the app bundle). Full per-OS walkthrough: [docs/USER-GUIDE.md](docs/USER-GUIDE.md) · [loredex install guide](https://github.com/ahmedtawfeeq1/loredex/blob/main/docs/DESKTOP.md).
 
 ## Build from source
 

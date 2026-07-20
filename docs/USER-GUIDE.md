@@ -65,6 +65,14 @@ The vault tree on the left, the rendered note on the right.
 - **Commit SHAs** in note bodies become links to the vault remote's commit page (GitHub remotes; anything else renders as plain monospace).
 - Markdown renders through one sanitized pipeline — note content is never executed.
 - **Drag a markdown file** from Finder onto the note pane to route it into the vault ([details](#routing-a-note)).
+- **`⇄ Changes`** opens a two-column **before / after** of the note's most recent
+  commit — the same review the contract timeline gives an API change, on the note
+  itself. Works in read and edit mode, on every dex type; it reads git history and
+  writes nothing.
+- **`⧉ Pop out`** puts a note in its own window (reader only, no sidebar) so a
+  reference note can sit beside the app.
+- The **metadata rail** starts collapsed — notes open at full prose width; one
+  click brings the properties back.
 
 ## Handoffs
 
@@ -152,7 +160,9 @@ Binary files (`.pdf`, `.xlsx`, `.png`, …) in the tree open in your OS default 
 
 The right-side **agent panel** (toggle in the top bar) is a chat with a coding agent — **Claude Code** or **Codex** — over the Agent Client Protocol:
 
-- Rich markdown, tool-call diffs, a usage/cost meter, and slash-command autocomplete in the composer (Enter sends, Shift+Enter for a newline); attach images where the agent supports them.
+- Rich markdown, tool-call diffs, a usage/cost meter, and slash-command autocomplete in the composer (Enter sends, Shift+Enter for a newline); attach images where the agent supports them. Drag the composer's bottom-right corner to make it taller, and keep typing while the agent is still answering.
+- **Tool rows show input and output**, with a live elapsed counter while a call is running — a long command reads as *working*, not stuck. Non-ASCII output (Arabic and other RTL scripts) renders as real text, laid out right-to-left.
+- **A tool that writes a note gets an `↗` button** on its row — one click opens that note in the Reader, from whatever view you were on.
 - **History** (the clock button) reopens past conversations; threads **auto-title** from their first message.
 - **Cross-provider continuation** carries a conversation from one agent to another; **pop-out** runs a chat in its own window.
 - On an agent-ops dex, **Chat Here** scopes a session to a client (a `◈ <client>` chip marks it) so it runs with that client's own MCP servers. When the agent asks permission for a tool, you can tick **"Always allow `<kind>` for `<client>`"** — matching requests then auto-answer with no modal (manage them in **Settings → Agent permissions**). A top-bar badge counts pending requests while the panel is closed.

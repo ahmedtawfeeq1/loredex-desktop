@@ -1,5 +1,8 @@
 # Backlog — future work
 
+> **All items BL-1…BL-9 shipped in v0.9.5.** Kept as the record of what was
+> wrong, why, and how each was fixed.
+
 Small, well-scoped UX fixes captured from real use. Nothing here is scheduled;
 pick them up in any order. Each item states the symptom, the cause (with
 file:line), what "done" looks like, and the screenshot it came from.
@@ -10,7 +13,7 @@ Status legend: `open` · `in progress` · `done`
 
 ## BL-1 — Chat: drop the composer action strip; make the header "New conversation" obvious
 
-**Status:** open · **Area:** agent panel · **Size:** S
+**Status:** done (v0.9.5) · **Area:** agent panel · **Size:** S
 
 **Symptom.** A `＋ New conversation` / `↻ Retry` strip sits directly above the
 composer. It duplicates the header `＋` icon, and **Retry isn't wanted at all** —
@@ -36,7 +39,7 @@ re-sending the last turn is not a control worth the space.
 
 ## BL-2 — Chat: keep the composer usable while the agent is responding
 
-**Status:** open · **Area:** agent panel · **Size:** S–M
+**Status:** done (v0.9.5) · **Area:** agent panel · **Size:** S–M
 
 **Symptom.** While the agent is generating, the whole composer is inert — you
 can't type the next message, paste, edit, or attach anything. You have to wait
@@ -60,7 +63,7 @@ more than sending:
 
 ## BL-3 — Chat: pin the code-block Copy button (stop it scrolling with the code)
 
-**Status:** open · **Area:** agent panel / markdown · **Size:** S
+**Status:** done (v0.9.5) · **Area:** agent panel / markdown · **Size:** S
 
 **Symptom.** In a fenced code / JSON block, the hover **Copy** button drifts
 across the code as you scroll the block horizontally — it ends up floating in
@@ -92,7 +95,7 @@ scrolled `"mcpServers":{"loredex":{"type":"http",…}` line.
 
 ## BL-4 — Terminal: collapse header actions into an overflow menu at narrow widths
 
-**Status:** open · **Area:** terminal · **Size:** M
+**Status:** done (v0.9.5) · **Area:** terminal · **Size:** M
 
 **Symptom.** With the terminal docked **left**, narrowing the pane makes its
 header actions (`dock ▾ · pop ↖ · split ▸ · split ▾ · close`) run past the pane
@@ -120,7 +123,7 @@ running over the app's logo strip.
 
 ## BL-5 — Switching provider must keep the session's working directory (MCP breaks today)
 
-**Status:** open · **Area:** agent panel / core · **Size:** M · **Priority:** high
+**Status:** done (v0.9.5) · **Area:** agent panel / core · **Size:** M · **Priority:** high
 
 **Symptom.** Start a chat scoped to a client (e.g. `projects/arabicss`), then
 **CONTINUE IN → Codex** (or Gemini). The new session comes up at the **vault
@@ -190,7 +193,7 @@ work is needed.
 
 ## BL-6 — "Chat Here" should ask which provider (it silently picks Claude)
 
-**Status:** open · **Area:** clients / agent panel · **Size:** S
+**Status:** done (v0.9.5) · **Area:** clients / agent panel · **Size:** S
 
 **Symptom.** On a client page, **Chat Here** always opens Claude Code. There's no
 way to start that client-scoped session on Codex or Gemini without opening
@@ -225,7 +228,7 @@ both questions instead of two separate dialogs.
 
 ## BL-7 — Chat: collapse the header chrome to 3 lines (it eats the thread)
 
-**Status:** open · **Area:** agent panel · **Size:** M
+**Status:** done (v0.9.5) · **Area:** agent panel · **Size:** M
 
 **Symptom.** Before a single message is visible the panel stacks **five** rows of
 chrome — provider chips, a pop-out notice, the session row, CONTINUE IN, the

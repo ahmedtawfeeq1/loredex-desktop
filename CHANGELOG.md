@@ -7,6 +7,49 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-07-20
+
+Usability pass over the agent panel, terminal, clients and reader — plus one
+real MCP bug fix.
+
+### Fixed
+- **A continued conversation keeps its folder.** Switching provider
+  (CONTINUE IN → Codex/Gemini), reopening from history, or popping a chat into
+  its own window used to restart the session at the **vault root**, so the
+  client's `.mcp.json` servers silently disappeared (MCP is discovered at
+  adapter startup — a later `cd` can't recover it). Conversations now record
+  their working directory and continuation respawns there. Falls back
+  cwd → client slug → vault root, each checked to still exist. A client-scoped
+  thread is asked whether to continue **in its folder** or at the vault root.
+- **The code-block Copy button no longer runs away.** It sat inside the
+  horizontally-scrolling `<pre>`, so scrolling sideways dragged it across the
+  code; it now lives in a non-scrolling wrapper, pinned to the visible corner.
+- **Terminal actions stop overlapping the app chrome.** On a narrow left dock
+  the `dock / pop / split / split / close` row used to run over the logo; below
+  a width threshold it collapses into a **☰ menu** carrying every action.
+
+### Changed
+- **You can type while the agent is answering.** Composing and sending are now
+  separate rights: type, edit, paste and attach mid-turn — only Send is held
+  (it already becomes **Stop**), and ↵ during a turn keeps your draft instead of
+  dropping it.
+- **Less chrome above the thread.** The pop-out note, session rows and
+  CONTINUE IN collapse into one line; the default header is just providers,
+  CONTEXT, and the session/tools/MCP summary. The client chip, run state and
+  close stay visible while collapsed.
+- **The composer action strip is gone.** `New conversation` now lives only in
+  the header `＋` (clearly labelled on hover); `Retry` was removed.
+
+### Added
+- **Chat Here asks which agent.** Starting a client-scoped chat offers Claude /
+  Codex / Gemini with an auth dot each, instead of silently using whichever
+  provider the panel happened to be set to.
+- **Search the fleet.** The Clients view filters by client name (also manager
+  and tag).
+- **Jump from the reader to a project's page.** Each project/client row carries
+  a `›` that opens *its* page for the dex type — the client console on an
+  agent-ops dex, the Atlas project lens on a research dex.
+
 ## [0.9.4] - 2026-07-20
 
 The **agent-ops app completion** — the desktop grows from a knowledge reader

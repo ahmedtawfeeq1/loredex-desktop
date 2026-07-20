@@ -1,6 +1,6 @@
 {
   "name": "loredex-desktop",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "Loredex Desktop — macOS reader and control surface for loredex vaults",
   "type": "module",
   "private": true,

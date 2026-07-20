@@ -918,7 +918,9 @@ export function AgentPanel(): React.JSX.Element | null {
         <textarea
           ref={inputRef}
           className="agent-input-field"
-          rows={Math.min(6, draft.split('\n').length)}
+          // BL-10: auto-grow further before you need the drag handle (a long
+          // dictated/pasted message used to sit in a 6-row peephole)
+          rows={Math.min(12, Math.max(1, draft.split('\n').length))}
           placeholder={
             !canCompose
               ? 'Needs a ready session'

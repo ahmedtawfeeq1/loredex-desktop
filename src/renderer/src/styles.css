@@ -9247,7 +9247,11 @@ a.button-primary {
 .agent-input-field {
   flex: 1;
   min-width: 0;
-  resize: none;
+  /* BL-10: drag the bottom-right corner to make the composer taller — the
+     auto-grow below still applies until you set a height by hand, after which
+     your inline height wins. Capped so it can never swallow the thread. */
+  resize: vertical;
+  max-height: 45vh;
   font: inherit;
   font-size: 12.5px;
   line-height: 1.45;

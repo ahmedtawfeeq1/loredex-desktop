@@ -7,6 +7,14 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-07-20
+
+### Changed
+- **The chat composer can be made taller.** Drag its **bottom-right corner** to
+  set the height you want (capped at 45% of the panel so it can't swallow the
+  thread). It also auto-grows further on its own — up to 12 rows instead of 6 —
+  so a long dictated or pasted message isn't stuck in a two-line peephole.
+
 ## [0.9.5] - 2026-07-20
 
 Usability pass over the agent panel, terminal, clients and reader — plus one

@@ -268,6 +268,26 @@ thread starting barely a third of the way down the window.
 
 ---
 
+## BL-10 — Chat: let the composer be made taller
+
+**Status:** done (v0.9.6) · **Area:** agent panel · **Size:** S
+
+**Symptom.** The composer is a ~2-line peephole. A long typed/dictated/pasted
+message scrolls inside a tiny box with no way to enlarge it.
+
+**Cause / where.**
+- `src/renderer/src/styles.css` — `.agent-input-field` had `resize: none`, so the
+  native drag handle was suppressed.
+- `src/renderer/src/agent/AgentPanel.tsx` — `rows={Math.min(6, …)}` auto-grew by
+  **newline count only**, so wrapped (dictated/pasted) text never grew the box.
+
+**Fixed by.** `resize: vertical` (native drag handle at the **bottom-right**) with
+a `max-height: 45vh` cap so it can't swallow the thread, and the auto-grow cap
+raised 6 → 12 rows. Auto-grow applies until you set a height by hand; after that
+your inline height wins.
+
+---
+
 ## Notes
 
 - BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1

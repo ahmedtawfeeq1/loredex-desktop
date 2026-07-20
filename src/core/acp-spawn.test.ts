@@ -13,6 +13,7 @@ import {
   adapterEntry,
   adapterEnv,
   authMode,
+  sharedEnvKeys,
   spawnAdapter,
   spawnErrorDetail,
   StderrRing,
@@ -31,17 +32,9 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-/** shared keys every adapter may emit (allowlist + ELECTRON_RUN_AS_NODE) */
-const SHARED = new Set([
-  'ELECTRON_RUN_AS_NODE',
-  'HOME',
-  'PATH',
-  'USER',
-  'LOGNAME',
-  'SHELL',
-  'TMPDIR',
-  'LANG',
-])
+/** shared keys every adapter may emit (this platform's allowlist +
+ *  ELECTRON_RUN_AS_NODE) — BL-24 made the set platform-dependent. */
+const SHARED = new Set(['ELECTRON_RUN_AS_NODE', ...sharedEnvKeys()])
 /** the ONLY provider credentials each agent may emit — a cross-provider key
  *  must NEVER appear (least privilege). */
 const PROVIDER_ALLOWED = {
@@ -67,6 +60,37 @@ describe('adapterEnv (explicit, per-agent allowlist)', () => {
         ).toBe(true)
       }
     }
+  })
+
+  /**
+   * BL-24: the POSIX-only allowlist meant a Windows adapter received no
+   * USERPROFILE (so no ~\.claude credentials) and — the reported symptom — no
+   * PATHEXT/ComSpec/APPDATA, so an `npx`-based MCP server out of a client's
+   * .mcp.json could not be spawned at all. Per-client MCP worked on macOS and
+   * silently did not on Windows.
+   */
+  it('BL-24: the Windows set carries the credential root and the keys npx needs', () => {
+    const win = sharedEnvKeys('win32')
+    for (const key of ['USERPROFILE', 'PATH', 'PATHEXT', 'ComSpec', 'SystemRoot', 'APPDATA']) {
+      expect(win, `windows adapters need ${key}`).toContain(key)
+    }
+    // and the POSIX names, which simply do not exist on Windows, are not it
+    expect(win).not.toContain('HOME')
+    expect(win).not.toContain('TMPDIR')
+    expect(win).not.toContain('SHELL')
+  })
+
+  it('BL-24: the POSIX set is unchanged — macOS/Linux behaviour is untouched', () => {
+    expect([...sharedEnvKeys('darwin')]).toEqual([
+      'HOME',
+      'PATH',
+      'USER',
+      'LOGNAME',
+      'SHELL',
+      'TMPDIR',
+      'LANG',
+    ])
+    expect([...sharedEnvKeys('linux')]).toEqual([...sharedEnvKeys('darwin')])
   })
 
   it('always sets ELECTRON_RUN_AS_NODE=1 (the Electron binary runs as plain node)', () => {

@@ -52,7 +52,47 @@ export function adapterEntry(agent: AcpAgent): string {
 /** Shell-hygiene + credential-root keys every adapter needs. HOME is the
  *  credential root (keychain / ~/.claude / ~/.codex), PATH for the agent's own
  *  subprocesses, the rest is shell hygiene. Forwarded ONLY when already set. */
-const SHARED = ['HOME', 'PATH', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG'] as const
+const SHARED_POSIX = ['HOME', 'PATH', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'LANG'] as const
+
+/**
+ * BL-24 — the Windows equivalents. This allowlist is the OPPOSITE of a full
+ * inherit, so anything absent here simply does not reach the adapter, and none
+ * of the POSIX names above exist on Windows: no HOME, no TMPDIR, no SHELL.
+ *
+ * That broke per-client MCP on Windows specifically. A client `.mcp.json` server
+ * is typically `{"command": "npx", ...}`, and the adapter spawns it with the env
+ * IT received — so on Windows that child needs `PATHEXT` (to resolve `npx.cmd`
+ * at all), `ComSpec`, `SystemRoot`/`windir`, and `APPDATA`/`LOCALAPPDATA` for
+ * npm's own config. With none of them forwarded the MCP server never spawned,
+ * while macOS worked because the POSIX set is sufficient there.
+ *
+ * `USERPROFILE` (+ HOMEDRIVE/HOMEPATH) is the credential root that HOME names on
+ * POSIX — it is how the adapter finds `~\.claude` / `~\.codex`.
+ */
+const SHARED_WIN32 = [
+  'USERPROFILE',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PATH',
+  'PATHEXT',
+  'ComSpec',
+  'SystemRoot',
+  'windir',
+  'TEMP',
+  'TMP',
+  'USERNAME',
+  'USERDOMAIN',
+  'NUMBER_OF_PROCESSORS',
+  'PROCESSOR_ARCHITECTURE',
+  'LANG',
+] as const
+
+/** The platform's shared set. Exported for the spawn test's allowlist proof. */
+export function sharedEnvKeys(platform: NodeJS.Platform = process.platform): readonly string[] {
+  return platform === 'win32' ? SHARED_WIN32 : SHARED_POSIX
+}
 
 /** Provider credentials scoped PER agent — least privilege: a Codex adapter
  *  must never receive ANTHROPIC_API_KEY, nor a Claude adapter the user's
@@ -94,7 +134,7 @@ export function authMode(
  *  user's system node is never relied on. */
 export function adapterEnv(agent: AcpAgent, overlay?: Record<string, string>): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ELECTRON_RUN_AS_NODE: '1' }
-  for (const key of [...SHARED, ...PROVIDER_KEYS[agent]]) {
+  for (const key of [...sharedEnvKeys(), ...PROVIDER_KEYS[agent]]) {
     const v = process.env[key]
     if (v !== undefined) env[key] = v
   }

@@ -9400,13 +9400,52 @@ a.button-primary {
   border-top: 1px solid var(--hairline);
 }
 
+/* BL-25: the composer's own stacking context — the grip pins to its TOP edge.
+   Replaces BL-10's native `resize: vertical`, whose grip is always
+   bottom-right and only grows downward, into a panel edge with no room. */
+.agent-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.agent-input-grip {
+  position: absolute;
+  top: -3px;
+  right: 0;
+  width: 48px;
+  height: 9px;
+  cursor: ns-resize;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  touch-action: none;
+  /* the visible grip is a centred 2px bar — a pseudo-element, not a gradient
+     (design-fidelity §4: the cobalt button owns the only sanctioned gradient) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-input-grip::after {
+  content: '';
+  width: 28px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--hairline);
+}
+
+.agent-input-wrap:hover .agent-input-grip,
+.agent-input-grip:active {
+  opacity: 1;
+}
+
 .agent-input-field {
   flex: 1;
   min-width: 0;
-  /* BL-10: drag the bottom-right corner to make the composer taller — the
-     auto-grow below still applies until you set a height by hand, after which
-     your inline height wins. Capped so it can never swallow the thread. */
-  resize: vertical;
+  /* height comes from the row count until the grip sets one by hand (BL-25);
+     the clamp lives in clampComposer so it can never swallow the thread. */
+  resize: none;
   max-height: 45vh;
   font: inherit;
   font-size: 12.5px;

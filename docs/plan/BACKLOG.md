@@ -553,6 +553,62 @@ Two regression tests cover both directions of the flag.
 
 ---
 
+## BL-24 — Per-client MCP never worked on Windows
+
+**Status:** done (v0.9.11) · **Area:** ACP adapter spawn · **Size:** M
+
+**Symptom.** Multiple pop-outs, each carrying its own client's MCP, works on
+macOS. On Windows the client's MCP servers are not there.
+
+**Cause — a POSIX-only env allowlist.** `adapterEnv` is deliberately the opposite
+of a full inherit (least privilege: a Codex adapter must never see
+`ANTHROPIC_API_KEY`), so anything not listed simply does not reach the adapter.
+The shared list was `HOME, PATH, USER, LOGNAME, SHELL, TMPDIR, LANG` — and on
+Windows **none of those exist except PATH**.
+
+The consequence lands squarely on client MCP. A client `.mcp.json` server is
+typically `{"command": "npx", …}`, and the adapter spawns that child with the env
+*it* received. On Windows that child needs `PATHEXT` to resolve `npx.cmd` at all,
+plus `ComSpec`, `SystemRoot`/`windir`, and `APPDATA`/`LOCALAPPDATA` for npm's own
+config. None were forwarded, so the MCP server never spawned. `USERPROFILE` was
+missing too — that is what `HOME` names on POSIX, i.e. how the adapter finds
+`~\.claude` / `~\.codex` credentials.
+
+**Note this was never pop-out-specific.** The loredex MCP is an HTTP server we
+inject by URL, so it needs no env and worked on Windows in both window kinds.
+It is the *client's* npx-spawned servers that failed — in the main window too.
+
+**Shipped.** `sharedEnvKeys(platform)` returns the POSIX set unchanged on
+darwin/linux and a Windows set on win32. Tests assert the Windows set carries the
+credential root and every key npx needs, that the POSIX names are absent from it,
+and that the POSIX set is byte-for-byte what it was.
+
+**Unverified on Windows.** Reasoned from the code and covered by tests; not
+reproduced on a Windows machine.
+
+---
+
+## BL-25 — The composer can only grow downward, into the panel edge
+
+**Status:** done (v0.9.11) · **Area:** agent panel · **Size:** S
+
+**Symptom.** BL-10 made the message box resizable, but the grip is at the
+bottom-right and drags *down* — and the composer is pinned to the bottom of the
+panel, so there is no room below to grow into.
+
+**Cause.** BL-10 used the browser's native `resize: vertical`. That grip's
+corner and direction are not stylable — it is always bottom-right, always
+downward.
+
+**Shipped.** Native resize off; a real handle on the composer's **top** edge.
+Dragging up grows the box upward, into the thread. `clampComposer` keeps it
+between one line and 45% of the viewport (the ceiling `max-height: 45vh`
+previously enforced), double-click resets to auto-grow. The grip is a
+pseudo-element bar, not a gradient — the design-fidelity suite reserves gradients
+for the cobalt button, and caught the first attempt.
+
+---
+
 ## Notes
 
 - BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1

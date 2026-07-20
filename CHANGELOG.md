@@ -7,6 +7,25 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-07-20
+
+### Fixed
+- **A client's own MCP servers now work on Windows.** The adapter receives a
+  deliberately minimal environment, and that list was POSIX-only — on Windows
+  none of it exists but `PATH`. A client `.mcp.json` server is usually an `npx`
+  command, and on Windows spawning one needs `PATHEXT`, `ComSpec`, `SystemRoot`
+  and `APPDATA`; `USERPROFILE` was also missing, which is how the agent finds its
+  stored credentials. All are now forwarded on Windows; macOS and Linux are
+  unchanged. (This was never pop-out-specific — the *loredex* MCP is an HTTP
+  server we hand over by URL and always worked; it was the client's own servers
+  that never started, in every window.)
+
+### Changed
+- **The message box now grows upward.** Its resize grip moved from the
+  bottom-right corner to the **top edge** — the composer sits at the bottom of
+  the panel, so there was never room to grow downward. Drag up for more room,
+  double-click to go back to auto-sizing.
+
 ## [0.9.10] - 2026-07-20
 
 ### Fixed

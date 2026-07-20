@@ -576,6 +576,13 @@ function StateNote({ s }: { s: AcpSessionView }): React.JSX.Element {
   )
 }
 
+/** BL-25: composer height bounds — one line's worth at the bottom, 45% of the
+ *  viewport at the top so a dragged composer can never swallow the thread (the
+ *  same ceiling the old `max-height: 45vh` enforced). */
+export function clampComposer(px: number, viewportH = window.innerHeight): number {
+  return Math.max(32, Math.min(px, viewportH * 0.45))
+}
+
 export function AgentPanel(): React.JSX.Element | null {
   const open = useAgentPanel((s) => s.open)
   const width = useAgentPanel((s) => s.width)
@@ -687,6 +694,9 @@ export function AgentPanel(): React.JSX.Element | null {
   // opens while the draft is a bare `/token`; picking inserts `/name ` (the
   // trailing space closes the menu) and the user adds args + sends normally.
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  // BL-25: a hand-set composer height. null = auto-grow from the row count (the
+  // default); a number wins until double-click resets it.
+  const [composerHeight, setComposerHeight] = useState<number | null>(null)
   const [slashSel, setSlashSel] = useState(0)
   const [slashDismissed, setSlashDismissed] = useState(false)
   const query = slashQuery(draft)
@@ -915,9 +925,42 @@ export function AgentPanel(): React.JSX.Element | null {
         >
           ⊕
         </button>
+        <div className="agent-input-wrap">
+          {/* BL-25: the native `resize: vertical` grip is always bottom-right and
+              only grows DOWNWARD — but the composer is pinned to the bottom of
+              the panel, so there is nothing below to grow into. This handle sits
+              on the composer's TOP edge and grows it upward, into the thread. */}
+          <div
+            className="agent-input-grip"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Drag to resize the message box"
+            title="Drag up to make the message box taller (double-click to reset)"
+            onDoubleClick={() => setComposerHeight(null)}
+            onPointerDown={(e) => {
+              const el = inputRef.current
+              if (!el) return
+              e.preventDefault()
+              const startY = e.clientY
+              const startH = el.getBoundingClientRect().height
+              const grip = e.currentTarget
+              grip.setPointerCapture(e.pointerId)
+              const onMove = (ev: PointerEvent): void => {
+                // dragging UP (smaller clientY) must make it TALLER
+                setComposerHeight(clampComposer(startH + (startY - ev.clientY)))
+              }
+              const onUp = (): void => {
+                grip.removeEventListener('pointermove', onMove)
+                grip.removeEventListener('pointerup', onUp)
+              }
+              grip.addEventListener('pointermove', onMove)
+              grip.addEventListener('pointerup', onUp)
+            }}
+          />
         <textarea
           ref={inputRef}
           className="agent-input-field"
+          style={composerHeight === null ? undefined : { height: `${composerHeight}px` }}
           // BL-10: auto-grow further before you need the drag handle (a long
           // dictated/pasted message used to sit in a 6-row peephole)
           rows={Math.min(12, Math.max(1, draft.split('\n').length))}
@@ -973,6 +1016,7 @@ export function AgentPanel(): React.JSX.Element | null {
             }
           }}
         />
+        </div>
         {active?.busy ? (
           <Button variant="danger" onClick={() => useAgentPanel.getState().cancel()}>
             Stop

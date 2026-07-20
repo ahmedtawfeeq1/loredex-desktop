@@ -128,6 +128,34 @@ describe('board data assembly (lanes.ts)', () => {
     expect(toVaultRelative('/v/projects/p/handoffs/x.md', '/v')).toBe('projects/p/handoffs/x.md')
     expect(toVaultRelative('elsewhere/x.md', '/v')).toBe('elsewhere/x.md')
   })
+
+  /**
+   * BL-26: on Windows the separator is `\`, so `startsWith(vault + '/')` never
+   * matched and EVERY caller silently got the absolute path back — which then
+   * went to git, or through `/^projects\/…/`, and failed. The result must be
+   * forward-slash relative (what git and the vault regexes expect).
+   */
+  it('relativizes Windows paths, and normalizes the result to forward slashes', () => {
+    expect(toVaultRelative('C:\\vault\\projects\\p\\n.md', 'C:\\vault')).toBe(
+      'projects/p/n.md',
+    )
+    // drive-letter case varies on Windows and must not defeat the match
+    expect(toVaultRelative('c:\\vault\\projects\\p\\n.md', 'C:\\Vault')).toBe(
+      'projects/p/n.md',
+    )
+  })
+
+  it('still returns an out-of-vault path UNCHANGED — callers use that as the sentinel', () => {
+    // ToolCallRow.openFileRef treats `rel === abs` as "not in this vault"
+    const outside = 'D:\\elsewhere\\x.md'
+    expect(toVaultRelative(outside, 'C:\\vault')).toBe(outside)
+    expect(toVaultRelative('/other/x.md', '/v')).toBe('/other/x.md')
+  })
+
+  it('does not treat a sibling directory with a shared prefix as inside', () => {
+    expect(toVaultRelative('/vault-two/n.md', '/vault')).toBe('/vault-two/n.md')
+    expect(toVaultRelative('C:\\vault-two\\n.md', 'C:\\vault')).toBe('C:\\vault-two\\n.md')
+  })
 })
 
 // The real simulated team vault (manual-verification target) — board assembly

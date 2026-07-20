@@ -7,6 +7,17 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-07-20
+
+### Fixed
+- **Windows: several features that depend on a note's vault-relative path.** The
+  helper that computes it only understood `/` separators, so on Windows it handed
+  back the full absolute path instead. Found while fixing the MCP issue, not
+  reported: it broke the note before/after diff (git got an absolute path),
+  archive/unarchive (the prefix was never stripped, so archiving twice could
+  nest `_archive/_archive/`), and inline comments (which lost their project and
+  filed under a fallback topic). macOS and Linux are unaffected.
+
 ## [0.9.11] - 2026-07-20
 
 ### Fixed

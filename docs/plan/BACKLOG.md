@@ -609,6 +609,38 @@ for the cobalt button, and caught the first attempt.
 
 ---
 
+## BL-26 — Vault-relative paths were computed POSIX-only
+
+**Status:** done (v0.9.12) · **Area:** shared paths · **Size:** S
+
+**Found while sweeping for BL-24**, not reported — but the same class, and it
+touches several features on Windows.
+
+**Cause.** `toVaultRelative` tested `absPath.startsWith(vaultPath + '/')`. On
+Windows the separator is `\`, so the test never passed and the function returned
+the **absolute path unchanged** for every in-vault note. Callers then either hand
+that to git or run POSIX-shaped regexes over it. Two more sites derived the
+relative path by hand with `resolved.slice(vault.length + 1)`, leaving `\`
+separators that the `/^projects\/…/` and `/^(_archive\/)+/` patterns never match.
+
+**What that broke on Windows:** the note before/after diff (BL-19) passed git an
+absolute path; archive/unarchive failed to strip the prefix, so archiving twice
+could nest `_archive/_archive/`; inline comments lost their project and filed
+under the fallback topic.
+
+**Shipped.** `toVaultRelative` compares on normalized copies (case-insensitively
+when the input looks Windows-shaped, since drive-letter case varies) and returns
+a forward-slash relative path — which is what git and every vault regex expect.
+An out-of-vault path still returns **unchanged**: callers use `rel === abs` as
+the "not in this vault" sentinel. Both hand-rolled slice sites now call it.
+
+Tests cover Windows separators, drive-letter case, the out-of-vault sentinel, and
+a shared-prefix sibling (`/vault-two` must not read as inside `/vault`).
+
+**Unverified on Windows** — reasoned from the code, covered by tests.
+
+---
+
 ## Notes
 
 - BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1

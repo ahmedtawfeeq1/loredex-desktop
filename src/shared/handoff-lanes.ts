@@ -112,7 +112,23 @@ export function formatAge(ageDays: number): string {
 
 /** Vault-relative path for the reader (HandoffCard.path is absolute). */
 export function toVaultRelative(absPath: string, vaultPath: string): string {
-  return absPath.startsWith(`${vaultPath}/`) ? absPath.slice(vaultPath.length + 1) : absPath
+  // BL-26: separators are `\` on Windows, so the old `startsWith(vault + '/')`
+  // never matched there and EVERY caller silently received the absolute path
+  // back. Callers then feed it to git, or run `/^projects\/…/` over it — both
+  // fail. Compare on normalized copies; drive-letter case also varies on
+  // Windows, so the comparison is case-insensitive when separators are `\`.
+  const norm = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '')
+  const a = norm(absPath)
+  const v = norm(vaultPath)
+  const windowsish = absPath.includes('\\') || vaultPath.includes('\\')
+  const inside = windowsish
+    ? a.toLowerCase().startsWith(`${v.toLowerCase()}/`)
+    : a.startsWith(`${v}/`)
+  // out-of-vault returns absPath UNCHANGED — callers use `rel === abs` as the
+  // "not in this vault" sentinel (ToolCallRow.openFileRef leans on it).
+  // Inside, the result is always forward-slash: that is what git wants and what
+  // the vault-relative regexes assume.
+  return inside ? a.slice(v.length + 1) : absPath
 }
 
 /**

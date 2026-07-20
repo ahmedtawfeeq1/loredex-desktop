@@ -974,7 +974,9 @@ export function removeNote(
   const config = getConfig()
   const resolved = resolveInVault(path)
   const vault = config.vaultPath
-  const rel = resolved.slice(vault.length + 1)
+  // BL-26: forward-slash relative on every platform — the _archive regexes below
+  // are POSIX-shaped, and a raw slice leaves `\` on Windows
+  const rel = toVaultRelative(resolved, vault)
   if (mode === 'unarchive') {
     // back to its original home: strip the _archive/ prefix (user 2026-07-18)
     const cleanRel = rel.replace(/^(_archive\/)+/, '')
@@ -1093,7 +1095,7 @@ export function createNoteComment(
   const resolved = resolveInVault(path)
   const parentName = basename(resolved, '.md')
   const dir = dirname(resolved)
-  const rel = resolved.slice(vault.length + 1)
+  const rel = toVaultRelative(resolved, vault) // BL-26: `\` on Windows broke both
   const project = /^projects\/([^/]+)\//.exec(rel)?.[1]
   const segments = rel.split('/')
   const topic = project && segments.length > 3 ? (segments[2] as string) : 'comments'

@@ -513,6 +513,42 @@ export interface CoreApi {
    *  compare; stale=true means the vault copy is behind its source. Re-route is
    *  the ordinary route() write, not a channel. */
   'vault.drift': { in: { path: string }; out: { stale: boolean; source?: string } }
+  /** Workspace-level MCP servers — ours + n8n, not per-client (2026-07-20 spec). */
+  'workspace.mcp.list': {
+    in: void
+    out: {
+      id: 'loredex' | 'n8n'
+      label: string
+      enabled: boolean
+      installed: boolean
+      /** 'documentation' when n8n has no key; 'full' with one; null for loredex */
+      mode: 'documentation' | 'full' | null
+    }[]
+  }
+  'workspace.mcp.setEnabled': { in: { id: 'loredex' | 'n8n'; on: boolean }; out: void }
+  'workspace.mcp.tools': {
+    in: { id: 'loredex' | 'n8n' }
+    out: { ok: boolean; tools: string[]; detail: string }
+  }
+  /** Best-effort install; ok:false hands back the command for the setup card. */
+  'workspace.mcp.install': {
+    in: { id: 'n8n' }
+    out: { ok: boolean; detail: string; command: string }
+  }
+  /** Presence only — the key itself never crosses this seam. */
+  'workspace.n8n.get': { in: void; out: { hasKey: boolean; url: string | null } }
+  'workspace.n8n.set': { in: { url?: string | null; key?: string | null }; out: void }
+  'workspace.skills.status': {
+    in: void
+    out: {
+      installed: boolean
+      command: string
+      plugin: string
+      /** the `claude mcp add` card for terminal-run claude. `command` carries a
+       *  PLACEHOLDER key, never the stored one — it must not cross this seam. */
+      terminal: { installed: boolean; command: string }
+    }
+  }
   /** BL-19: before/after for a note's most recent commit — the reader's Changes
    *  panel. null when the note has no git history. oldText null = created then. */
   'note.diff': {

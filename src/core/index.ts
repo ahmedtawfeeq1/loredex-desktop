@@ -31,6 +31,7 @@ import {
 } from './settings'
 import { killAllAcpSessions } from './acp'
 import { loadAgentKeys } from './agent-keys'
+import { loadN8nConfig } from './n8n-config'
 import { killAllTerminals } from './terminals'
 import { startVaultWatcher } from './watcher'
 import { writeLock } from './write-lock'
@@ -67,6 +68,9 @@ void initGhCapability(appDb)
 // B1: fold any keychain-stored adapter API keys into the in-memory cache the
 // acp spawn path reads (agent-keys) — best-effort, never blocks boot.
 void loadAgentKeys()
+// Same shape for the workspace n8n server: its keychain key + meta-table URL
+// are folded into the in-memory cache buildWorkspaceServers reads at spawn.
+void loadN8nConfig()
 
 // vault_id scopes every app-db row (story 9.2); null without a config or db.
 const vid = config && appDb ? vaultId(config.vaultPath, engine.identity().remote) : null

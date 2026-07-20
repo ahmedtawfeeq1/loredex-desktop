@@ -95,6 +95,30 @@ export function stripWriteTools(mcp: object): void {
 }
 
 /**
+ * Our own host's tool names, enumerated from a FRESH server instance via the
+ * same `_registeredTools` seam stripWriteTools uses — never a hardcoded array,
+ * which would drift as tools are added.
+ *
+ * There is no long-lived server to read: this host is stateless and builds one
+ * MCP server per request (see `handle` below), so the inventory builds its own
+ * throwaway instance and mirrors the write-tools switch, making the list match
+ * what a session actually gets. Never throws — no config yet (vault picker
+ * pending) is an empty list, not a broken Settings page.
+ */
+export function loredexToolNames(writeTools: boolean): string[] {
+  try {
+    // held as `object` so the private-field read below is the same widening
+    // seam stripWriteTools takes — a direct cast off McpServer is a type error
+    const mcp: object = engine.createMcpServer()
+    if (!writeTools) stripWriteTools(mcp)
+    const tools = (mcp as { _registeredTools?: Record<string, unknown> })._registeredTools
+    return tools ? Object.keys(tools).sort() : []
+  } catch {
+    return []
+  }
+}
+
+/**
  * FR14: every tool response echoes the vault identity — the same line the
  * chrome badge shows. The SDK has no response middleware, so each registered
  * tool's dispatch-time `handler` is wrapped (guarded: unexpected SDK shapes

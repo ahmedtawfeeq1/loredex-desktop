@@ -49,7 +49,24 @@ import {
 import type { CoreIpc } from './ipc'
 import { invalidateLinkIndex, resolveLink } from './links'
 import { commentView } from './notes'
-import { getMcpStatus, mcpRequestLog, PREFERRED_MCP_PORT, restartMcpServer } from './mcp-server'
+import {
+  getMcpStatus,
+  loredexToolNames,
+  mcpRequestLog,
+  PREFERRED_MCP_PORT,
+  restartMcpServer,
+} from './mcp-server'
+import {
+  N8N_SKILLS_COMMAND,
+  N8N_SKILLS_PLUGIN,
+  hasPluginInstalled,
+  hasTerminalN8nMcp,
+  terminalN8nCommand,
+} from './claude-plugins'
+import { probeStdioTools } from './mcp-tools'
+import { clearN8nKey, n8nEnv, n8nStatus, setN8nKey, setN8nUrl } from './n8n-config'
+import { installN8nMcp, n8nEntryPath, n8nInstallCommand } from './n8n-install'
+import { workspaceServerRows } from './workspace-rows'
 import {
   authStatus,
   createDexRepo,
@@ -111,6 +128,8 @@ import {
   loadPermissionRules,
   setPermissionRule,
   removePermissionRule,
+  loadWorkspaceEnabled,
+  setWorkspaceEnabled,
 } from './settings'
 import { termCreate, termInput, termKill, termResize } from './terminals'
 import { buildThread, collectComments } from './threads'
@@ -400,6 +419,55 @@ export function registerCoreHandlers(
   ipc.register('clients.dirAbs', ({ client }) => ({ dir: engine.clientDirAbs(client) }))
   // BL-19: read-only note history — the reader's before/after Changes panel
   ipc.register('note.diff', ({ path }) => engine.noteDiff(path))
+  // ── Workspace MCP servers (2026-07-20 spec) ───────────────────────────────
+  ipc.register('workspace.mcp.list', () => workspaceServerRows(loadWorkspaceEnabled(), n8nStatus()))
+  ipc.register('workspace.mcp.setEnabled', ({ id, on }) => setWorkspaceEnabled(id, on))
+  ipc.register('workspace.mcp.tools', async ({ id }) => {
+    if (id === 'loredex') {
+      // ours — a throwaway in-process instance, mirroring the live write-tools
+      // switch, so no spawn and no drift from what a session actually gets
+      const names = loredexToolNames(loadMcpWriteTools())
+      return { ok: true, tools: names, detail: `${names.length} tools` }
+    }
+    const entry = n8nEntryPath()
+    if (!entry) return { ok: false, tools: [], detail: 'not installed' }
+    // 6s, not the 9s default: a wedged server costs timeoutMs + ~2s of SDK
+    // shutdown grace, and this blocks a Settings spinner. n8n-mcp starts in
+    // 430ms–1.1s, so 6s is ample headroom without an ~11s stare.
+    return await probeStdioTools(
+      process.execPath,
+      [entry],
+      {
+        ...n8nEnv(),
+        ELECTRON_RUN_AS_NODE: '1',
+        PATH: process.env.PATH ?? '',
+        HOME: process.env.HOME ?? '',
+      },
+      6000,
+    )
+  })
+  ipc.register('workspace.mcp.install', async () => {
+    const res = await installN8nMcp()
+    return { ...res, command: n8nInstallCommand() }
+  })
+  ipc.register('workspace.n8n.get', () => n8nStatus())
+  ipc.register('workspace.n8n.set', async ({ url, key }) => {
+    if (url !== undefined) setN8nUrl(url)
+    if (key !== undefined) {
+      if (key === null || key === '') await clearN8nKey()
+      else await setN8nKey(key)
+    }
+  })
+  ipc.register('workspace.skills.status', async () => ({
+    installed: hasPluginInstalled(N8N_SKILLS_PLUGIN),
+    command: N8N_SKILLS_COMMAND,
+    plugin: N8N_SKILLS_PLUGIN,
+    terminal: {
+      installed: await hasTerminalN8nMcp(),
+      // n8nStatus().url is NOT secret; the key is a placeholder in the command
+      command: terminalN8nCommand(n8nStatus().url),
+    },
+  }))
   // WP-C: snapshot a pipeline/agent into _versions/<unit>/<stamp>/ (agent-ops).
   // One attributed commit under the write lock; the stamp is minted here (the
   // clock lives host-side, not in the lib). A fresh Versions list is the

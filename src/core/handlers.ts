@@ -18,6 +18,7 @@ import type {
 import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import { readClientTokens, storeClientToken } from './client-tokens'
+import { fetchBundles, planFiles } from './genudo-pull'
 import {
   capDiff,
   computeLinks,
@@ -344,6 +345,48 @@ export function registerCoreHandlers(
       ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
       notifier.refresh()
       return workspace
+    }),
+  )
+  /**
+   * Pull the client's live pipeline configuration into the vault (WP-PULL).
+   * agent-ops only, and only for a client whose genudo connection is wired —
+   * an unwired client is told so rather than silently doing nothing.
+   */
+  ipc.register('clients.pull', ({ client, identity, preview }) =>
+    withWriteLock(async () => {
+      requireAgentOps('pulling pipeline config')
+      if (!isValidIdentity(identity)) {
+        throw ipcError('INTERNAL', 'pulling needs an identity — set name and email in Settings')
+      }
+      const conn = engine.clientConnections(client).find((c) => c.server === 'genudo')
+      if (!conn) {
+        throw ipcError('INTERNAL', `${client} has no genudo connection in workspace.yml`)
+      }
+      const held = await readClientTokens(conn.envRefs)
+      const env: Record<string, string> = {}
+      const missing: string[] = []
+      for (const [key, value] of Object.entries(conn.env)) {
+        env[key] = value.replace(/\$\{([A-Z0-9_]+)\}/g, (whole, ref: string) => {
+          const token = held[ref]
+          if (token === undefined) missing.push(ref)
+          return token ?? whole
+        })
+      }
+      if (missing.length > 0) {
+        throw ipcError('INTERNAL', `no token held for ${missing.join(', ')} — paste it in Agent tooling first`)
+      }
+      const { bundles } = await fetchBundles(
+        env.GENUDO_TOKEN ?? '',
+        env.GENUDO_BASE_URL ?? 'https://api.genudo.ai',
+      )
+      const plan = planFiles(client, bundles)
+      if (preview) {
+        return { ...plan, files: plan.files.map((f) => f.rel), written: false }
+      }
+      engine.writeClientPull(client, plan, identity)
+      invalidateAtlas()
+      ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
+      return { ...plan, files: plan.files.map((f) => f.rel), written: true }
     }),
   )
   // Health probe: spawn the connection's mcp server with keychain-expanded env

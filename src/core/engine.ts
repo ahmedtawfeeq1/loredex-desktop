@@ -105,6 +105,7 @@ import {
   listClientInbox as listClientInboxLib,
   type InboxItem,
 } from 'loredex'
+import { writePlan } from './genudo-pull'
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { abbreviatePath } from '../shared/identity'
 import { type DuplicateGroup, findDuplicates, type NoteRecord } from './duplicates'
@@ -414,6 +415,30 @@ export function createSnapshot(
       config.vaultPath,
       config,
       `loredex: snapshot ${result.unit} ${result.stamp} (${identity.name})`,
+    ),
+  )
+  return result
+}
+
+/**
+ * WP-PULL: land a pulled plan and commit it as one attributed change, so the
+ * whole pull is a single reviewable/revertible commit rather than N writes.
+ */
+export function writeClientPull(
+  client: string,
+  plan: { pipelines: { name: string }[]; files: { rel: string; content: string }[] },
+  identity: Identity,
+): { written: number } {
+  const config = getConfig()
+  const clientAbs = join(config.vaultPath, 'projects', client)
+  const result = writePlan(clientAbs, plan as never)
+  rebuildIndexes(config.vaultPath)
+  const names = plan.pipelines.map((p) => p.name).join(', ')
+  withGitIdentity(identity, () =>
+    gitAutoCommit(
+      config.vaultPath,
+      config,
+      `loredex: pull ${client} from genudo — ${names} (${identity.name})`,
     ),
   )
   return result

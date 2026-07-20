@@ -335,6 +335,8 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [status, setStatus] = useState<ClientWorkspaceStatus | null>(null)
   // BL-6: Chat Here asks which provider instead of silently using the panel's
   const [chatPick, setChatPick] = useState(false)
+  const [pulling, setPulling] = useState(false)
+  const identity = useIdentity((s) => effectiveIdentity(s))
   const providerAuth = useAgentPanel((s) => s.providerAuth)
   const [conns, setConns] = useState<
     Array<{ server: string; envRefs: string[] }>
@@ -439,6 +441,40 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           onClick={() => void rewire({})}
         >
           {status?.generated ? 'Re-wire' : 'Wire'}
+        </button>
+        {/* WP-PULL: the vault's pipeline folders were empty scaffolding until this
+            existed — the real config only ever lived on the platform. */}
+        <button
+          type="button"
+          className="button-emphasis"
+          disabled={pulling || !identity}
+          title={
+            identity
+              ? "Pull this client's live pipelines, stages and actions from genudo into the vault"
+              : 'Pulling needs an identity — set name and email in Settings'
+          }
+          onClick={() => {
+            if (!identity) return
+            setPulling(true)
+            void invoke('clients.pull', { client: info.slug, identity })
+              .then((r) => {
+                const stages = r.pipelines.reduce((n, p) => n + p.stages, 0)
+                useToasts
+                  .getState()
+                  .push(
+                    `Pulled ${info.slug}`,
+                    `${r.pipelines.length} pipeline${r.pipelines.length === 1 ? '' : 's'}, ${stages} stages, ${r.files.length} files`,
+                  )
+              })
+              .catch((e: unknown) =>
+                useToasts
+                  .getState()
+                  .push('Pull failed', e instanceof Error ? e.message : String(e)),
+              )
+              .finally(() => setPulling(false))
+          }}
+        >
+          {pulling ? 'Pulling…' : 'Pull from genudo'}
         </button>
         <button
           type="button"

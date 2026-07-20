@@ -543,6 +543,17 @@ export interface CoreApi {
   /** Real round trip to the n8n API — a saved key that 401s is otherwise only
    *  discovered mid-conversation by an agent. */
   'workspace.n8n.test': { in: void; out: { ok: boolean; detail: string } }
+  /** Pull a client's LIVE pipeline config off the genudo platform into the vault.
+   *  `preview: true` plans without writing, so the user sees it land first. */
+  'clients.pull': {
+    in: { client: string; identity: Identity; preview?: boolean }
+    out: {
+      pipelines: { id: number; name: string; slug: string; stages: number }[]
+      files: string[]
+      warnings: string[]
+      written: boolean
+    }
+  }
   'workspace.skills.status': {
     in: void
     out: {

@@ -13,7 +13,7 @@
 - **Pinned n8n-mcp version: `2.65.1`.** Exact string, one place (`N8N_MCP_VERSION`).
 - **Install always uses `--omit=optional`.** n8n-mcp's only optional dep is `better-sqlite3`, a native module whose ABI will not match Electron's. Omitting forces the pure-WASM `sql.js` path. Non-negotiable.
 - **Never gate stdio injection on an advertised capability.** The Claude adapter reports `mcpCapabilities: {http, sse}` — no stdio — yet honours stdio. Verified 2026-07-20.
-- **Resolve n8n-mcp via its main entry, never `<pkg>/package.json`.** Its `exports` map is restricted and the `package.json` resolve throws. Use `join(dirname(require.resolve('n8n-mcp')), 'mcp/stdio-wrapper.js')`.
+- **Never use `require.resolve` for n8n-mcp — CONSTRUCT the path.** Two independent reasons: (a) the package restricts its `exports` map, so `require.resolve('n8n-mcp/package.json')` throws; (b) it is installed into `<userData>/mcp/n8n-mcp/node_modules/`, which is outside every module-resolution root the core host has, so even `require.resolve('n8n-mcp')` would throw MODULE_NOT_FOUND. The only correct form is `join(mcpInstallDir('n8n-mcp'), 'node_modules/n8n-mcp/dist/mcp/stdio-wrapper.js')`, returning `null` when it does not exist. *(Corrected during Task 3 — the earlier wording described the spike layout, not the install layout.)*
 - **Secrets:** the n8n API key never enters `process.env`, the vault, a commit, a renderer payload, or a log. Only presence crosses the IPC seam.
 - **Research-dex safety:** nothing in this feature writes to the vault. No `requireAgentOps` guard is needed, and no dex file may change.
 - **Naming:** internal loredex MCP tools use the `vault_*` prefix. This feature adds no MCP tools, so the rule is only a don't-break constraint.

@@ -11,7 +11,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { N8N_SKILLS_PLUGIN, hasPluginInstalled, terminalN8nCommand } from './claude-plugins'
+import { N8N_SKILLS_COMMAND, N8N_SKILLS_PLUGIN, hasPluginInstalled, terminalN8nCommand } from './claude-plugins'
 
 function homeWith(contents: string | null): string {
   const home = mkdtempSync(join(tmpdir(), 'loredex-claude-home-'))
@@ -49,6 +49,24 @@ describe('hasPluginInstalled', () => {
   it('fails closed on a malformed registry rather than throwing', () => {
     expect(hasPluginInstalled(N8N_SKILLS_PLUGIN, homeWith('{not json'))).toBe(false)
     expect(hasPluginInstalled(N8N_SKILLS_PLUGIN, homeWith('{"version":2}'))).toBe(false)
+  })
+})
+
+describe('N8N_SKILLS_COMMAND', () => {
+  /**
+   * The repo README's one-liner is wrong: Claude Code parses the argument as
+   * `<plugin>@<marketplace>` and answers `Marketplace "czlonkowski/n8n-skills"
+   * not found`. The marketplace must be added first, under the name from
+   * marketplace.json (`n8n-mcp-skills`), not the GitHub path.
+   */
+  it('adds the marketplace before installing, and installs by marketplace name', () => {
+    const [add, install] = N8N_SKILLS_COMMAND.split('\n')
+    expect(add).toBe('/plugin marketplace add czlonkowski/n8n-skills')
+    expect(install).toBe('/plugin install n8n-mcp-skills@n8n-mcp-skills')
+  })
+
+  it('never uses the README one-liner that fails', () => {
+    expect(N8N_SKILLS_COMMAND).not.toContain('/plugin install czlonkowski/n8n-skills')
   })
 })
 

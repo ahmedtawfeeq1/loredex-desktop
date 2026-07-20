@@ -18,7 +18,18 @@ import { join } from 'node:path'
 import { N8N_MCP_VERSION } from './n8n-install'
 
 export const N8N_SKILLS_PLUGIN = 'n8n-mcp-skills'
-export const N8N_SKILLS_COMMAND = '/plugin install czlonkowski/n8n-skills'
+/**
+ * TWO commands, in order, inside a running `claude` session.
+ *
+ * The repo README's "recommended" one-liner `/plugin install czlonkowski/
+ * n8n-skills` DOES NOT WORK — Claude Code reads the argument as
+ * `<plugin>@<marketplace>`, so it reports `Marketplace "czlonkowski/n8n-skills"
+ * not found`. The marketplace has to be registered first, and its name is
+ * `n8n-mcp-skills` (from the repo's .claude-plugin/marketplace.json), not the
+ * GitHub path. Verified against the live repo 2026-07-20.
+ */
+export const N8N_SKILLS_COMMAND =
+  '/plugin marketplace add czlonkowski/n8n-skills\n/plugin install n8n-mcp-skills@n8n-mcp-skills'
 
 export function hasPluginInstalled(pluginName: string, home: string = homedir()): boolean {
   try {

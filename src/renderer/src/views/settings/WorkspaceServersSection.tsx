@@ -44,6 +44,12 @@ function SetupCard({
           <pre className="ws-setup-cmd" dir="ltr">
             {command}
           </pre>
+          {command.includes('\n') && (
+            <p className="ws-setup-note">
+              Two steps — run them in order inside a <span className="mono">claude</span> session.
+              “Open terminal” types the first.
+            </p>
+          )}
           <div className="ws-setup-actions">
             <Button
               variant="secondary"
@@ -55,7 +61,10 @@ function SetupCard({
                 void useTerminal
                   .getState()
                   .openAt(vaultPath ?? '')
-                  .then(() => useTerminal.getState().typeIntoActive(command))
+                  // a multi-line command (the skills card is two steps) types
+                  // only its FIRST line — we never auto-run a second step, and
+                  // never append a newline: the user presses Enter
+                  .then(() => useTerminal.getState().typeIntoActive(command.split('\n')[0] ?? command))
               }}
             >
               Open terminal

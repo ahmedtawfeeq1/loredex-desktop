@@ -1,6 +1,10 @@
 # Workspace MCP servers & skills — design
 
-**Date:** 2026-07-20 · **Status:** approved (design), pending implementation plan
+**Date:** 2026-07-20 · **Status:** approved; spikes run, two decisions reversed
+
+> **Revision 2** — three spikes were run before planning. They reversed the
+> bundling decision and removed the two largest risks. Every number below is
+> measured on this machine, not estimated. See *Spike results*.
 
 ## Problem
 
@@ -57,17 +61,46 @@ ACP's `McpServer` union includes `McpServerStdio`:
 same way the ACP adapters already do: **`process.execPath` with
 `ELECTRON_RUN_AS_NODE=1`, pointed at the package's resolved `dist` entry.**
 
-n8n-mcp becomes a **bundled dependency** rather than an `npx` invocation. This:
-- removes a network fetch from the session-start path,
-- pins the version (an `npx` floating install can change under us),
-- avoids the Windows `npx.cmd` / `cmd /c` problem entirely (BL-24's lesson),
-- reuses `adapterEntry`'s existing `app.asar` → `app.asar.unpacked` rewrite.
+**n8n-mcp is installed on demand, NOT bundled** (revised — see Spike 1).
+Bundling was the original decision; measurement killed it: the package is
+**105 MB installed**, of which `data/nodes.db` alone is **96 MB**. Current
+installers are ~110–130 MB, so bundling would roughly double all seven release
+assets, every release, for a feature not every user enables.
+
+Instead, the first time n8n is enabled loredex installs it into its **own app-data
+directory** (`<userData>/mcp/n8n-mcp/`, beside `app.db`, so it survives app
+replacement), at a **pinned version**, and spawns the resolved entry directly:
+
+- `npm install n8n-mcp@<pinned> --omit=optional --prefix <userData>/mcp/n8n-mcp`
+- run `dist/mcp/stdio-wrapper.js` under `process.execPath` + `ELECTRON_RUN_AS_NODE=1`
+
+`--omit=optional` is **required, not incidental**: n8n-mcp's only optional
+dependency is `better-sqlite3`, a **native** module. A native build compiled for
+one Node ABI does not load under Electron's — the exact class of failure this
+project already hit with `better-sqlite3` going x86_64. Omitting it forces the
+required pure-WASM `sql.js` path: no compiler on the user's machine, no ABI
+coupling, no Windows build toolchain. Spike 3 proved it is also **faster**.
+
+Because we spawn a resolved path under our own node, `npx` is never involved —
+so the Windows `npx.cmd` / `cmd /c` problem (BL-24) does not arise here at all.
+
+**Resolution gotcha (Spike 1):** n8n-mcp restricts its `exports` map, so
+`require.resolve('n8n-mcp/package.json')` — the trick `adapterEntry` uses for the
+ACP adapters — **throws**. Resolution must go through the main entry:
+`join(dirname(require.resolve('n8n-mcp')), 'mcp/stdio-wrapper.js')`.
 
 Its env, per the upstream docs: `MCP_MODE=stdio`, `LOG_LEVEL=error`,
 `DISABLE_CONSOLE_OUTPUT=true` (all three required to keep debug output off stdout,
 which is the ACP/MCP wire), plus `N8N_API_URL` and `N8N_API_KEY` when configured.
 
 **Provider reach:** all three. This is protocol-level, not Claude-specific.
+
+**Proven (Spike 2).** The Claude ACP adapter accepts an injected stdio server and
+spawns it. Worth recording precisely because `initialize` advertises
+`mcpCapabilities: {http: true, sse: true}` — **stdio is not advertised at all**,
+yet `session/new` honoured it. So capability introspection would have given the
+wrong answer in *both* directions; only the live test settled it. Implementation
+must therefore **not** gate stdio injection on an advertised capability flag.
 
 ### Lane 2 — The API key (Settings, once)
 
@@ -179,16 +212,30 @@ with no spawn.
 - Existing `acp.test.ts` must still pass unchanged: loredex-mcp injection behaviour
   is refactored, not altered.
 
+## Spike results (2026-07-20, this machine)
+
+| # | Question | Result |
+|---|---|---|
+| 1 | Does n8n-mcp run as stdio under plain node, with no API key? | **Yes.** 7 documentation tools, 1113 ms start. Also found: restricted `exports` breaks the `package.json` resolve trick. |
+| 2 | Does the Claude ACP adapter honour an **injected stdio** server? | **Yes.** `session/new` accepted it and the adapter spawned the child (observed in `ps`). stdio is *not* in advertised `mcpCapabilities`. |
+| 3 | Does it work without the native `better-sqlite3`? | **Yes, and faster** — 427 ms start on pure-WASM `sql.js`. `search_nodes("webhook")` returned 9910 chars of real data in **43 ms**, so the 96 MB DB genuinely loads and queries. |
+
+Consequences: bundling is out, `--omit=optional` is mandatory, capability-gating
+is wrong, and Lane 1 is confirmed buildable.
+
 ## Risks
 
-1. **Untested assumption: the Claude ACP adapter honours injected stdio servers.**
-   The type exists in the ACP SDK; that it round-trips through this adapter is not
-   yet proven. **This is the first thing the plan verifies** — a throwaway spike
-   before any UI work, because the whole of Lane 1 rests on it. If it fails, Lane 1
-   falls back to Lane 3 (a `claude mcp add` button) and the design changes shape.
-2. **Bundle size.** n8n-mcp ships a node database of n8n node docs. If it is large
-   enough to hurt the installer, the fallback is `npx n8n-mcp` with the Windows
-   `cmd /c` wrap the loredex lib already implements.
+1. **On-demand install needs a working `npm` at runtime.** This is the risk that
+   replaced the two the spikes retired. A GUI-launched app does not inherit a
+   login shell's PATH — the same root cause as the `spawn npx ENOENT` issue seen
+   earlier in this project. Mitigation: resolve npm explicitly rather than
+   trusting PATH, and treat install failure as a **Lane 3 fallback** — the setup
+   card shows the exact `npm install --prefix` command with an Open-terminal
+   button, which is the pattern the user asked for anyway. Install is therefore
+   never a dead end, only a fallback to a button.
+2. **Disk cost moves from the installer to the user's app-data** — ~154 MB once
+   n8n is enabled. Acceptable because it is opt-in and one-time, but the enable
+   toggle must state the size before downloading, not after.
 3. **Skills are Claude-only.** Codex/Gemini ignore `~/.claude/skills` entirely.
    The UI must say so on the row rather than implying broader reach.
 4. **Windows** remains unverified by the author on all of this, consistent with
@@ -196,7 +243,12 @@ with no spawn.
 
 ## Decisions taken
 
-- **Bundled dependency over `npx`** — determinism and Windows safety.
+- **On-demand install over bundling** (revised) — 96 MB of node docs must not
+  ride in every installer for an opt-in feature.
+- **`--omit=optional`** — forces pure-WASM `sql.js`; no native ABI coupling to
+  Electron, no build toolchain on the user's machine. Measured faster too.
+- **Never gate stdio on advertised capability** — the adapter honours what it
+  does not advertise.
 - **Registry over a second hardcoded server** — loredex-mcp becomes a row.
 - **Key optional** — the 7-tool documentation mode is a legitimate state.
 - **Claude-only skills this round** — user's explicit sequencing.

@@ -78,6 +78,9 @@ export function WorkspaceServersSection(): React.JSX.Element {
   const tools = useWorkspaceMcp((s) => s.tools)
   const skills = useWorkspaceMcp((s) => s.skills)
   const busy = useWorkspaceMcp((s) => s.busy)
+  const saved = useWorkspaceMcp((s) => s.saved)
+  const verifying = useWorkspaceMcp((s) => s.verifying)
+  const error = useWorkspaceMcp((s) => s.error)
   const [url, setUrl] = useState('')
   const [key, setKey] = useState('')
   const [installMsg, setInstallMsg] = useState<string | null>(null)
@@ -215,6 +218,10 @@ export function WorkspaceServersSection(): React.JSX.Element {
         >
           Save n8n settings
         </Button>
+        {/* the button previously cleared the key field with no confirmation, so
+            a successful save was indistinguishable from nothing happening */}
+        {saved && !error && <span className="ws-saved">Saved — key stored in your keychain</span>}
+        {error && <span className="ws-error">{error}</span>}
       </div>
 
       <h3 className="settings-title ws-subtitle">n8n skills (Claude only)</h3>
@@ -243,10 +250,20 @@ export function WorkspaceServersSection(): React.JSX.Element {
       {skills && (
         <SetupCard
           title="n8n MCP for terminal claude"
-          note="Optional — the agent panel does not need this"
           command={skills.terminal.command}
-          done={skills.terminal.installed}
-          onVerify={() => void useWorkspaceMcp.getState().verifySkills()}
+          // null = never checked. The check costs ~12s (claude mcp list
+          // health-checks every configured MCP server), so it is Verify-driven
+          // and this card starts in an honest "unknown" state rather than
+          // claiming "not installed" on no evidence.
+          done={skills.terminal.installed === true}
+          note={
+            skills.terminal.installed === null
+              ? verifying
+                ? 'Checking… (this asks claude to health-check every MCP server)'
+                : 'Not checked yet — press Verify'
+              : 'Not registered with your claude CLI'
+          }
+          onVerify={() => void useWorkspaceMcp.getState().verifyTerminal()}
         />
       )}
     </div>

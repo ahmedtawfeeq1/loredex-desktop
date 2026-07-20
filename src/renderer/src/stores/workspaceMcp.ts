@@ -16,12 +16,18 @@ interface State {
   tools: Record<string, Tools | undefined>
   skills: Skills | null
   busy: boolean
+  /** true briefly after a successful save — the UI had no confirmation at all */
+  saved: boolean
+  /** the slow terminal check is in flight */
+  verifying: boolean
+  error: string | null
   load(): Promise<void>
   setEnabled(id: Row['id'], on: boolean): Promise<void>
   loadTools(id: Row['id']): Promise<void>
   install(): Promise<CoreApi['workspace.mcp.install']['out']>
   saveN8n(url: string | null, key: string | null): Promise<void>
   verifySkills(): Promise<void>
+  verifyTerminal(): Promise<void>
 }
 
 export const useWorkspaceMcp = create<State>((set, get) => ({
@@ -29,18 +35,29 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
   tools: {},
   skills: null,
   busy: false,
+  saved: false,
+  verifying: false,
+  error: null,
 
   async load() {
-    set({ busy: true })
+    set({ busy: true, error: null })
+    // rows FIRST and on their own: they are a pure in-memory read, so the page
+    // must never wait on anything slower to show them. Coupling them to another
+    // fetch via Promise.all made the whole section render empty for as long as
+    // the slowest call took.
     try {
-      const [rows, skills] = await Promise.all([
-        invoke('workspace.mcp.list', undefined),
-        invoke('workspace.skills.status', undefined),
-      ])
-      set({ rows, skills, busy: false })
-      await Promise.all(rows.filter((r) => r.installed).map((r) => get().loadTools(r.id)))
+      const rows = await invoke('workspace.mcp.list', undefined)
+      set({ rows, busy: false })
+      void Promise.all(rows.filter((r) => r.installed).map((r) => get().loadTools(r.id)))
+    } catch (e) {
+      // and a failure must SAY so rather than leaving an empty section that
+      // looks like a UI that does nothing
+      set({ busy: false, error: e instanceof Error ? e.message : String(e) })
+    }
+    try {
+      set({ skills: await invoke('workspace.skills.status', undefined) })
     } catch {
-      set({ busy: false }) // a settings page must never hard-fail on a probe
+      // the skills card is optional chrome — its absence is not a page failure
     }
   },
 
@@ -72,8 +89,29 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
   },
 
   async saveN8n(url, key) {
-    await invoke('workspace.n8n.set', { url, key })
-    await get().load()
+    set({ saved: false, error: null })
+    try {
+      await invoke('workspace.n8n.set', { url, key })
+      set({ saved: true })
+      await get().load()
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
+  /** The SLOW check (~12s: `claude mcp list` health-checks every configured MCP
+   *  server). Only ever runs from the Verify button. */
+  async verifyTerminal() {
+    set({ verifying: true })
+    try {
+      const { installed } = await invoke('workspace.terminal.check', undefined)
+      set((s) => ({
+        verifying: false,
+        skills: s.skills ? { ...s.skills, terminal: { ...s.skills.terminal, installed } } : s.skills,
+      }))
+    } catch {
+      set({ verifying: false })
+    }
   },
 
   async verifySkills() {

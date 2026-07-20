@@ -9832,3 +9832,15 @@ a.button-primary {
   display: flex;
   justify-content: flex-end;
 }
+
+.ws-saved {
+  align-self: center;
+  font-size: 11px;
+  color: var(--ok);
+}
+
+.ws-error {
+  align-self: center;
+  font-size: 11px;
+  color: var(--rust);
+}

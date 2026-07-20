@@ -458,15 +458,21 @@ export function registerCoreHandlers(
       else await setN8nKey(key)
     }
   })
-  ipc.register('workspace.skills.status', async () => ({
+  ipc.register('workspace.skills.status', () => ({
     installed: hasPluginInstalled(N8N_SKILLS_PLUGIN),
     command: N8N_SKILLS_COMMAND,
     plugin: N8N_SKILLS_PLUGIN,
     terminal: {
-      installed: await hasTerminalN8nMcp(),
+      // null = not checked yet. `claude mcp list` health-checks every configured
+      // MCP server (~12s on a populated machine), so it must never sit on the
+      // settings-page load path — the Verify button drives it instead.
+      installed: null,
       // n8nStatus().url is NOT secret; the key is a placeholder in the command
       command: terminalN8nCommand(n8nStatus().url),
     },
+  }))
+  ipc.register('workspace.terminal.check', async () => ({
+    installed: await hasTerminalN8nMcp(),
   }))
   // WP-C: snapshot a pipeline/agent into _versions/<unit>/<stamp>/ (agent-ops).
   // One attributed commit under the write lock; the stamp is minted here (the

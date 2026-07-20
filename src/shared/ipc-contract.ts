@@ -538,6 +538,8 @@ export interface CoreApi {
   /** Presence only — the key itself never crosses this seam. */
   'workspace.n8n.get': { in: void; out: { hasKey: boolean; url: string | null } }
   'workspace.n8n.set': { in: { url?: string | null; key?: string | null }; out: void }
+  /** The slow on-demand half of the skills card — see the note on `terminal`. */
+  'workspace.terminal.check': { in: void; out: { installed: boolean } }
   'workspace.skills.status': {
     in: void
     out: {
@@ -545,8 +547,11 @@ export interface CoreApi {
       command: string
       plugin: string
       /** the `claude mcp add` card for terminal-run claude. `command` carries a
-       *  PLACEHOLDER key, never the stored one — it must not cross this seam. */
-      terminal: { installed: boolean; command: string }
+       *  PLACEHOLDER key, never the stored one — it must not cross this seam.
+       *  `installed` is null until checked: the check shells out to
+       *  `claude mcp list`, which health-checks EVERY configured MCP server and
+       *  takes ~12s, so it runs only on demand (workspace.terminal.check). */
+      terminal: { installed: boolean | null; command: string }
     }
   }
   /** BL-19: before/after for a note's most recent commit — the reader's Changes

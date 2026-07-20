@@ -7,6 +7,33 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-07-20
+
+### Added
+- **Tool rows show their input.** A tool call now displays **what it was asked
+  to do**, not just what came back — ACP has always sent `rawInput`, the panel
+  simply never read it. Expanded rows have **Input** / **Output** sections, and
+  a tool with input but no output yet can be inspected too.
+- **Elapsed time on running tools.** A pending/running row ticks a live counter
+  (`12s` → `4m 05s`), so a long command reads as *working* rather than *stuck*.
+- **Update notice.** The top bar tells you when a newer release exists and links
+  to the download. (Not a true auto-updater: that needs a code-signed app, and
+  these builds are unsigned — a silent-failing updater would be worse.)
+
+### Fixed
+- **Arabic and other non-ASCII tool output renders properly.** MCP servers
+  serializing with Python's `json.dumps` escape non-ASCII by default
+  (`ensure_ascii=True`), so Arabic arrived as `خا…`. JSON output is now
+  decoded (and pretty-printed) before display, and text blocks use `dir="auto"`
+  so right-to-left scripts lay out correctly. Non-JSON output is untouched.
+
+### Changed
+- **Permission modal reads properly.** The proposed diff — the thing you're
+  actually judging — is wider (up to 920px) and taller, with an
+  **expand/collapse** toggle to see the whole change instead of a summary. The
+  *"always allow"* toggle now sits on the decision line beside Allow/Reject
+  rather than floating in its own centered row.
+
 ## [0.9.6] - 2026-07-20
 
 ### Changed

@@ -42,10 +42,15 @@ export type AcpChatItem =
       title: string
       toolKind?: string
       status: string
+      /** BL-14: what the tool was asked to do (rawInput), serialized */
+      input?: string
       /** the adapter's tool output — before/after diffs + text (A2) */
       content?: AcpToolContent[]
       /** files this tool touched — ABSOLUTE paths, relativized before open (A2) */
       locations?: AcpToolLocation[]
+      /** BL-12: ms when the row first appeared — drives the elapsed counter
+       *  while the tool is pending/running (absent on rehydrated history). */
+      startedAt?: number
     }
 
 /** A staged composer attachment (B4): the contract shape plus a display `name`
@@ -946,6 +951,7 @@ if (typeof window !== 'undefined' && window.loredex) {
                       title: e.title ?? i.title,
                       toolKind: e.toolKind ?? i.toolKind,
                       status: e.status ?? i.status,
+                      input: e.input ?? i.input,
                       // sparse-merge: content/locations arrive on the update, not
                       // always the initial call — keep what we had if absent
                       content: e.content ?? i.content,
@@ -965,8 +971,13 @@ if (typeof window !== 'undefined' && window.loredex) {
                   title: e.title ?? 'Tool call',
                   toolKind: e.toolKind,
                   status: e.status ?? 'pending',
+                  input: e.input,
                   content: e.content,
                   locations: e.locations,
+                  // BL-12: when this tool first appeared — the row shows elapsed
+                  // time while it's pending/running, so "working" is visibly
+                  // different from "stuck"
+                  startedAt: Date.now(),
                 },
               ],
             }

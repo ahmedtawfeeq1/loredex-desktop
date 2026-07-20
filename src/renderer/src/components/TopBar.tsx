@@ -11,6 +11,7 @@ import { useApp } from '../stores/app'
 import { effectiveIdentity, useIdentity } from '../stores/identity'
 import { useSearch } from '../stores/search'
 import { dotTone, useSync } from '../stores/sync'
+import { useUpdateCheck } from '../stores/updateCheck'
 import { useSettingsTab } from '../stores/settingsTab'
 import { useTerminal } from '../stores/terminal'
 
@@ -69,10 +70,19 @@ export function TopBar(): React.JSX.Element {
   const terminalDock = useTerminal((s) => s.dock)
   const agentOpen = useAgentPanel((s) => s.open)
   const pendingPermissions = useAgentPanel((s) => s.pendingPermissions)
+  // BL-11: one check per launch; silent when up to date / offline
+  const update = useUpdateCheck((s) => s.available)
+  const updateUrl = useUpdateCheck((s) => s.url)
+  const updateDismissed = useUpdateCheck((s) => s.dismissed)
+  const checkUpdate = useUpdateCheck((s) => s.check)
 
   useEffect(() => {
     if (!health) void loadSync()
   }, [health, loadSync])
+
+  useEffect(() => {
+    void checkUpdate()
+  }, [checkUpdate])
 
   const tone = dotTone(health)
   const last = health ? (health.lastPush ?? health.lastPull ?? null) : null
@@ -141,6 +151,31 @@ export function TopBar(): React.JSX.Element {
           )}
         </button>
         <span className="topbar-sep" aria-hidden="true" />
+        {update && !updateDismissed && (
+          // BL-11: the app is unsigned, so no auto-updater on macOS — tell the
+          // user a release exists and link to it. Opens in the default browser
+          // (main intercepts external navigation via shell.openExternal).
+          <span className="update-pill">
+            <a
+              className="update-pill-link"
+              href={updateUrl}
+              target="_blank"
+              rel="noreferrer"
+              title={`Loredex ${update} is available — open the download page`}
+            >
+              ↑ {update} available
+            </a>
+            <button
+              type="button"
+              className="update-pill-x"
+              title="Dismiss"
+              aria-label="Dismiss update notice"
+              onClick={() => useUpdateCheck.getState().dismiss()}
+            >
+              ×
+            </button>
+          </span>
+        )}
         {unpushed > 0 && (
           <button
             type="button"

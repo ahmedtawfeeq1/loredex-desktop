@@ -8,6 +8,7 @@
  * ACP path (vault.relativize) and opens the note in the reader, scrolling to
  * the edited text. Tokens only, 1px hairlines, no gradients (design law).
  */
+import { useEffect, useState } from 'react'
 import { invoke } from '../api'
 import type { AcpChatItem } from '../stores/agentPanel'
 import { useReader } from '../stores/reader'
@@ -26,6 +27,55 @@ const TOOL_CHIP: Record<string, { glyph: string; label: string; cls: string }> =
   in_progress: { glyph: '▸', label: 'running', cls: 'is-ok' },
   completed: { glyph: '✓', label: 'done', cls: 'is-ok' },
   failed: { glyph: '✕', label: 'failed', cls: 'is-err' },
+}
+
+/** A tool that hasn't reached a terminal state is still in flight. */
+const IN_FLIGHT = new Set(['pending', 'in_progress'])
+
+/**
+ * BL-15: MCP servers commonly serialize their JSON result with Python's
+ * `json.dumps`, whose `ensure_ascii=True` default turns every non-ASCII
+ * character into a `\uXXXX` escape — so Arabic/CJK output arrived as
+ * `خا...` and we rendered that literally.
+ *
+ * Round-tripping through JSON.parse → JSON.stringify decodes those escapes
+ * (JS does NOT escape non-ASCII on the way out) and pretty-prints as a bonus.
+ * Anything that isn't JSON is returned untouched — never mangle plain output.
+ */
+function prettyJson(text: string): string {
+  const t = text.trim()
+  if (!(t.startsWith('{') || t.startsWith('['))) return text
+  try {
+    return JSON.stringify(JSON.parse(t), null, 2)
+  } catch {
+    return text // not valid JSON — show exactly what the tool returned
+  }
+}
+
+/** `12s` · `4m 05s` · `1h 02m` — compact, monospace-friendly. */
+function formatElapsed(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  if (s < 60) return `${s}s`
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ${String(s % 60).padStart(2, '0')}s`
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
+}
+
+/**
+ * BL-12: live elapsed time for a tool that is still pending/running, so a long
+ * command reads as *working* rather than *stuck*. Ticks once a second and only
+ * while in flight — a finished row costs no timer. Returns null when there is
+ * nothing honest to show (terminal status, or history with no start time).
+ */
+function useElapsed(startedAt: number | undefined, inFlight: boolean): string | null {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!inFlight || startedAt === undefined) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [inFlight, startedAt])
+  if (!inFlight || startedAt === undefined) return null
+  return formatElapsed(now - startedAt)
 }
 
 /** A file the tool touched — from a diff's `.path` and/or a location. `needle`
@@ -134,16 +184,24 @@ function FileRefButton({ file }: { file: FileRef }): React.JSX.Element {
 
 export function ToolCallRow({ item }: { item: ToolItem }): React.JSX.Element {
   const chip = TOOL_CHIP[item.status] ?? TOOL_CHIP.pending
+  const elapsed = useElapsed(item.startedAt, IN_FLIGHT.has(item.status))
   const diffs = (item.content ?? []).filter((c): c is ToolDiffContent => c.kind === 'diff')
   const texts = (item.content ?? []).filter((c): c is ToolTextContent => c.kind === 'text')
   const refs = collectRefs(item)
-  const expandable = diffs.length > 0 || texts.length > 0 || refs.length > 0
+  // BL-14: an input alone is worth expanding for — a tool with no output yet
+  // (pending/running) can now still be inspected
+  const expandable = diffs.length > 0 || texts.length > 0 || refs.length > 0 || Boolean(item.input)
 
   const line = (
     <>
       <span className={`agent-state-chip ${chip.cls}`}>
         {chip.glyph} {chip.label}
       </span>
+      {elapsed && (
+        <span className="agent-tool-elapsed" title="Time since this tool started">
+          {elapsed}
+        </span>
+      )}
       {item.title}
     </>
   )
@@ -163,14 +221,28 @@ export function ToolCallRow({ item }: { item: ToolItem }): React.JSX.Element {
         {line}
       </summary>
       <div className="agent-tool-body">
+        {item.input && (
+          // BL-14: what the tool was ASKED to do. The protocol always sent this
+          // (ToolCall.rawInput); the row just never read it.
+          <>
+            <div className="agent-tool-section">Input</div>
+            <pre className="agent-tool-text" dir="auto">
+              {item.input}
+            </pre>
+          </>
+        )}
+        {(diffs.length > 0 || texts.length > 0) && item.input && (
+          <div className="agent-tool-section">Output</div>
+        )}
         {diffs.map((d, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: tool content is positional, append-only
           <ToolDiff key={i} diff={d} />
         ))}
         {texts.map((t, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: tool content is positional, append-only
-          <pre key={i} className="agent-tool-text">
-            {t.text}
+          // dir="auto" so Arabic/Hebrew output renders right-to-left per line
+          <pre key={i} className="agent-tool-text" dir="auto">
+            {prettyJson(t.text)}
           </pre>
         ))}
         {refs.length > 0 && (

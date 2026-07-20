@@ -758,6 +758,9 @@ export type CoreEvent =
       title?: string
       toolKind?: string
       status?: 'pending' | 'in_progress' | 'completed' | 'failed'
+      /** BL-14: what the tool was ASKED to do (ToolCall.rawInput), serialized
+       *  and length-capped — the row used to show only the output. */
+      input?: string
       /** the adapter's tool output — diffs + text (terminal/other dropped) */
       content?: AcpToolContent[]
       /** files this tool touched — ABSOLUTE paths (relativize to open) */

@@ -701,6 +701,30 @@ function mapToolContent(
   return out.length ? out : undefined
 }
 
+/** A rawInput can carry a whole file body — bound what crosses the seam. */
+const TOOL_INPUT_MAX = 4000
+
+/**
+ * BL-14: ToolCall.rawInput → a readable string for the row's Input section.
+ * The protocol has always sent this; the panel simply never read it, which is
+ * why a tool row showed its output but never what it was *asked* to do.
+ *
+ * Re-serialized with JSON.stringify rather than passing the adapter's own text
+ * through: JS does not \u-escape non-ASCII, so Arabic/CJK arrive as real
+ * characters instead of `خا…`.
+ */
+function mapToolInput(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null) return undefined
+  let text: string
+  try {
+    text = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2)
+  } catch {
+    return undefined // circular / unserializable — never throw mid-map
+  }
+  if (!text || text === '{}' || text === '""') return undefined
+  return text.length > TOOL_INPUT_MAX ? `${text.slice(0, TOOL_INPUT_MAX)}\n… (truncated)` : text
+}
+
 /** ToolCall/ToolCallUpdate.locations → AcpToolLocation[] (ABSOLUTE paths). */
 function mapToolLocations(
   locations: Array<ToolCallLocation> | null | undefined,
@@ -818,6 +842,7 @@ export function mapUpdate(sessionId: string, update: SessionNotification['update
     case 'tool_call_update': {
       const content = mapToolContent(update.content)
       const locations = mapToolLocations(update.locations)
+      const input = mapToolInput(update.rawInput)
       return {
         act: 'event',
         event: {
@@ -827,6 +852,7 @@ export function mapUpdate(sessionId: string, update: SessionNotification['update
           title: update.title ?? undefined,
           toolKind: update.kind ?? undefined,
           status: update.status ?? undefined,
+          ...(input ? { input } : {}),
           ...(content ? { content } : {}),
           ...(locations ? { locations } : {}),
         },

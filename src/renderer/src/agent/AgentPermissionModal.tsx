@@ -29,12 +29,15 @@ export function AgentPermissionModal(): React.JSX.Element | null {
   const permission = useAgentPanel((s) => s.permission)
   const sessions = useAgentPanel((s) => s.sessions)
   const [remember, setRemember] = useState(false)
+  // BL-13: the diff starts tall-but-capped; expand shows the whole thing
+  const [diffOpen, setDiffOpen] = useState(false)
   // the toggle only makes sense with a client scope AND a tool kind (the rule key)
   const canRemember = Boolean(permission?.clientSlug && permission?.toolKind)
 
   // a fresh request resets the toggle (never carries a remember across requests)
   useEffect(() => {
     setRemember(false)
+    setDiffOpen(false)
   }, [permission?.requestId])
 
   // Esc rejects; ⌘⏎ picks the first allow_once (mirrors Modal.tsx keys).
@@ -116,28 +119,44 @@ export function AgentPermissionModal(): React.JSX.Element | null {
           </span>
         </div>
         {diffs.length > 0 && (
-          <div className="modal-row agent-perm-diff">
-            <span className="modal-label">Proposed change</span>
+          // BL-13: the diff is the thing you're actually judging — it gets the
+          // room, and expands to full height when a summary isn't enough.
+          <div className={`modal-row agent-perm-diff${diffOpen ? ' is-expanded' : ''}`}>
+            <span className="modal-label agent-perm-diff-head">
+              Proposed change
+              <button
+                type="button"
+                className="agent-perm-diff-toggle"
+                aria-expanded={diffOpen}
+                title={diffOpen ? 'Collapse the diff' : 'Expand to see the whole diff'}
+                onClick={() => setDiffOpen(!diffOpen)}
+              >
+                {diffOpen ? '▾ collapse' : '▸ expand'}
+              </button>
+            </span>
             {diffs.map((d, i) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: diff content is positional, append-only
               <ToolDiff key={i} diff={d} />
             ))}
           </div>
         )}
-        {canRemember && (
-          <label className="modal-row agent-perm-remember">
-            <input
-              type="checkbox"
-              role="switch"
-              checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
-            />
-            <span>
-              Always allow <b>{permission.toolKind}</b> for <b>{permission.clientSlug}</b>
-            </span>
-          </label>
-        )}
         <div className="modal-footer agent-perm-actions">
+          {/* BL-13: the always-allow toggle belongs ON the decision line, not
+              floating in its own centered row above the buttons. */}
+          {canRemember && (
+            <label className="agent-perm-remember">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              <span>
+                Always allow <b>{permission.toolKind}</b> for <b>{permission.clientSlug}</b>
+              </span>
+            </label>
+          )}
+          <span className="agent-perm-actions-spacer" />
           {permission.options.map((o, i) => (
             <Button
               key={o.optionId}

@@ -288,6 +288,87 @@ your inline height wins.
 
 ---
 
+## BL-11 — In-app update check
+
+**Status:** done (v0.9.7) · **Area:** top bar · **Size:** S
+
+**Why not a real auto-updater.** electron-updater/Squirrel.Mac requires a
+**code-signed** bundle; these builds are unsigned, so auto-update would silently
+fail on macOS — the primary platform. Shipping that is worse than nothing.
+
+**Shipped.** `stores/updateCheck.ts` asks the GitHub releases API for the latest
+tag once per launch, compares it to `__APP_VERSION__`, and shows a dismissible
+top-bar pill linking to the download. Read-only, best-effort — any
+network/API/rate-limit failure shows nothing. Version compare is **numeric**
+(`0.9.10 > 0.9.9`) and treats a release as newer than its own pre-release, never
+the reverse.
+
+---
+
+## BL-12 — Elapsed time on pending/running tools
+
+**Status:** done (v0.9.7) · **Area:** agent panel · **Size:** S
+
+**Symptom.** A tool row sat on `· pending` with no way to tell *working* from
+*stuck*.
+
+**Shipped.** Tool rows record `startedAt`; a non-terminal row shows a live
+counter (`12s` → `4m 05s` → `1h 02m`), ticking once a second and only while in
+flight. Terminal rows cost no timer.
+
+---
+
+## BL-13 — Permission modal: diff room, expand, and the toggle on the decision line
+
+**Status:** done (v0.9.7) · **Area:** agent panel · **Size:** S
+
+**Symptom.** The proposed diff — the thing you're actually judging — was a small
+capped box; the *always allow* checkbox floated in its own centered row above the
+buttons; there was no way to see the whole diff.
+
+**Shipped.** Modal widened to `min(920px, 92vw)`; diff preview raised to `60vh`
+with an **expand/collapse** toggle that lifts the cap entirely; the always-allow
+toggle now rides the footer beside Allow/Reject.
+
+---
+
+## BL-14 — Tool rows showed output but never the input
+
+**Status:** done (v0.9.7) · **Area:** agent panel / core · **Size:** S
+
+**Symptom.** A tool row showed what came back but never what the tool was *asked*
+to do.
+
+**Cause.** ACP has always sent `ToolCall.rawInput` — `mapUpdate` in
+`src/core/acp.ts` simply never read it, so the input was dropped at the core
+seam and could not reach the UI.
+
+**Shipped.** `mapToolInput` serializes `rawInput` (length-capped at 4000 chars),
+it rides the `acp.tool` event and sparse-merges like every other field, and the
+expanded row renders **Input** / **Output** sections. A tool with input but no
+output yet is now expandable too.
+
+---
+
+## BL-15 — Arabic (and any non-ASCII) tool output rendered as `\uXXXX`
+
+**Status:** done (v0.9.7) · **Area:** agent panel · **Size:** S
+
+**Symptom.** Arabic in a tool result displayed as
+`خاصية` instead of `خاصية`.
+
+**Cause — not ours.** MCP servers commonly serialize with Python's
+`json.dumps`, whose **`ensure_ascii=True` default** escapes every non-ASCII
+character. We received escaped text and rendered it faithfully.
+
+**Shipped.** Tool text that parses as JSON is round-tripped through
+`JSON.parse` → `JSON.stringify` — JS does *not* escape non-ASCII on output, so
+the escapes decode to real characters (and it pretty-prints as a bonus).
+Non-JSON output is passed through untouched. Text blocks also carry `dir="auto"`
+so RTL scripts lay out correctly.
+
+---
+
 ## Notes
 
 - BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1

@@ -294,7 +294,9 @@ describe('event routing — tool upsert (ordering law)', () => {
       toolKind: 'read',
       status: 'pending',
     })
-    expect(items('s1')).toEqual([
+    // toMatchObject, not toEqual: a tool row also carries BL-12 `startedAt`
+    // (non-deterministic) and BL-14 `input` — the ordering law is what's asserted
+    expect(items('s1')).toMatchObject([
       { type: 'agent', text: 'reading ' },
       { type: 'tool', toolCallId: 't1', title: 'Read README', toolKind: 'read', status: 'pending' },
     ])
@@ -304,16 +306,34 @@ describe('event routing — tool upsert (ordering law)', () => {
     useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
     emit({ kind: 'acp.tool', sessionId: 's1', toolCallId: 't1', title: 'Read README', status: 'pending' })
     emit({ kind: 'acp.tool', sessionId: 's1', toolCallId: 't1', status: 'completed' })
-    expect(items('s1')).toEqual([
-      { type: 'tool', toolCallId: 't1', title: 'Read README', toolKind: undefined, status: 'completed' },
+    expect(items('s1')).toMatchObject([
+      { type: 'tool', toolCallId: 't1', title: 'Read README', status: 'completed' },
     ])
+    expect(items('s1')).toHaveLength(1) // updated in place, not appended
   })
 
   it('an update for an unseen toolCallId pushes a row with defaults', () => {
     useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
     emit({ kind: 'acp.tool', sessionId: 's1', toolCallId: 't9' })
-    expect(items('s1')).toEqual([
-      { type: 'tool', toolCallId: 't9', title: 'Tool call', toolKind: undefined, status: 'pending' },
+    expect(items('s1')).toMatchObject([
+      { type: 'tool', toolCallId: 't9', title: 'Tool call', status: 'pending' },
+    ])
+  })
+
+  it('BL-14: rawInput rides through and sparse-merges like the other fields', () => {
+    useAgentPanel.setState({ sessions: [session('s1')], activeId: 's1' })
+    emit({
+      kind: 'acp.tool',
+      sessionId: 's1',
+      toolCallId: 't1',
+      title: 'Write plan.md',
+      input: '{\n  "path": "plan.md"\n}',
+      status: 'pending',
+    })
+    // a later update with no input must KEEP it (sparse-merge)
+    emit({ kind: 'acp.tool', sessionId: 's1', toolCallId: 't1', status: 'completed' })
+    expect(items('s1')).toMatchObject([
+      { type: 'tool', input: '{\n  "path": "plan.md"\n}', status: 'completed' },
     ])
   })
 })

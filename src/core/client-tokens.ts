@@ -67,14 +67,33 @@ export async function keychainDelete(service: string, account: string): Promise<
   }
 }
 
-/** Read an AES-256-GCM JSON map file (the non-darwin secret fallback). */
+/**
+ * Read an AES-256-GCM JSON map file (the non-darwin secret fallback).
+ *
+ * BL-22: "absent" and "present but unreadable" are NOT the same answer. This
+ * used to return `{}` for both, and every writer here is read-modify-write — so
+ * one failed decrypt made the whole map look empty and the next save overwrote
+ * the real (still-encrypted) contents with a single entry. That is silent,
+ * permanent loss of every stored secret.
+ *
+ * The key is `scrypt(hostname + username)`, so a machine rename or a roamed
+ * profile is enough to break the decrypt. Now it throws: the caller surfaces an
+ * error and nothing overwrites the file.
+ */
 export function readEncMap(file: string): Record<string, string> {
+  if (!existsSync(file)) return {}
+  const plain = decryptCredString(readFileSync(file))
+  if (plain === null) {
+    throw new Error(
+      `stored credentials at ${file} could not be decrypted on this machine — ` +
+        'they are keyed to the hostname and user account that saved them. ' +
+        'Nothing was overwritten; move the file aside to start fresh.',
+    )
+  }
   try {
-    if (!existsSync(file)) return {}
-    const plain = decryptCredString(readFileSync(file))
-    return plain ? (JSON.parse(plain) as Record<string, string>) : {}
+    return JSON.parse(plain) as Record<string, string>
   } catch {
-    return {}
+    return {} // decrypted fine but isn't a map — an empty store, safe to rewrite
   }
 }
 

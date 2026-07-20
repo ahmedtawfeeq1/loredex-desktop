@@ -268,11 +268,25 @@ export async function restartMcpServer(
   return bootMcpServer(opts)
 }
 
-/** Clean shutdown: close the listener and remove the discovery file. */
+/**
+ * Clean shutdown: close the listener and remove the discovery file.
+ *
+ * BL-21: the removal is guarded on `server` — only a host that actually BOUND
+ * ever wrote the file. A pop-out's core loses the race for the fixed port
+ * (state 'port-conflict', nothing written), and it used to delete the file on
+ * close anyway. That is the MAIN window's file, and the discovery file is the
+ * only way a secondary host reaches the loredex MCP — so closing one pop-out
+ * silently stripped MCP tools from every pop-out opened afterwards.
+ */
 export async function stopMcpServer(): Promise<void> {
   const server = http
   http = null
-  if (server) await new Promise<void>((resolve) => server.close(() => resolve()))
+  if (!server) {
+    // never bound → never wrote → not ours to delete
+    status = { ...status, state: 'stopped', port: null, discoveryPath: null }
+    return
+  }
+  await new Promise<void>((resolve) => server.close(() => resolve()))
   removeDiscovery(discoveryDirInUse)
   status = { ...status, state: 'stopped', port: null, discoveryPath: null }
 }

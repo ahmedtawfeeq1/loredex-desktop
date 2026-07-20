@@ -7,6 +7,26 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-07-20
+
+### Fixed
+- **"Chat Here" stopped working after the first chat.** It was hitting the
+  4-session limit and failing *silently* — the picker just collapsed. Failures
+  now say what went wrong, and the limit is 8 (it is per window, so each pop-out
+  gets its own).
+- **The second pop-out lost its loredex MCP tools.** Closing any pop-out deleted
+  the discovery file that secondary windows use to reach the MCP host — even
+  though that pop-out never wrote it. Every pop-out opened afterwards came up
+  without tools. (Closing the *main* window while pop-outs are alive still ends
+  their MCP; that needs real port brokering and is tracked.)
+- **Saved client credentials could disappear (Windows).** The credential store
+  read an undecryptable file as an *empty* one, and since every save is
+  read-modify-write, the next save overwrote the real contents. It now refuses to
+  read what it cannot decrypt instead of quietly discarding it, and the
+  non-secret metadata (label, username, url, note) moved to the app database.
+  Existing credentials migrate on first read; secrets stay in the OS keychain on
+  macOS and the encrypted file elsewhere.
+
 ## [0.9.8] - 2026-07-20
 
 ### Added

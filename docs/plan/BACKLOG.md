@@ -442,6 +442,82 @@ dexes — no `requireAgentOps` guard needed, and nothing is written.
 
 ---
 
+## BL-20 — "Chat Here" does nothing after the first time
+
+**Status:** done (v0.9.9) · **Area:** clients → agent panel · **Size:** S
+
+**Symptom.** Chat Here works once. After that, pressing it opens the provider
+picker, and picking any provider just collapses the picker — no chat, no error,
+no clue.
+
+**Cause.** Two silent `catch {}` blocks over the only failing step. `acp.start`
+throws `agent session limit reached (4)` once four sessions are alive, and
+`openHere` swallowed it ("the panel stays open" was the intent). `chatHere` in
+ClientPage swallowed its own rewire/dirAbs failures the same way. Nothing ever
+reached the user, so a hit cap was indistinguishable from a dead button.
+
+**Shipped.** Both catches now push a toast naming the actual failure, with
+"close a session and try again" appended when it is the cap. The cap itself went
+**4 → 8**: it is per core host, and a fleet operator with several clients in
+flight hits four quickly. (Pop-outs fork their own host, so each gets its own
+budget of 8.)
+
+---
+
+## BL-21 — The second pop-out has no loredex MCP
+
+**Status:** done (v0.9.9) · **Area:** MCP host · **Size:** S
+
+**Symptom.** Pop out a conversation: MCP tools work. Pop out another one: no MCP.
+
+**Cause.** The MCP host binds one fixed port. The first window's core wins it and
+writes `~/.loredex/desktop.json`; a pop-out's core loses the bind and instead
+reads that file to reach the winner's host. But `stopMcpServer` called
+`removeDiscovery` **unconditionally** — including on a core that never bound and
+therefore never wrote it. So closing any pop-out deleted the *main window's*
+discovery file, and every pop-out opened afterwards found nothing to connect to.
+
+**Shipped.** The removal is guarded on having actually bound: a host that never
+listened never wrote the file, so it is not that host's to delete. Regression
+test drives a losing boot + shutdown and asserts the winner's file is byte-identical
+afterwards (it fails without the guard).
+
+**Still open.** Closing the MAIN window while pop-outs are alive correctly removes
+the file, so those pop-outs lose MCP on their next session start. Fixing that
+properly means brokering the port rather than first-come-first-served — deferred.
+
+---
+
+## BL-22 — Saved client credentials disappear (Windows)
+
+**Status:** done (v0.9.9) · **Area:** clients → credentials · **Size:** M
+
+**Symptom.** Add a credential, open another client, come back — it is gone.
+Reported on Windows; macOS unaffected.
+
+**Cause — a read-modify-write over a read that lies.** `readEncMap` returned `{}`
+for BOTH "no file" and "file present but would not decrypt". Every writer in the
+store is read-modify-write, so a single failed decrypt made the map look empty
+and the next save **overwrote the real encrypted contents** with one entry. The
+key is `scrypt(hostname + username)`, so a machine rename or a roamed Windows
+profile is enough to trigger it. macOS escaped the worst of it because secrets
+go to the Keychain there — only the metadata index shared the file.
+
+**Shipped, two parts.**
+1. `readEncMap` now distinguishes the two cases: absent → `{}`, present but
+   undecryptable → **throws**, naming the file and saying nothing was
+   overwritten. Loud beats silent loss.
+2. The metadata index (label, username, url, note — **never** a secret) moved out
+   of that file into **app.db**, the same durable SQLite store every other
+   setting uses. It was never secret, so it never needed the fragile crypto.
+   Reads fall back to the old file when no db is open, and adopt a pre-BL-22
+   file's entries on first touch, so existing credentials migrate forward.
+
+Only the secret still needs platform crypto: Keychain on macOS, the encrypted
+file elsewhere.
+
+---
+
 ## Notes
 
 - BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1

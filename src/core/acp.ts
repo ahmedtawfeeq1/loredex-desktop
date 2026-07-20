@@ -74,8 +74,11 @@ export function deriveClientSlug(cwd: string, vaultRoot: string): string | null 
   const segments = rel.split(sep)
   return segments[0] === 'projects' && segments[1] ? segments[1] : null
 }
-/** ponytail ceiling: adapters are heavy — each carries a native CLI child. */
-const MAX_ACP_SESSIONS = 4
+/** ponytail ceiling: adapters are heavy — each carries a native CLI child.
+ *  BL-20: 4 was too tight for a fleet operator with several clients in flight —
+ *  hitting it made Chat Here look broken. The cap is per core host, so a pop-out
+ *  (its own host) gets its own budget. */
+const MAX_ACP_SESSIONS = 8
 
 const CANCELLED: RequestPermissionResponse = { outcome: { outcome: 'cancelled' } }
 

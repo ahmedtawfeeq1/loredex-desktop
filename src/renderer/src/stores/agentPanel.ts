@@ -27,6 +27,7 @@ import {
 import { clampPanelWidth, DEFAULT_PANEL_WIDTH } from '../agent/panelWidth'
 import { invoke, onEvent, openAgentWindow } from '../api'
 import { useApp } from './app'
+import { useToasts } from './toasts'
 
 // re-exported so existing importers (store test) keep their one entry point;
 // the source of truth is agent/panelWidth.ts (clone of listPaneWidth.ts)
@@ -618,9 +619,17 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
           'acp.start',
           cwd === undefined ? { agent } : { agent, cwd },
         ))
-      } catch {
-        // session cap / invalid cwd / no core — the start silently doesn't
-        // happen (terminal splitActive precedent); the panel stays open
+      } catch (e) {
+        // BL-20: this used to be silent, which made "Chat Here does nothing
+        // after the first time" unreadable — the session cap is by far the most
+        // common cause and the user had no way to know. Say what happened.
+        const msg = e instanceof Error ? e.message : String(e)
+        useToasts
+          .getState()
+          .push(
+            'Could not start the chat',
+            /limit reached/i.test(msg) ? `${msg} — close a session and try again.` : msg,
+          )
         return
       }
       if (resetGen !== gen) {

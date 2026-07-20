@@ -22,6 +22,7 @@ import {
   readEncMap,
   writeEncMap,
 } from './client-tokens'
+import { getAppDb, metaGet, metaSet } from './db/index'
 
 const CRED_SERVICE = 'loredex-client-creds'
 const LOGINS_FILE = join(CRED_DIR, 'client-logins')
@@ -32,7 +33,28 @@ const metaKey = (client: string): string => `meta:${client}`
 const secretAccount = (client: string, id: string): string => `${client}/${id}`
 const secretKey = (client: string, id: string): string => `secret:${secretAccount(client, id)}`
 
-function readMeta(client: string): ClientCredential[] {
+/**
+ * BL-22: the metadata index lives in **app.db**, not the encrypted file.
+ *
+ * It used to share the AES-GCM map with the secrets. That map is keyed off
+ * `scrypt(hostname + username)` and `readEncMap` swallows EVERY failure as `{}`
+ * — so a single unreadable/undecryptable read makes a client's whole login list
+ * vanish silently, and the next write persists the empty list over it. On
+ * Windows that is exactly the reported symptom: add a credential, switch client,
+ * come back, gone.
+ *
+ * The metadata is NOT secret (label, username, url, note — never the password),
+ * so it belongs in the same durable store as every other app setting: one
+ * SQLite row, transactional, already proven across all three platforms. Only the
+ * secret still needs platform crypto.
+ *
+ * No db (bare host / unit tests) falls back to the old encrypted file, and a
+ * read still consults the file once so credentials saved by an older build
+ * migrate forward on first touch.
+ */
+const dbKey = (client: string): string => `client-creds:${client}`
+
+function readFileMeta(client: string): ClientCredential[] {
   const raw = readEncMap(LOGINS_FILE)[metaKey(client)]
   if (!raw) return []
   try {
@@ -42,7 +64,29 @@ function readMeta(client: string): ClientCredential[] {
   }
 }
 
+function readMeta(client: string): ClientCredential[] {
+  const db = getAppDb()
+  if (!db) return readFileMeta(client)
+  const raw = metaGet(db, dbKey(client))
+  if (raw !== null) {
+    try {
+      return JSON.parse(raw) as ClientCredential[]
+    } catch {
+      return []
+    }
+  }
+  // never written to the db → adopt whatever the pre-BL-22 file holds
+  const legacy = readFileMeta(client)
+  if (legacy.length > 0) metaSet(db, dbKey(client), JSON.stringify(legacy))
+  return legacy
+}
+
 function writeMeta(client: string, list: ClientCredential[]): void {
+  const db = getAppDb()
+  if (db) {
+    metaSet(db, dbKey(client), list.length === 0 ? null : JSON.stringify(list))
+    return
+  }
   const map = readEncMap(LOGINS_FILE)
   if (list.length === 0) delete map[metaKey(client)]
   else map[metaKey(client)] = JSON.stringify(list)

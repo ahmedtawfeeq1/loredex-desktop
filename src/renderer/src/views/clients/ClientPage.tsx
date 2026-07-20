@@ -409,8 +409,12 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
       }
       const { dir } = await invoke('clients.dirAbs', { client: info.slug })
       await useAgentPanel.getState().openHere(dir, provider)
-    } catch {
-      // no bridge / start failed — best-effort, the panel just doesn't open
+    } catch (e) {
+      // BL-20: rewire/dirAbs failing here used to be silent too, so a failed
+      // Chat Here just collapsed the picker. openHere reports its own failures.
+      useToasts
+        .getState()
+        .push('Could not start the chat', e instanceof Error ? e.message : String(e))
     }
   }
 

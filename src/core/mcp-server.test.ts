@@ -4,7 +4,7 @@
  * token), discovery file lifecycle (chmod 600, cleanup), loud port conflict.
  */
 import { createServer } from 'node:http'
-import { mkdtempSync, rmSync, statSync, readFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -145,6 +145,34 @@ describe('loud-failure port policy', () => {
     expect(existsSync(discoveryPath(discoveryDir))).toBe(false) // no stale discovery
     await new Promise<void>((r) => squatter.close(() => r()))
     // restore the running server for any later suites in this file
+    await bootMcpServer({ port: PORT, token: TOKEN, discoveryDir })
+  })
+
+  it("BL-21: a host that lost the port never deletes the winner's discovery file", async () => {
+    // The real setup is two PROCESSES: the main window's core binds and writes
+    // the file, a pop-out's core loses the port and writes nothing. Here the
+    // module is the pop-out's core: stop it, let a squatter hold the port, and
+    // boot into a conflict so `http` stays null — exactly the pop-out's state.
+    await stopMcpServer()
+    const squatter = createServer()
+    await new Promise<void>((r) => squatter.listen(PORT, '127.0.0.1', () => r()))
+
+    // the winner's file, as the main window's core would have left it
+    const winnerFile = JSON.stringify({ port: PORT, token: 'winner-token' })
+    writeFileSync(discoveryPath(discoveryDir), winnerFile)
+
+    const losing = await bootMcpServer({ port: PORT, token: TOKEN, discoveryDir })
+    expect(losing.state).toBe('port-conflict')
+
+    // the pop-out window closes → its core shuts down
+    await stopMcpServer()
+
+    // the file must still be the WINNER's: before the guard, this shutdown
+    // deleted it and every later pop-out lost its loredex MCP tools
+    expect(existsSync(discoveryPath(discoveryDir))).toBe(true)
+    expect(readFileSync(discoveryPath(discoveryDir), 'utf8')).toBe(winnerFile)
+
+    await new Promise<void>((r) => squatter.close(() => r()))
     await bootMcpServer({ port: PORT, token: TOKEN, discoveryDir })
   })
 })

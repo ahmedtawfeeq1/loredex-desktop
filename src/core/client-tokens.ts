@@ -42,7 +42,16 @@ export async function keychainSet(
   )
 }
 
-/** Read one keychain secret, or null when absent/unreadable. */
+/**
+ * Read one keychain secret, or null when absent/unreadable.
+ *
+ * A miss and a REFUSAL are not the same thing and used to be indistinguishable.
+ * macOS ACLs keychain items to the creating binary, so a rebuilt or differently
+ * signed app (every dev build) can be denied access to an item it stored
+ * earlier — which looked exactly like "no key saved" and sent us hunting in the
+ * wrong place. `security` exits 44 for "item not found"; anything else is a real
+ * failure and gets logged (never the secret, only the account and code).
+ */
 export async function keychainGet(service: string, account: string): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync(
@@ -51,7 +60,11 @@ export async function keychainGet(service: string, account: string): Promise<str
       { timeout: 5000 },
     )
     return stdout.trim() || null
-  } catch {
+  } catch (e) {
+    const code = (e as { code?: number }).code
+    if (code !== 44) {
+      console.warn(`[keychain] read failed for ${service}/${account} — exit ${String(code)}`)
+    }
     return null
   }
 }

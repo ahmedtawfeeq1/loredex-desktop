@@ -10,11 +10,14 @@ import { invoke } from '../api'
 type Row = CoreApi['workspace.mcp.list']['out'][number]
 type Tools = CoreApi['workspace.mcp.tools']['out']
 type Skills = CoreApi['workspace.skills.status']['out']
+type N8n = CoreApi['workspace.n8n.get']['out']
 
 interface State {
   rows: Row[]
   tools: Record<string, Tools | undefined>
   skills: Skills | null
+  /** stored n8n config — presence of a key + the (non-secret) instance URL */
+  n8n: N8n | null
   busy: boolean
   /** true briefly after a successful save — the UI had no confirmation at all */
   saved: boolean
@@ -34,6 +37,7 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
   rows: [],
   tools: {},
   skills: null,
+  n8n: null,
   busy: false,
   saved: false,
   verifying: false,
@@ -46,8 +50,13 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
     // fetch via Promise.all made the whole section render empty for as long as
     // the slowest call took.
     try {
-      const rows = await invoke('workspace.mcp.list', undefined)
-      set({ rows, busy: false })
+      const [rows, n8n] = await Promise.all([
+        invoke('workspace.mcp.list', undefined),
+        invoke('workspace.n8n.get', undefined),
+      ])
+      // both are in-memory reads — pairing them costs nothing and lets the form
+      // show the instance URL that is actually stored
+      set({ rows, n8n, busy: false })
       void Promise.all(rows.filter((r) => r.installed).map((r) => get().loadTools(r.id)))
     } catch (e) {
       // and a failure must SAY so rather than leaving an empty section that

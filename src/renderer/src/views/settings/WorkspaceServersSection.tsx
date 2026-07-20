@@ -80,8 +80,16 @@ export function WorkspaceServersSection(): React.JSX.Element {
   const busy = useWorkspaceMcp((s) => s.busy)
   const saved = useWorkspaceMcp((s) => s.saved)
   const verifying = useWorkspaceMcp((s) => s.verifying)
+  const storedHasKey = useWorkspaceMcp((s) => s.n8n?.hasKey ?? false)
   const error = useWorkspaceMcp((s) => s.error)
   const [url, setUrl] = useState('')
+  // The URL is not a secret and IS persisted, but the field never seeded from
+  // it — so a saved instance looked empty on every visit, exactly like a save
+  // that had failed. Seed once the status arrives, without clobbering typing.
+  const storedUrl = useWorkspaceMcp((s) => s.n8n?.url ?? null)
+  useEffect(() => {
+    if (storedUrl) setUrl((cur) => (cur === '' ? storedUrl : cur))
+  }, [storedUrl])
   const [key, setKey] = useState('')
   const [installMsg, setInstallMsg] = useState<string | null>(null)
   const [installCmd, setInstallCmd] = useState<string | null>(null)
@@ -200,7 +208,9 @@ export function WorkspaceServersSection(): React.JSX.Element {
         <input
           className="settings-input"
           type="password"
-          placeholder={n8n?.mode === 'full' ? 'Stored — paste a new key to replace it' : 'n8n API key'}
+          placeholder={
+            storedHasKey ? 'Stored — paste a new key to replace it' : 'n8n API key (optional)'
+          }
           value={key}
           onChange={(e) => setKey(e.target.value)}
         />

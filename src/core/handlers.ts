@@ -465,16 +465,17 @@ export function registerCoreHandlers(
     plugin: N8N_SKILLS_PLUGIN,
     launch: CLAUDE_LAUNCH_COMMAND,
     terminal: {
-      // null = not checked yet. `claude mcp list` health-checks every configured
-      // MCP server (~12s on a populated machine), so it must never sit on the
-      // settings-page load path — the Verify button drives it instead.
-      installed: null,
+      // now a direct ~/.claude.json read (see hasTerminalN8nMcp), so it is
+      // instant and answers on load — no more "not checked yet" state
+      installed: hasTerminalN8nMcp(engine.getConfig().vaultPath),
       // n8nStatus().url is NOT secret; the key is a placeholder in the command
       command: terminalN8nCommand(n8nStatus().url),
     },
   }))
-  ipc.register('workspace.terminal.check', async () => ({
-    installed: await hasTerminalN8nMcp(),
+  ipc.register('workspace.terminal.check', () => ({
+    // `claude mcp add` registers PROJECT-scoped by default, keyed by the cwd it
+    // ran in — which is the vault, since that is where the card sends the user
+    installed: hasTerminalN8nMcp(engine.getConfig().vaultPath),
   }))
   // WP-C: snapshot a pipeline/agent into _versions/<unit>/<stamp>/ (agent-ops).
   // One attributed commit under the write lock; the stamp is minted here (the

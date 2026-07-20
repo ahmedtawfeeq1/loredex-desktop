@@ -551,10 +551,9 @@ export interface CoreApi {
       launch: string
       /** the `claude mcp add` card for terminal-run claude. `command` carries a
        *  PLACEHOLDER key, never the stored one — it must not cross this seam.
-       *  `installed` is null until checked: the check shells out to
-       *  `claude mcp list`, which health-checks EVERY configured MCP server and
-       *  takes ~12s, so it runs only on demand (workspace.terminal.check). */
-      terminal: { installed: boolean | null; command: string }
+       *  `installed` reads ~/.claude.json directly — instant, and it sees the
+       *  project-scoped entry `claude mcp add` writes by default. */
+      terminal: { installed: boolean; command: string }
     }
   }
   /** BL-19: before/after for a note's most recent commit — the reader's Changes

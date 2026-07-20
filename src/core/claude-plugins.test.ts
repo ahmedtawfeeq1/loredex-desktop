@@ -11,7 +11,13 @@ import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { N8N_SKILLS_COMMAND, N8N_SKILLS_PLUGIN, hasPluginInstalled, terminalN8nCommand } from './claude-plugins'
+import {
+  N8N_SKILLS_COMMAND,
+  N8N_SKILLS_PLUGIN,
+  hasPluginInstalled,
+  hasTerminalN8nMcp,
+  terminalN8nCommand,
+} from './claude-plugins'
 
 function homeWith(contents: string | null): string {
   const home = mkdtempSync(join(tmpdir(), 'loredex-claude-home-'))
@@ -67,6 +73,54 @@ describe('N8N_SKILLS_COMMAND', () => {
 
   it('never uses the README one-liner that fails', () => {
     expect(N8N_SKILLS_COMMAND).not.toContain('/plugin install czlonkowski/n8n-skills')
+  })
+})
+
+describe('hasTerminalN8nMcp', () => {
+  /**
+   * `claude mcp add` defaults to LOCAL (project) scope, so the entry lands under
+   * projects["<cwd>"].mcpServers — NOT the global map. Checking only the global
+   * map (or running `claude mcp list` from the wrong directory) reports "not
+   * installed" for a server that is installed and working. Shape below is taken
+   * from a real ~/.claude.json after a successful add.
+   */
+  function homeWithClaudeJson(contents: string | null): string {
+    const home = mkdtempSync(join(tmpdir(), 'loredex-claude-cfg-'))
+    if (contents !== null) writeFileSync(join(home, '.claude.json'), contents)
+    return home
+  }
+
+  const VAULT = '/Users/x/Business/clients_work'
+
+  it('finds a PROJECT-scoped server under the vault path', () => {
+    const home = homeWithClaudeJson(
+      JSON.stringify({ projects: { [VAULT]: { mcpServers: { 'n8n-mcp': {} } } } }),
+    )
+    expect(hasTerminalN8nMcp(VAULT, home)).toBe(true)
+  })
+
+  it('finds a user-scoped server in the global map', () => {
+    const home = homeWithClaudeJson(JSON.stringify({ mcpServers: { 'n8n-mcp': {} } }))
+    expect(hasTerminalN8nMcp(null, home)).toBe(true)
+  })
+
+  it('does not report a server registered under a DIFFERENT project', () => {
+    const home = homeWithClaudeJson(
+      JSON.stringify({ projects: { '/some/other/dir': { mcpServers: { 'n8n-mcp': {} } } } }),
+    )
+    expect(hasTerminalN8nMcp(VAULT, home)).toBe(false)
+  })
+
+  it('is false when only other servers are registered', () => {
+    const home = homeWithClaudeJson(
+      JSON.stringify({ mcpServers: { atlassian: {}, ticktick: {} }, projects: {} }),
+    )
+    expect(hasTerminalN8nMcp(VAULT, home)).toBe(false)
+  })
+
+  it('fails closed on a missing or malformed config', () => {
+    expect(hasTerminalN8nMcp(VAULT, homeWithClaudeJson(null))).toBe(false)
+    expect(hasTerminalN8nMcp(VAULT, homeWithClaudeJson('{not json'))).toBe(false)
   })
 })
 

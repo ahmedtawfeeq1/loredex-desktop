@@ -11,7 +11,6 @@
  * Every failure path returns FALSE. A false green here would tell the user their
  * skills are active when they are not.
  */
-import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -35,6 +34,9 @@ export const N8N_SKILLS_COMMAND =
  *  claude slash commands, not shell commands — typed at a zsh prompt they just
  *  produce `zsh: no such file or directory: /plugin`. */
 export const CLAUDE_LAUNCH_COMMAND = 'claude'
+
+/** The server name `claude mcp add n8n-mcp …` registers under. */
+export const N8N_MCP_SERVER_NAME = 'n8n-mcp'
 
 export function hasPluginInstalled(pluginName: string, home: string = homedir()): boolean {
   try {
@@ -74,11 +76,37 @@ export function terminalN8nCommand(url: string | null): string {
   ].join(' ')
 }
 
-/** Is n8n-mcp registered with the user's own claude CLI? Fails closed. */
-export async function hasTerminalN8nMcp(): Promise<boolean> {
-  return await new Promise((resolve) => {
-    execFile('claude', ['mcp', 'list'], { timeout: 10_000 }, (err, stdout) => {
-      resolve(!err && stdout.includes('n8n-mcp'))
-    })
-  })
+/**
+ * Is n8n-mcp registered with the user's own claude CLI?
+ *
+ * READS ~/.claude.json directly rather than shelling out to `claude mcp list`.
+ * Three reasons, all learned the hard way:
+ *   1. `claude mcp list` HEALTH-CHECKS every configured server — ~12s on a
+ *      populated machine, and it grows with each server added. This question is
+ *      one file read.
+ *   2. `claude mcp add` defaults to LOCAL (project) scope, so the entry lands in
+ *      `projects["<cwd>"].mcpServers`, not the global map. A `claude mcp list`
+ *      run from anywhere else could never see it — which is exactly what made
+ *      the card spin forever after a successful add.
+ *   3. The core host may not even have `claude` on its PATH (a GUI-launched app
+ *      does not inherit a login shell's PATH).
+ *
+ * `vaultPath` is where the user was told to run the command, so it is the scope
+ * to check; the global map is checked too, for a `--scope user` install.
+ * Fails closed: missing, unreadable or unexpected shape → false.
+ */
+export function hasTerminalN8nMcp(vaultPath?: string | null, home: string = homedir()): boolean {
+  try {
+    const raw = readFileSync(join(home, '.claude.json'), 'utf8')
+    const cfg = JSON.parse(raw) as {
+      mcpServers?: Record<string, unknown>
+      projects?: Record<string, { mcpServers?: Record<string, unknown> }>
+    }
+    if (cfg.mcpServers && N8N_MCP_SERVER_NAME in cfg.mcpServers) return true
+    if (!vaultPath) return false
+    const project = cfg.projects?.[vaultPath]
+    return Boolean(project?.mcpServers && N8N_MCP_SERVER_NAME in project.mcpServers)
+  } catch {
+    return false
+  }
 }

@@ -278,18 +278,8 @@ export function WorkspaceServersSection(): React.JSX.Element {
         <SetupCard
           title="n8n MCP for terminal claude"
           command={skills.terminal.command}
-          // null = never checked. The check costs ~12s (claude mcp list
-          // health-checks every configured MCP server), so it is Verify-driven
-          // and this card starts in an honest "unknown" state rather than
-          // claiming "not installed" on no evidence.
-          done={skills.terminal.installed === true}
-          note={
-            skills.terminal.installed === null
-              ? verifying
-                ? 'Checking… (this asks claude to health-check every MCP server)'
-                : 'Not checked yet — press Verify'
-              : 'Not registered with your claude CLI'
-          }
+          done={skills.terminal.installed}
+          note={verifying ? 'Checking…' : 'Not registered with your claude CLI'}
           onVerify={() => void useWorkspaceMcp.getState().verifyTerminal()}
         />
       )}

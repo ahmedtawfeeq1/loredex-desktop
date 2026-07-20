@@ -540,6 +540,9 @@ export interface CoreApi {
   'workspace.n8n.set': { in: { url?: string | null; key?: string | null }; out: void }
   /** The slow on-demand half of the skills card — see the note on `terminal`. */
   'workspace.terminal.check': { in: void; out: { installed: boolean } }
+  /** Real round trip to the n8n API — a saved key that 401s is otherwise only
+   *  discovered mid-conversation by an agent. */
+  'workspace.n8n.test': { in: void; out: { ok: boolean; detail: string } }
   'workspace.skills.status': {
     in: void
     out: {

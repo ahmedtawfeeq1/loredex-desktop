@@ -66,7 +66,12 @@ export function hasPluginInstalled(pluginName: string, home: string = homedir())
  */
 export function terminalN8nCommand(url: string | null): string {
   return [
-    'claude mcp add n8n-mcp',
+    // --scope user, NOT the default (local/project). A project-scoped entry is
+    // keyed by the cwd it was added in — the vault — and the agent panel's own
+    // sessions run there too, so the adapter would load it ON TOP of the server
+    // loredex already injects: two n8n servers, 48 duplicate tools. User scope
+    // reaches terminal claude anywhere and never collides with our injection.
+    'claude mcp add --scope user n8n-mcp',
     '-e MCP_MODE=stdio',
     '-e LOG_LEVEL=error',
     '-e DISABLE_CONSOLE_OUTPUT=true',

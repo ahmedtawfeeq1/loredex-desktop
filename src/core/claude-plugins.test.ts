@@ -129,10 +129,20 @@ describe('terminalN8nCommand', () => {
     const cmd = terminalN8nCommand('https://n8n.example.com')
     expect(cmd).toContain('<paste-your-n8n-api-key>')
     expect(cmd).toContain('https://n8n.example.com')
-    expect(cmd).toContain('claude mcp add n8n-mcp')
+    expect(cmd).toContain('n8n-mcp')
   })
 
   it('falls back to a url placeholder when none is configured', () => {
     expect(terminalN8nCommand(null)).toContain('<your-n8n-url>')
+  })
+
+  /**
+   * USER scope, not the default. `claude mcp add` defaults to local/project
+   * scope, keyed by the cwd — the vault. The agent panel's sessions run there
+   * too, so the adapter would load that entry ON TOP of the server loredex
+   * already injects: two n8n servers and 48 duplicate tools in one session.
+   */
+  it('registers at USER scope so it cannot duplicate the injected server', () => {
+    expect(terminalN8nCommand('https://n8n.example.com')).toContain('--scope user')
   })
 })

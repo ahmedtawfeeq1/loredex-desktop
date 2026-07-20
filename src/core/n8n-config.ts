@@ -65,3 +65,41 @@ export function n8nEnv(): Record<string, string> {
   }
   return env
 }
+
+/**
+ * Does the stored URL + key actually authenticate against the n8n instance?
+ *
+ * A wrong key is otherwise invisible until an agent tries a tool mid-conversation
+ * and gets AUTHENTICATION_ERROR — which reads as "the feature is broken" rather
+ * than "that credential is wrong". Same principle as the per-client MCP probe:
+ * green must mean a real round trip, not merely that something was saved.
+ *
+ * n8n's public API wants the key in X-N8N-API-KEY. A real key is a JWT
+ * (`eyJ…`); a 40-char hex string is a webhook/other token and will 401.
+ */
+export async function testN8nConnection(): Promise<{ ok: boolean; detail: string }> {
+  if (!apiUrl) return { ok: false, detail: 'No instance URL set' }
+  if (!apiKey) return { ok: false, detail: 'No API key set — documentation tools only' }
+  const base = apiUrl.replace(/\/+$/, '')
+  try {
+    const res = await fetch(`${base}/api/v1/workflows?limit=1`, {
+      headers: { 'X-N8N-API-KEY': apiKey, Accept: 'application/json' },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (res.status === 401 || res.status === 403) {
+      return {
+        ok: false,
+        detail: apiKey.startsWith('eyJ')
+          ? 'Rejected (401) — the key is expired or from another instance'
+          : "Rejected (401) — this does not look like an n8n API key. A real one is a long JWT starting `eyJ`, from n8n → Settings → API.",
+      }
+    }
+    if (!res.ok) return { ok: false, detail: `Instance returned HTTP ${res.status}` }
+    const body = (await res.json()) as { data?: unknown[] }
+    const n = Array.isArray(body.data) ? body.data.length : 0
+    return { ok: true, detail: `Connected — API reachable (${n} workflow${n === 1 ? '' : 's'} visible)` }
+  } catch (e) {
+    // wrong host, DNS, TLS, timeout — all "cannot reach", never a thrown page
+    return { ok: false, detail: e instanceof Error ? e.message.split('\n')[0] : String(e) }
+  }
+}

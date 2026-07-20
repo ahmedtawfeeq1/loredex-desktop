@@ -21,6 +21,9 @@ interface State {
   busy: boolean
   /** true briefly after a successful save — the UI had no confirmation at all */
   saved: boolean
+  /** the real round-trip result: a saved key that 401s must not read as working */
+  test: { ok: boolean; detail: string } | null
+  testing: boolean
   /** the slow terminal check is in flight */
   verifying: boolean
   error: string | null
@@ -29,6 +32,7 @@ interface State {
   loadTools(id: Row['id']): Promise<void>
   install(): Promise<CoreApi['workspace.mcp.install']['out']>
   saveN8n(url: string | null, key: string | null): Promise<void>
+  testN8n(): Promise<void>
   verifySkills(): Promise<void>
   verifyTerminal(): Promise<void>
 }
@@ -40,6 +44,8 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
   n8n: null,
   busy: false,
   saved: false,
+  test: null,
+  testing: false,
   verifying: false,
   error: null,
 
@@ -103,8 +109,20 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
       await invoke('workspace.n8n.set', { url, key })
       set({ saved: true })
       await get().load()
+      // saving is not the same as working — verify immediately rather than let a
+      // wrong key surface later as an agent tool failure mid-conversation
+      await get().testN8n()
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
+  async testN8n() {
+    set({ testing: true, test: null })
+    try {
+      set({ test: await invoke('workspace.n8n.test', undefined), testing: false })
+    } catch (e) {
+      set({ testing: false, test: { ok: false, detail: e instanceof Error ? e.message : String(e) } })
     }
   },
 

@@ -65,7 +65,7 @@ import {
   terminalN8nCommand,
 } from './claude-plugins'
 import { probeStdioTools } from './mcp-tools'
-import { clearN8nKey, n8nEnv, n8nStatus, setN8nKey, setN8nUrl } from './n8n-config'
+import { clearN8nKey, n8nEnv, n8nStatus, setN8nKey, setN8nUrl, testN8nConnection } from './n8n-config'
 import { installN8nMcp, n8nEntryPath, n8nInstallCommand } from './n8n-install'
 import { workspaceServerRows } from './workspace-rows'
 import {
@@ -452,6 +452,7 @@ export function registerCoreHandlers(
     return { ...res, command: n8nInstallCommand() }
   })
   ipc.register('workspace.n8n.get', () => n8nStatus())
+  ipc.register('workspace.n8n.test', () => testN8nConnection())
   ipc.register('workspace.n8n.set', async ({ url, key }) => {
     if (url !== undefined) setN8nUrl(url)
     if (key !== undefined) {

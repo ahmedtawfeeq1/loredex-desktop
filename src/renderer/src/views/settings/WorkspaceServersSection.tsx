@@ -97,6 +97,8 @@ export function WorkspaceServersSection(): React.JSX.Element {
   const saved = useWorkspaceMcp((s) => s.saved)
   const verifying = useWorkspaceMcp((s) => s.verifying)
   const storedHasKey = useWorkspaceMcp((s) => s.n8n?.hasKey ?? false)
+  const test = useWorkspaceMcp((s) => s.test)
+  const testing = useWorkspaceMcp((s) => s.testing)
   const error = useWorkspaceMcp((s) => s.error)
   const [url, setUrl] = useState('')
   // The URL is not a secret and IS persisted, but the field never seeded from
@@ -246,7 +248,17 @@ export function WorkspaceServersSection(): React.JSX.Element {
         </Button>
         {/* the button previously cleared the key field with no confirmation, so
             a successful save was indistinguishable from nothing happening */}
-        {saved && !error && <span className="ws-saved">Saved — key stored in your keychain</span>}
+        <Button
+          variant="secondary"
+          disabled={testing}
+          title="Make a real API call to the n8n instance with the stored key"
+          onClick={() => void useWorkspaceMcp.getState().testN8n()}
+        >
+          {testing ? 'Testing…' : 'Test connection'}
+        </Button>
+        {saved && !error && !test && <span className="ws-saved">Saved to your keychain</span>}
+        {/* a real round trip: green here means the key actually authenticates */}
+        {test && <span className={test.ok ? 'ws-saved' : 'ws-error'}>{test.detail}</span>}
         {error && <span className="ws-error">{error}</span>}
       </div>
 

@@ -226,12 +226,16 @@ interface AgentPanelState {
   /** narrow the visible session list to one provider (or 'all') — A6 */
   setFilter(f: AcpAgent | 'all'): void
   /** open the panel + acp.start + select the new session */
-  openHere(cwd?: string): Promise<void>
+  /** BL-6: `provider` starts this session on a specific agent (the client
+   *  page's Chat Here picker); omitted, it uses the panel's current selection. */
+  openHere(cwd?: string, provider?: AcpAgent): Promise<void>
   /** B2 cross-provider continuation: take the ACTIVE session's conversation and
    *  continue it on `provider` (agent.continue) — a new session bound to the
    *  same transcript, hydrated so the prior thread shows while the target boots.
    *  No active conversation → no-op. */
-  continueIn(provider: AcpAgent): Promise<void>
+  /** BL-5: `atVaultRoot` starts the continued session at the vault root instead
+   *  of the thread's own folder (the where-to-continue choice). */
+  continueIn(provider: AcpAgent, atVaultRoot?: boolean): Promise<void>
   /** B3 pop-out: open the ACTIVE conversation in its OWN standalone window (its
    *  own core host reads the same vault app.db). No active conversation → no-op. */
   popOut(): Promise<void>
@@ -476,6 +480,8 @@ async function startContinuation(
   conversationId: string,
   provider: AcpAgent,
   title: string,
+  /** BL-5: force the vault root instead of the thread's own folder. */
+  atVaultRoot?: boolean,
 ): Promise<void> {
   useAgentPanel.setState({ open: true })
   const gen = resetGen
@@ -485,7 +491,11 @@ async function startContinuation(
   try {
     let sessionId: string
     try {
-      ;({ sessionId } = await invoke('agent.continue', { conversationId, provider }))
+      ;({ sessionId } = await invoke('agent.continue', {
+        conversationId,
+        provider,
+        ...(atVaultRoot ? { atVaultRoot: true } : {}),
+      }))
     } catch {
       // unknown conversation / dead core — the continue silently doesn't happen
       return
@@ -584,11 +594,13 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     set({ filter })
   },
 
-  async openHere(cwd) {
+  async openHere(cwd, provider) {
     set({ open: true }) // optimistic — the panel appears while the start rides
     persist()
     const gen = resetGen
-    const agent = get().agent
+    // BL-6: an explicit provider wins (Chat Here picker); otherwise the panel's
+    // current selection, as before
+    const agent = provider ?? get().agent
     // fast-fail race guard (see pendingSessionEvents): mark a start in flight so
     // a spawn-error acp.session event that beats the ack gets buffered, not
     // dropped — otherwise a missing adapter (gemini ENOENT) strands 'starting'.
@@ -641,13 +653,13 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     }
   },
 
-  async continueIn(provider) {
+  async continueIn(provider, atVaultRoot) {
     const { activeId, sessions } = get()
     const active = sessions.find((v) => v.sessionId === activeId)
     // continuation needs a persisted thread to carry — a no-db session (no
     // conversationId) or no active session has nothing to continue
     if (!active?.conversationId) return
-    await startContinuation(active.conversationId, provider, active.title)
+    await startContinuation(active.conversationId, provider, active.title, atVaultRoot)
   },
 
   async popOut() {

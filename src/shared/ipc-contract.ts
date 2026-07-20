@@ -192,6 +192,10 @@ export interface AcpConvLoad {
   /** WP-A: agent-ops client this thread was started under — null for vault-root
    *  / research threads. */
   clientSlug?: string | null
+  /** BL-5: the folder this thread was started in. Continuing it (provider
+   *  switch / reopen / pop-out) respawns the adapter here so the folder's
+   *  `.mcp.json` servers load again. Null for older threads. */
+  cwd?: string | null
   providers: { provider: AcpAgent; acpSessionId: string | null }[]
   messages: AcpConvMessage[]
 }
@@ -578,7 +582,12 @@ export interface CoreApi {
    *  seeds the rendered transcript onto the first prompt. There is NO protocol
    *  cross-provider session id — the seam replays a client-held transcript.
    *  Unknown / cross-vault conversation → ACP_CONV_UNKNOWN. */
-  'agent.continue': { in: { conversationId: string; provider: AcpAgent }; out: { sessionId: string } }
+  /** `atVaultRoot` forces the vault root instead of the thread's own folder
+   *  (BL-5: the "start at vault root" answer to the where-to-continue prompt). */
+  'agent.continue': {
+    in: { conversationId: string; provider: AcpAgent; atVaultRoot?: boolean }
+    out: { sessionId: string }
+  }
   /** B1 per-provider API-key auth (Settings › AI providers). The key is stored
    *  in the OS keychain (agent-keys) and folded into ONLY the matching adapter's
    *  env at spawn — it never enters process.env, the vault, a commit, a renderer

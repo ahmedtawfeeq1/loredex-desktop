@@ -44,6 +44,20 @@ describe('createConversation + loadConversation', () => {
     d.close()
   })
 
+  it('persists + round-trips the BL-5 working directory', () => {
+    const d = db()
+    const { id } = createConversation(d, 'v1', {
+      agent: 'claude',
+      clientSlug: 'acme_dental',
+      cwd: '/vault/projects/acme_dental',
+    })
+    expect(loadConversation(d, id)!.cwd).toBe('/vault/projects/acme_dental')
+    // a vault-root thread records none — continuation falls back to the root
+    const bare = createConversation(d, 'v1', { agent: 'claude' })
+    expect(loadConversation(d, bare.id)!.cwd).toBeNull()
+    d.close()
+  })
+
   it('persists + round-trips the WP-A client slug (list + load)', () => {
     const d = db()
     const { id } = createConversation(d, 'v1', { agent: 'claude', clientSlug: 'acme_dental' })

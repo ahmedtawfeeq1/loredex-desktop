@@ -20,6 +20,8 @@ import type { TreeNode } from '../../../../shared/types'
 import { invoke, openInNewWindow, openPath } from '../../api'
 import { RailChevron } from '../../components/NavIcon'
 import { humanizeTitle, noteDate } from '../../humanize'
+import { useApp } from '../../stores/app'
+import { useAtlas } from '../../stores/atlas'
 import { useDex } from '../../stores/dex'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
 import { useFileSearch } from '../../stores/fileSearch'
@@ -262,6 +264,21 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
 
 /** Rounded tinted section row (D1): dot solid, label 11px caps, chevron
  *  collapses — the tint inherits to descendants as `--section-color`. */
+/**
+ * BL-9: open a project/client row's own page, chosen by dex type — an
+ * `agent-ops` dex has a client console per project; a research dex has the
+ * project's Atlas lens. Same affordance, right destination for the dex.
+ */
+function openProjectPage(name: string, agentOps: boolean): void {
+  if (agentOps) {
+    useDex.getState().selectClient(name)
+    useApp.getState().setView('clients')
+    return
+  }
+  useApp.getState().setView('atlas')
+  void useAtlas.getState().drillProject(name)
+}
+
 function SectionNode({
   node,
   isProject,
@@ -297,7 +314,14 @@ function SectionNode({
     >
       <button
         type="button"
-        className={sub ? 'tree-section tree-section-sub' : 'tree-section'}
+        className={[
+          'tree-section',
+          sub ? 'tree-section-sub' : '',
+          // BL-9: reserve room so the open-page arrow doesn't sit on the chevron
+          isProject && !sub ? 'tree-section-has-open' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         aria-expanded={!collapsed}
         title={collapsed ? `Expand ${label}` : `Collapse ${label}`}
         onClick={() => useTreeSections.getState().toggle(node.path)}
@@ -325,6 +349,23 @@ function SectionNode({
           <RailChevron dir={collapsed ? 'right' : 'down'} />
         </span>
       </button>
+      {isProject && !sub && (
+        // BL-9: jump from a project/client row to ITS page — which page depends
+        // on the dex type: an agent-ops dex opens the client console, a research
+        // dex opens the project's Atlas lens.
+        <button
+          type="button"
+          className="tree-section-open"
+          title={agentOps ? `Open the ${node.name} client page` : `Open ${node.name} in the Atlas`}
+          aria-label={agentOps ? `Open the ${node.name} client page` : `Open ${node.name} in the Atlas`}
+          onClick={(e) => {
+            e.stopPropagation()
+            openProjectPage(node.name, agentOps)
+          }}
+        >
+          ›
+        </button>
+      )}
       {!collapsed &&
         (node.children && node.children.length > 0 ? (
           <Branch

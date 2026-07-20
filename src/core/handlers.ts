@@ -971,14 +971,17 @@ export function registerCoreHandlers(
   // same conversation, seeded (or natively resumed) from its transcript. Needs
   // the transcript store — acpContinue scope-checks the conversation's vault_id.
   // cwd is the vault root (the only cwd the panel starts sessions with, B0/B1).
-  ipc.register('agent.continue', ({ conversationId, provider }) => {
+  ipc.register('agent.continue', ({ conversationId, provider, atVaultRoot }) => {
     const db = getAppDb()
     const vid = currentVaultId()
     if (!db || !vid) throw ipcError('ACP_CONV_UNKNOWN', 'no conversation store')
     const { sessionId } = acpContinue((e) => ipc.emit(e), {
       conversationId,
       targetProvider: provider,
+      // BL-5: the vault path is only the FALLBACK — acpContinue prefers the
+      // thread's own recorded cwd so its .mcp.json servers load again.
       cwd: engine.getConfig().vaultPath,
+      ...(atVaultRoot ? { atVaultRoot: true } : {}),
       persist: { db, vaultId: vid },
     })
     return { sessionId }

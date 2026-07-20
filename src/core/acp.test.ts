@@ -5,6 +5,9 @@
  * batching and adapter lifecycle are exercised by the dev-app smoke (no live
  * agent in unit tests). Heavy core deps are mocked so the import stays light.
  */
+import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import type { RequestPermissionRequest, SessionNotification } from '@agentclientprotocol/sdk'
 
@@ -23,6 +26,7 @@ import {
   attachmentBlock,
   buildPromptBlocks,
   canLoadSession,
+  continueCwd,
   deriveClientSlug,
   evaluatePermission,
   mapPermissionEvent,
@@ -500,6 +504,33 @@ describe('deriveClientSlug', () => {
   it('returns null for a non-projects subtree (research dex layout)', () => {
     expect(deriveClientSlug(`${vault}/some_project/topic`, vault)).toBeNull()
     expect(deriveClientSlug(`${vault}/projects`, vault)).toBeNull() // no client segment
+  })
+})
+
+// BL-5: continuing a thread must respawn in its own folder, so that folder's
+// .mcp.json servers load again (MCP is discovered at adapter startup).
+describe('continueCwd', () => {
+  const sandbox = realpathSync(mkdtempSync(join(tmpdir(), 'loredex-continue-cwd-')))
+  const vault = join(sandbox, 'vault')
+  const clientDir = join(vault, 'projects', 'acme')
+  mkdirSync(clientDir, { recursive: true })
+
+  it('prefers the thread’s own recorded cwd', () => {
+    expect(continueCwd({ cwd: clientDir, clientSlug: 'acme' }, vault)).toBe(clientDir)
+  })
+  it('derives from the client slug for older threads with no cwd', () => {
+    expect(continueCwd({ cwd: null, clientSlug: 'acme' }, vault)).toBe(clientDir)
+  })
+  it('falls back to the vault root when the recorded folder is gone', () => {
+    expect(continueCwd({ cwd: join(vault, 'projects', 'deleted'), clientSlug: null }, vault)).toBe(
+      vault,
+    )
+  })
+  it('falls back to the vault root when the slug folder is gone', () => {
+    expect(continueCwd({ cwd: null, clientSlug: 'never-existed' }, vault)).toBe(vault)
+  })
+  it('is the vault root for an unscoped thread', () => {
+    expect(continueCwd({}, vault)).toBe(vault)
   })
 })
 

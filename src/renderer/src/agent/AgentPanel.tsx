@@ -12,7 +12,6 @@ import type { AcpAgent, AcpConvSummary, AcpSessionState } from '../../../shared/
 import { invoke, pathForFile } from '../api'
 import { Button } from '../components/Button'
 import {
-  lastUserText,
   useAgentPanel,
   visibleSessions,
   type AcpChatItem,
@@ -42,12 +41,14 @@ const STATE_CHIP: Record<AcpSessionState, { glyph: string; label: string; cls: s
  *  place providers are enumerated for the UI, so a Phase-2 provider (gemini)
  *  is a compile error until listed and then rides the picker automatically
  *  (no literal ['claude','codex'] tuple to forget). */
-const AGENT_META: Record<AcpAgent, { label: string; tag: string }> = {
+/** exported so other surfaces (e.g. the client page's Chat Here picker) name the
+ *  providers exactly the way the panel does — one source of truth. */
+export const AGENT_META: Record<AcpAgent, { label: string; tag: string }> = {
   claude: { label: 'Claude', tag: 'CC' },
   codex: { label: 'Codex', tag: 'CX' },
   gemini: { label: 'Gemini', tag: 'GM' },
 }
-const AGENTS = Object.keys(AGENT_META) as AcpAgent[]
+export const AGENTS = Object.keys(AGENT_META) as AcpAgent[]
 
 /** Small monochrome provider mark (currentColor, theme-safe): Claude = the
  *  Anthropic burst, Codex = the OpenAI knot ring, Gemini = the 4-point spark. */
@@ -330,6 +331,96 @@ function SessionRow({ s, active }: { s: AcpSessionView; active: boolean }): Reac
   )
 }
 
+/**
+ * BL-7: the header chrome as ONE collapsed line. Collapsed it still carries the
+ * live essentials — provider tag, title, ◈ client chip, run state and close —
+ * so nothing you need at a glance is hidden. Expanding reveals every session
+ * row, the provider-switch (CONTINUE IN) controls, and the pop-out note.
+ */
+function SessionStrip({
+  sessions,
+  activeId,
+  active,
+  popout,
+}: {
+  sessions: AcpSessionView[]
+  activeId: string | null
+  active: AcpSessionView | null
+  popout: boolean
+}): React.JSX.Element | null {
+  const [open, setOpen] = useState(false)
+  if (sessions.length === 0 && !popout) return null
+  const chip = active ? STATE_CHIP[active.state] : null
+  return (
+    <div className="agent-strip">
+      <div className="agent-strip-line">
+        <button
+          type="button"
+          className="agent-strip-toggle"
+          aria-expanded={open}
+          title={open ? 'Hide session details' : 'Show all sessions and provider switch'}
+          aria-label={open ? 'Hide session details' : 'Show all sessions and provider switch'}
+          onClick={() => setOpen(!open)}
+        >
+          {open ? '▾' : '▸'}
+        </button>
+        {active ? (
+          <>
+            <span className="agent-strip-title" title={active.title}>
+              <span className="agent-tag">[{agentTag(active.agent)}]</span> {active.title}
+            </span>
+            <ClientChip slug={active.clientSlug} />
+            {chip && (
+              <span className={`agent-state-chip ${chip.cls}`}>
+                {chip.glyph} {chip.label}
+              </span>
+            )}
+            {popout && (
+              <span
+                className="agent-strip-popout"
+                title="Popped-out window — using the main window's loredex MCP server."
+              >
+                ⧉
+              </span>
+            )}
+            <button
+              type="button"
+              className="agent-session-close"
+              title="End this session"
+              aria-label="End this session"
+              onClick={() => void useAgentPanel.getState().closeSession(active.sessionId)}
+            >
+              ×
+            </button>
+          </>
+        ) : (
+          <span className="agent-strip-title agent-strip-muted">No active session</span>
+        )}
+      </div>
+      {open && (
+        <div className="agent-strip-body">
+          {popout && (
+            // The pop-out core can't bind the single MCP port, but its agent
+            // sessions connect to the MAIN window's running host via the
+            // discovery file — so this window has the full loredex toolset too.
+            <div className="agent-popout-note" role="note">
+              ⧉ Popped-out window — using the main window's loredex MCP server.
+            </div>
+          )}
+          {sessions.length > 0 && (
+            <div className="agent-sessions">
+              {sessions.map((s) => (
+                <SessionRow key={s.sessionId} s={s} active={s.sessionId === activeId} />
+              ))}
+            </div>
+          )}
+          {active !== null && <ContinueControl active={active} />}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** Copy control (chat-completeness COPY): writes `text` to the clipboard with a
  *  brief "Copied" acknowledgement (glyph + word, never color alone). Same
  *  navigator.clipboard.writeText the settings device-flow uses. */
@@ -403,9 +494,53 @@ export const ThreadItem = memo(function ThreadItem({ item }: { item: AcpChatItem
  *  session with a persisted conversation (conversationId) — a no-db session has
  *  no transcript to carry. NOT a cobalt primary (Send owns the one-per-view). */
 function ContinueControl({ active }: { active: AcpSessionView }): React.JSX.Element | null {
+  // BL-5: a client-scoped thread gets asked WHERE to continue — its own folder
+  // (so the client's .mcp.json servers load again) or the vault root. An
+  // unscoped thread has no choice to make, so it switches straight away.
+  const [pending, setPending] = useState<AcpAgent | null>(null)
   if (!active.conversationId) return null
   const others = AGENTS.filter((a) => a !== active.agent)
   if (others.length === 0) return null
+  const scoped = Boolean(active.clientSlug)
+
+  const go = (a: AcpAgent, atVaultRoot: boolean): void => {
+    setPending(null)
+    void useAgentPanel.getState().continueIn(a, atVaultRoot)
+  }
+
+  if (pending) {
+    return (
+      <div className="agent-continue" role="group" aria-label="Where to continue">
+        <span className="agent-continue-label">Start in</span>
+        <button
+          type="button"
+          className="agent-continue-btn"
+          title={`Continue in the ${active.clientSlug} folder — its MCP servers load again`}
+          onClick={() => go(pending, false)}
+        >
+          ◈ {active.clientSlug}
+        </button>
+        <button
+          type="button"
+          className="agent-continue-btn"
+          title="Continue at the vault root (the client's MCP servers will NOT load)"
+          onClick={() => go(pending, true)}
+        >
+          Vault root
+        </button>
+        <button
+          type="button"
+          className="agent-continue-btn"
+          title="Cancel"
+          aria-label="Cancel"
+          onClick={() => setPending(null)}
+        >
+          ×
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div
       className="agent-continue"
@@ -420,7 +555,7 @@ function ContinueControl({ active }: { active: AcpSessionView }): React.JSX.Elem
           className="agent-continue-btn"
           title={`Continue this conversation in ${AGENT_META[a].label} (carries the transcript)`}
           aria-label={`Continue in ${AGENT_META[a].label}`}
-          onClick={() => void useAgentPanel.getState().continueIn(a)}
+          onClick={() => (scoped ? setPending(a) : go(a, false))}
         >
           <span className="agent-tag">[{agentTag(a)}]</span> {AGENT_META[a].label}
         </button>
@@ -473,12 +608,13 @@ export function AgentPanel(): React.JSX.Element | null {
     if (el && stickRef.current) el.scrollTop = el.scrollHeight
   }, [itemCount, active?.items])
 
-  const canSend = active !== null && active.state === 'ready' && !active.busy
+  // Composing and sending are different rights (BL-2): you may type, edit,
+  // paste and attach while the agent is mid-answer — only the SEND is held
+  // until the turn ends. Enter during a turn no-ops (submit() re-checks
+  // canSend) and leaves the draft intact rather than dropping it.
+  const canCompose = active !== null && active.state === 'ready'
+  const canSend = canCompose && !active.busy
   const hasContent = draft.trim().length > 0 || attachments.length > 0
-  // chat-completeness RETRY: offered only when the session is idle AND there is
-  // a prior user turn with resendable text (an attachment-only turn strips to '')
-  const retryText = active ? lastUserText(active.items) : null
-  const canRetry = canSend && retryText !== null && retryText.trim().length > 0
 
   // B4 attach: paste (ClipboardEvent images/files) + an attach button that opens
   // a hidden file input; images ride as base64, other files as their real path
@@ -648,12 +784,12 @@ export function AgentPanel(): React.JSX.Element | null {
         <ConvHistoryMenu />
         <button
           type="button"
-          className="agent-head-btn"
-          title="New conversation (vault root)"
+          className="agent-head-btn agent-head-new"
+          title="New conversation"
           aria-label="New conversation"
           onClick={() => void useAgentPanel.getState().openHere()}
         >
-          +
+          ＋
         </button>
         {active?.conversationId && (
           // B3 pop-out: hand the active conversation to its OWN standalone window
@@ -679,22 +815,10 @@ export function AgentPanel(): React.JSX.Element | null {
           ›
         </button>
       </div>
-      {popout && (
-        // The pop-out core can't bind the single MCP port, but its agent
-        // sessions now connect to the MAIN window's running host via the
-        // discovery file — so this window has the full loredex toolset too.
-        <div className="agent-popout-note" role="note">
-          ⧉ Popped-out window — using the main window's loredex MCP server.
-        </div>
-      )}
-      {shown.length > 0 && (
-        <div className="agent-sessions">
-          {shown.map((s) => (
-            <SessionRow key={s.sessionId} s={s} active={s.sessionId === activeId} />
-          ))}
-        </div>
-      )}
-      {active !== null && <ContinueControl active={active} />}
+      {/* BL-7: pop-out note + session rows + CONTINUE IN collapse into ONE line.
+          What stays visible by default is only: providers (header, above),
+          CONTEXT (UsageBar) and the session/tools/MCP summary below. */}
+      <SessionStrip sessions={shown} activeId={activeId} active={active} popout={popout} />
       {active !== null && <UsageBar usage={active.usage} authMode={active.authMode} />}
       {active !== null && <SessionInfoPanel session={active} />}
       <div
@@ -768,35 +892,9 @@ export function AgentPanel(): React.JSX.Element | null {
           ⚠ {attachNotice}
         </div>
       )}
-      {active !== null && (
-        // chat-completeness NEW + RETRY: conversation-level actions above the
-        // composer. "New conversation" is the labeled twin of the header + icon
-        // (both reuse openHere — a new session IS a fresh transcript, B0);
-        // Retry re-sends the last user turn. Hairline text buttons, never the
-        // cobalt primary (Send owns the one-per-view).
-        <div className="agent-composer-tools" role="group" aria-label="Conversation actions">
-          <button
-            type="button"
-            className="agent-new-convo"
-            title="Start a new conversation (a fresh session at the vault root)"
-            aria-label="New conversation"
-            onClick={() => void useAgentPanel.getState().openHere()}
-          >
-            ＋ New conversation
-          </button>
-          {canRetry && (
-            <button
-              type="button"
-              className="agent-retry-btn"
-              title="Re-send the last message"
-              aria-label="Retry last message"
-              onClick={() => void useAgentPanel.getState().retry()}
-            >
-              ↻ Retry
-            </button>
-          )}
-        </div>
-      )}
+      {/* BL-1: the composer action strip is gone — "New conversation" lives in
+          the header ＋ (its labeled twin), and Retry was redundant with simply
+          re-typing. The thread keeps the vertical space instead. */}
       <div className="agent-input">
         <input
           ref={fileInputRef}
@@ -812,7 +910,7 @@ export function AgentPanel(): React.JSX.Element | null {
           className="agent-attach-btn"
           title="Attach files or images"
           aria-label="Attach files or images"
-          disabled={!canSend}
+          disabled={!canCompose}
           onClick={() => fileInputRef.current?.click()}
         >
           ⊕
@@ -821,9 +919,15 @@ export function AgentPanel(): React.JSX.Element | null {
           ref={inputRef}
           className="agent-input-field"
           rows={Math.min(6, draft.split('\n').length)}
-          placeholder={canSend ? 'Message the agent…  (↵ send · ⇧↵ newline)' : 'Needs a ready session'}
+          placeholder={
+            !canCompose
+              ? 'Needs a ready session'
+              : active.busy
+                ? 'Type your next message…  (sends when the turn ends)'
+                : 'Message the agent…  (↵ send · ⇧↵ newline)'
+          }
           value={draft}
-          disabled={!canSend}
+          disabled={!canCompose}
           onPaste={onPaste}
           onChange={(e) => useAgentPanel.getState().setDraft(e.target.value)}
           onKeyDown={(e) => {

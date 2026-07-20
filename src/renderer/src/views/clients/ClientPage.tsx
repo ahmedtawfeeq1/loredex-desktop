@@ -14,7 +14,9 @@ import type {
   SnapshotSummary,
   WorkspaceResult,
 } from '../../../../shared/ipc-contract'
+import type { AcpAgent } from '../../../../shared/ipc-contract'
 import type { Identity } from '../../../../shared/types'
+import { AGENT_META, AGENTS } from '../../agent/AgentPanel'
 import { invoke, revealPath } from '../../api'
 import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
@@ -84,6 +86,11 @@ const PAGE_CSS = `
 .cp-cred-actions button { font-size: 11px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 6px; padding: 1px 7px; cursor: pointer; }
 .cp-cred-actions button:hover { color: var(--text-1); border-color: var(--text-2); }
 .cp-inbox-head { font-weight: 600; margin-bottom: 6px; }
+.cp-chat-pick { display: inline-flex; align-items: center; gap: 6px; }
+.cp-chat-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+.cp-chat-dot.tone-ok { background: var(--ok); }
+.cp-chat-dot.tone-auth_required { background: var(--warn); }
+.cp-chat-dot.tone-unknown { background: var(--text-3); }
 .cp-seg { display: flex; align-items: center; gap: 6px; }
 .cp-seg-btn { font-size: 12px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
 .cp-seg-btn.is-on { color: var(--text-1); border-color: var(--accent-hi); background: var(--bg-inset); }
@@ -326,6 +333,9 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<WorkspaceResult | null>(null)
   const [status, setStatus] = useState<ClientWorkspaceStatus | null>(null)
+  // BL-6: Chat Here asks which provider instead of silently using the panel's
+  const [chatPick, setChatPick] = useState(false)
+  const providerAuth = useAgentPanel((s) => s.providerAuth)
   const [conns, setConns] = useState<
     Array<{ server: string; envRefs: string[] }>
   >([])
@@ -389,13 +399,16 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   // WP-A: open the agent chat panel in THIS client's folder (◈ scoped session).
   // Materialize stale/absent tooling first so the client's own MCP servers
   // attach to the session, then start the chat at the client dir.
-  async function chatHere(): Promise<void> {
+  // BL-6: the provider is chosen explicitly rather than inheriting whatever the
+  // panel happened to be set to (which silently meant Claude).
+  async function chatHere(provider: AcpAgent): Promise<void> {
+    setChatPick(false)
     try {
       if (info.hasWorkspaceYml && status && (status.drift || !status.generated)) {
         await rewire({})
       }
       const { dir } = await invoke('clients.dirAbs', { client: info.slug })
-      await useAgentPanel.getState().openHere(dir)
+      await useAgentPanel.getState().openHere(dir, provider)
     } catch {
       // no bridge / start failed — best-effort, the panel just doesn't open
     }
@@ -436,14 +449,45 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
         >
           Open in Terminal
         </button>
-        <button
-          type="button"
-          className="button-secondary"
-          title="Open the agent chat panel scoped to this client (◈) — wires stale tooling first"
-          onClick={() => void chatHere()}
-        >
-          Chat Here
-        </button>
+        {chatPick ? (
+          // BL-6: pick the provider explicitly; the auth dot mirrors the panel's
+          // provider chips so an unauthenticated agent is obvious before it
+          // fails to spawn.
+          <span className="cp-chat-pick" role="group" aria-label="Start chat in which agent">
+            {AGENTS.map((a) => (
+              <button
+                key={a}
+                type="button"
+                className="button-secondary"
+                title={`Chat here in ${AGENT_META[a].label}${
+                  providerAuth[a] === 'auth_required' ? ' (needs sign-in)' : ''
+                }`}
+                onClick={() => void chatHere(a)}
+              >
+                <span className={`cp-chat-dot tone-${providerAuth[a]}`} aria-hidden />
+                {AGENT_META[a].label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="button-quiet"
+              title="Cancel"
+              aria-label="Cancel"
+              onClick={() => setChatPick(false)}
+            >
+              ×
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="button-secondary"
+            title="Open the agent chat panel scoped to this client (◈) — wires stale tooling first"
+            onClick={() => setChatPick(true)}
+          >
+            Chat Here
+          </button>
+        )}
         <span style={{ flex: 1 }} />
         <button
           type="button"

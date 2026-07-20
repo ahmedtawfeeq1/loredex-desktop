@@ -108,6 +108,143 @@ function WidthHandle(): React.JSX.Element {
   )
 }
 
+/** BL-4: below this drawer width the header actions collapse into a ☰ menu. */
+const COLLAPSE_ACTIONS_BELOW = 380
+
+interface TermAction {
+  key: string
+  label: string
+  title: string
+  run: () => void
+}
+
+/**
+ * BL-4: the terminal's header actions, rendered inline when there's room and as
+ * a ☰ overflow menu when the drawer is too narrow — so narrowing the left dock
+ * never pushes the buttons over the app's logo/chrome.
+ */
+function TerminalActions({
+  left,
+  collapsed,
+}: {
+  left: boolean
+  collapsed: boolean
+}): React.JSX.Element {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const closePane = (): void => {
+    const { activeId, root: tree } = useTerminal.getState()
+    const id = activeId ?? (tree ? firstTermId(tree) : null)
+    if (id) void useTerminal.getState().closePane(id)
+  }
+  const actions: TermAction[] = [
+    ...(popoutMode() === null
+      ? [
+          {
+            key: 'dock',
+            label: left ? 'dock ▾' : 'dock ◧',
+            title: left ? 'Dock to the bottom' : 'Dock to the left',
+            run: () => useTerminal.getState().toggleDock(),
+          },
+          {
+            key: 'pop',
+            label: 'pop ⇱',
+            title: 'Pop the terminal out into its own window',
+            run: () => void openTerminalWindow(null),
+          },
+        ]
+      : []),
+    {
+      key: 'split-right',
+      label: 'split ▸',
+      title: 'Split the active pane right',
+      run: () => void useTerminal.getState().splitActive('row'),
+    },
+    {
+      key: 'split-down',
+      label: 'split ▾',
+      title: 'Split the active pane down',
+      run: () => void useTerminal.getState().splitActive('column'),
+    },
+    { key: 'close', label: 'close', title: 'Close the active pane', run: closePane },
+    {
+      key: 'agent',
+      label: 'agent ▸',
+      title: 'Open agent here (vault root)',
+      run: () => void useAgentPanel.getState().openHere(),
+    },
+  ]
+
+  if (!collapsed) {
+    return (
+      <>
+        {actions.map((a) => (
+          <button
+            key={a.key}
+            type="button"
+            className="term-hdr-btn"
+            title={a.title}
+            aria-label={a.title}
+            onClick={a.run}
+          >
+            {a.label}
+          </button>
+        ))}
+      </>
+    )
+  }
+
+  return (
+    <div className="term-hdr-menu-wrap">
+      <button
+        type="button"
+        className="term-hdr-btn term-hdr-menu-btn"
+        title="Terminal actions"
+        aria-label="Terminal actions"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen(!menuOpen)}
+      >
+        ☰
+      </button>
+      {menuOpen && (
+        <>
+          {/* click-away closes; Esc handled on the menu itself */}
+          <button
+            type="button"
+            className="term-hdr-menu-scrim"
+            aria-label="Close menu"
+            tabIndex={-1}
+            onClick={() => setMenuOpen(false)}
+          />
+          <div
+            className="term-hdr-menu"
+            role="menu"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setMenuOpen(false)
+            }}
+          >
+            {actions.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                role="menuitem"
+                className="term-hdr-menu-item"
+                title={a.title}
+                onClick={() => {
+                  setMenuOpen(false)
+                  a.run()
+                }}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function TerminalDrawer(): React.JSX.Element | null {
   const root = useTerminal((s) => s.root)
   const open = useTerminal((s) => s.open)
@@ -130,6 +267,10 @@ export function TerminalDrawer(): React.JSX.Element | null {
   if (root === null) return null
 
   const left = dock === 'left'
+  // BL-4: a narrow LEFT dock can't fit the inline action row — it used to run
+  // past the drawer and overlap the app chrome. Below this width the actions
+  // collapse into a ☰ menu instead. The bottom dock is full-width, never tight.
+  const collapsed = left && width < COLLAPSE_ACTIONS_BELOW
   const cls = [
     'terminal-drawer',
     left ? 'dock-left' : 'dock-bottom',
@@ -144,64 +285,7 @@ export function TerminalDrawer(): React.JSX.Element | null {
       {left ? <WidthHandle /> : <HeightHandle />}
       <div className="terminal-drawer-header">
         <span className="terminal-drawer-title">TERMINAL</span>
-        {popoutMode() === null && (
-          <button
-            type="button"
-            className="term-hdr-btn"
-            title={left ? 'Dock to the bottom' : 'Dock to the left'}
-            aria-label={left ? 'Dock the terminal to the bottom' : 'Dock the terminal to the left'}
-            onClick={() => useTerminal.getState().toggleDock()}
-          >
-            {left ? 'dock ▾' : 'dock ◧'}
-          </button>
-        )}
-        {popoutMode() === null && (
-          <button
-            type="button"
-            className="term-hdr-btn"
-            title="Pop the terminal out into its own window"
-            aria-label="Pop the terminal out into its own window"
-            onClick={() => void openTerminalWindow(null)}
-          >
-            pop ⇱
-          </button>
-        )}
-        <button
-          type="button"
-          className="term-hdr-btn"
-          title="Split the active pane right"
-          onClick={() => void useTerminal.getState().splitActive('row')}
-        >
-          split ▸
-        </button>
-        <button
-          type="button"
-          className="term-hdr-btn"
-          title="Split the active pane down"
-          onClick={() => void useTerminal.getState().splitActive('column')}
-        >
-          split ▾
-        </button>
-        <button
-          type="button"
-          className="term-hdr-btn"
-          title="Close the active pane"
-          onClick={() => {
-            const { activeId, root: tree } = useTerminal.getState()
-            const id = activeId ?? (tree ? firstTermId(tree) : null)
-            if (id) void useTerminal.getState().closePane(id)
-          }}
-        >
-          close
-        </button>
-        <button
-          type="button"
-          className="term-hdr-btn"
-          title="Open agent here (vault root)"
-          onClick={() => void useAgentPanel.getState().openHere()}
-        >
-          agent ▸
-        </button>
+        <TerminalActions left={left} collapsed={collapsed} />
       </div>
       <div className="terminal-drawer-body">
         <PaneNode pane={root} path={[]} />

@@ -39,18 +39,25 @@ const agentSchema = {
  *  (the raw code — the button itself lives outside <code>, so its label never
  *  pollutes the copy) and writes it to the clipboard, the same navigator API
  *  the settings device-flow uses. Injected via rehype-react's `components`
- *  AFTER sanitize, so it needs no schema widening. */
+ *  AFTER sanitize, so it needs no schema widening.
+ *
+ *  The button lives in a NON-scrolling wrapper, never inside the <pre>: the
+ *  <pre> is the horizontal scroll container, so a button positioned against it
+ *  drifts across the code as you scroll sideways. Anchoring to the wrapper pins
+ *  it to the visible top-right corner at any scroll offset. */
 function CodeBlock(props: React.HTMLAttributes<HTMLPreElement>): React.JSX.Element {
   const { children, ...rest } = props
   return (
-    <pre {...rest}>
+    <div className="agent-code-wrap">
       <button
         type="button"
         className="agent-copy-code"
         aria-label="Copy code"
         title="Copy code"
         onClick={(e) => {
-          const code = e.currentTarget.closest('pre')?.querySelector('code')
+          // the button is a SIBLING of <pre> now — reach the code through the
+          // wrapper, not closest('pre') (which would find nothing)
+          const code = e.currentTarget.parentElement?.querySelector('code')
           try {
             void navigator.clipboard?.writeText(code?.textContent ?? '')
           } catch {
@@ -60,8 +67,8 @@ function CodeBlock(props: React.HTMLAttributes<HTMLPreElement>): React.JSX.Eleme
       >
         Copy
       </button>
-      {children}
-    </pre>
+      <pre {...rest}>{children}</pre>
+    </div>
   )
 }
 

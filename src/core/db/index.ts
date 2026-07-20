@@ -61,6 +61,14 @@ export const migrations: Array<(db: AppDb) => void> = [
   (db) => {
     db.exec(`ALTER TABLE agent_conversations ADD COLUMN client_slug TEXT;`)
   },
+  // 4 — BL-5: the working directory the conversation was started in. Continuing
+  // a thread (provider switch / reopen / pop-out) must respawn the adapter in
+  // the SAME folder, or the folder's .mcp.json servers never load (MCP is
+  // discovered at startup). Nullable + additive — older rows fall back to the
+  // client slug, then the vault root.
+  (db) => {
+    db.exec(`ALTER TABLE agent_conversations ADD COLUMN cwd TEXT;`)
+  },
 ]
 
 export function runMigrations(db: AppDb): void {

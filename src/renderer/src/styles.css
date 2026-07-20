@@ -812,6 +812,44 @@ details > .tree-empty,
 
 .tree-section-item {
   margin: 2px 0 2px 8px;
+  position: relative; /* BL-9: anchors the open-page arrow */
+}
+
+/* BL-9: jump from a project/client row to its own page (client console on an
+   agent-ops dex, Atlas project lens on a research dex). Hover/focus-revealed so
+   the tree stays quiet, with room reserved from the collapse chevron. */
+.tree-section-has-open {
+  padding-right: 32px;
+}
+
+.tree-section-open {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.tree-section-item:hover > .tree-section-open,
+.tree-section-open:focus-visible {
+  opacity: 1;
+}
+
+.tree-section-open:hover {
+  color: var(--text-1);
+  background: var(--bg-hover);
 }
 
 .tree-section-dot {
@@ -7777,6 +7815,61 @@ a.button-primary {
   padding: 0 10px;
   background: var(--bg-card);
   border-bottom: 1px solid var(--hairline);
+  /* BL-4: never let the actions spill out of the drawer onto the app chrome —
+     below the collapse width they become a ☰ menu, and this is the backstop. */
+  overflow: hidden;
+}
+
+/* BL-4: overflow menu for a narrow terminal dock */
+.term-hdr-menu-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.term-hdr-menu-btn {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.term-hdr-menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.term-hdr-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 41;
+  min-width: 132px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 2px;
+  background: var(--bg-card);
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.term-hdr-menu-item {
+  text-align: left;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
+  font: 11px var(--font-mono);
+  cursor: pointer;
+}
+
+.term-hdr-menu-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
 }
 
 .terminal-drawer-title {
@@ -8371,6 +8464,13 @@ a.button-primary {
   position: relative;
 }
 
+/* Non-scrolling wrapper around a fenced code block: the <pre> inside scrolls
+   horizontally, so the copy button anchors HERE and stays pinned to the visible
+   corner instead of drifting across the code. */
+.agent-code-wrap {
+  position: relative;
+}
+
 .agent-copy-msg,
 .agent-copy-code {
   position: absolute;
@@ -8388,7 +8488,7 @@ a.button-primary {
 }
 
 .agent-msg-agent:hover .agent-copy-msg,
-.agent-md pre:hover .agent-copy-code,
+.agent-code-wrap:hover .agent-copy-code,
 .agent-copy-msg:focus-visible,
 .agent-copy-code:focus-visible {
   opacity: 1;
@@ -8425,33 +8525,62 @@ a.button-primary {
   background: var(--bg-hover);
 }
 
-/* NEW + RETRY: conversation actions above the composer. */
-.agent-composer-tools {
+/* BL-1: the composer NEW + RETRY strip was removed — "New conversation" lives
+   in the header ＋ and Retry is gone. Its styles went with it. */
+
+/* BL-7: collapsed header chrome — one line carrying the live essentials, with
+   every session row / provider switch / pop-out note behind the disclosure. */
+.agent-strip {
   flex: 0 0 auto;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.agent-strip-line {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px 0;
+  gap: 8px;
+  padding: 4px 12px;
+  min-height: 26px;
 }
 
-.agent-new-convo,
-.agent-retry-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--hairline);
+.agent-strip-toggle {
+  flex: 0 0 auto;
+  border: 0;
   background: transparent;
-  color: var(--text-2);
-  font: 10.5px var(--font-mono);
-  padding: 2px 9px;
-  border-radius: 6px;
+  color: var(--text-3);
+  font: 10px var(--font-mono);
   cursor: pointer;
+  padding: 0 2px;
 }
 
-.agent-new-convo:hover,
-.agent-retry-btn:hover {
-  background: var(--bg-hover);
+.agent-strip-toggle:hover {
   color: var(--text-1);
+}
+
+.agent-strip-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 11px var(--font-mono);
+  color: var(--text-2);
+}
+
+.agent-strip-muted {
+  color: var(--text-3);
+}
+
+.agent-strip-popout {
+  flex: 0 0 auto;
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: default;
+}
+
+.agent-strip-body {
+  border-top: 1px solid var(--hairline);
+  padding-bottom: 2px;
 }
 
 /* markdown-in-bubble: the sanctioned pipeline's block elements, sized for chat.
@@ -8463,6 +8592,10 @@ a.button-primary {
   margin-top: 0;
 }
 .agent-md > :last-child {
+  margin-bottom: 0;
+}
+/* the code wrapper is transparent for spacing — the <pre> inside carries it */
+.agent-md > .agent-code-wrap:last-child pre {
   margin-bottom: 0;
 }
 .agent-md p {

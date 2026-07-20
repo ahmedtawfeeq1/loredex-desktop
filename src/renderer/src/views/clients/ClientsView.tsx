@@ -44,6 +44,8 @@ const CLIENTS_CSS = `
 .client-card-tags .client-tag-chip { padding: 1px 8px; }
 .client-card-errors { font-size: 11px; color: var(--rust, #a33f2e); font-weight: 600; }
 .clients-empty { color: var(--text-2); padding: 40px 0; }
+.clients-search { font-size: 12.5px; padding: 4px 10px; min-width: 200px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--bg-inset); color: var(--text-1); }
+.clients-search:focus { outline: none; border-color: var(--accent-hi); }
 .clients-repair-msg { font-size: 12.5px; color: var(--text-2); margin: -6px 0 14px; }
 `
 
@@ -95,6 +97,7 @@ export function ClientsView(): React.JSX.Element {
   const managerScope = useDex((s) => s.selectedManager)
   const selectManager = useDex((s) => s.selectManager)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [search, setSearch] = useState('') // BL-8: find a client by name
   const [adding, setAdding] = useState(false)
   const [normalizing, setNormalizing] = useState(false)
   const [repairMsg, setRepairMsg] = useState<string | null>(null)
@@ -131,7 +134,17 @@ export function ClientsView(): React.JSX.Element {
     [fleet, managerScope],
   )
   const allTags = useMemo(() => [...new Set(scoped.flatMap((c) => c.tags))].sort(), [scoped])
-  const visible = scoped.filter((c) => !tagFilter || c.tags.includes(tagFilter))
+  // BL-8: name search, applied alongside the tag filter. Matches the slug and
+  // the manager so "sara" finds a manager's clients too.
+  const q = search.trim().toLowerCase()
+  const visible = scoped.filter(
+    (c) =>
+      (!tagFilter || c.tags.includes(tagFilter)) &&
+      (!q ||
+        c.slug.toLowerCase().includes(q) ||
+        (c.manager ?? '').toLowerCase().includes(q) ||
+        c.tags.some((t) => t.toLowerCase().includes(q))),
+  )
   const byManager = new Map<string, ClientInfo[]>()
   for (const client of visible) {
     const key = client.manager ?? ''
@@ -158,6 +171,14 @@ export function ClientsView(): React.JSX.Element {
           {visible.length} client{visible.length === 1 ? '' : 's'}
         </span>
         <span style={{ flex: 1 }} />
+        <input
+          className="clients-search"
+          type="search"
+          placeholder="Search clients…"
+          aria-label="Search clients by name"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         <button
           type="button"
           className="button-secondary"

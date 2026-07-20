@@ -11,7 +11,7 @@
 import { randomUUID } from 'node:crypto'
 import { statSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { basename, relative, sep } from 'node:path'
+import { basename, join, relative, sep } from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import type {
@@ -281,7 +281,13 @@ export function acpStart(
   const conversationId =
     arg.conversationId ??
     (persist
-      ? createConversation(persist.db, persist.vaultId, { agent: arg.agent, clientSlug }).id
+      ? createConversation(persist.db, persist.vaultId, {
+          agent: arg.agent,
+          clientSlug,
+          // BL-5: remember WHERE this thread runs, so continuing it later
+          // respawns in the same folder and re-loads its .mcp.json servers
+          cwd: arg.cwd,
+        }).id
       : randomUUID())
   const sessionId = randomUUID()
   const s: AcpSession = {
@@ -355,6 +361,35 @@ export function acpStart(
   return { sessionId, conversationId }
 }
 
+/**
+ * BL-5: which directory a continued thread should respawn in. Preference order:
+ *   1. the thread's own recorded `cwd` (if it still exists on disk)
+ *   2. `<vault>/projects/<clientSlug>` for older threads recorded before the
+ *      cwd column existed (if it still exists)
+ *   3. the vault root
+ * The existence checks matter: a client folder can be renamed or removed
+ * between sessions, and a missing cwd would otherwise fail the whole start with
+ * ACP_CWD_INVALID instead of degrading to the root.
+ */
+export function continueCwd(
+  loaded: { cwd?: string | null; clientSlug?: string | null },
+  vaultRoot: string,
+): string {
+  const isDir = (p: string): boolean => {
+    try {
+      return statSync(p).isDirectory()
+    } catch {
+      return false
+    }
+  }
+  if (loaded.cwd && isDir(loaded.cwd)) return loaded.cwd
+  if (loaded.clientSlug) {
+    const derived = join(vaultRoot, 'projects', loaded.clientSlug)
+    if (isDir(derived)) return derived
+  }
+  return vaultRoot
+}
+
 /** B2 cross-provider continuation (the killer feature): start a NEW session on
  *  targetProvider bound to the SAME conversation, carrying the prior transcript.
  *  boot resolves the mechanism — a same-provider resume with the adapter's own
@@ -364,7 +399,17 @@ export function acpStart(
  *  (the seam scope-checks too; this is defence in depth). */
 export function acpContinue(
   emit: (e: CoreEvent) => void,
-  arg: { conversationId: string; targetProvider: AcpAgent; cwd: string; persist: ConvPersist },
+  arg: {
+    conversationId: string
+    targetProvider: AcpAgent
+    /** the fallback root (vault path) — the thread's own cwd wins when it has
+     *  one and still exists (BL-5) */
+    cwd: string
+    persist: ConvPersist
+    /** BL-5: force the vault root even when the thread has a stored cwd (the
+     *  "start at vault root" answer to the where-to-continue prompt). */
+    atVaultRoot?: boolean
+  },
 ): { sessionId: string; conversationId: string } {
   const loaded = loadConversation(arg.persist.db, arg.conversationId)
   if (!loaded || loaded.vaultId !== arg.persist.vaultId) {
@@ -374,7 +419,10 @@ export function acpContinue(
   const seed = renderSeed(arg.persist.db, arg.conversationId)
   return acpStart(emit, {
     agent: arg.targetProvider,
-    cwd: arg.cwd,
+    // BL-5: respawn where the thread actually lives, so its folder's
+    // `.mcp.json` servers load again (MCP is discovered at startup — a later
+    // `cd` can't recover them). `atVaultRoot` honours an explicit user choice.
+    cwd: arg.atVaultRoot ? arg.cwd : continueCwd(loaded, arg.cwd),
     conversationId: arg.conversationId,
     persist: arg.persist,
     // WP-A/WP-B: carry the conversation's persisted client scope across a

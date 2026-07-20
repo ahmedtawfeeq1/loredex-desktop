@@ -38,14 +38,21 @@ type ToolMsg = NonNullable<AcpConvMessage['tool']>
 export function createConversation(
   db: AppDb,
   vaultId: string,
-  arg: { agent: AcpAgent; title?: string | null; clientSlug?: string | null },
+  arg: {
+    agent: AcpAgent
+    title?: string | null
+    clientSlug?: string | null
+    /** BL-5: the folder this thread was started in — continuation respawns here
+     *  so the folder's `.mcp.json` servers load again. */
+    cwd?: string | null
+  },
 ): { id: string } {
   const id = randomUUID()
   const now = new Date().toISOString()
   db.prepare(
-    `INSERT INTO agent_conversations (vault_id, id, title, last_provider, client_slug, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(vaultId, id, arg.title ?? null, arg.agent, arg.clientSlug ?? null, now, now)
+    `INSERT INTO agent_conversations (vault_id, id, title, last_provider, client_slug, cwd, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(vaultId, id, arg.title ?? null, arg.agent, arg.clientSlug ?? null, arg.cwd ?? null, now, now)
   return { id }
 }
 
@@ -137,7 +144,7 @@ export function setConvProviderSession(
 export function loadConversation(db: AppDb, convId: string): LoadedConversation | null {
   const conv = db
     .prepare(
-      'SELECT vault_id, id, title, last_provider, client_slug FROM agent_conversations WHERE id = ?',
+      'SELECT vault_id, id, title, last_provider, client_slug, cwd FROM agent_conversations WHERE id = ?',
     )
     .get(convId) as
     | {
@@ -146,6 +153,7 @@ export function loadConversation(db: AppDb, convId: string): LoadedConversation 
         title: string | null
         last_provider: string
         client_slug: string | null
+        cwd: string | null
       }
     | undefined
   if (!conv) return null
@@ -161,6 +169,7 @@ export function loadConversation(db: AppDb, convId: string): LoadedConversation 
     title: conv.title,
     lastProvider: conv.last_provider as AcpAgent,
     clientSlug: conv.client_slug,
+    cwd: conv.cwd,
     providers: provRows.map((p) => ({
       provider: p.provider as AcpAgent,
       acpSessionId: p.acp_session_id,

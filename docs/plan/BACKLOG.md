@@ -1,0 +1,125 @@
+# Backlog — future work
+
+Small, well-scoped UX fixes captured from real use. Nothing here is scheduled;
+pick them up in any order. Each item states the symptom, the cause (with
+file:line), what "done" looks like, and the screenshot it came from.
+
+Status legend: `open` · `in progress` · `done`
+
+---
+
+## BL-1 — Chat: drop the composer action strip; make the header "New conversation" obvious
+
+**Status:** open · **Area:** agent panel · **Size:** S
+
+**Symptom.** A `＋ New conversation` / `↻ Retry` strip sits directly above the
+composer. It duplicates the header `＋` icon, and **Retry isn't wanted at all** —
+re-sending the last turn is not a control worth the space.
+
+**Cause / where.**
+- The strip: `src/renderer/src/agent/AgentPanel.tsx` ~773–795 (`＋ New conversation`, `↻ Retry`, gated on `canRetry` at :481).
+- The header twin: same file ~652–653 — the `＋` icon already carries
+  `title="New conversation (vault root)"`.
+
+**Done when.**
+- The strip above the composer is gone (both buttons, and `canRetry`/`retryText`
+  if nothing else uses them).
+- The header `＋` is unmistakably "new conversation": hovering it reads
+  **New conversation**, and it's visually distinct from the neighbouring
+  history/pop-out icons.
+- Starting a fresh conversation is still one click, discoverable without hunting.
+
+**Reference.** Screenshots: the strip above the composer; the header icon row
+(`AGENT · All · Claude · Codex · Gemini · 🕘 ＋ ⧉ ›`).
+
+---
+
+## BL-2 — Chat: keep the composer usable while the agent is responding
+
+**Status:** open · **Area:** agent panel · **Size:** S–M
+
+**Symptom.** While the agent is generating, the whole composer is inert — you
+can't type the next message, paste, edit, or attach anything. You have to wait
+for the turn to finish before you can even start writing.
+
+**Cause / where.** `src/renderer/src/agent/AgentPanel.tsx` — `canSend` gates far
+more than sending:
+- `:826` the `<textarea>` — `disabled={!canSend}`
+- `:815` the attach (`⊕`) button — `disabled={!canSend}`
+- `:876` the Send button — `disabled={!canSend || !hasContent}` ← **this one is correct**
+
+**Done when.**
+- While a turn is in flight you can **type, edit, select, copy/paste, and attach
+  images/files**; the draft persists (the store already holds `draft`).
+- **Only sending** is blocked — Send is disabled (or, better, becomes **Stop**
+  for the active turn) and re-enables the moment the turn ends.
+- Pressing ↵ mid-response does not silently drop the text (either queue it or
+  no-op with the draft intact).
+
+---
+
+## BL-3 — Chat: pin the code-block Copy button (stop it scrolling with the code)
+
+**Status:** open · **Area:** agent panel / markdown · **Size:** S
+
+**Symptom.** In a fenced code / JSON block, the hover **Copy** button drifts
+across the code as you scroll the block horizontally — it ends up floating in
+the middle of the content instead of staying in the corner.
+
+**Cause / where.** The button is absolutely positioned *inside* the element that
+scrolls:
+- `src/renderer/src/agent/agentMarkdown.tsx` ~46–49 — the custom `<pre>` renders
+  `<button class="agent-copy-code">` as a child of the `<pre>`.
+- `src/renderer/src/styles.css` — `.agent-md pre` (~8508) is
+  `position: relative` **and** the horizontal scroll container;
+  `.agent-copy-code` (~8375) is `position: absolute; right: 4px`.
+  Absolute positioning resolves against the *scrolled* padding box, so the
+  button translates with the content.
+
+**Done when.**
+- Copy stays visually pinned to the **top-right of the visible code box** at any
+  horizontal scroll offset.
+- Fix by anchoring it outside the scroller — wrap the `<pre>` in a
+  non-scrolling `position: relative` container and render the button there (or
+  make the button `position: sticky`). Don't just bump `right`.
+- Still hover/focus-revealed, still copies the **full** code (not the visible
+  slice), and doesn't overlap the first line of code or the scrollbar.
+
+**Reference.** Screenshot: `Copy` sitting mid-content over a horizontally
+scrolled `"mcpServers":{"loredex":{"type":"http",…}` line.
+
+---
+
+## BL-4 — Terminal: collapse header actions into an overflow menu at narrow widths
+
+**Status:** open · **Area:** terminal · **Size:** M
+
+**Symptom.** With the terminal docked **left**, narrowing the pane makes its
+header actions (`dock ▾ · pop ↖ · split ▸ · split ▾ · close`) run past the pane
+and **overlap the Loredex logo / app chrome**. They neither wrap nor truncate —
+they just collide.
+
+**Cause / where.** `src/renderer/src/terminal/TerminalDrawer.tsx` ~116–181 — the
+action row is laid out inline with no width breakpoint and no overflow
+behaviour, so at small widths it overflows its container.
+
+**Done when.**
+- Narrowing the terminal **never** overlaps the logo or any app chrome.
+- Below a width threshold the actions collapse into a single **hamburger (☰)**
+  button that opens a menu containing *every* action (dock target, pop out,
+  split right, split down, close) — the mobile-nav pattern.
+- Above the threshold the inline buttons return unchanged.
+- The menu is keyboard reachable (focusable trigger, Esc closes, arrow/tab
+  through items) and the actions keep their current labels/behaviour.
+- Applies to the left dock at minimum; check the bottom dock doesn't regress.
+
+**Reference.** Screenshot: `TERMINAL  dock ▾  pop ↖  split ▸  split ▾  close`
+running over the app's logo strip.
+
+---
+
+## Notes
+
+- BL-1/2/3 are all in the agent panel and could ship as one pass.
+- BL-2's "Send becomes Stop" is the nicer end state but is optional — unblocking
+  typing is the actual ask.

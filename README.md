@@ -150,6 +150,7 @@ Full detail: [docs/architecture.md](docs/architecture.md) (+ [the M2 addendum](d
 | [architecture](docs/architecture.md) | Process model, IPC contract, coding standards |
 | [architecture-m2](docs/architecture-m2.md) | Handoff schema v2, app-db, poller, contracts, wizards |
 | [DESIGN](docs/DESIGN.md) | The design system — tokens, layout, component rules |
+| [BACKLOG](docs/plan/BACKLOG.md) | Captured future work — symptom, cause (file:line), and acceptance criteria per item |
 
 ## License
 

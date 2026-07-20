@@ -105,6 +105,7 @@ import {
   listClientInbox as listClientInboxLib,
   type InboxItem,
 } from 'loredex'
+import { toVaultRelative } from '../shared/handoff-lanes'
 import { abbreviatePath } from '../shared/identity'
 import { type DuplicateGroup, findDuplicates, type NoteRecord } from './duplicates'
 import { gitLog, withGitIdentity } from './git'
@@ -421,6 +422,47 @@ export function createSnapshot(
 /** WP-C: list snapshots for a client (all units, or one) — read-only, no commit. */
 export function listSnapshotsFor(client: string, unit?: string): SnapshotSummary[] {
   return listSnapshotsLib(getConfig().vaultPath, client, unit)
+}
+
+/**
+ * BL-19: what changed in this note on its most recent commit — the before/after
+ * pair the reader's Changes panel renders (same two-column shape the agent's
+ * tool diffs use). Read-only: git queries only, never a write.
+ *
+ * `oldText` is the note's content at the commit BEFORE the last one that
+ * touched it; null means the note was created by that commit (nothing before).
+ * Returns null when the note has no git history at all (untracked / no repo).
+ */
+export function noteDiff(
+  path: string,
+): { rel: string; oldText: string | null; newText: string; sha: string; subject: string; when: string } | null {
+  const config = getConfig()
+  const resolved = resolveInVault(path)
+  const rel = toVaultRelative(resolved, config.vaultPath)
+  const show = (args: readonly string[]): string | null => {
+    try {
+      return gitLog(config.vaultPath, args)
+    } catch {
+      return null // no repo / unknown ref / path not in that commit
+    }
+  }
+  // the last two commits that touched this note, newest first
+  const historyRaw = show(['log', '-2', '--format=%H%x1f%s%x1f%aI', '--', rel])
+  if (historyRaw === null) return null
+  const lines = historyRaw.split('\n').filter(Boolean)
+  const [head, prev] = lines.map((l) => l.split('\x1f'))
+  if (!head?.[0]) return null // never committed
+  const newText = readFileSync(resolved, 'utf8')
+  // no previous commit → the note was born in `head`, so there is no "before"
+  const oldText = prev?.[0] ? show(['show', `${prev[0]}:${rel}`]) : null
+  return {
+    rel,
+    oldText,
+    newText,
+    sha: head[0],
+    subject: head[1] ?? '',
+    when: head[2] ?? '',
+  }
 }
 
 // ── WP-G: scaffold + inbox (agent-ops; each write = reindex + one commit) ────

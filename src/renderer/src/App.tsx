@@ -3,10 +3,18 @@
  * identity chip), contextual list pane, reader. v0.1 nav: Reader, Handoffs
  * (open-count badge), Settings.
  */
-import { Fragment, useEffect } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import { appActions, visibleViews } from './actions/registry'
 import { isTypingTarget, matchShortcut } from './actions/shortcuts'
-import { onEvent, onJoinLink, onOpenAgent, onOpenHandoff, onVaultChanged, popoutMode } from './api'
+import {
+  onEvent,
+  onJoinLink,
+  onOpenAgent,
+  onOpenHandoff,
+  onOpenNote,
+  onVaultChanged,
+  popoutMode,
+} from './api'
 import { parseJoinLink } from '../../shared/join-link'
 import { AgentPanel } from './agent/AgentPanel'
 import { AgentPermissionModal } from './agent/AgentPermissionModal'
@@ -112,6 +120,8 @@ export default function App(): React.JSX.Element {
   // pop-out windows (?popout=chat|terminal): this window mounts ONLY that panel,
   // full-window, not the full app shell
   const popout = popoutMode()
+  // BL-18: the note path can arrive before the core is ready — hold it here
+  const pendingNoteRef = useRef<string | null>(null)
   useEffect(() => {
     if (popout === 'chat' && !useAgentPanel.getState().open) void useAgentPanel.getState().toggle()
     // the terminal spawn needs the core host — wait until the window reports
@@ -119,6 +129,22 @@ export default function App(): React.JSX.Element {
     // root===null opens AND spawns the shell at the vault root.
     if (popout === 'terminal' && status === 'ready' && useTerminal.getState().root === null)
       void useTerminal.getState().toggle()
+  }, [popout, status])
+
+  // BL-18: a popped-out note window is handed its path post-load (mirrors the
+  // agent pop-out). Wait for the core, then open it in this window's reader.
+  useEffect(() => {
+    if (popout !== 'note') return
+    return onOpenNote((notePath) => {
+      pendingNoteRef.current = notePath
+      if (useApp.getState().status === 'ready') void useReader.getState().open(notePath)
+    })
+  }, [popout])
+
+  useEffect(() => {
+    if (popout !== 'note' || status !== 'ready') return
+    const p = pendingNoteRef.current
+    if (p) void useReader.getState().open(p)
   }, [popout, status])
 
   // dex-type boot race: the first load() can beat the core host and fail; once
@@ -253,6 +279,11 @@ export default function App(): React.JSX.Element {
             <AgentPanel />
             <AgentPermissionModal />
           </>
+        ) : popout === 'note' ? (
+          // BL-18: reader-only window — the note fills it, no app shell
+          <main className="pane-reader popout-note-pane">
+            <ReaderSurface />
+          </main>
         ) : (
           <TerminalDrawer />
         )}

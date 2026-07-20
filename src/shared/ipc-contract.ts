@@ -513,6 +513,19 @@ export interface CoreApi {
    *  compare; stale=true means the vault copy is behind its source. Re-route is
    *  the ordinary route() write, not a channel. */
   'vault.drift': { in: { path: string }; out: { stale: boolean; source?: string } }
+  /** BL-19: before/after for a note's most recent commit — the reader's Changes
+   *  panel. null when the note has no git history. oldText null = created then. */
+  'note.diff': {
+    in: { path: string }
+    out: {
+      rel: string
+      oldText: string | null
+      newText: string
+      sha: string
+      subject: string
+      when: string
+    } | null
+  }
   'sync.status': { in: void; out: SyncHealth } // (lib PR-4)
   'sync.run': { in: void; out: SyncReport } // (lib PR-5)
   /** app-local contract evolution (story 5.2): engine/schema handshake (NFR8) */

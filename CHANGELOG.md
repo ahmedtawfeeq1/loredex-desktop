@@ -7,6 +7,27 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-07-20
+
+### Added
+- **Open a note straight from the chat.** When a tool creates or updates a
+  markdown note, the tool row now carries an `↗ <name>` button that opens it in
+  the reader — and it *switches to the Reader* first, so the click works from
+  Clients, Atlas, anywhere. (Previously the note loaded invisibly behind the
+  current view.)
+- **Pop a note out into its own window.** `⧉ Pop out` on any note, the same
+  affordance chat and the terminal already had. The window is reader-only: no
+  sidebar, no rails, just the note.
+- **Before/after review on a note.** `⇄ Changes` opens a two-column diff of the
+  note's most recent commit — the same review shape the contract timeline gives
+  an API change, now on the note itself. Works in read *and* edit mode, and on
+  research and agent-ops dexes alike (it is plain git history; nothing is
+  written).
+
+### Changed
+- **Note metadata rail starts collapsed.** Notes open at full prose width; the
+  metadata panel is one click away.
+
 ## [0.9.7] - 2026-07-20
 
 ### Added

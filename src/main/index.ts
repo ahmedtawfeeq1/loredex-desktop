@@ -299,6 +299,24 @@ app.whenReady().then(() => {
       return null
     },
   )
+  // BL-18: one note in its own standalone window — same shape as the agent
+  // pop-out: fork a core on this vault, then hand the note path to the fresh
+  // renderer once it has loaded (its own did-finish-load, after brokering).
+  ipcMain.handle(
+    'loredex:open-note-window',
+    (_event, arg: { vaultPath?: string | null; notePath: string }) => {
+      const vaultPath =
+        typeof arg?.vaultPath === 'string' && arg.vaultPath ? arg.vaultPath : loadVaultPath()
+      const win = openWindow(vaultPath, 'note')
+      const notePath = arg?.notePath
+      if (typeof notePath === 'string' && notePath) {
+        win.webContents.once('did-finish-load', () => {
+          win.webContents.send('open-note', notePath)
+        })
+      }
+      return null
+    },
+  )
   // story 7.4: native markdown picker for route-a-note (no business logic here)
   ipcMain.handle('loredex:pick-route-file', (event) => pickRouteFileDialog(windowFor(event)))
   // story 11.1: native folder picker for contract project roots (TCC rule)

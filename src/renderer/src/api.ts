@@ -22,6 +22,8 @@ declare global {
       openInNewWindow(vaultPath?: string): Promise<null>
       openAgentWindow(vaultPath: string | null, conversationId: string): Promise<null>
       openTerminalWindow(vaultPath: string | null): Promise<null>
+      openNoteWindow(vaultPath: string | null, notePath: string): Promise<null>
+      onOpenNote(cb: (notePath: string) => void): Unsubscribe
       onJoinLink(cb: (url: string) => void): Unsubscribe
       onOpenAgent(cb: (conversationId: string) => void): Unsubscribe
       pathForFile(file: File): string
@@ -117,11 +119,25 @@ export function openTerminalWindow(vaultPath: string | null): Promise<null> {
   return window.loredex.openTerminalWindow(vaultPath)
 }
 
+/** BL-18: open one note in its own standalone window (mirrors the chat/terminal
+ *  pop-out: own core host, same vault, reader-only). */
+export function openNoteWindow(vaultPath: string | null, notePath: string): Promise<null> {
+  return window.loredex.openNoteWindow(vaultPath, notePath)
+}
+
+/** BL-18: a popped-out note window receives its path post-load. */
+export function onOpenNote(cb: (notePath: string) => void): Unsubscribe {
+  return window.loredex.onOpenNote(cb)
+}
+
 /** The pop-out mode of THIS window, read from the ?popout= URL query at load
  *  (main sets it per createMainWindow). null for the normal full app window. */
-export function popoutMode(): 'chat' | 'terminal' | null {
+export function popoutMode(): 'chat' | 'terminal' | 'note' | null {
+  // BL-18 put this on a render path (ModeToggle), so it now runs under the
+  // node-env design-fidelity tests too — no window there, and no pop-out either
+  if (typeof window === 'undefined') return null
   const m = new URLSearchParams(window.location.search).get('popout')
-  return m === 'chat' || m === 'terminal' ? m : null
+  return m === 'chat' || m === 'terminal' || m === 'note' ? m : null
 }
 
 /** loredex://join deep link (story 13.2): raw URL, parsed by shared/join-link. */

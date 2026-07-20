@@ -22,9 +22,11 @@ import { EditorState, Prec } from '@codemirror/state'
 import { drawSelection, EditorView, highlightActiveLine, keymap } from '@codemirror/view'
 import type { Doc } from '../../../../shared/ipc-contract'
 import type { Identity } from '../../../../shared/types'
+import { openNoteWindow, popoutMode } from '../../api'
 import { useAgentPanel } from '../../stores/agentPanel'
 import { useApp } from '../../stores/app'
 import { useEditor } from '../../stores/editor'
+import { useNoteDiff } from '../../stores/noteDiff'
 import { actionCommand, applyAction, selectionText, type ToolbarAction } from './editorCommands'
 import { EDITOR_V2_CSS, editorChrome, markdownHighlight } from './editorTheme'
 import { FrontmatterPanel } from './NoteView'
@@ -60,6 +62,55 @@ const TOOLBAR: Array<Array<{ action: ToolbarAction | 'undo' | 'redo'; label: str
   ],
 ]
 
+/**
+ * BL-19: this note's before/after, from git — the same two-column review the
+ * contract timeline gives an API change, on the note itself. Opens under the
+ * mode bar in BOTH read and edit mode (it hangs off ModeToggle), and closes on
+ * a second click of ⇄ Changes.
+ */
+export function NoteChangesPanel({ selected }: { selected: string }): React.JSX.Element | null {
+  const path = useNoteDiff((s) => s.path)
+  const diff = useNoteDiff((s) => s.diff)
+  const busy = useNoteDiff((s) => s.busy)
+  const error = useNoteDiff((s) => s.error)
+  // the store holds one note at a time; a different note's panel is not ours
+  if (path !== selected) return null
+  return (
+    <section className="note-changes" aria-label="What changed in this note">
+      <header className="note-changes-head">
+        <strong>Changes</strong>
+        {diff && (
+          <span className="note-changes-meta" title={diff.sha}>
+            {diff.subject || diff.sha.slice(0, 7)}
+            {diff.when ? ` · ${new Date(diff.when).toLocaleString()}` : ''}
+          </span>
+        )}
+        <span style={{ flex: 1 }} />
+        <button type="button" title="Close" onClick={() => useNoteDiff.getState().close()}>
+          ✕
+        </button>
+      </header>
+      {busy && <p className="note-changes-empty">Reading history…</p>}
+      {error && <p className="note-changes-empty">{error}</p>}
+      {diff && (
+        <>
+          {diff.oldText === null && (
+            <p className="note-changes-empty">This note was created in that commit — no “before”.</p>
+          )}
+          <div className="tool-diff" aria-label={`Diff of ${diff.rel}`}>
+            <pre className="tool-diff-col tool-diff-old" tabIndex={0} dir="auto">
+              {diff.oldText ?? ''}
+            </pre>
+            <pre className="tool-diff-col tool-diff-new" tabIndex={0} dir="auto">
+              {diff.newText}
+            </pre>
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
 export function ModeToggle({
   selected,
   doc,
@@ -72,6 +123,7 @@ export function ModeToggle({
   unsaved: boolean
 }): React.JSX.Element {
   return (
+    <>
     <div className="note-mode" role="group" aria-label="Note mode">
       <button
         type="button"
@@ -91,7 +143,34 @@ export function ModeToggle({
         Edit
       </button>
       {unsaved && <span className="unsaved-dot" title="Unsaved changes (⌘S to save)" />}
+      <span style={{ flex: 1 }} />
+      {/* BL-19: before/after for this note, from git — the same review shape the
+          contract timeline uses, on the note itself. */}
+      <button
+        type="button"
+        className="note-mode-extra"
+        title="Show what changed in this note (before / after)"
+        onClick={() => void useNoteDiff.getState().open(selected)}
+      >
+        ⇄ Changes
+      </button>
+      {/* BL-18: this note in its own window — same pop-out as chat/terminal */}
+      {popoutMode() === null && (
+        <button
+          type="button"
+          className="note-mode-extra"
+          title="Open this note in its own window"
+          onClick={() => {
+            const vaultPath = useApp.getState().identity?.vaultPath ?? null
+            void openNoteWindow(vaultPath, selected)
+          }}
+        >
+          ⧉ Pop out
+        </button>
+      )}
     </div>
+    <NoteChangesPanel selected={selected} />
+    </>
   )
 }
 

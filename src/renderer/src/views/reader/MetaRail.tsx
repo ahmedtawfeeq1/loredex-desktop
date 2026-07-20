@@ -32,9 +32,11 @@ const STATUS_TONE: Record<string, string> = {
   consumed: 'is-mut',
 }
 
-/** meta-rail collapse — session state; full-width reading on demand. */
+/** meta-rail collapse — session state; full-width reading on demand.
+ *  BL-17: collapsed by DEFAULT — you open a note to read it, not to read its
+ *  metadata; the rail is one click away when you want it. */
 export const useMetaRail = create<{ collapsed: boolean; toggle(): void }>((set) => ({
-  collapsed: false,
+  collapsed: true,
   toggle: () => set((s) => ({ collapsed: !s.collapsed })),
 }))
 

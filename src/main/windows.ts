@@ -4,7 +4,7 @@ import { BrowserWindow, shell } from 'electron'
 /** A standalone pop-out shows ONE panel filling the window (chat or terminal),
  *  not the full app — signalled to the renderer via a `?popout=` URL query read
  *  at first render (no full-app flash), and given a smaller frame. */
-export type PopoutMode = 'chat' | 'terminal'
+export type PopoutMode = 'chat' | 'terminal' | 'note'
 
 /** Main is logic-free: window creation + wiring only (architecture.md#process-model). */
 export function createMainWindow(popout?: PopoutMode): BrowserWindow {

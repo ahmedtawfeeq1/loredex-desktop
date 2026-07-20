@@ -398,6 +398,8 @@ export function registerCoreHandlers(
   // "Open in Terminal" opens the IN-APP terminal drawer at this dir (renderer
   // side); the core just resolves the absolute path cross-platform.
   ipc.register('clients.dirAbs', ({ client }) => ({ dir: engine.clientDirAbs(client) }))
+  // BL-19: read-only note history — the reader's before/after Changes panel
+  ipc.register('note.diff', ({ path }) => engine.noteDiff(path))
   // WP-C: snapshot a pipeline/agent into _versions/<unit>/<stamp>/ (agent-ops).
   // One attributed commit under the write lock; the stamp is minted here (the
   // clock lives host-side, not in the lib). A fresh Versions list is the

@@ -369,6 +369,79 @@ so RTL scripts lay out correctly.
 
 ---
 
+## BL-16 — No way to open a note the agent just created/updated
+
+**Status:** done (v0.9.8) · **Area:** agent panel → reader · **Size:** S
+
+**Symptom.** The chat says a note was written, but there is no button to open
+it. Clicking a file ref inside an expanded tool row from the Clients or Atlas
+view appeared to do *nothing*.
+
+**Cause — two.** (1) Openable refs lived only in the *expanded* tool body, so a
+collapsed row gave no affordance at all. (2) `openFileRef` loaded the note into
+the reader store but never switched the view — off the Reader tab the note
+loaded invisibly behind whatever was on screen.
+
+**Shipped.** Markdown refs now render as `↗ <name>` buttons on the tool line
+itself (`stopPropagation` so they don't toggle the row), and `openFileRef` calls
+`setView('reader')` before `open(rel)`. Non-markdown refs stay in the expanded
+body — there is no reader view for them.
+
+---
+
+## BL-17 — Note metadata rail expanded by default
+
+**Status:** done (v0.9.8) · **Area:** reader · **Size:** XS
+
+**Symptom.** Every note opened with the right-hand metadata panel expanded,
+pushing the prose narrow before you had read a word.
+
+**Shipped.** `useMetaRail` defaults to `collapsed: true`. The rail is one click
+away and its collapsed state still persists per the existing rails setting.
+
+---
+
+## BL-18 — Pop a note out into its own window
+
+**Status:** done (v0.9.8) · **Area:** reader · **Size:** M
+
+**Ask.** The same `⧉` pop-out chat and the terminal already have, on a note —
+so a reference note can sit beside the app instead of inside it.
+
+**Shipped.** `PopoutMode` widened to `'chat' | 'terminal' | 'note'`; a new
+`loredex:open-note-window` main handler forks a window in `note` mode and sends
+it the path once loaded. The window mounts the reader surface alone (no shell,
+no rails). The path can arrive before the core host is brokered, so it is held
+in a ref and opened on `status === 'ready'`. The `⧉ Pop out` button hides
+inside a pop-out (`popoutMode() === null`) — no pop-outs of pop-outs.
+
+`popoutMode()` also gained a `typeof window === 'undefined'` guard: BL-18 put it
+on a render path, and the design-fidelity tests render in the node env.
+
+---
+
+## BL-19 — Review before/after for a note that changed
+
+**Status:** done (v0.9.8) · **Area:** reader · **Size:** M
+
+**Ask.** The contract timeline gives an API change a two-column before/after.
+A note an agent just rewrote deserves the same read, on the note itself.
+
+**Shipped.** `engine.noteDiff(path)` reads the last two commits touching the
+note (`git log -2` + `git show <prev>:<rel>`) and returns
+`{rel, oldText, newText, sha, subject, when}` — `oldText` null when the head
+commit *created* the note. Exposed as the read-only `note.diff` channel, held by
+a `useNoteDiff` store (opening the same note twice toggles it closed; a slow
+read for note A is dropped if note B was opened meanwhile), and rendered by
+`NoteChangesPanel` under the mode bar in **both** read and edit mode, reusing
+the `.tool-diff` two-column shape. `dir="auto"` on both columns so RTL notes
+read correctly.
+
+It is plain git history, so it works identically on research and agent-ops
+dexes — no `requireAgentOps` guard needed, and nothing is written.
+
+---
+
 ## Notes
 
 - BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1

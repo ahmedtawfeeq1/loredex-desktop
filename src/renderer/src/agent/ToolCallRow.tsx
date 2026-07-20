@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '../api'
 import type { AcpChatItem } from '../stores/agentPanel'
+import { useApp } from '../stores/app'
 import { useReader } from '../stores/reader'
 import type { AcpToolContent } from '../../../shared/ipc-contract'
 import { findTextRange } from '../views/reader/anchorHighlight'
@@ -147,6 +148,9 @@ async function openFileRef(abs: string, needle?: string): Promise<void> {
     return
   }
   if (rel === abs) return // still absolute → outside the vault, nothing to open
+  // BL-16: loading the note is not enough — if you're on Clients/Atlas/etc the
+  // Reader isn't on screen, so the click looked like it did nothing. Navigate.
+  useApp.getState().setView('reader')
   await useReader.getState().open(rel)
   if (needle) scrollNoteToText(needle)
 }
@@ -188,6 +192,9 @@ export function ToolCallRow({ item }: { item: ToolItem }): React.JSX.Element {
   const diffs = (item.content ?? []).filter((c): c is ToolDiffContent => c.kind === 'diff')
   const texts = (item.content ?? []).filter((c): c is ToolTextContent => c.kind === 'text')
   const refs = collectRefs(item)
+  // BL-16: only markdown refs are openable in the reader — those get a button
+  // on the row itself; the rest stay in the expanded body.
+  const mdRefs = refs.filter((f) => isMarkdown(f.abs))
   // BL-14: an input alone is worth expanding for — a tool with no output yet
   // (pending/running) can now still be inspected
   const expandable = diffs.length > 0 || texts.length > 0 || refs.length > 0 || Boolean(item.input)
@@ -202,7 +209,29 @@ export function ToolCallRow({ item }: { item: ToolItem }): React.JSX.Element {
           {elapsed}
         </span>
       )}
-      {item.title}
+      <span className="agent-tool-title">{item.title}</span>
+      {/* BL-16: notes this tool wrote are openable straight from the row — no
+          expanding first. The whole point of a note appearing in chat is to go
+          read it. */}
+      {mdRefs.length > 0 && (
+        <span className="agent-tool-open" onClick={(e) => e.stopPropagation()}>
+          {mdRefs.slice(0, 3).map((f) => (
+            <button
+              key={f.abs}
+              type="button"
+              className="agent-tool-open-btn"
+              title={`Open ${basename(f.abs)} in the reader`}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                void openFileRef(f.abs, f.needle)
+              }}
+            >
+              ↗ {basename(f.abs).replace(/\.md$/i, '')}
+            </button>
+          ))}
+        </span>
+      )}
     </>
   )
 

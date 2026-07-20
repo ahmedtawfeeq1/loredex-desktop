@@ -5948,6 +5948,76 @@ a.commit-chip-sha:hover {
   flex: none;
 }
 
+/* BL-18/BL-19: ⇄ Changes and ⧉ Pop out sit past a hairline so they read as
+   actions on the note, not as a third Read/Edit mode. */
+.note-mode-extra {
+  border-left: 1px solid var(--hairline) !important;
+  color: var(--text-3) !important;
+}
+
+.note-mode-extra:hover {
+  background: var(--bg-hover);
+  color: var(--text-1) !important;
+}
+
+/* BL-19: the note's before/after. `clear: both` because .note-mode floats
+   right — without it the panel would tuck in beside the mode bar. */
+.note-changes {
+  clear: both;
+  margin: 8px 0 16px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.note-changes-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.note-changes-meta {
+  font: 10px var(--font-mono);
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.note-changes-head button {
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.note-changes-empty {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* the diff itself reuses .tool-diff verbatim; only the height differs — a note
+   is longer than a tool patch, so give it room before it scrolls. */
+.note-changes .tool-diff-col {
+  max-height: 52vh;
+}
+
+/* BL-18: a popped-out note owns its whole window — no list rail, no rails */
+.popout-note-pane {
+  grid-column: 1 / -1;
+  height: 100vh;
+  overflow: auto;
+}
+
 .fm-locked {
   opacity: 0.85;
 }
@@ -8578,6 +8648,40 @@ a.button-primary {
   font: 10px var(--font-mono);
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
+}
+
+/* BL-16: the title has to yield so the ↗ open buttons stay on the row */
+.agent-tool-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* BL-16: one-click "open the note this tool touched" — right on the tool line,
+   so a created/updated note never needs hunting for in the reader tree. */
+.agent-tool-open {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.agent-tool-open-btn {
+  font: 10px var(--font-mono);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.agent-tool-open-btn:hover {
+  background: var(--bg-hover);
 }
 
 /* BL-7: collapsed header chrome — one line carrying the live essentials, with

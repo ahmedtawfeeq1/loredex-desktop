@@ -57,6 +57,14 @@ contextBridge.exposeInMainWorld('loredex', {
     ipcRenderer.invoke('loredex:open-agent-window', { vaultPath, conversationId }),
   openTerminalWindow: (vaultPath: string | null): Promise<null> =>
     ipcRenderer.invoke('loredex:open-terminal-window', { vaultPath }),
+  // BL-18: one note in its own window
+  openNoteWindow: (vaultPath: string | null, notePath: string): Promise<null> =>
+    ipcRenderer.invoke('loredex:open-note-window', { vaultPath, notePath }),
+  onOpenNote: (cb: (notePath: string) => void): (() => void) => {
+    const listener = (_e: unknown, notePath: string): void => cb(notePath)
+    ipcRenderer.on('open-note', listener)
+    return () => ipcRenderer.removeListener('open-note', listener)
+  },
   // story 10.7: atlas export — bytes rendered in the page, saved via a native panel
   saveExport: (defaultName: string, data: string | ArrayBuffer): Promise<string | null> =>
     ipcRenderer.invoke('loredex:save-export', defaultName, data),

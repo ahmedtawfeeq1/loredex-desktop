@@ -6,11 +6,19 @@
 import { create } from 'zustand'
 import type { CoreApi } from '../../../shared/ipc-contract'
 import { invoke } from '../api'
+import { isErrEnvelope } from '../../../shared/ipc-contract'
 
 type Row = CoreApi['workspace.mcp.list']['out'][number]
 type Tools = CoreApi['workspace.mcp.tools']['out']
 type Skills = CoreApi['workspace.skills.status']['out']
 type N8n = CoreApi['workspace.n8n.get']['out']
+
+/** The IPC layer rejects with a typed ENVELOPE, not an Error — `String(envelope)`
+ *  renders the useless `[object Object]`. Every store here must unwrap it. */
+function reason(e: unknown): string {
+  if (isErrEnvelope(e)) return e.message
+  return e instanceof Error ? e.message : String(e)
+}
 
 interface State {
   rows: Row[]
@@ -67,7 +75,7 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
     } catch (e) {
       // and a failure must SAY so rather than leaving an empty section that
       // looks like a UI that does nothing
-      set({ busy: false, error: e instanceof Error ? e.message : String(e) })
+      set({ busy: false, error: reason(e) })
     }
     try {
       set({ skills: await invoke('workspace.skills.status', undefined) })
@@ -89,7 +97,7 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
       set((s) => ({
         tools: {
           ...s.tools,
-          [id]: { ok: false, tools: [], detail: e instanceof Error ? e.message : String(e) },
+          [id]: { ok: false, tools: [], detail: reason(e) },
         },
       }))
     }
@@ -113,7 +121,7 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
       // wrong key surface later as an agent tool failure mid-conversation
       await get().testN8n()
     } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) })
+      set({ error: reason(e) })
     }
   },
 
@@ -122,7 +130,7 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
     try {
       set({ test: await invoke('workspace.n8n.test', undefined), testing: false })
     } catch (e) {
-      set({ testing: false, test: { ok: false, detail: e instanceof Error ? e.message : String(e) } })
+      set({ testing: false, test: { ok: false, detail: reason(e) } })
     }
   },
 

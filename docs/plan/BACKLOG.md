@@ -145,6 +145,23 @@ continuation now, so a continued session currently **displays a client scope it
 doesn't actually have**. Fixing the cwd makes the chip truthful again; until
 then the chip over-promises.
 
+**Also reproduces on pop-out — and looks like a *different* bug.** Popping a
+client-scoped chat into its own window loses the client's MCP while `loredex`
+keeps working, which reads as "MCP partially died". It isn't: the two servers
+arrive by different routes.
+
+| Server | Delivery | Survives pop-out? |
+|---|---|---|
+| `loredex` | **Injected** by the app at spawn as a runtime HTTP server (`core/acp.ts:478–505`); in a secondary window it falls back to `readDiscovery()` and connects to the **main window's** host | ✅ by design |
+| a client's server (e.g. `genudo`) | **File-registered** in `projects/<client>/.mcp.json`, discovered by the adapter **from the cwd at startup** | ❌ cwd is the vault root |
+
+Pop-out path: `resumeConversation` (`stores/agentPanel.ts:684`) → `startContinuation`
+→ `agent.continue` → the hardcoded vault-root cwd above. So the popped-out
+session never had the client's server — the agent correctly reports
+*"Current root `.mcp.json` only has loredex"*. Restoring the cwd fixes pop-out,
+reopen-from-history, and provider switch in one change; no separate pop-out MCP
+work is needed.
+
 **Done when.**
 - The conversation persists its working directory (new **additive, nullable**
   `cwd` column — next free migration index; `client_slug` already took one).

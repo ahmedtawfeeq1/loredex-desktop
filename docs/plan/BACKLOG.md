@@ -518,6 +518,41 @@ file elsewhere.
 
 ---
 
+## BL-23 — Identity looks unsaved on every app open, and blocks editing
+
+**Status:** done (v0.9.10) · **Area:** settings / reader · **Size:** S
+
+**Symptom.** Open the app, open a note, try to edit — "Editing needs an
+identity", Save disabled. Go to Settings and the identity is *right there*,
+filled in. Save it again and editing works. Every launch, again.
+
+**Cause.** The identity persists perfectly (`app.db`, via `saveIdentityProfile`).
+It was just never **loaded at boot**. `useIdentity.load()` had exactly three call
+sites — the Settings form, the create-vault wizard, and the Inbox — so a launch
+straight into the Reader left the store at its initial `profile: null,
+ambient: null`. Editing gates on that store, so it refused. Visiting Settings
+ran the load as a side effect of rendering the form, which is why re-saving
+"fixed" it and why the value always looked present once you went looking.
+
+A second, smaller edge rode along: `loaded` starts `false`, and a null profile
+before the load has run means *"not known yet"*, not *"none saved"*. The editor
+treated both as "none" and printed the error during the async load even once the
+boot call existed.
+
+**Shipped.**
+1. `useIdentity.load()` joins the boot effect in `App.tsx`, next to the dex,
+   rails, terminal and agent-panel loads — and re-runs on vault change, since
+   the ambient git identity is per-repo.
+2. `identityLoaded` rides down to `NoteEditor` as a prop (matching the file's
+   "store state rides down as props" rule, which keeps it statically testable).
+   The "needs an identity" message only appears once the load has finished and
+   genuinely found none. Save's `disabled` is unchanged — it already keys off the
+   effective identity prop, and gating it on the load flag only made it dead.
+
+Two regression tests cover both directions of the flag.
+
+---
+
 ## Notes
 
 - BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1

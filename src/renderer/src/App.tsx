@@ -31,6 +31,7 @@ import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
 import { useDex } from './stores/dex'
+import { useIdentity } from './stores/identity'
 import { useFileSearch } from './stores/fileSearch'
 import { useFind } from './stores/find'
 import { useHandoffs } from './stores/handoffs'
@@ -160,6 +161,12 @@ export default function App(): React.JSX.Element {
     void useTerminal.getState().load()
     void useAgentPanel.getState().load()
     void useTreeSections.getState().load()
+    // BL-23: identity gates every write (it stamps the git commits), but it was
+    // only ever loaded by the Settings form, the wizard and the Inbox. Boot
+    // straight into the Reader and the store still held null, so editing said
+    // "Editing needs an identity" even though one was saved — and visiting
+    // Settings "fixed" it, which read as the identity not persisting.
+    void useIdentity.getState().load()
     // menu-driven vault change (main) → refresh identity + reset the stores
     return onVaultChanged(() => {
       useDex.getState().reset()
@@ -193,6 +200,7 @@ export default function App(): React.JSX.Element {
       void init()
       void useRails.getState().load() // the NEW vault's persisted rail state
       void useTreeSections.getState().load() // …and its collapsed sections (16.3)
+      void useIdentity.getState().load() // BL-23: and its ambient git identity
     })
   }, [init])
 

@@ -99,7 +99,28 @@ describe('Addendum D1: edit mode + inline comments (story 16.4)', () => {
     busy: false,
     error: null,
     identity: { name: 'Dana Reyes', email: 'dana@nimbus.dev' },
+    identityLoaded: true,
   }
+
+  /**
+   * BL-23: identity gates saving, and the store starts `loaded: false` with a
+   * null profile. The editor used to read that null as "no identity" and print
+   * "Editing needs an identity" on every note open — before the load that would
+   * have supplied one had even run. It reads as a saved identity being lost.
+   */
+  it('does not claim a missing identity while the identity store is still loading', () => {
+    const out = renderToStaticMarkup(
+      createElement(NoteEditor, { ...editorProps, identity: null, identityLoaded: false }),
+    )
+    expect(out).not.toContain('Editing needs an identity')
+  })
+
+  it('does claim a missing identity once the load has finished with none', () => {
+    const out = renderToStaticMarkup(
+      createElement(NoteEditor, { ...editorProps, identity: null, identityLoaded: true }),
+    )
+    expect(out).toContain('Editing needs an identity')
+  })
 
   it('Read mode renders the mode toggle with Read pressed and an Edit (\u2318E) affordance', () => {
     const out = renderNote('projects/p/t/n.md', 'text\n')

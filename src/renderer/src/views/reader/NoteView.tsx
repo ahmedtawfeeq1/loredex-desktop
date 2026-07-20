@@ -105,6 +105,7 @@ export function NoteView(): React.JSX.Element {
   const busy = useEditor((s) => s.busy)
   const editError = useEditor((s) => s.error)
   const identity = useIdentity((s) => effectiveIdentity(s))
+  const identityLoaded = useIdentity((s) => s.loaded)
   const comments = useComments((s) => (s.path === selected ? s.list : null)) ?? []
   const composerAnchor = useComments((s) => s.composerAnchor)
 
@@ -133,6 +134,7 @@ export function NoteView(): React.JSX.Element {
         busy={busy}
         error={editError}
         identity={identity}
+        identityLoaded={identityLoaded}
       />
     )
   }

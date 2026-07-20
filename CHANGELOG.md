@@ -7,6 +7,18 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-07-20
+
+### Fixed
+- **Your identity no longer looks lost on every launch.** It was always saved —
+  it just wasn't *loaded* at startup unless you happened to open Settings, the
+  Inbox or the vault wizard. Launching straight into the Reader left the app
+  thinking you had no identity, so editing a note refused with "Editing needs an
+  identity" until you re-saved it. Identity now loads with everything else at
+  boot (and reloads on a vault switch, since the fallback git identity is
+  per-repo). The warning also waits for that load to finish before claiming
+  anything is missing.
+
 ## [0.9.9] - 2026-07-20
 
 ### Fixed

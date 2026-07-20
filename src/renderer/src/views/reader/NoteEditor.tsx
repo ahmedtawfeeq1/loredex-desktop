@@ -182,6 +182,7 @@ export function NoteEditor({
   busy,
   error,
   identity,
+  identityLoaded,
 }: {
   selected: string
   doc: Doc
@@ -190,6 +191,10 @@ export function NoteEditor({
   busy: boolean
   error: string | null
   identity: Identity | null
+  /** BL-23: has the identity store finished loading? A null `identity` before
+   *  it has means "not known yet", not "none saved" — the difference between a
+   *  quiet editor and a false "your identity is missing" on every note open. */
+  identityLoaded: boolean
 }): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -329,7 +334,10 @@ export function NoteEditor({
           onClick={() => identity && void useEditor.getState().save(identity)}>
           {busy ? 'Saving…' : 'Save'}
         </Button>
-        {!identity && (
+        {/* BL-23: only claim there's no identity once the load has actually
+            finished — the store starts null, so this used to flash on every
+            note open and read as "my saved identity was lost". */}
+        {!identity && identityLoaded && (
           <p className="modal-error">
             Editing needs an identity.{' '}
             <Button

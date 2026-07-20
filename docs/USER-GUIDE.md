@@ -15,6 +15,9 @@ Everything the app does, view by view. For what the vault itself is (filing rule
 - [Activity](#activity)
 - [Sync](#sync)
 - [Settings](#settings)
+- [Agent-ops: operate a client fleet](#agent-ops-operate-a-client-fleet)
+- [AI agent panels](#ai-agent-panels)
+- [Embedded terminal](#embedded-terminal)
 - [Routing a note](#routing-a-note)
 - [The wizards](#the-wizards)
 - [Command palette](#command-palette)
@@ -115,6 +118,8 @@ The health panel: ahead/behind vs the remote, status warnings (schema mismatches
 
 **Sync now** (⇧⌘S) commits, pulls, and pushes under the app's write lock. In the background a **poller** fetches every 60 seconds while the app is focused (5 minutes in the background), detects teammates' new handoffs and status changes *without merging*, and only integrates (`git pull`) when you're not mid-write and the worktree is clean — the panel shows "behind N" while it waits. After every integrate, views rebuild from disk truth.
 
+On **agent-ops** dexes the poller also **auto-pushes** your local commits once they've settled (~30 seconds after the last one, fast-forward-only, never holding the write lock) — so snapshots, scaffolds, and agent/terminal work reach the team without a manual Sync. A top-bar **"N unpushed"** pill appears if commits linger (offline, no remote). Research dexes stay pull-only, unchanged.
+
 ## Settings
 
 - **Appearance** — system / light / dark.
@@ -122,6 +127,39 @@ The health panel: ahead/behind vs the remote, status warnings (schema mismatches
 - **Contracts** — the project repo folders to scan, plus extra glob patterns for contract files.
 - **GitHub** — shows whether the `gh` CLI is available (that's what powers PR chips and merged-PR suggestions; without it you still get plain commit links). Re-check after installing.
 - **MCP server** — host status and a port override, the sanctioned answer to a port conflict ([details](#mcp-connect-your-agents)).
+- **Agent permissions** *(agent-ops dexes only)* — the always-allow rules an AI chat has saved, per `(client, tool kind)`; remove one to restore the prompt.
+
+## Agent-ops: operate a client fleet
+
+Open an **agent-ops** dex (create one with `loredex init --type agent-ops`, or the create-vault wizard) and a **Clients** view joins the sidebar. It's the operating console for an agency running a fleet of client AI-agent deployments: managers → clients → pipelines/agents → stages.
+
+**The Clients list** groups clients under their manager, each with a health dot (schema problems, pending inbox). Click one for its page.
+
+**A client page** shows everything for one deployment:
+
+- **Pipelines & Agents** — each unit with its ordered stage rail (`01 → 02 → …`); every file name is a link that opens in the Reader. `+ Pipeline` / `+ Agent` create a unit; `+ Stage` inserts one (choosing *At end / Before / After*, renumbering the rest). Each is one attributed commit — you never hand-edit dex files.
+- **Versions** — `⧉ Snapshot` on any unit copies its definition into `_versions/<unit>/<stamp>/` (optionally with a note + the knowledge tables). The Versions section lists snapshots newest-first; a row opens its manifest.
+- **Knowledge tables** — the client's grounding CSVs; **Reveal Folder** opens `knowledge_tables/` in your file manager to drop new ones in.
+- **Credentials** — the client's platform logins, kept in your **OS keychain** (never the dex). Add / Reveal / Copy / Edit / Delete; the list shows metadata only, secrets are fetched on demand.
+- **Agent tooling** — generate `.mcp.json` / `.claude` settings / `AGENTS.md` from `workspace.yml` (**Wire** / **Re-wire**), paste one token per connection, and run a **live connection probe** (green = a real MCP handshake). **Chat Here** and **Open in Terminal** drop an AI chat or the terminal into the client's folder.
+- **Inbox** — intake files pending consumption: **open**, **keep → randoms**, or **delete** each.
+
+**Adding a client** is terminal-free: the Add-Client flow scaffolds the client, copies a golden client's standard tooling with per-client env rewrite, and probes each connection.
+
+Binary files (`.pdf`, `.xlsx`, `.png`, …) in the tree open in your OS default app; folders reveal in Finder/Explorer. All of this is safe on a shared dex — a realpath containment check plus an extension allowlist mean a teammate-committed executable is revealed, never launched.
+
+## AI agent panels
+
+The right-side **agent panel** (toggle in the top bar) is a chat with a coding agent — **Claude Code** or **Codex** — over the Agent Client Protocol:
+
+- Rich markdown, tool-call diffs, a usage/cost meter, and slash-command autocomplete in the composer (Enter sends, Shift+Enter for a newline); attach images where the agent supports them.
+- **History** (the clock button) reopens past conversations; threads **auto-title** from their first message.
+- **Cross-provider continuation** carries a conversation from one agent to another; **pop-out** runs a chat in its own window.
+- On an agent-ops dex, **Chat Here** scopes a session to a client (a `◈ <client>` chip marks it) so it runs with that client's own MCP servers. When the agent asks permission for a tool, you can tick **"Always allow `<kind>` for `<client>`"** — matching requests then auto-answer with no modal (manage them in **Settings → Agent permissions**). A top-bar badge counts pending requests while the panel is closed.
+
+## Embedded terminal
+
+A full terminal (xterm.js) docks at the bottom or left (top-bar buttons, or **Open in Terminal** on a client). VS Code-style splits let you run several shells; a chat or terminal can pop out into its own window. Local commits it makes are auto-pushed on agent-ops dexes (see [Sync](#sync)).
 
 ## Routing a note
 

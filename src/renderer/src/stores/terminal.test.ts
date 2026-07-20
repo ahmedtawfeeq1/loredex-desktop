@@ -319,6 +319,30 @@ describe('runCommand (B1 one-click login)', () => {
   })
 })
 
+describe('typeIntoActive (setup cards, 2026-07-20)', () => {
+  it('types the command with NO trailing newline — the user presses Enter, not us', async () => {
+    useTerminal.setState({ root: { kind: 'term', id: 't3' }, activeId: 't3' })
+    await useTerminal.getState().typeIntoActive('/plugin install czlonkowski/n8n-skills')
+    expect(invoke).toHaveBeenCalledWith('term.input', {
+      id: 't3',
+      data: '/plugin install czlonkowski/n8n-skills',
+    })
+  })
+
+  it('falls back to the first pane when nothing is focused', async () => {
+    useTerminal.setState({ root: { kind: 'term', id: 't7' }, activeId: null })
+    await useTerminal.getState().typeIntoActive('npm install n8n-mcp')
+    expect(invoke).toHaveBeenCalledWith('term.input', { id: 't7', data: 'npm install n8n-mcp' })
+  })
+
+  it('no-ops with no pty at all — never throws, never spawns', async () => {
+    useTerminal.setState({ root: null, activeId: null })
+    await expect(useTerminal.getState().typeIntoActive('x')).resolves.toBeUndefined()
+    expect(invoke).not.toHaveBeenCalledWith('term.input', expect.anything())
+    expect(invoke).not.toHaveBeenCalledWith('term.create', expect.anything())
+  })
+})
+
 describe('dock + width — left dock (2026-07-19)', () => {
   it('toggleDock flips bottom ↔ left and persists the new dock', () => {
     expect(useTerminal.getState().dock).toBe('bottom')

@@ -51,6 +51,10 @@ interface TerminalState {
    *  so the user reuses the same subscription, no API key. Best-effort: no core
    *  / spawn refused → no-op, never throws. */
   runCommand(command: string): Promise<void>
+  /** Type text into the focused pty WITHOUT a trailing newline — the setup cards
+   *  put a command in front of the user; they press Enter, not us. We never
+   *  auto-execute something we just asked them to check. */
+  typeIntoActive(text: string): Promise<void>
   /** open the drawer with a pty rooted at `cwd` — the client page's
    *  "Open in Terminal" so `claude` runs in that client's folder, in-app. */
   openAt(cwd: string): Promise<void>
@@ -228,6 +232,18 @@ export const useTerminal = create<TerminalState>((set, get) => ({
     const data = command.endsWith('\n') ? command : `${command}\n`
     try {
       await invoke('term.input', { id, data })
+    } catch {
+      // pty died / no bridge (node tests) — best-effort
+    }
+  },
+
+  async typeIntoActive(text) {
+    const { root, activeId } = get()
+    const id = activeId ?? (root ? firstTermId(root) : null)
+    if (!id) return // nothing focused / no core — best-effort, never throw
+    try {
+      // NO trailing newline: the user reads the command and presses Enter.
+      await invoke('term.input', { id, data: text })
     } catch {
       // pty died / no bridge (node tests) — best-effort
     }

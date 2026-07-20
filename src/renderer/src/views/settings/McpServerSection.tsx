@@ -10,6 +10,7 @@ import type { McpLogEntry, McpStatus } from '../../../../shared/types'
 import { invoke } from '../../api'
 import { Button } from '../../components/Button'
 import { useApp } from '../../stores/app'
+import { WorkspaceServersSection } from './WorkspaceServersSection'
 
 function Toggle({
   on,
@@ -188,6 +189,8 @@ export function McpServerSection(): React.JSX.Element {
         status dot lives in the nav — problems visible before you click. state + fix + test always
         together.
       </p>
+
+      <WorkspaceServersSection />
     </>
   )
 }

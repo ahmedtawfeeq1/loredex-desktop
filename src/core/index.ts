@@ -18,6 +18,7 @@ import { registerCoreHandlers, runSuggestionScan } from './handlers'
 import { createCoreIpc } from './ipc'
 import { invalidateLinkIndex } from './links'
 import { bootMcpServer, PREFERRED_MCP_PORT } from './mcp-server'
+import { setUserDataDir } from './paths'
 import { createPoller, type Poller } from './poller'
 import {
   initSettings,
@@ -47,6 +48,7 @@ if (config?.vaultPath) process.parentPort.postMessage({ t: 'vault', path: config
 // then live in its meta table, importing the v0.1 settings.json shim once.
 const userDataFlag = process.argv.indexOf('--user-data')
 const userDataDir = userDataFlag !== -1 ? process.argv[userDataFlag + 1] : undefined
+setUserDataDir(userDataDir)
 const appDb = initAppDb(userDataDir)
 // boot evidence for packaged/dev smokes (story 15.1) — app.db is the ABI canary
 if (appDb && userDataDir) console.log(`[loredex-core] app.db open — ${join(userDataDir, 'app.db')}`)

@@ -206,9 +206,53 @@ both questions instead of two separate dialogs.
 
 ---
 
+## BL-7 — Chat: collapse the header chrome to 3 lines (it eats the thread)
+
+**Status:** open · **Area:** agent panel · **Size:** M
+
+**Symptom.** Before a single message is visible the panel stacks **five** rows of
+chrome — provider chips, a pop-out notice, the session row, CONTINUE IN, the
+context meter, and the SESSION summary. On a short window that's most of the
+panel; the actual conversation is squeezed into what's left.
+
+**Cause / where.** `src/renderer/src/agent/AgentPanel.tsx:686–699` renders them
+as independent stacked rows, none of which collapse together:
+
+| Row | Element | Wanted |
+|---|---|---|
+| provider chips + 🕘 ＋ ⧉ › | panel header | **stays visible** |
+| `⧉ Popped-out window — using the main window's loredex MCP server.` | `.agent-popout-note` (:686) | collapse |
+| `[CC] <title>` · `◈ arabicss` · `● ready` · `×` | `.agent-sessions` → `SessionRow` (:691) | collapse |
+| `CONTINUE IN [CX] Codex [GM] Gemini` | `<ContinueControl>` (:697) | collapse |
+| `▪ CONTEXT ▬▬ 50,879 / 1,000,000 5%` | `<UsageBar>` (:698) | **stays visible** |
+| `▸ SESSION Manual · 142 commands · 1 MCP` | `<SessionInfoPanel>` (:699) | **stays visible** (already a collapsed disclosure) |
+
+**Done when.**
+- Default chrome is **three lines**: (1) provider chips, (2) CONTEXT, (3) the
+  session/tools/MCP summary line.
+- The pop-out notice, session row, and CONTINUE IN collapse into **one**
+  disclosure line that expands to show all of them (and their actions).
+- **Nothing meaningful is lost while collapsed.** The session row currently
+  carries the `◈ <client>` chip, the `● ready`/error state, and the close `×` —
+  surface those in the collapsed summary (a compact `◈ arabicss · ready ×` is
+  enough) rather than hiding state the user needs to see at a glance.
+- CONTINUE IN stays reachable in one click from the collapsed state (it's an
+  action, not just info — a button/menu is fine).
+- The pop-out notice is one-time information; an icon + tooltip is enough, it
+  doesn't need a full row.
+- Collapsed/expanded preference persists per panel (same treatment
+  `SessionInfoPanel` already gets).
+
+**Reference.** Screenshot: five chrome rows above the first message, with the
+thread starting barely a third of the way down the window.
+
+---
+
 ## Notes
 
-- BL-1/2/3 are all in the agent panel and could ship as one pass.
+- BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1
+  (removing the composer strip) and BL-7 (collapsing the header) are the same
+  "give the thread its space back" goal from opposite ends.
 - BL-2's "Send becomes Stop" is the nicer end state but is optional — unblocking
   typing is the actual ask.
 - BL-5 is the highest-value item here: it silently breaks per-client MCP on every

@@ -7,6 +7,70 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-07-20
+
+The **agent-ops app completion** — the desktop grows from a knowledge reader
+into a control surface for a fleet of client AI-agent deployments. Everything
+below is gated to `agent-ops` dexes; a research (default) dex is byte-identical
+to before.
+
+### Added
+- **Client-scoped agent chat** — "Chat Here" on a client page opens the AI panel
+  in that client's folder (materializing its tooling first if stale), so the
+  session runs with the client's own MCP servers. A `◈ <client>` chip marks
+  scoped sessions on the session row and in the history dropdown. Conversations
+  now **auto-title** from their first message.
+- **Snapshots & Versions** — `⧉ Snapshot` on any pipeline/agent versions its
+  definition files into `_versions/<unit>/<stamp>/` as one attributed commit (a
+  note + include-tables option in the dialog). A **Versions** section lists them
+  newest-first; each row opens its manifest in the reader. Backed by the new
+  `loredex snapshot` command + `vault_snapshot` MCP tool, which can also capture
+  live platform state fetched via the client's own MCP.
+- **Client credentials** — a per-client login card keeps platform usernames/
+  passwords in your OS keychain (never the dex): masked rows with Reveal / Copy /
+  Edit / Delete. Secrets live in the keychain (encrypted-file fallback);
+  metadata is stored separately so the card lists logins without touching a
+  secret.
+- **Always-allow permissions** — an agent permission request for a scoped client
+  offers *"Always allow `<kind>` for `<client>`"*; matching requests then
+  auto-answer with no modal. Manage/revoke the rules in **Settings → Agent
+  permissions**. A TopBar badge counts pending requests while the panel is closed.
+- **Open in the OS** — binary docs/images (`.pdf`, `.xlsx`, `.png`, …) in the
+  tree open in your default app; folders and knowledge-tables reveal in Finder/
+  Explorer. Guarded by a realpath containment check + an ext **allowlist** —
+  teammate-committed executables (even symlinked under a safe name) are revealed,
+  never launched.
+- **Scaffold from the UI** — `+ Pipeline` / `+ Agent` / `+ Stage` create units
+  (stage insert renumbers), and an inbox panel consumes intake files (open /
+  keep→randoms / delete) — each one attributed commit. No hand-editing dex files.
+
+### Changed
+- **Auto-push** — the background poller now pushes settled local commits (30s
+  debounce, fast-forward-only, never holds the write lock, fails fast on a bad
+  remote) on agent-ops dexes; a TopBar "N unpushed" pill surfaces commits that
+  linger. Research dexes stay pull-only, exactly as before.
+
+## [0.8.0 – 0.9.3] - 2026-07-17 → 2026-07-19
+
+The platform the agent-ops work builds on (previously unreleased in this log):
+
+### Added
+- **AI agent panels** — chat with Claude Code or Codex over ACP in a side panel:
+  rich markdown, tool-call diffs, usage/cost, slash-command autocomplete, image
+  attachments, provider filter, resize. **Cross-provider continuation** carries a
+  conversation from one agent to another; a **history dropdown** reopens past
+  threads; **pop-out** windows run a chat or terminal standalone.
+- **Embedded terminal** — a VS Code-style terminal (xterm.js) with splits,
+  docked left or bottom, launched at a client's folder from "Open in Terminal".
+- **Add-Client onboarding (agent-ops)** — a terminal-free flow to create a
+  client, copy a golden client's standard tooling with per-client env rewrite,
+  paste one token per connection, and run a live connection probe (green = a real
+  MCP handshake, not just a held token). "Repair structure" normalizes the fleet;
+  "Apply & retry" rebinds the MCP host without relaunch.
+- **Clients view** — the agent-ops fleet: managers → clients → pipelines/agents →
+  stages, per-client pages with the ordered stage rail, knowledge tables,
+  workflows, inbox, and the workspace tooling panel.
+
 ## [0.7.4] - 2026-07-17
 
 ### Changed

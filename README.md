@@ -4,7 +4,7 @@
 
 # Loredex Desktop
 
-**The native control surface for [loredex](https://github.com/ahmedtawfeeq1/loredex) vaults — read the team's knowledge, run the handoff lifecycle, see the whole map. macOS · Windows · Linux.**
+**The native control surface for [loredex](https://github.com/ahmedtawfeeq1/loredex) dexes — read the team's knowledge, run the handoff lifecycle, see the whole map, and operate a fleet of client AI-agent deployments. macOS · Windows · Linux.**
 
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![mac · win · linux](https://img.shields.io/badge/mac%20·%20win%20·%20linux-download-2ea043)](https://github.com/ahmedtawfeeq1/loredex-desktop/releases/latest)
@@ -18,6 +18,12 @@
 [Loredex](https://github.com/ahmedtawfeeq1/loredex) turns scattered agent markdown into one shared vault: filed, indexed, and handed off between projects. Loredex Desktop is the native app for living in that vault, on **macOS, Windows, and Linux**. It embeds the same `loredex` npm package the CLI and agents use — **in-process, one engine** — and puts a UI on everything: a reader with working wikilinks, an inbox/outbox board for the full handoff lifecycle (accept / decline / snooze / consume, replies, threads), a zoomable atlas of the whole vault, an API-contract change timeline, live sync against the team's git remote, and an in-app MCP server so agents on your machine read the exact vault state the app shows.
 
 No Obsidian required, no server, no account. The vault stays a plain markdown folder in git.
+
+A dex comes in two types and the app adapts to each: a **research** dex (the
+default) is the knowledge workflow described below; an **agent-ops** dex turns
+the app into a control room for a fleet of client AI-agent deployments — a
+Clients view, embedded terminal, and client-scoped AI chat panels. See
+[Agent-ops: operate a client fleet](#agent-ops-operate-a-client-fleet).
 
 ## The tour
 
@@ -37,9 +43,29 @@ Nine views, in sidebar order (⌘1–⌘9):
 
 Around the views: create-vault and join-vault wizards (plus `loredex://join` deep links), a first-run screen, native notifications with a dock badge for open handoffs, a ⌘K command palette that lists every action, and a `?` keyboard cheatsheet. Full walkthrough: [docs/USER-GUIDE.md](docs/USER-GUIDE.md).
 
+## Agent-ops: operate a client fleet
+
+Point the app at an **agent-ops** dex (`loredex init --type agent-ops`, or create one in the wizard) and a **Clients** view appears alongside the tour above: your fleet as managers → clients → pipelines/agents → stages. Each client page is the operating console for one deployment.
+
+| Capability | What it does |
+|---|---|
+| **Add Client** | Terminal-free onboarding — create a client, copy a golden client's standard MCP tooling with per-client env rewrite, paste one token per connection, and run a **live connection probe** (green = a real MCP handshake, not just a held token). |
+| **Scaffold** | `+ Pipeline` / `+ Agent` / `+ Stage` create units from the UI (inserting a stage renumbers the rest); an inbox panel consumes intake files (open / keep→randoms / delete). Every write is one attributed commit — no hand-editing dex files. |
+| **Snapshots & Versions** | `⧉ Snapshot` versions a pipeline/agent's definition into `_versions/<unit>/<stamp>/`; a Versions section lists them newest-first. Can also capture live platform state via the client's own MCP. |
+| **Credentials** | Per-client platform logins in your **OS keychain** (never the dex) — masked rows with Reveal / Copy / Edit / Delete. |
+| **Chat Here** | Opens the AI panel in the client's folder (materializing its tooling first if stale), so the session runs with that client's own MCP servers. A `◈ <client>` chip marks scoped sessions; **Always allow `<kind>` for `<client>`** auto-answers matching permission requests. |
+| **Open in Terminal** | Drops the embedded terminal at the client's folder — `claude`/`codex` run in place. |
+
+Two side panels ride every dex and come into their own here:
+
+- **AI agent chat** — talk to Claude Code or Codex over ACP: rich markdown, tool-call diffs, usage/cost, slash-command autocomplete, image attachments, cross-provider continuation, and a history dropdown. Pop a conversation into its own window.
+- **Embedded terminal** — a VS Code-style terminal (xterm.js) with splits, docked left or bottom.
+
+Everything above is gated to agent-ops dexes — a research dex behaves exactly as it did before.
+
 ## Agents read the same vault: in-app MCP
 
-While a vault is open, the app hosts a Streamable HTTP MCP server on `127.0.0.1` (port 52017 by default) with the same six tools as `loredex mcp` — `vault_search`, `vault_note`, `handoffs_open`, `handoff_consume`, `product_state`, `vault_store` — one implementation, two hosts. A discovery file at `~/.loredex/desktop.json` carries the port and a per-install bearer token (owner-read-only, removed on quit). Wiring Claude Code takes one command: see [the MCP section of the user guide](docs/USER-GUIDE.md#mcp-connect-your-agents).
+While a vault is open, the app hosts a Streamable HTTP MCP server on `127.0.0.1` (port 52017 by default) with the same tools as `loredex mcp` — `vault_search`, `vault_note`, `handoffs_open`, `handoff_consume`, `product_state`, `vault_store` (plus `vault_snapshot` / `vault_snapshot_list` on agent-ops dexes) — one implementation, two hosts. A discovery file at `~/.loredex/desktop.json` carries the port and a per-install bearer token (owner-read-only, removed on quit). Wiring Claude Code takes one command: see [the MCP section of the user guide](docs/USER-GUIDE.md#mcp-connect-your-agents).
 
 ## Install
 
@@ -82,7 +108,7 @@ npm run build      # typecheck + electron-vite build
 npm run dist       # unsigned installer for the current OS (macOS arm64 locally)
 ```
 
-The app depends on `loredex` from npm (`^2.3.0`) — `npm install` pulls it, no sibling checkout needed. Cross-platform installers are produced by CI: tag `vX.Y.Z` and the [release workflow](.github/workflows/release.yml) builds macOS/Windows/Linux on their own runners (native `better-sqlite3` compiles per OS) and attaches every installer to the release.
+The app embeds the `loredex` engine (currently the 2.9.0 agent-ops build, vendored under `vendor/`) — `npm install` resolves it, no sibling checkout needed. Cross-platform installers are produced by CI: tag `vX.Y.Z` and the [release workflow](.github/workflows/release.yml) builds macOS/Windows/Linux on their own runners (native `better-sqlite3` compiles per OS) and attaches every installer to the release.
 
 ## Architecture
 

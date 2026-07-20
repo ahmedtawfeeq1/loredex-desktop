@@ -901,7 +901,7 @@ git commit -m "feat(core): live tools/list probe for stdio MCP servers"
 - Test: `src/core/claude-plugins.test.ts`
 
 **Interfaces:**
-- Produces: `N8N_SKILLS_PLUGIN`, `N8N_SKILLS_COMMAND`, `hasPluginInstalled(pluginName: string, home?: string): boolean`.
+- Produces: `N8N_SKILLS_PLUGIN`, `N8N_SKILLS_COMMAND`, `hasPluginInstalled(pluginName: string, home?: string): boolean`, `terminalN8nCommand(url: string | null): string`, `hasTerminalN8nMcp(): Promise<boolean>`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1013,11 +1013,76 @@ export function hasPluginInstalled(pluginName: string, home: string = homedir())
 Run: `npx vitest run src/core/claude-plugins.test.ts`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Add the terminal-claude n8n card support**
+
+Terminal-run `claude` reads its own config, not ours, so n8n reaches it only via
+`claude mcp add`. Append to `src/core/claude-plugins.ts`:
+
+```ts
+import { execFile } from 'node:child_process'
+import { N8N_MCP_VERSION } from './n8n-install'
+
+/**
+ * The command that gives TERMINAL-run `claude` the n8n server.
+ *
+ * SECURITY: the API key is a PLACEHOLDER, never the real key. Interpolating the
+ * stored key here would carry it across the IPC seam to the renderer — the one
+ * thing every credential path in this app refuses to do. The URL is not secret,
+ * so it is filled in; the user pastes their own key.
+ *
+ * NOTE this is `npx`, not our resolved entry: the command runs in the USER's
+ * shell under their own node, where npx is the documented invocation. Our
+ * in-app injection still uses the resolved path and never touches npx.
+ */
+export function terminalN8nCommand(url: string | null): string {
+  return [
+    'claude mcp add n8n-mcp',
+    '-e MCP_MODE=stdio',
+    '-e LOG_LEVEL=error',
+    '-e DISABLE_CONSOLE_OUTPUT=true',
+    `-e N8N_API_URL=${url ?? '<your-n8n-url>'}`,
+    '-e N8N_API_KEY=<paste-your-n8n-api-key>',
+    `-- npx n8n-mcp@${N8N_MCP_VERSION}`,
+  ].join(' ')
+}
+
+/** Is n8n-mcp registered with the user's own claude CLI? Fails closed. */
+export async function hasTerminalN8nMcp(): Promise<boolean> {
+  return await new Promise((resolve) => {
+    execFile('claude', ['mcp', 'list'], { timeout: 10_000 }, (err, stdout) => {
+      resolve(!err && stdout.includes('n8n-mcp'))
+    })
+  })
+}
+```
+
+Add these tests to `claude-plugins.test.ts`:
+
+```ts
+describe('terminalN8nCommand', () => {
+  it('NEVER contains a real key — only a placeholder', () => {
+    const cmd = terminalN8nCommand('https://n8n.example.com')
+    expect(cmd).toContain('<paste-your-n8n-api-key>')
+    expect(cmd).toContain('https://n8n.example.com')
+    expect(cmd).toContain('claude mcp add n8n-mcp')
+  })
+
+  it('falls back to a url placeholder when none is configured', () => {
+    expect(terminalN8nCommand(null)).toContain('<your-n8n-url>')
+  })
+})
+```
+
+Import `terminalN8nCommand` in the test file.
+
+Run: `npx vitest run src/core/claude-plugins.test.ts`
+Expected: PASS, 7 tests.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/core/claude-plugins.ts src/core/claude-plugins.test.ts
-git commit -m "feat(core): verify the n8n Claude skills plugin, failing closed"
+git commit -m "feat(core): verify the n8n skills plugin and terminal MCP, failing closed"
 ```
 
 ---
@@ -1063,7 +1128,14 @@ In `src/shared/ipc-contract.ts`, inside `CoreApi`, after the `'vault.drift'` ent
   'workspace.n8n.set': { in: { url?: string | null; key?: string | null }; out: void }
   'workspace.skills.status': {
     in: void
-    out: { installed: boolean; command: string; plugin: string }
+    out: {
+      installed: boolean
+      command: string
+      plugin: string
+      /** the `claude mcp add` card for terminal-run claude. `command` carries a
+       *  PLACEHOLDER key, never the stored one — it must not cross this seam. */
+      terminal: { installed: boolean; command: string }
+    }
   }
 ```
 
@@ -1202,17 +1274,28 @@ In `src/core/handlers.ts`, after the `ipc.register('note.diff', …)` line:
       else await setN8nKey(key)
     }
   })
-  ipc.register('workspace.skills.status', () => ({
+  ipc.register('workspace.skills.status', async () => ({
     installed: hasPluginInstalled(N8N_SKILLS_PLUGIN),
     command: N8N_SKILLS_COMMAND,
     plugin: N8N_SKILLS_PLUGIN,
+    terminal: {
+      installed: await hasTerminalN8nMcp(),
+      // n8nStatus().url is NOT secret; the key is a placeholder in the command
+      command: terminalN8nCommand(n8nStatus().url),
+    },
   }))
 ```
 
 Add the imports:
 
 ```ts
-import { N8N_SKILLS_COMMAND, N8N_SKILLS_PLUGIN, hasPluginInstalled } from './claude-plugins'
+import {
+  N8N_SKILLS_COMMAND,
+  N8N_SKILLS_PLUGIN,
+  hasPluginInstalled,
+  hasTerminalN8nMcp,
+  terminalN8nCommand,
+} from './claude-plugins'
 import { probeStdioTools } from './mcp-tools'
 import { clearN8nKey, n8nEnv, n8nStatus, setN8nKey, setN8nUrl } from './n8n-config'
 import { installN8nMcp, n8nEntryPath, n8nInstallCommand } from './n8n-install'
@@ -1650,6 +1733,24 @@ export function WorkspaceServersSection(): React.JSX.Element {
           onVerify={() => void useWorkspaceMcp.getState().verifySkills()}
         />
       )}
+
+      <h3 className="settings-subtitle">n8n in the terminal</h3>
+      <p className="settings-hint">
+        The agent panel already has n8n — this is only for <code>claude</code> run in a terminal,
+        which reads its own config. <strong>Heads up:</strong> this command stores your API key in
+        <code>~/.claude.json</code> in plain text. The agent panel keeps it in your OS keychain
+        instead. Replace the placeholder with your real key before running it — loredex does not
+        put your stored key into this command.
+      </p>
+      {skills && (
+        <SetupCard
+          title="n8n MCP for terminal claude"
+          note="Optional — the agent panel does not need this"
+          command={skills.terminal.command}
+          done={skills.terminal.installed}
+          onVerify={() => void useWorkspaceMcp.getState().verifySkills()}
+        />
+      )}
     </section>
   )
 }
@@ -1827,6 +1928,9 @@ Run `npm run dev`, then:
 6. Repeat step 5 on **Codex**. The n8n tools must be there too — this is the all-providers claim.
 7. The skills card is red with `/plugin install czlonkowski/n8n-skills`. Press **Open terminal**: the terminal opens at the vault root with the command typed and **not executed**.
 8. Run it inside a `claude` session, then press **Verify**. The card turns green.
+9. The "n8n in the terminal" card shows a command containing
+   `<paste-your-n8n-api-key>` — **confirm your real key is NOT in it**. This is the
+   seam invariant; if the real key appears, stop and fix before shipping.
 
 - [ ] **Step 4: Update BACKLOG and CHANGELOG**
 

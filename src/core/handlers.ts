@@ -57,6 +57,7 @@ import {
   restartMcpServer,
 } from './mcp-server'
 import {
+  CLAUDE_LAUNCH_COMMAND,
   N8N_SKILLS_COMMAND,
   N8N_SKILLS_PLUGIN,
   hasPluginInstalled,
@@ -462,6 +463,7 @@ export function registerCoreHandlers(
     installed: hasPluginInstalled(N8N_SKILLS_PLUGIN),
     command: N8N_SKILLS_COMMAND,
     plugin: N8N_SKILLS_PLUGIN,
+    launch: CLAUDE_LAUNCH_COMMAND,
     terminal: {
       // null = not checked yet. `claude mcp list` health-checks every configured
       // MCP server (~12s on a populated machine), so it must never sit on the

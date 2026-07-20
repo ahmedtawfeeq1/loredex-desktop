@@ -25,12 +25,18 @@ function SetupCard({
   command,
   done,
   onVerify,
+  /** when set, `command` is a claude SLASH command: Open terminal launches this
+   *  first (e.g. `claude`) and types the slash command into the session. Typed
+   *  at a shell instead, a slash command is just
+   *  `zsh: no such file or directory: /plugin`. */
+  launch,
 }: {
   title: string
   note: string
   command: string
   done: boolean
   onVerify: () => void
+  launch?: string
 }): React.JSX.Element {
   return (
     <div className={`ws-setup${done ? ' is-done' : ''}`}>
@@ -46,8 +52,9 @@ function SetupCard({
           </pre>
           {command.includes('\n') && (
             <p className="ws-setup-note">
-              Two steps — run them in order inside a <span className="mono">claude</span> session.
-              “Open terminal” types the first.
+              Two steps, inside a <span className="mono">claude</span> session — these are Claude
+              slash commands, not shell commands. “Open in Claude” starts the session and types the
+              first; press Enter, then run the second.
             </p>
           )}
           <div className="ws-setup-actions">
@@ -254,6 +261,7 @@ export function WorkspaceServersSection(): React.JSX.Element {
           note="Run this inside a claude session"
           command={skills.command}
           done={skills.installed}
+          launch={skills.launch}
           onVerify={() => void useWorkspaceMcp.getState().verifySkills()}
         />
       )}

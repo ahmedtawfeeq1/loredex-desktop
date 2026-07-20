@@ -31,6 +31,11 @@ export const N8N_SKILLS_PLUGIN = 'n8n-mcp-skills'
 export const N8N_SKILLS_COMMAND =
   '/plugin marketplace add czlonkowski/n8n-skills\n/plugin install n8n-mcp-skills@n8n-mcp-skills'
 
+/** The shell command that OPENS the session those slash commands need. They are
+ *  claude slash commands, not shell commands — typed at a zsh prompt they just
+ *  produce `zsh: no such file or directory: /plugin`. */
+export const CLAUDE_LAUNCH_COMMAND = 'claude'
+
 export function hasPluginInstalled(pluginName: string, home: string = homedir()): boolean {
   try {
     const raw = readFileSync(join(home, '.claude', 'plugins', 'installed_plugins.json'), 'utf8')

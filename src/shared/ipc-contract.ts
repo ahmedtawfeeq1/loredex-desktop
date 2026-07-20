@@ -546,6 +546,9 @@ export interface CoreApi {
       installed: boolean
       command: string
       plugin: string
+      /** the shell command that opens the claude session `command` runs INSIDE
+       *  — the plugin commands are slash commands, meaningless at a shell. */
+      launch: string
       /** the `claude mcp add` card for terminal-run claude. `command` carries a
        *  PLACEHOLDER key, never the stored one — it must not cross this seam.
        *  `installed` is null until checked: the check shells out to

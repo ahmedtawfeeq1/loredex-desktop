@@ -118,8 +118,57 @@ running over the app's logo strip.
 
 ---
 
+## BL-5 — Switching provider must keep the session's working directory (MCP breaks today)
+
+**Status:** open · **Area:** agent panel / core · **Size:** M · **Priority:** high
+
+**Symptom.** Start a chat scoped to a client (e.g. `projects/arabicss`), then
+**CONTINUE IN → Codex** (or Gemini). The new session comes up at the **vault
+root**, so that client's `.mcp.json` never loads and its MCP tools are gone —
+the agent reports *"Genudo MCP is not callable in this current root session.
+Current root `/clients_work/.mcp.json` only has loredex."* The connector exists
+at `projects/arabicss/.mcp.json`, but the session wasn't started there, and MCP
+is discovered **at startup** — `cd`-ing mid-session does not hot-load it.
+
+**Cause / where.**
+- `src/core/handlers.ts:981` — the `agent.continue` handler **hardcodes**
+  `cwd: engine.getConfig().vaultPath`. The original folder is never consulted.
+- `src/core/agent-conversations.ts` / `src/core/db/index.ts` — the conversation
+  row persists `client_slug` but there is **no `cwd` column**, so continuation
+  has nothing to restore even if the handler wanted to.
+- All three continuation paths funnel through `startContinuation` →
+  `agent.continue` → `acpContinue`, so reopen-from-history and pop-out inherit
+  the same bug, not just provider switch.
+
+**Extra wrinkle (honesty).** The `◈ <client>` chip *is* carried across
+continuation now, so a continued session currently **displays a client scope it
+doesn't actually have**. Fixing the cwd makes the chip truthful again; until
+then the chip over-promises.
+
+**Done when.**
+- The conversation persists its working directory (new **additive, nullable**
+  `cwd` column — next free migration index; `client_slug` already took one).
+  `acpStart` already receives `arg.cwd`, so `createConversation` can record it.
+- `acpContinue` restores that cwd instead of the vault root, so the switched-to
+  provider spawns in the **same folder** and picks up the same `.mcp.json`.
+- Fallback order for older rows with no stored cwd:
+  `cwd` → derive from `client_slug` (`<vault>/projects/<slug>`) → vault root.
+- Guard it: if the stored directory no longer exists, fall back rather than
+  failing the switch (`acpStart` already throws `ACP_CWD_INVALID` on a bad dir).
+- Applies to **provider switch, reopen-from-history, and pop-out** alike.
+- Verify: start at `projects/<client>`, confirm its MCP tools; switch provider;
+  the new session lists the **same** MCP servers and the chip is accurate.
+
+**Reference.** Screenshot: Codex session reporting root `.mcp.json` has only
+`loredex`, with the arabicss connector sitting unused at
+`projects/arabicss/.mcp.json`.
+
+---
+
 ## Notes
 
 - BL-1/2/3 are all in the agent panel and could ship as one pass.
 - BL-2's "Send becomes Stop" is the nicer end state but is optional — unblocking
   typing is the actual ask.
+- BL-5 is the highest-value item here: it silently breaks per-client MCP on every
+  provider switch, and it also makes the `◈` chip honest.

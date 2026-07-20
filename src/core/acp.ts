@@ -54,7 +54,13 @@ import {
 import type { AppDb } from './db/index'
 import { readDiscovery } from './discovery'
 import { getMcpStatus } from './mcp-server'
-import { loadPermissionRules, mintAgentToken, revokeAgentToken } from './settings'
+import {
+  loadPermissionRules,
+  loadWorkspaceEnabled,
+  mintAgentToken,
+  revokeAgentToken,
+} from './settings'
+import { buildWorkspaceServers } from './workspace-mcp'
 import type { PermissionRule } from '../shared/types'
 
 /** Batch window for acp.chunk — the terminals.ts ~8ms precedent. */
@@ -526,36 +532,38 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
   // crosses the renderer seam.
   const httpOk = init.agentCapabilities?.mcpCapabilities?.http === true
   const mcp = getMcpStatus()
-  let mcpServers: McpServer[] = []
-  if (httpOk && mcp.state === 'running' && mcp.port !== null) {
-    // this window owns the MCP host — a per-session agent token (attributed in
-    // the Agents view; the token never crosses the renderer seam)
-    s.tokenName = `acp:${agent}:${sessionId.slice(0, 8)}`
-    mcpServers = [
-      {
-        type: 'http',
-        name: 'loredex',
+  // Which loredex host this session talks to: ours when this window owns the
+  // port, else the MAIN window's via its discovery file (a pop-out's core loses
+  // the bind and reads the winner's file — BL-21). Resolved only when the
+  // adapter advertises http, so no token is minted for a session that could
+  // never use one.
+  let loredexHost: { url: string; token: string } | null = null
+  if (httpOk) {
+    if (mcp.state === 'running' && mcp.port !== null) {
+      // this window owns the MCP host — a per-session agent token (attributed in
+      // the Agents view; the token never crosses the renderer seam)
+      s.tokenName = `acp:${agent}:${sessionId.slice(0, 8)}`
+      loredexHost = {
         url: `http://127.0.0.1:${mcp.port}/`,
-        headers: [{ name: 'Authorization', value: `Bearer ${mintAgentToken(s.tokenName)}` }],
-      },
-    ]
-  } else if (httpOk) {
-    // a pop-out / secondary window can't bind the single MCP port — connect to
-    // the MAIN window's already-running host via its discovery file. Its `token`
-    // is the install bearer the host always accepts, so the pop-out gets the
-    // exact same loredex tools as the main window (not attributed per-session).
-    const disc = readDiscovery()
-    if (disc) {
-      mcpServers = [
-        {
-          type: 'http',
-          name: 'loredex',
-          url: `http://127.0.0.1:${disc.port}/`,
-          headers: [{ name: 'Authorization', value: `Bearer ${disc.token}` }],
-        },
-      ]
+        token: mintAgentToken(s.tokenName),
+      }
+    } else {
+      // a pop-out / secondary window can't bind the single MCP port — connect to
+      // the MAIN window's already-running host via its discovery file. Its `token`
+      // is the install bearer the host always accepts, so the pop-out gets the
+      // exact same loredex tools as the main window (not attributed per-session).
+      const disc = readDiscovery()
+      if (disc) loredexHost = { url: `http://127.0.0.1:${disc.port}/`, token: disc.token }
     }
   }
+  // NOTE: n8n is stdio and is emitted regardless of `httpOk` — the Claude
+  // adapter advertises mcpCapabilities {http, sse} with NO stdio, yet honours
+  // stdio servers (verified 2026-07-20). Never gate stdio on the capability.
+  let mcpServers: McpServer[] = buildWorkspaceServers({
+    loredex: loredexHost,
+    httpOk,
+    enabled: loadWorkspaceEnabled(),
+  })
   // B2 continuation: a same-provider resume (session/load, loadSession cap) lets
   // the adapter restore its OWN context by replaying the whole conversation — we
   // suppress that replay (routeUpdate early-returns while replaying) because our

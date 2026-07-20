@@ -424,3 +424,15 @@ export function loadMcpPortOverride(): number | null {
 export function saveMcpPortOverride(port: number | null): void {
   writeKey('mcpPort', port === null ? null : JSON.stringify(port))
 }
+
+/** Which workspace MCP servers are enabled. loredex defaults ON (it is ours and
+ *  free); n8n defaults OFF because enabling it downloads ~154 MB. */
+export function loadWorkspaceEnabled(): { loredex: boolean; n8n: boolean } {
+  const raw = readJsonKey('workspace-mcp-enabled')
+  const v = (raw ?? {}) as Partial<Record<'loredex' | 'n8n', boolean>>
+  return { loredex: v.loredex !== false, n8n: v.n8n === true }
+}
+
+export function setWorkspaceEnabled(id: 'loredex' | 'n8n', on: boolean): void {
+  writeKey('workspace-mcp-enabled', JSON.stringify({ ...loadWorkspaceEnabled(), [id]: on }))
+}

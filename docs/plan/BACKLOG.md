@@ -151,6 +151,12 @@ then the chip over-promises.
   `acpStart` already receives `arg.cwd`, so `createConversation` can record it.
 - `acpContinue` restores that cwd instead of the vault root, so the switched-to
   provider spawns in the **same folder** and picks up the same `.mcp.json`.
+- **Ask, don't assume.** Switching provider (CONTINUE IN → Codex/Gemini) prompts
+  *where* to start the new session: **"Same folder (`projects/<client>`)"** —
+  the default — or **"Vault root"**. Only show the prompt when the current
+  session's cwd isn't already the vault root (otherwise there's no choice to
+  make). Remembering the answer for the session is fine; a "don't ask again"
+  preference is optional.
 - Fallback order for older rows with no stored cwd:
   `cwd` → derive from `client_slug` (`<vault>/projects/<slug>`) → vault root.
 - Guard it: if the stored directory no longer exists, fall back rather than
@@ -162,6 +168,41 @@ then the chip over-promises.
 **Reference.** Screenshot: Codex session reporting root `.mcp.json` has only
 `loredex`, with the arabicss connector sitting unused at
 `projects/arabicss/.mcp.json`.
+
+---
+
+## BL-6 — "Chat Here" should ask which provider (it silently picks Claude)
+
+**Status:** open · **Area:** clients / agent panel · **Size:** S
+
+**Symptom.** On a client page, **Chat Here** always opens Claude Code. There's no
+way to start that client-scoped session on Codex or Gemini without opening
+Claude first and then switching provider (which today also loses the folder —
+see BL-5).
+
+**Cause / where.**
+- `src/renderer/src/views/clients/ClientPage.tsx:398` — `chatHere()` calls
+  `openHere(dir)` with no provider argument.
+- `src/renderer/src/stores/agentPanel.ts` — `openHere` takes the provider from
+  `get().agent` (the panel's current selection), which defaults to `'claude'`
+  (store default at `:535`). So the button inherits panel state the user never
+  consciously set.
+
+**Done when.**
+- **Chat Here** asks which provider to start — Claude / Codex / Gemini — before
+  opening, rather than inheriting the panel's current agent.
+- The picker reflects reality: show each provider's availability/auth state the
+  way the panel's provider chips already do, so an unauthenticated or
+  not-installed provider is obvious *before* starting (a missing binary
+  otherwise fails later as an ENOENT spawn error).
+- `openHere` accepts an explicit provider (optional arg, falling back to
+  `get().agent`) so the existing `+` / ⌘K entry points are unchanged.
+- Same courtesy as BL-5: remembering the last choice is fine; don't force the
+  prompt when there's only one usable provider.
+
+**Shared with BL-5.** Both items are "ask before starting a session" — BL-5 asks
+*where*, BL-6 asks *which*. Build one small start-session prompt that can carry
+both questions instead of two separate dialogs.
 
 ---
 

@@ -37,16 +37,28 @@ export function AgentPermissionsSection(): React.JSX.Element {
       {rules.length === 0 ? (
         <div className="settings-empty">No always-allow rules yet.</div>
       ) : (
-        <div className="perm-rules">
+        <div className="perm-table">
+          <div className="perm-thead" role="row">
+            <span className="perm-client">CLIENT</span>
+            <span className="perm-kind">TOOL KIND</span>
+            <span className="perm-act" />
+          </div>
           {rules.map((r) => (
-            <div key={`${r.client}/${r.toolKind}`} className="perm-rule-row">
-              <span className="perm-rule-scope">
+            <div key={`${r.client}/${r.toolKind}`} className="perm-tr" role="row">
+              <span className="perm-client">
                 <span className="agent-client-chip">◈ {r.client}</span>
-                <span className="perm-rule-kind">{r.toolKind}</span>
               </span>
-              <button type="button" className="button-secondary" onClick={() => void remove(r)}>
-                Remove
-              </button>
+              <span className="perm-kind">{r.toolKind}</span>
+              <span className="perm-act">
+                <button
+                  type="button"
+                  className="button-secondary button-small"
+                  title={`Stop auto-approving ${r.toolKind} for ${r.client}`}
+                  onClick={() => void remove(r)}
+                >
+                  Remove
+                </button>
+              </span>
             </div>
           ))}
         </div>

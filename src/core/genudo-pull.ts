@@ -24,7 +24,7 @@
  */
 import { type Dirent, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { widenWindowsPath } from './win-spawn'
+import { widenWindowsPath, withResolvedNpx } from './win-spawn'
 
 /** Prose fields lifted out of the pipeline object into their own .md files. */
 const PIPELINE_PROSE = ['persona', 'instructions'] as const
@@ -298,16 +298,26 @@ export async function fetchBundles(
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
   const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js')
   const client = new Client({ name: 'loredex-pull', version: '1.0.0' })
+  // widenWindowsPath is a no-op off Windows; there it appends the per-user
+  // Node locations a desktop-launched app cannot otherwise see
+  const env = widenWindowsPath({
+    ...process.env,
+    GENUDO_TOKEN: token,
+    GENUDO_BASE_URL: baseUrl,
+  })
+  // Windows cannot spawn the `npx.cmd` shim directly — Node refuses since
+  // CVE-2024-27980 — so it goes through `cmd /c`, with the absolute path
+  // substituted when we can find one so cmd has no lookup left to fail.
+  const spawn = withResolvedNpx(
+    process.platform === 'win32'
+      ? { command: 'cmd', args: ['/c', 'npx', '-y', 'genudo-mcp-client'] }
+      : { command: 'npx', args: ['-y', 'genudo-mcp-client'] },
+    env,
+  )
   const transport = new StdioClientTransport({
-    command: 'npx',
-    args: ['-y', 'genudo-mcp-client'],
-    // widenWindowsPath is a no-op off Windows; there it appends the per-user
-    // Node locations a desktop-launched app cannot otherwise see
-    env: widenWindowsPath({
-      ...process.env,
-      GENUDO_TOKEN: token,
-      GENUDO_BASE_URL: baseUrl,
-    }) as Record<string, string>,
+    command: spawn.command,
+    args: spawn.args,
+    env: env as Record<string, string>,
   })
   const call = async (name: string, args: Record<string, unknown> = {}): Promise<unknown> => {
     const res = (await client.callTool({ name, arguments: args })) as {

@@ -21,7 +21,7 @@ import { readClientTokens, storeClientToken } from './client-tokens'
 import { fetchBundles, planFiles } from './genudo-pull'
 import { buildKbWorkbook } from './kb-export'
 import { scanStagedEdits } from './staged-edits'
-import { explainSpawnFailure, widenWindowsPath } from './win-spawn'
+import { explainSpawnFailure, widenWindowsPath, withResolvedNpx } from './win-spawn'
 import {
   capDiff,
   computeLinks,
@@ -415,7 +415,9 @@ export function registerCoreHandlers(
     }
     // Windows can't spawn the npx shim directly (ENOENT) — same cmd /c wrap the
     // generated .mcp.json uses, so the probe matches what `claude` will run.
-    const safe = engine.windowsSafeCommand(conn.command, conn.args)
+    // Absolute npx.cmd when we can find one: cmd /c still has to LOCATE `npx`,
+    // and that lookup is the step that fails on a desktop-launched app.
+    const safe = withResolvedNpx(engine.windowsSafeCommand(conn.command, conn.args), env)
     return await new Promise<{ ok: boolean; detail: string }>((resolve) => {
       const child = execFile(safe.command, safe.args, {
         env,

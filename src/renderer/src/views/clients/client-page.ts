@@ -55,16 +55,21 @@ function unitSection(info: ClientInfo, unit: ClientInfo['pipelines'][number], li
   return {
     name: unit.name,
     kind: unit.kind,
+    // Paths follow the structure the genudo playbook specifies and the pull
+    // writes. They were the ORIGINAL scaffold names, so every chip opened a file
+    // that no longer exists — hence "This note has moved or was removed".
     personaPath: `${unit.dir}/_persona.md`,
-    generalInstructionsPath: `${unit.dir}/_general_instructions.md`,
-    actionsPath: `${unit.dir}/_actions.curls.yaml`,
-    settingsPath: `${unit.dir}/_settings.export.yaml`,
+    generalInstructionsPath: `${unit.dir}/_instructions.md`,
+    actionsPath: `${unit.dir}/_actions.yaml`,
+    settingsPath: `${unit.dir}/pipeline.yaml`,
     stages: unit.stages.map((stage) => ({
       nn: stage.nn,
       slug: stage.slug,
-      instructionsPath: `${unit.dir}/stages/${stage.dir}/${stage.nn}_stage_instructions.md`,
-      broken:
-        stage.prefixMismatches.length > 0 || Object.values(stage.files).some((present) => !present),
+      instructionsPath: `${unit.dir}/stages/${stage.dir}/_instructions.md`,
+      // `stage.files` is keyed by the retired scaffold names, so every stage read
+      // as broken. Until the lib's schema is updated it cannot tell us anything
+      // true about a pulled stage, so only a real prefix mismatch marks one.
+      broken: stage.prefixMismatches.length > 0,
     })),
     problems: lints
       .filter((f) => f.level === 'error' && f.scope.startsWith(scope))
@@ -72,8 +77,32 @@ function unitSection(info: ClientInfo, unit: ClientInfo['pipelines'][number], li
   }
 }
 
+/**
+ * Filenames from the ORIGINAL agent-ops scaffold, which no longer exist.
+ *
+ * A pipeline pulled from genudo is written in the structure the genudo editing
+ * playbook now specifies (verified server-side 2026-07-21): `_instructions.md`,
+ * `_actions.yaml`, `pipeline.yaml`, and per stage `_instructions.md` +
+ * `stage.yaml`. The lib's linter still checks for the scaffold's old names, so
+ * it reports a dozen files as "missing" that were simply RENAMED — the content
+ * is present and correct.
+ *
+ * Reporting a healthy client as broken is worse than reporting nothing, so these
+ * specific stale findings are suppressed here. This is a STOPGAP: the real fix
+ * is updating UNIT_FILES / STAGE_FILE_SUFFIXES in loredex/src/core/agent-ops.ts
+ * (plus the scaffold, doctor and indexer that share them) and re-vendoring.
+ * Every other finding still shows.
+ */
+const RETIRED_FILENAMES =
+  /_general_instructions\.md|_settings\.export\.yaml|actions\.curls\.yaml|_enter_condition\.md|_stage_instructions\.md|_followup\.md|\d\d_(enter_condition|stage_instructions|followup)\b/
+
+/** True when this finding is only about the retired scaffold names. */
+export function isRetiredSchemaLint(f: LintFinding): boolean {
+  return RETIRED_FILENAMES.test(f.message)
+}
+
 export function buildClientPage(info: ClientInfo, lints: LintFinding[]): ClientPageModel {
-  const mine = lints.filter((f) => f.client === info.slug)
+  const mine = lints.filter((f) => f.client === info.slug && !isRetiredSchemaLint(f))
   return {
     header: {
       slug: info.slug,

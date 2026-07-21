@@ -65,3 +65,42 @@ export function recognizedCommand(
 export function commandArgs(draft: string): string {
   return /^\/\S+\s+([\s\S]*)$/.exec(draft)?.[1] ?? ''
 }
+
+/** One recognized command inside the draft, with where it sits. */
+export interface InvokedCommand {
+  command: AcpCommand
+  /** index into the draft where the `/name` token starts */
+  start: number
+  /** index just past the token */
+  end: number
+}
+
+/**
+ * EVERY known command the draft invokes, in order.
+ *
+ * A draft can carry several — `/feature-wireframe /n8n-build` is two distinct
+ * instructions, and showing only the first hid the rest behind plain text.
+ * Matching is on whole `/token`s at a word boundary, so prose that merely
+ * contains a slash never lights up.
+ */
+export function recognizedCommands(
+  draft: string,
+  commands: readonly AcpCommand[],
+): InvokedCommand[] {
+  const byName = new Map(commands.map((c) => [c.name.toLowerCase(), c]))
+  const out: InvokedCommand[] = []
+  const re = /(?:^|\s)(\/([A-Za-z0-9][\w-]*))(?=\s|$)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(draft)) !== null) {
+    const command = byName.get((m[2] ?? '').toLowerCase())
+    if (!command) continue
+    const start = m.index + m[0].indexOf('/')
+    out.push({ command, start, end: start + (m[1]?.length ?? 0) })
+  }
+  return out
+}
+
+/** The draft with one command token removed, whitespace tidied. */
+export function removeCommand(draft: string, at: InvokedCommand): string {
+  return `${draft.slice(0, at.start)}${draft.slice(at.end)}`.replace(/\s{2,}/g, ' ').trim()
+}

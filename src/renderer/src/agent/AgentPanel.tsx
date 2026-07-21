@@ -24,7 +24,12 @@ import { renderAgentMarkdown } from './agentMarkdown'
 import { PanelResizeHandle } from './PanelResizeHandle'
 import { SessionInfoPanel } from './SessionInfoPanel'
 import { SlashCommandMenu } from './SlashCommandMenu'
-import { commandArgs, filterCommands, recognizedCommand, slashQuery } from './slashCommands'
+import {
+  filterCommands,
+  recognizedCommands,
+  removeCommand,
+  slashQuery,
+} from './slashCommands'
 import { ToolCallRow } from './ToolCallRow'
 import { UsageBar } from './UsageBar'
 
@@ -708,7 +713,7 @@ export function AgentPanel(): React.JSX.Element | null {
   // the draft INVOKES a real command — true even with arguments after it, which
   // is exactly when the autocomplete menu closes and all other signal is lost
   const invoked = useMemo(
-    () => recognizedCommand(draft, active?.commands ?? []),
+    () => recognizedCommands(draft, active?.commands ?? []),
     [draft, active?.commands],
   )
   // reset selection as the match set shifts; re-arm the menu once the draft
@@ -925,28 +930,25 @@ export function AgentPanel(): React.JSX.Element | null {
       {/* A textarea cannot render a chip inline, so the recognition lives on its
           own line directly above — visible for as long as the draft is a
           command, arguments included. */}
-      {invoked && (
+      {invoked.length > 0 && (
         <div className="agent-cmd-strip" role="status">
-          <span className="agent-cmd-chip">
-            /{invoked.name}
-            <button
-              type="button"
-              className="agent-cmd-x"
-              title="Send as plain text instead of running the command"
-              aria-label={`Do not run /${invoked.name}`}
-              onClick={() => {
-                // strip the leading command, keep whatever was typed after it —
-                // discarding the command should not discard the message
-                useAgentPanel.getState().setDraft(commandArgs(draft))
-              }}
-            >
-              ×
-            </button>
-          </span>
-          <span className="agent-cmd-desc">{invoked.description}</span>
-          {commandArgs(draft).trim() !== '' && (
-            <span className="agent-cmd-args">{commandArgs(draft).trim()}</span>
-          )}
+          {invoked.map((inv) => (
+            <div className="agent-cmd-row" key={`${inv.command.name}:${inv.start}`}>
+              <span className="agent-cmd-chip">
+                /{inv.command.name}
+                <button
+                  type="button"
+                  className="agent-cmd-x"
+                  title="Remove this command from the message"
+                  aria-label={`Remove /${inv.command.name}`}
+                  onClick={() => useAgentPanel.getState().setDraft(removeCommand(draft, inv))}
+                >
+                  ×
+                </button>
+              </span>
+              <span className="agent-cmd-desc">{inv.command.description}</span>
+            </div>
+          ))}
         </div>
       )}
       <div className="agent-input">

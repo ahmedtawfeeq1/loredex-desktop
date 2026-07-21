@@ -9949,12 +9949,23 @@ a.button-primary {
 /* Slash command recognition. A textarea holds plain text only, so the chip sits
    on its own line above the composer rather than inside it — and stays visible
    once arguments are typed, which is when the autocomplete menu closes. */
+/* one command per LINE: the panel is 280-480px wide, so side-by-side chips ran
+   out of room the moment a second command was typed */
 .agent-cmd-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 5px 12px 0;
+  font-size: 11px;
+  min-width: 0;
+  max-height: 22vh;
+  overflow-y: auto;
+}
+
+.agent-cmd-row {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 5px 12px 0;
-  font-size: 11px;
   min-width: 0;
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AcpCommand } from '../../../shared/ipc-contract'
-import { filterCommands, slashQuery , commandArgs, recognizedCommand } from './slashCommands'
+import { filterCommands, slashQuery , commandArgs, recognizedCommand, recognizedCommands, removeCommand } from './slashCommands'
 
 const cmd = (name: string): AcpCommand => ({ name, description: `${name} desc` })
 const CMDS = [cmd('commit'), cmd('compact'), cmd('review'), cmd('recommit'), cmd('verify')]
@@ -32,6 +32,45 @@ describe('filterCommands', () => {
   })
   it('no match → empty', () => {
     expect(filterCommands(CMDS, 'zzz')).toEqual([])
+  })
+})
+
+describe('recognizedCommands — every command in the draft, not just the first', () => {
+  const cmds = [
+    { name: 'compact', description: 'Free up context' },
+    { name: 'feature-wireframe', description: 'Wireframe a feature' },
+    { name: 'n8n-build', description: 'Build an n8n workflow' },
+  ]
+
+  it('finds ALL of them, in order', () => {
+    const found = recognizedCommands('/feature-wireframe /n8n-build do the thing', cmds)
+    expect(found.map((f) => f.command.name)).toEqual(['feature-wireframe', 'n8n-build'])
+  })
+
+  it('still recognizes one with arguments after it (the /compact case)', () => {
+    const found = recognizedCommands('/compact focus on the webhook work', cmds)
+    expect(found.map((f) => f.command.name)).toEqual(['compact'])
+  })
+
+  it('ignores unknown slash words and prose containing a slash', () => {
+    expect(recognizedCommands('/nope and /alsonope', cmds)).toEqual([])
+    expect(recognizedCommands('read the docs/compact guide', cmds)).toEqual([])
+  })
+
+  it('matches a hyphenated name whole, never a prefix of it', () => {
+    expect(recognizedCommands('/feature', cmds)).toEqual([])
+    expect(recognizedCommands('/feature-wireframe', cmds)).toHaveLength(1)
+  })
+
+  it('removeCommand strips just that one and keeps the rest of the message', () => {
+    const draft = '/feature-wireframe /n8n-build do the thing'
+    const found = recognizedCommands(draft, cmds)
+    expect(removeCommand(draft, found[0]!)).toBe('/n8n-build do the thing')
+    expect(removeCommand(draft, found[1]!)).toBe('/feature-wireframe do the thing')
+  })
+
+  it('is case-insensitive', () => {
+    expect(recognizedCommands('/COMPACT', cmds)).toHaveLength(1)
   })
 })
 

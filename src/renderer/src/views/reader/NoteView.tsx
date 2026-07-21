@@ -96,6 +96,7 @@ export function NoteView(): React.JSX.Element {
   const selected = useReader((s) => s.selected)
   const doc = useReader((s) => s.doc)
   const docError = useReader((s) => s.docError)
+  const missing = useReader((s) => s.missing)
   const readingOrder = useReader((s) => s.readingOrder)
   // Addendum D1 (story 16.4): per-note mode — Edit replaces the article.
   // Store state rides down as props (presentation stays statically testable).
@@ -123,6 +124,23 @@ export function NoteView(): React.JSX.Element {
     )
   }
   if (docError) return <div className="note-error">{docError}</div>
+  {/* a file that is simply absent is an ordinary state, not a failure */}
+  if (missing) {
+    const name = missing.path.split('/').pop() ?? missing.path
+    return (
+      <div className="empty-state reader-empty">
+        <p className="empty-state-title">Nothing here yet</p>
+        <p className="empty-state-note">
+          <span className="mono">{name}</span> does not exist for this unit
+          {name.startsWith('_actions')
+            ? ' — this pipeline has no actions defined on the platform.'
+            : name.startsWith('_variables')
+              ? ' — this pipeline collects no variables.'
+              : '.'}
+        </p>
+      </div>
+    )
+  }
   if (!doc) return <div />
   if (editing) {
     return (

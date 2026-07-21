@@ -36,6 +36,25 @@ function reason(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
 }
 
+/**
+ * Local scaffolding (+ Pipeline / + Stage / + Agent) is OFF.
+ *
+ * Those buttons call the lib's scaffolder, which still writes the ORIGINAL file
+ * names — `_general_instructions.md`, `_settings.export.yaml`,
+ * `NN_stage_instructions.md`. A pipeline pulled from genudo uses the names the
+ * genudo playbook specifies, so pressing them recreates exactly the "missing
+ * file" mess this page was just fixed for, in a shape neither the pull nor the
+ * MCP understands.
+ *
+ * They are also the wrong model now: the platform is the source of truth, so a
+ * stage created only on disk never exists to the agent. Creating one belongs to
+ * the genudo MCP (`create_stage`), which updates the platform AND re-mirrors.
+ *
+ * Flip this back on once UNIT_FILES / STAGE_FILE_SUFFIXES and the scaffolder in
+ * loredex/src/core/agent-ops.ts are updated to the new schema.
+ */
+const LOCAL_SCAFFOLD_ENABLED = false
+
 const PAGE_CSS = `
 .client-page { padding: 24px 32px; overflow-y: auto; width: 100%; max-width: 1080px; }
 .cp-back { font-size: 12px; color: var(--text-2); margin-bottom: 10px; }
@@ -151,7 +170,7 @@ function Unit({
         <span className="cp-unit-name">{unit.name}</span>
         <span className="cp-unit-kind">{unit.kind}</span>
         <span style={{ flex: 1 }} />
-        {unit.kind === 'pipeline' && (
+        {unit.kind === 'pipeline' && LOCAL_SCAFFOLD_ENABLED && (
           <button
             type="button"
             className="cp-unit-snapshot"
@@ -1293,9 +1312,9 @@ export function ClientPage({
       <section className="cp-section">
         <div className="cp-section-title">
           Pipelines
-          <button type="button" className="cp-cred-add" onClick={() => setNewUnit('pipeline')}>
+          {LOCAL_SCAFFOLD_ENABLED && (<button type="button" className="cp-cred-add" onClick={() => setNewUnit('pipeline')}>
             + Pipeline
-          </button>
+          </button>)}
         </div>
         {page.pipelines.length === 0 ? (
           <div className="cp-empty">No pipelines yet.</div>
@@ -1314,9 +1333,9 @@ export function ClientPage({
       <section className="cp-section">
         <div className="cp-section-title">
           Agents
-          <button type="button" className="cp-cred-add" onClick={() => setNewUnit('agent')}>
+          {LOCAL_SCAFFOLD_ENABLED && (<button type="button" className="cp-cred-add" onClick={() => setNewUnit('agent')}>
             + Agent
-          </button>
+          </button>)}
         </div>
         {page.agents.length === 0 ? (
           <div className="cp-empty">No agents yet.</div>

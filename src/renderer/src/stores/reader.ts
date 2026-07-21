@@ -15,6 +15,9 @@ import { useDiagnostics } from './diagnostics'
 interface ReaderState {
   tree: TreeNode[] | null
   treeError: string | null
+  /** the file simply is not there — an ordinary state (e.g. a pipeline with no
+   *  actions has no _actions.yaml), rendered as an empty state, not an error */
+  missing: { path: string } | null
   /** vault-relative path of the open note */
   selected: string | null
   doc: Doc | null
@@ -45,6 +48,7 @@ const isStalePathError = (e: unknown): boolean =>
 export const useReader = create<ReaderState>((set, get) => ({
   tree: null,
   treeError: null,
+  missing: null,
   selected: null,
   doc: null,
   raw: null,
@@ -64,7 +68,7 @@ export const useReader = create<ReaderState>((set, get) => ({
   },
 
   async open(path, readingOrder = [], retriedStale = false) {
-    set({ selected: path, docError: null, unsupported: null, readingOrder })
+    set({ selected: path, docError: null, missing: null, unsupported: null, readingOrder })
     useDiagnostics.getState().clearNote(path) // re-fed as the note re-renders
     try {
       // agent-ops data files (yaml/json/csv) render read-only via vault.readRaw
@@ -90,12 +94,17 @@ export const useReader = create<ReaderState>((set, get) => ({
         await get().loadTree()
         return get().open(path, readingOrder, true)
       }
+      // After a refresh+retry has already failed, the file genuinely is not
+      // there. That is an ORDINARY state, not an error: a pipeline with no
+      // actions simply has no _actions.yaml, and the pull writes nothing rather
+      // than an empty file. Say so plainly instead of an alarming red warning
+      // about something being removed.
       set({
         doc: null,
         raw: null,
-        docError: isStalePathError(e)
-          ? 'This note has moved or was removed since the list was loaded. The file list has been refreshed — pick it again from the tree.'
-          : errText(e),
+        docError: null,
+        missing: isStalePathError(e) ? { path } : null,
+        ...(isStalePathError(e) ? {} : { docError: errText(e) }),
       })
     }
   },

@@ -35,7 +35,12 @@ const PIPELINE_PROSE = ['persona', 'instructions'] as const
  * 10,059 bytes, identical), and the stage persona is not something this team
  * edits. Both would be pure noise in the diff.
  */
-const STAGE_PROSE = ['instructions', 'description'] as const
+const STAGE_PROSE = [
+  'enter_condition',
+  'instructions',
+  'static_opening_message',
+  'description',
+] as const
 
 /** Volatile/derived fields that would churn the diff on every pull for no
  *  information — timestamps move even when nothing meaningful changed. */
@@ -250,11 +255,43 @@ export function planFiles(
           ),
         })
       }
+      // followup is NOT on the stage object — it needs its own tool call, so an
+      // earlier version of this pull simply never captured it
+      const followup = stage.__followup
+      if (typeof followup === 'string' && followup.trim()) {
+        files.push({
+          rel: join(dir, '_followup.md'),
+          content: md(
+            {
+              client,
+              pipeline: pipeline.name,
+              stage: stage.name,
+              platform_id: stage.id,
+              type: 'followup',
+            },
+            followup,
+          ),
+        })
+      }
+
+      // actions belong to the pipeline but each carries a stage_id — split them
+      // so a stage folder shows the actions that actually fire from it
+      const stageActions = actions.filter(
+        (a) => (a as { stage_id?: number }).stage_id === stage.id,
+      )
+      if (stageActions.length > 0) {
+        files.push({
+          rel: join(dir, '_actions.yaml'),
+          content: `# Actions that fire from stage "${stage.name}".\n${toYaml({ actions: stageActions })}\n`,
+        })
+      }
+
       const stageConfig: Record<string, unknown> = {}
       for (const [k, v] of Object.entries(stage)) {
         if (SKIP_FIELDS.has(k)) continue
         if ((STAGE_PROSE as readonly string[]).includes(k)) continue
         if (k === 'ai_persona' || k === 'notes') continue // dropped by decision
+        if (k === '__followup') continue // internal carrier, not platform config
         stageConfig[k] = v
       }
       files.push({
@@ -329,9 +366,28 @@ export async function fetchBundles(
         ]),
         deadline,
       ])) as [{ stages?: RawStage[] }, { actions?: unknown[] }, { variables?: unknown[] }]
+      // one extra call per stage — followup lives behind its own tool
+      const withFollowups = await Promise.all(
+        (stages.stages ?? []).map(async (stage) => {
+          try {
+            const fu = (await call('get_stage_followup', { stage_id: stage.id })) as {
+              followup?: unknown
+            }
+            const text =
+              typeof fu.followup === 'string'
+                ? fu.followup
+                : typeof (fu.followup as { message?: unknown })?.message === 'string'
+                  ? (fu.followup as { message: string }).message
+                  : null
+            return text ? { ...stage, __followup: text } : stage
+          } catch {
+            return stage // a followup that cannot be read is not a failed pull
+          }
+        }),
+      )
       bundles.push({
         pipeline,
-        stages: stages.stages ?? [],
+        stages: withFollowups,
         actions: actions.actions ?? [],
         variables: variables.variables ?? [],
       })

@@ -111,6 +111,41 @@ export interface AcpSessionView {
    *  Set from the starting/ready event's clientSlug; null for a vault-root or
    *  research session. Kept across state transitions. */
   clientSlug?: string | null
+  /**
+   * Messages typed while a turn was running, in order.
+   *
+   * ACP is one turn at a time — `session/prompt` has no mid-turn injection — so
+   * these are held and fired when the turn ends. That is exactly what Claude
+   * Code's own TUI does ("Press up to edit queued messages"). loredex used to
+   * promise this in the placeholder and then silently DROP the message.
+   *
+   * Two intents, deliberately not mixed:
+   *   'next' — more work, to start after the current task finishes.
+   *   'btw'  — a small side question about the work in flight, not a new task.
+   * Both are delivered the same way (the protocol offers nothing else), but the
+   * agent is told which it is, so a side question is not mistaken for the next
+   * job on the list.
+   */
+  queued?: QueuedMessage[]
+}
+
+/** A message waiting for the current turn to end. */
+export interface QueuedMessage {
+  text: string
+  kind: 'next' | 'btw'
+}
+
+/**
+ * How a queued message reaches the agent.
+ *
+ * ACP cannot inject mid-turn, so a 'btw' still arrives after the turn like any
+ * other prompt. What we CAN do is tell the agent what kind of message it is, so
+ * a quick aside is not picked up as the next task on the list. The framing is
+ * one line and deliberately plain — no invented syntax the agent has to know.
+ */
+export function framedQueued(q: QueuedMessage): string {
+  if (q.kind !== 'btw') return q.text
+  return `(By the way — a quick side question about what you were just doing, not a new task.)\n\n${q.text}`
 }
 
 export interface AcpPermissionView {
@@ -211,6 +246,11 @@ interface AgentPanelState {
    *  every permission/queue change (never delta-mutated). Drives the TopBar
    *  badge when the panel is closed. */
   pendingPermissions: number
+  /** Which intent the NEXT queued message carries. Reset to 'next' after each
+   *  queue, so "by the way" is a deliberate per-message choice rather than a
+   *  mode you can forget you left on. */
+  queueKind: 'next' | 'btw'
+  setQueueKind(kind: 'next' | 'btw'): void
   /** the composer draft — lifted into the store (A8) so addContext can
    *  pre-fill it from a note selection; the panel textarea is controlled by it */
   draft: string
@@ -557,6 +597,7 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   permission: null,
   pendingPermissions: 0,
   draft: '',
+  queueKind: 'next',
   attachments: [],
 
   async load() {
@@ -727,6 +768,10 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     set({ activeId: id })
   },
 
+  setQueueKind(kind) {
+    set({ queueKind: kind })
+  },
+
   setDraft(text) {
     set({ draft: text })
   },
@@ -754,8 +799,21 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     // a turn needs SOMETHING — text or at least one attachment (B4)
     if (!text.trim() && attachments.length === 0) return
     const session = sessions.find((v) => v.sessionId === activeId)
-    // belt and braces — the input is disabled in these states anyway
-    if (!session || session.state !== 'ready' || session.busy) return
+    if (!session || session.state !== 'ready') return
+    // A turn is running: ACP has no mid-turn injection, so hold it in order and
+    // fire when the turn ends. This used to `return` outright — the message the
+    // user typed was silently discarded despite the placeholder promising
+    // "sends when the turn ends".
+    if (session.busy) {
+      const body = text.trim()
+      if (body) {
+        patchSession(session.sessionId, {
+          queued: [...(session.queued ?? []), { text: body, kind: get().queueKind }],
+        })
+        set({ draft: '', queueKind: 'next' }) // the intent is per-message
+      }
+      return
+    }
     const id = session.sessionId
     // title from the first prompt words; an attachment-only first turn keeps the
     // marker so the session is never a blank "New session"
@@ -1082,6 +1140,15 @@ if (typeof window !== 'undefined' && window.loredex) {
       case 'acp.turnEnd': {
         commitChunks()
         patchSession(e.sessionId, { busy: false })
+        // drain one queued message per turn, in order — sending them all at once
+        // would interleave, which is the race ACP's one-turn-at-a-time rule exists
+        // to prevent
+        const s = useAgentPanel.getState().sessions.find((v) => v.sessionId === e.sessionId)
+        const next = s?.queued?.[0]
+        if (next !== undefined) {
+          patchSession(e.sessionId, { queued: s?.queued?.slice(1) ?? [] })
+          void useAgentPanel.getState().send(framedQueued(next))
+        }
         return
       }
       default:

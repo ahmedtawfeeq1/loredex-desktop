@@ -930,6 +930,42 @@ export function AgentPanel(): React.JSX.Element | null {
       {/* A textarea cannot render a chip inline, so the recognition lives on its
           own line directly above — visible for as long as the draft is a
           command, arguments included. */}
+      {/* Queued while the turn runs. ACP cannot inject mid-turn, so these are
+          held and fired in order when it ends — the same thing Claude Code's TUI
+          does. Shown so they are never a silent promise. */}
+      {(active?.queued?.length ?? 0) > 0 && (
+        <div className="agent-queued" role="status">
+          {active?.queued?.map((q, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: append-only queue
+            <div className={`agent-queued-row is-${q.kind}`} key={i}>
+              <span className="agent-queued-kind">
+                {q.kind === 'btw' ? 'by the way' : 'next'}
+              </span>
+              <span className="agent-queued-text">{q.text}</span>
+              <button
+                type="button"
+                className="agent-cmd-x"
+                title="Remove this queued message"
+                aria-label="Remove queued message"
+                onClick={() => {
+                  const s2 = useAgentPanel.getState()
+                  const sess = s2.sessions.find((v) => v.sessionId === s2.activeId)
+                  if (!sess) return
+                  useAgentPanel.setState({
+                    sessions: s2.sessions.map((v) =>
+                      v.sessionId === sess.sessionId
+                        ? { ...v, queued: (v.queued ?? []).filter((_, j) => j !== i) }
+                        : v,
+                    ),
+                  })
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {invoked.length > 0 && (
         <div className="agent-cmd-strip" role="status">
           {invoked.map((inv) => (
@@ -1064,9 +1100,35 @@ export function AgentPanel(): React.JSX.Element | null {
         />
         </div>
         {active?.busy ? (
-          <Button variant="danger" onClick={() => useAgentPanel.getState().cancel()}>
-            Stop
-          </Button>
+          <span className="agent-queue-actions">
+            {/* Two intents, never mixed: more work to start next, versus a small
+                aside about what is running now. */}
+            <Button
+              className="button-small"
+              disabled={!hasContent}
+              title="Queue as the next task — sent when this turn ends"
+              onClick={() => {
+                useAgentPanel.getState().setQueueKind('next')
+                submit()
+              }}
+            >
+              Queue
+            </Button>
+            <Button
+              className="button-small"
+              disabled={!hasContent}
+              title="A quick side question about what's running — not a new task"
+              onClick={() => {
+                useAgentPanel.getState().setQueueKind('btw')
+                submit()
+              }}
+            >
+              BTW
+            </Button>
+            <Button variant="danger" className="button-small" onClick={() => useAgentPanel.getState().cancel()}>
+              Stop
+            </Button>
+          </span>
         ) : (
           // the panel's ONE cobalt primary (one-per-view law)
           <Button variant="primary" kbd="↵" disabled={!canSend || !hasContent} onClick={submit}>

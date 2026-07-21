@@ -30,7 +30,7 @@ window.loredex = {
 // value imports MUST ride this dynamic import (never a static one) — a static
 // import hoists above the window.loredex assignment above, so the store's
 // onEvent subscription guard would see no bridge and emit would stay unset
-const { DEFAULT_PANEL_WIDTH, lastUserText, quoteForChat, useAgentPanel, visibleSessions } =
+const { DEFAULT_PANEL_WIDTH, framedQueued, lastUserText, quoteForChat, useAgentPanel, visibleSessions } =
   await import('./agentPanel')
 
 const session = (id: string, over: Partial<AcpSessionView> = {}): AcpSessionView => ({
@@ -954,5 +954,59 @@ describe('reset (vault switch)', () => {
       activeId: null,
       permission: null,
     })
+  })
+})
+
+describe('queued messages while a turn runs', () => {
+  /**
+   * send() used to `return` outright when busy, so the message the user typed
+   * was silently DISCARDED — while the composer placeholder promised
+   * "sends when the turn ends".
+   */
+  it('queues instead of dropping, and keeps order', () => {
+    useAgentPanel.setState({
+      activeId: 's1',
+      sessions: [
+        {
+          sessionId: 's1', agent: 'claude', title: 't', state: 'ready',
+          busy: true, items: [], plan: [],
+        },
+      ],
+      draft: '',
+      queueKind: 'next',
+    })
+    void useAgentPanel.getState().send('first')
+    void useAgentPanel.getState().send('second')
+    const q = useAgentPanel.getState().sessions[0]?.queued ?? []
+    expect(q.map((x) => x.text)).toEqual(['first', 'second'])
+    expect(q.every((x) => x.kind === 'next')).toBe(true)
+  })
+
+  it('records the BTW intent, then resets so it is never a sticky mode', () => {
+    useAgentPanel.setState({
+      activeId: 's1',
+      sessions: [
+        {
+          sessionId: 's1', agent: 'claude', title: 't', state: 'ready',
+          busy: true, items: [], plan: [],
+        },
+      ],
+      draft: '',
+      queueKind: 'btw',
+    })
+    void useAgentPanel.getState().send('quick aside')
+    expect(useAgentPanel.getState().sessions[0]?.queued?.[0]).toMatchObject({
+      text: 'quick aside',
+      kind: 'btw',
+    })
+    // the next message must not silently inherit "by the way"
+    expect(useAgentPanel.getState().queueKind).toBe('next')
+  })
+
+  it('frames a BTW so it is not mistaken for the next task; leaves next alone', () => {
+    expect(framedQueued({ text: 'x', kind: 'next' })).toBe('x')
+    const btw = framedQueued({ text: 'is the webhook live?', kind: 'btw' })
+    expect(btw).toMatch(/side question/i)
+    expect(btw).toContain('is the webhook live?')
   })
 })

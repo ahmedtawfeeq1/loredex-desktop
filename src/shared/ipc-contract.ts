@@ -292,6 +292,25 @@ export interface CoreApi {
   }
   /** agent-ops: list a client's snapshots (all units), newest stamp first. */
   'clients.snapshot.list': { in: { client: string }; out: SnapshotSummary[] }
+  /**
+   * agent-ops: build this client's knowledge base as one .xlsx, a sheet per
+   * table, and hand back the bytes base64-encoded (the IPC channel is JSON).
+   *
+   * It returns bytes rather than writing a file because an export is an
+   * artefact to send someone, not dex content: the renderer passes it to the
+   * native save panel, so it lands wherever the user chooses and never in the
+   * vault, where a binary regenerable from CSV would only bloat the history.
+   */
+  'clients.kb.export': {
+    in: { client: string }
+    out: {
+      /** the .xlsx, base64 */
+      base64: string
+      filename: string
+      tables: { name: string; rows: number; columns: number }[]
+      skipped: { name: string; reason: string }[]
+    }
+  }
   // ── WP-G: scaffold new units + inbox consumption (one attributed commit each) ──
   'clients.scaffold.pipeline': {
     in: { client: string; name: string; identity: Identity }

@@ -19,6 +19,7 @@ import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import { readClientTokens, storeClientToken } from './client-tokens'
 import { fetchBundles, planFiles } from './genudo-pull'
+import { buildKbWorkbook } from './kb-export'
 import { scanStagedEdits } from './staged-edits'
 import { explainSpawnFailure, widenWindowsPath } from './win-spawn'
 import {
@@ -553,6 +554,19 @@ export function registerCoreHandlers(
     }),
   )
   ipc.register('clients.snapshot.list', ({ client }) => engine.listSnapshotsFor(client))
+  // Knowledge-base export. Read-only: no write lock, no vault.changed, no
+  // commit — nothing in the dex changes, the bytes go to wherever the user
+  // points the save panel.
+  ipc.register('clients.kb.export', ({ client }) => {
+    requireAgentOps('knowledge base export')
+    const { buffer, tables, skipped } = buildKbWorkbook(engine.getConfig().vaultPath, client)
+    return {
+      base64: buffer.toString('base64'),
+      filename: `${client}-knowledge-base.xlsx`,
+      tables,
+      skipped,
+    }
+  })
   // WP-D: per-client login credentials — machine-local keychain only, never the
   // dex/git. No write lock, no vault.changed (nothing in the vault changes).
   ipc.register('clients.credentials.list', ({ client }) => listCredentials(client))

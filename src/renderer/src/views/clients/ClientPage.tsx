@@ -17,7 +17,7 @@ import type {
 import type { AcpAgent } from '../../../../shared/ipc-contract'
 import type { Identity } from '../../../../shared/types'
 import { AGENT_META, AGENTS } from '../../agent/AgentPanel'
-import { invoke, revealPath } from '../../api'
+import { invoke, revealPath, saveExport } from '../../api'
 import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
@@ -1282,6 +1282,32 @@ export function ClientPage({
       .catch(() => setSnapshots([]))
   }, [info.slug, snapRefresh])
 
+  // Knowledge-base → Excel. Core builds the workbook; the native save panel
+  // decides where it lands, so nothing is written until the user picks a spot.
+  const [exportingKb, setExportingKb] = useState(false)
+  async function exportKb(): Promise<void> {
+    setExportingKb(true)
+    try {
+      const r = await invoke('clients.kb.export', { client: info.slug })
+      const bytes = Uint8Array.from(atob(r.base64), (c) => c.charCodeAt(0))
+      const saved = await saveExport(r.filename, bytes.buffer as ArrayBuffer)
+      if (!saved) return // cancelled — not an error, and not worth a toast
+      const rows = r.tables.reduce((n, t) => n + t.rows, 0)
+      useToasts
+        .getState()
+        .push(
+          'Knowledge base exported',
+          `${r.tables.length} table${r.tables.length === 1 ? '' : 's'} · ${rows} row${rows === 1 ? '' : 's'}${
+            r.skipped.length > 0 ? ` · skipped ${r.skipped.map((s) => s.name).join(', ')}` : ''
+          }`,
+        )
+    } catch (e) {
+      useToasts.getState().push('Export failed', reason(e))
+    } finally {
+      setExportingKb(false)
+    }
+  }
+
   // WP-G: new-pipeline/agent modal + new-stage modal (pipeline it targets)
   const [newUnit, setNewUnit] = useState<'pipeline' | 'agent' | null>(null)
   const [stageFor, setStageFor] = useState<string | null>(null)
@@ -1407,6 +1433,17 @@ export function ClientPage({
           >
             Reveal Folder
           </button>
+          {page.tables.length > 0 && (
+            <button
+              type="button"
+              className="cp-cred-add"
+              disabled={exportingKb}
+              title="Download every knowledge table as one Excel workbook, a sheet per table"
+              onClick={() => void exportKb()}
+            >
+              {exportingKb ? 'Building…' : 'Export to Excel'}
+            </button>
+          )}
         </div>
         {page.tables.length === 0 ? (
           <div className="cp-empty">No tables — the AI has nothing to be grounded on yet.</div>

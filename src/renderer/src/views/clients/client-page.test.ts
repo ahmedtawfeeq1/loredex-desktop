@@ -4,19 +4,30 @@
  */
 import { describe, expect, it } from 'vitest'
 import type { ClientInfo, LintFinding } from '../../../../shared/ipc-contract'
-import { buildClientPage , isRetiredSchemaLint } from './client-page'
+import { buildClientPage } from './client-page'
 
-const stage = (nn: string, slug: string, broken = false) => ({
+const stage = (nn: string, slug: string, opts?: { noConfig?: boolean; noInstructions?: boolean }) => ({
   nn,
   slug,
   dir: `${nn}_${slug}`,
   files: {
-    enterCondition: true,
-    stageInstructions: true,
-    followup: !broken,
-    actions: true,
+    stageInstructions: !opts?.noInstructions,
+    stageConfig: !opts?.noConfig,
   },
-  prefixMismatches: [],
+})
+
+const unit = (name: string, kind: 'pipeline' | 'agent', over?: Partial<ClientInfo['pipelines'][number]>) => ({
+  name,
+  kind,
+  dir: `projects/brightsmile-dental/${kind === 'pipeline' ? 'pipelines' : 'agents'}/${name}`,
+  persona: 'ok' as const,
+  instructions: 'ok' as const,
+  hasActions: true,
+  hasVariables: true,
+  hasConfig: true,
+  stages: [],
+  hasStagesDir: kind === 'pipeline',
+  ...over,
 })
 
 const info: ClientInfo = {
@@ -25,31 +36,11 @@ const info: ClientInfo = {
   tags: ['dental', 'new-platform'],
   manager: 'sara',
   pipelines: [
-    {
-      name: 'booking',
-      kind: 'pipeline',
-      dir: 'projects/brightsmile-dental/pipelines/booking',
-      persona: 'ok',
-      generalInstructions: 'ok',
-      hasActions: true,
-      hasSettings: true,
-      stages: [stage('01', 'intake'), stage('02', 'confirm', true)],
-      hasStagesDir: true,
-    },
+    unit('booking', 'pipeline', {
+      stages: [stage('01', 'intake'), stage('02', 'confirm', { noConfig: true })],
+    }),
   ],
-  agents: [
-    {
-      name: 'reception-agent',
-      kind: 'agent',
-      dir: 'projects/brightsmile-dental/agents/reception-agent',
-      persona: 'ok',
-      generalInstructions: 'ok',
-      hasActions: true,
-      hasSettings: true,
-      stages: [],
-      hasStagesDir: false,
-    },
-  ],
+  agents: [unit('reception-agent', 'agent', { hasActions: false, hasVariables: false })],
   knowledgeTables: ['patients.csv'],
   workflows: ['booking-flow.json'],
   inboxCount: 2,
@@ -63,7 +54,7 @@ const lints: LintFinding[] = [
     level: 'error',
     client: 'brightsmile-dental',
     scope: 'pipelines/booking/stages/02_confirm',
-    message: 'stage 02 has no matching platform stage',
+    message: 'missing stage.yaml',
   },
   { level: 'attention', client: 'brightsmile-dental', scope: '_inbox', message: '2 pending' },
   { level: 'error', client: 'other-client', scope: '.', message: 'not mine' },
@@ -82,17 +73,11 @@ describe('buildClientPage', () => {
       errorCount: 1, // only THIS client's errors
     })
     const booking = page.pipelines[0]
-    expect(booking?.personaPath).toBe('projects/brightsmile-dental/pipelines/booking/_persona.md')
-    expect(booking?.stages.map((s) => s.nn)).toEqual(['01', '02'])
-    expect(booking?.stages[0]?.instructionsPath).toBe(
-      'projects/brightsmile-dental/pipelines/booking/stages/01_intake/_instructions.md',
+    expect(booking?.files.find((f) => f.label === 'persona')?.path).toBe(
+      'projects/brightsmile-dental/pipelines/booking/_persona.md',
     )
-    // `broken` is now driven ONLY by a real prefix mismatch: stage.files is keyed
-    // by the retired scaffold names, so it cannot say anything true about a
-    // pulled stage until the lib's schema catches up.
-    expect(booking?.stages[0]?.broken).toBe(false)
-    expect(booking?.stages[1]?.broken).toBe(false)
-    expect(booking?.problems).toEqual(['stage 02 has no matching platform stage'])
+    expect(booking?.stages.map((s) => s.nn)).toEqual(['01', '02'])
+    expect(booking?.problems).toEqual(['missing stage.yaml'])
     expect(page.agents[0]?.stages).toEqual([])
     expect(page.tables).toEqual([
       { name: 'patients.csv', path: 'projects/brightsmile-dental/knowledge_tables/patients.csv' },
@@ -105,32 +90,51 @@ describe('buildClientPage', () => {
     // other clients' findings never leak in
     expect(page.lints.every((f) => f.client === 'brightsmile-dental')).toBe(true)
   })
-})
 
-describe('retired scaffold lints', () => {
   /**
-   * The lib's linter still checks for the ORIGINAL scaffold filenames. A pulled
-   * pipeline uses the names the genudo playbook now specifies, so those findings
-   * report renamed files as "missing" — content that is present and correct.
-   * Showing a healthy client as broken is worse than showing nothing.
+   * The bug this guards: every file chip was rendered as a link regardless of
+   * whether the file existed, so a pipeline with no actions — a perfectly normal
+   * pipeline — opened "This note has moved or was removed" and read as broken.
    */
-  it('suppresses findings that name only retired scaffold files', () => {
-    for (const message of [
-      '_general_instructions.md missing',
-      'missing 00_enter_condition.md, 00_stage_instructions.md, 00_followup.md, 00_actions.curls.yaml',
-      '_settings.export.yaml missing',
-    ]) {
-      expect(isRetiredSchemaLint({ level: 'error', client: 'c', scope: '.', message })).toBe(true)
-    }
+  it('marks a file the unit does not have as absent, not as a link', () => {
+    const page = buildClientPage(info, lints)
+    const agent = page.agents[0]
+    expect(agent?.files.find((f) => f.label === 'actions')).toMatchObject({ present: false })
+    expect(agent?.files.find((f) => f.label === 'variables')).toMatchObject({ present: false })
+    expect(agent?.files.find((f) => f.label === 'persona')).toMatchObject({ present: true })
   })
 
-  it('never suppresses a finding that still means something', () => {
-    for (const message of [
-      'stage numbering has a gap: 00, 02',
-      'workspace.yml references an undefined token',
-      '2 pending',
-    ]) {
-      expect(isRetiredSchemaLint({ level: 'error', client: 'c', scope: '.', message })).toBe(false)
+  it('a stage is broken when it has no stage.yaml — not merely no instructions', () => {
+    const page = buildClientPage(info, lints)
+    const stages = page.pipelines[0]?.stages
+    expect(stages?.[0]?.broken).toBe(false)
+    expect(stages?.[1]?.broken).toBe(true)
+  })
+
+  /**
+   * A stage with no `_instructions.md` inherits the pipeline's — that is by
+   * design, and the pull deliberately omits the duplicate. Clicking it must open
+   * the config it DOES have rather than a file that was never written.
+   */
+  it('a stage with no instructions of its own opens stage.yaml instead', () => {
+    const inherited: ClientInfo = {
+      ...info,
+      pipelines: [
+        unit('booking', 'pipeline', { stages: [stage('01', 'intake', { noInstructions: true })] }),
+      ],
     }
+    const step = buildClientPage(inherited, [])?.pipelines[0]?.stages[0]
+    expect(step?.hasInstructions).toBe(false)
+    expect(step?.instructionsPath).toBe(
+      'projects/brightsmile-dental/pipelines/booking/stages/01_intake/stage.yaml',
+    )
+    expect(step?.broken).toBe(false)
+  })
+
+  it('a stage WITH instructions opens them', () => {
+    const step = buildClientPage(info, [])?.pipelines[0]?.stages[0]
+    expect(step?.instructionsPath).toBe(
+      'projects/brightsmile-dental/pipelines/booking/stages/01_intake/_instructions.md',
+    )
   })
 })

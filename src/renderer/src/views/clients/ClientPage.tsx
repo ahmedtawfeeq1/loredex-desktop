@@ -39,19 +39,17 @@ function reason(e: unknown): string {
 /**
  * Local scaffolding (+ Pipeline / + Stage / + Agent) is OFF.
  *
- * Those buttons call the lib's scaffolder, which still writes the ORIGINAL file
- * names — `_general_instructions.md`, `_settings.export.yaml`,
- * `NN_stage_instructions.md`. A pipeline pulled from genudo uses the names the
- * genudo playbook specifies, so pressing them recreates exactly the "missing
- * file" mess this page was just fixed for, in a shape neither the pull nor the
- * MCP understands.
+ * It was originally off for two reasons. The first — the lib's scaffolder wrote
+ * the retired filenames — is fixed as of loredex 2.10.0: it now writes
+ * `_instructions.md` and per-stage `_instructions.md` + `stage.yaml`, the same
+ * names the pull and the platform's MCP use.
  *
- * They are also the wrong model now: the platform is the source of truth, so a
- * stage created only on disk never exists to the agent. Creating one belongs to
- * the genudo MCP (`create_stage`), which updates the platform AND re-mirrors.
- *
- * Flip this back on once UNIT_FILES / STAGE_FILE_SUFFIXES and the scaffolder in
- * loredex/src/core/agent-ops.ts are updated to the new schema.
+ * The second reason is why it stays off, and it is not a bug to be fixed: the
+ * PLATFORM is the source of truth. A stage that exists only on disk does not
+ * exist to the agent, so the button would produce folders that look real, lint
+ * clean, and change nothing about how the AI behaves. Creating a stage belongs
+ * to the platform's MCP (`create_stage`), which writes upstream and re-mirrors
+ * down. A button that silently does nothing useful is worse than no button.
  */
 const LOCAL_SCAFFOLD_ENABLED = false
 
@@ -81,6 +79,8 @@ const PAGE_CSS = `
 .cp-unit-files { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .cp-filelink { font-size: 11.5px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
 .cp-filelink:hover { color: var(--text-1); border-color: var(--text-2); }
+.cp-filelink.is-absent { opacity: 0.42; cursor: default; border-style: dashed; }
+.cp-filelink.is-absent:hover { color: var(--text-2); border-color: var(--hairline); }
 .cp-stage-rail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .cp-stage { display: flex; align-items: center; gap: 6px; font-size: 12px; border: 1px solid var(--hairline); border-radius: 8px; padding: 4px 10px; cursor: pointer; color: var(--text-1); }
 .cp-stage:hover { border-color: var(--text-2); }
@@ -183,25 +183,35 @@ function Unit({
         <button
           type="button"
           className="cp-unit-snapshot"
-          title="Version this unit's definition files into _versions/ (committed)"
+          title="Capture this unit's whole definition into versions/vNN (committed)"
           onClick={() => onSnapshot(unit.name)}
         >
           ⧉ Snapshot
         </button>
       </div>
       <div className="cp-unit-files">
-        {(
-          [
-            ['persona', unit.personaPath],
-            ['instructions', unit.generalInstructionsPath],
-            ['actions', unit.actionsPath],
-            ['settings', unit.settingsPath],
-          ] as const
-        ).map(([label, path]) => (
-          <button key={label} type="button" className="cp-filelink" onClick={() => openNote(path)}>
-            {label}
-          </button>
-        ))}
+        {/* A pipeline with no actions is normal, not broken. Absent files render
+            as disabled rather than as a link into "this note was removed". */}
+        {unit.files.map((f) =>
+          f.present ? (
+            <button
+              key={f.label}
+              type="button"
+              className="cp-filelink"
+              onClick={() => openNote(f.path)}
+            >
+              {f.label}
+            </button>
+          ) : (
+            <span
+              key={f.label}
+              className="cp-filelink is-absent"
+              title={`No ${f.label} for this ${unit.kind} — nothing to open`}
+            >
+              {f.label}
+            </span>
+          ),
+        )}
       </div>
       {unit.kind === 'pipeline' && (
         <div className="cp-stage-rail">
@@ -216,7 +226,13 @@ function Unit({
               <button
                 type="button"
                 className={stage.broken ? 'cp-stage cp-stage-broken' : 'cp-stage'}
-                title={stage.broken ? 'Stage files incomplete — see problems below' : undefined}
+                title={
+                  stage.broken
+                    ? 'No stage.yaml — see problems below'
+                    : stage.hasInstructions
+                      ? undefined
+                      : 'No instructions of its own — inherits the pipeline. Opens stage.yaml.'
+                }
                 onClick={() => openNote(stage.instructionsPath)}
               >
                 <span className="cp-stage-nn">{stage.nn}</span>
@@ -1360,13 +1376,14 @@ export function ClientPage({
               <div className="cp-rows">
                 {snaps.map((s) => (
                   <button
-                    key={s.stamp}
+                    key={s.dir}
                     type="button"
                     className="cp-row"
                     title={s.note ?? 'Open the snapshot manifest'}
-                    onClick={() =>
-                      openNote(`${info.dir}/_versions/${s.unit}/${s.stamp}/manifest.json`)
-                    }
+                    // `dir` comes from the lib, which knows whether this version
+                    // sits in the unit's versions/ or the retired _versions/.
+                    // Rebuilding the path here is how the old rows 404'd.
+                    onClick={() => openNote(`${s.dir}/manifest.json`)}
                   >
                     <span className="cp-row-type">{s.fileCount}f</span>
                     {s.stamp}

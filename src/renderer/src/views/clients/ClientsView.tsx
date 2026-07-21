@@ -8,7 +8,6 @@ import type { ClientInfo } from '../../../../shared/ipc-contract'
 import { invoke } from '../../api'
 import { useDex } from '../../stores/dex'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
-import { isRetiredSchemaLint } from './client-page'
 import { sectionTint } from '../reader/sectionTint'
 import { AddClientModal } from './AddClientModal'
 import { ClientPage } from './ClientPage'
@@ -47,19 +46,17 @@ const CLIENTS_CSS = `
 .clients-empty { color: var(--text-2); padding: 40px 0; }
 .clients-search { font-size: 12.5px; padding: 4px 10px; min-width: 200px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--bg-inset); color: var(--text-1); }
 .clients-search:focus { outline: none; border-color: var(--accent-hi); }
+.clients-manager-filter { font-size: 12.5px; padding: 4px 8px; border: 1px solid var(--hairline); border-radius: 8px; background: var(--bg-inset); color: var(--text-1); }
+.clients-manager-filter:focus { outline: none; border-color: var(--accent-hi); }
 .clients-repair-msg { font-size: 12.5px; color: var(--text-2); margin: -6px 0 14px; }
 `
 
 function ClientCard({ info, onOpen }: { info: ClientInfo; onOpen: () => void }): React.JSX.Element {
-  // Same suppression the client page applies: findings that name ONLY the
-  // retired scaffold filenames report renamed content as missing. The card and
-  // the page must agree — a card reading "13 schema problems" that opens to a
-  // clean page is worse than either alone.
+  // Counted exactly the way the client page counts them, so a card reading
+  // "3 schema problems" opens to a page showing those same three.
   const errors = useDex(
     (s) =>
-      (s.lints ?? []).filter(
-        (f) => f.client === info.slug && f.level === 'error' && !isRetiredSchemaLint(f),
-      ).length,
+      (s.lints ?? []).filter((f) => f.client === info.slug && f.level === 'error').length,
   )
   return (
     <button
@@ -106,6 +103,9 @@ export function ClientsView(): React.JSX.Element {
   const selectManager = useDex((s) => s.selectManager)
   const [tagFilter, setTagFilter] = useState<string | null>(null)
   const [search, setSearch] = useState('') // BL-8: find a client by name
+  // Filter by manager. Distinct from `managerScope`, which is the sidebar
+  // drilling into one manager's page; this is a filter inside the full list.
+  const [managerFilter, setManagerFilter] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [normalizing, setNormalizing] = useState(false)
   const [repairMsg, setRepairMsg] = useState<string | null>(null)
@@ -142,12 +142,21 @@ export function ClientsView(): React.JSX.Element {
     [fleet, managerScope],
   )
   const allTags = useMemo(() => [...new Set(scoped.flatMap((c) => c.tags))].sort(), [scoped])
-  // BL-8: name search, applied alongside the tag filter. Matches the slug and
-  // the manager so "sara" finds a manager's clients too.
+  // Every manager in the dex, unassigned last — the filter's options.
+  const allManagers = useMemo(
+    () =>
+      [...new Set(scoped.map((c) => c.manager ?? ''))].sort((a, b) =>
+        a === '' ? 1 : b === '' ? -1 : a.localeCompare(b),
+      ),
+    [scoped],
+  )
+  // BL-8: name search, applied alongside the tag and manager filters. Matches
+  // the slug and the manager so "sara" finds a manager's clients too.
   const q = search.trim().toLowerCase()
   const visible = scoped.filter(
     (c) =>
       (!tagFilter || c.tags.includes(tagFilter)) &&
+      (managerFilter === null || (c.manager ?? '') === managerFilter) &&
       (!q ||
         c.slug.toLowerCase().includes(q) ||
         (c.manager ?? '').toLowerCase().includes(q) ||
@@ -187,6 +196,23 @@ export function ClientsView(): React.JSX.Element {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+        {/* Hidden when the sidebar already scoped to one manager — two controls
+            for the same thing invite them to disagree. */}
+        {!managerScope && allManagers.length > 0 && (
+          <select
+            className="clients-manager-filter"
+            aria-label="Filter by manager"
+            value={managerFilter ?? ''}
+            onChange={(e) => setManagerFilter(e.target.value || null)}
+          >
+            <option value="">All managers</option>
+            {allManagers.map((m) => (
+              <option key={m} value={m}>
+                {m || 'Unassigned'}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           className="button-secondary"

@@ -9,19 +9,38 @@ import type { ClientInfo, LintFinding } from '../../../../shared/ipc-contract'
 export interface StageRailStep {
   nn: string
   slug: string
-  /** vault-relative path of the stage instructions file (reader open target) */
+  /**
+   * What clicking this stage opens. Its `_instructions.md` when it has one;
+   * otherwise `stage.yaml`, because a stage that inherits the pipeline's
+   * instructions still has config worth reading — and opening a file that was
+   * never written is how a healthy stage came to look broken.
+   */
   instructionsPath: string
-  /** any of the four files missing / misnumbered */
+  /** false when this stage has no `_instructions.md` — it inherits the pipeline's */
+  hasInstructions: boolean
+  /** no `stage.yaml` — the stage is not addressable on the platform */
   broken: boolean
+}
+
+/**
+ * One file the page can offer to open, and whether it is actually there.
+ *
+ * A pipeline legitimately has no actions or no variables. Rendering a chip that
+ * opens "This note has moved or was removed" makes a healthy pipeline look
+ * broken, so presence travels with the path and the view renders absent files
+ * as absent rather than as a dead link.
+ */
+export interface UnitFileRef {
+  label: string
+  path: string
+  present: boolean
 }
 
 export interface UnitSection {
   name: string
   kind: 'pipeline' | 'agent'
-  personaPath: string
-  generalInstructionsPath: string
-  actionsPath: string
-  settingsPath: string
+  /** files this unit can open, in reading order; check `present` before linking */
+  files: UnitFileRef[]
   stages: StageRailStep[]
   /** error-level lint messages scoped to this unit */
   problems: string[]
@@ -55,21 +74,30 @@ function unitSection(info: ClientInfo, unit: ClientInfo['pipelines'][number], li
   return {
     name: unit.name,
     kind: unit.kind,
-    // Paths follow the structure the genudo playbook specifies and the pull
-    // writes. They were the ORIGINAL scaffold names, so every chip opened a file
-    // that no longer exists — hence "This note has moved or was removed".
-    personaPath: `${unit.dir}/_persona.md`,
-    generalInstructionsPath: `${unit.dir}/_instructions.md`,
-    actionsPath: `${unit.dir}/_actions.yaml`,
-    settingsPath: `${unit.dir}/pipeline.yaml`,
+    // `present` comes from the scanner, not from guessing at the filename — the
+    // lib and the pull now agree on these names, so an absent file here means
+    // the platform genuinely has nothing for that field.
+    files: [
+      { label: 'persona', path: `${unit.dir}/_persona.md`, present: unit.persona !== 'missing' },
+      {
+        label: 'instructions',
+        path: `${unit.dir}/_instructions.md`,
+        present: unit.instructions !== 'missing',
+      },
+      { label: 'actions', path: `${unit.dir}/_actions.yaml`, present: unit.hasActions },
+      { label: 'variables', path: `${unit.dir}/_variables.yaml`, present: unit.hasVariables },
+      { label: 'config', path: `${unit.dir}/pipeline.yaml`, present: unit.hasConfig },
+    ],
     stages: unit.stages.map((stage) => ({
       nn: stage.nn,
       slug: stage.slug,
-      instructionsPath: `${unit.dir}/stages/${stage.dir}/_instructions.md`,
-      // `stage.files` is keyed by the retired scaffold names, so every stage read
-      // as broken. Until the lib's schema is updated it cannot tell us anything
-      // true about a pulled stage, so only a real prefix mismatch marks one.
-      broken: stage.prefixMismatches.length > 0,
+      instructionsPath: `${unit.dir}/stages/${stage.dir}/${
+        stage.files.stageInstructions ? '_instructions.md' : 'stage.yaml'
+      }`,
+      hasInstructions: stage.files.stageInstructions,
+      // no stage.yaml = no id, no order, no enter condition. That is broken;
+      // a stage with no instructions of its own is merely inheriting.
+      broken: !stage.files.stageConfig,
     })),
     problems: lints
       .filter((f) => f.level === 'error' && f.scope.startsWith(scope))
@@ -77,32 +105,8 @@ function unitSection(info: ClientInfo, unit: ClientInfo['pipelines'][number], li
   }
 }
 
-/**
- * Filenames from the ORIGINAL agent-ops scaffold, which no longer exist.
- *
- * A pipeline pulled from genudo is written in the structure the genudo editing
- * playbook now specifies (verified server-side 2026-07-21): `_instructions.md`,
- * `_actions.yaml`, `pipeline.yaml`, and per stage `_instructions.md` +
- * `stage.yaml`. The lib's linter still checks for the scaffold's old names, so
- * it reports a dozen files as "missing" that were simply RENAMED — the content
- * is present and correct.
- *
- * Reporting a healthy client as broken is worse than reporting nothing, so these
- * specific stale findings are suppressed here. This is a STOPGAP: the real fix
- * is updating UNIT_FILES / STAGE_FILE_SUFFIXES in loredex/src/core/agent-ops.ts
- * (plus the scaffold, doctor and indexer that share them) and re-vendoring.
- * Every other finding still shows.
- */
-const RETIRED_FILENAMES =
-  /_general_instructions\.md|_settings\.export\.yaml|actions\.curls\.yaml|_enter_condition\.md|_stage_instructions\.md|_followup\.md|\d\d_(enter_condition|stage_instructions|followup)\b/
-
-/** True when this finding is only about the retired scaffold names. */
-export function isRetiredSchemaLint(f: LintFinding): boolean {
-  return RETIRED_FILENAMES.test(f.message)
-}
-
 export function buildClientPage(info: ClientInfo, lints: LintFinding[]): ClientPageModel {
-  const mine = lints.filter((f) => f.client === info.slug && !isRetiredSchemaLint(f))
+  const mine = lints.filter((f) => f.client === info.slug)
   return {
     header: {
       slug: info.slug,

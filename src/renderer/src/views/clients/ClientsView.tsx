@@ -8,6 +8,7 @@ import type { ClientInfo } from '../../../../shared/ipc-contract'
 import { invoke } from '../../api'
 import { useDex } from '../../stores/dex'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
+import { isRetiredSchemaLint } from './client-page'
 import { sectionTint } from '../reader/sectionTint'
 import { AddClientModal } from './AddClientModal'
 import { ClientPage } from './ClientPage'
@@ -50,8 +51,15 @@ const CLIENTS_CSS = `
 `
 
 function ClientCard({ info, onOpen }: { info: ClientInfo; onOpen: () => void }): React.JSX.Element {
+  // Same suppression the client page applies: findings that name ONLY the
+  // retired scaffold filenames report renamed content as missing. The card and
+  // the page must agree — a card reading "13 schema problems" that opens to a
+  // clean page is worse than either alone.
   const errors = useDex(
-    (s) => (s.lints ?? []).filter((f) => f.client === info.slug && f.level === 'error').length,
+    (s) =>
+      (s.lints ?? []).filter(
+        (f) => f.client === info.slug && f.level === 'error' && !isRetiredSchemaLint(f),
+      ).length,
   )
   return (
     <button

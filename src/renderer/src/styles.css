@@ -9844,3 +9844,48 @@ a.button-primary {
   font-size: 11px;
   color: var(--rust);
 }
+
+/* Staged edits — fleet-wide view of pipeline edits the agent staged but may
+   never have pushed (agent-ops only). */
+.staged-view { padding: 24px 32px; overflow-y: auto; width: 100%; max-width: 1080px; }
+.staged-title { font-family: var(--font-ui); font-size: 26px; color: var(--text-1); margin-bottom: 6px; }
+.staged-sub { font-size: 12.5px; color: var(--text-2); margin-bottom: 16px; max-width: 70ch; }
+.staged-summary { font-size: 13px; color: var(--text-1); margin-bottom: 10px; }
+.staged-note {
+  font-size: 12px; color: var(--text-2); line-height: 1.5; max-width: 74ch;
+  /* the design system reserves a 2px left rail for hairline/section/accent —
+     an inset panel carries the same "read this" weight without breaking it */
+  border: 1px solid var(--hairline);
+  border-radius: 8px; padding: 9px 12px; margin-bottom: 16px; background: var(--bg-inset);
+}
+.staged-empty { padding: 24px 32px; font-size: 13px; color: var(--text-2); }
+.staged-group { border: 1px solid var(--hairline); border-radius: 10px; margin-bottom: 8px; background: var(--bg-card); overflow: hidden; }
+.staged-group-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; background: none; border: 0; cursor: pointer; color: var(--text-1); font-size: 13px;
+}
+.staged-group-head:hover { background: var(--bg-hover); }
+.staged-caret { color: var(--text-3); font-size: 10px; width: 10px; }
+.staged-count { font-size: 11.5px; color: var(--text-2); }
+.staged-when { font: 10.5px var(--font-mono); color: var(--text-3); }
+.staged-rows { border-top: 1px solid var(--hairline); }
+.staged-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 12px 7px 32px; border-bottom: 1px solid var(--hairline); font-size: 12.5px;
+}
+.staged-row:last-child { border-bottom: 0; }
+.staged-state {
+  font: 600 9.5px var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em;
+  border: 1px solid var(--hairline); border-radius: 999px; padding: 1px 8px; white-space: nowrap;
+}
+.staged-state.is-pushed { color: var(--ok); border-color: var(--ok); }
+.staged-state.is-staged { color: var(--warn); border-color: var(--warn); }
+.staged-state.is-unknown { color: var(--text-3); }
+.staged-version { font: 11px var(--font-mono); color: var(--text-1); }
+.staged-pipeline { font-size: 11.5px; color: var(--text-2); }
+.staged-files { font-size: 11px; color: var(--text-3); }
+.staged-open {
+  font-size: 11.5px; color: var(--text-2); border: 1px solid var(--hairline);
+  border-radius: 6px; padding: 2px 9px; cursor: pointer; background: none;
+}
+.staged-open:hover { color: var(--text-1); border-color: var(--text-2); }

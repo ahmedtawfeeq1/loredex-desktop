@@ -11,6 +11,7 @@ export type AppView =
   | 'home'
   | 'reader'
   | 'clients'
+  | 'staged-edits'
   | 'handoffs'
   | 'plan'
   | 'agents'

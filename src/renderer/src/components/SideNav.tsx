@@ -35,6 +35,7 @@ const GLYPH: Partial<Record<AppView, string>> = {
   feed: '≋',
   settings: '⚙',
   clients: '◫',
+  'staged-edits': '⇡',
   search: '⌕',
   contracts: '§',
 }

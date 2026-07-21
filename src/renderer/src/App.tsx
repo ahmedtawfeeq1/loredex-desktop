@@ -31,6 +31,7 @@ import { useApp } from './stores/app'
 import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
 import { useDex } from './stores/dex'
+import { StagedEditsView } from './views/clients/StagedEditsView'
 import { useIdentity } from './stores/identity'
 import { useFileSearch } from './stores/fileSearch'
 import { useFind } from './stores/find'
@@ -324,6 +325,10 @@ export default function App(): React.JSX.Element {
         ) : view === 'agents' ? (
           <main className="pane-board">
             <AgentsView />
+          </main>
+        ) : view === 'staged-edits' ? (
+          <main className="pane-board">
+            <StagedEditsView />
           </main>
         ) : view === 'clients' ? (
           <main className="pane-board">

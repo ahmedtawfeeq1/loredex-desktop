@@ -65,6 +65,7 @@ import type {
   TourDef,
   TreeNode,
   TreeSectionsCollapsed,
+  StagedEditsReport,
   VaultIdentity,
   WizardFlow,
   WizardStepStatus,
@@ -77,6 +78,7 @@ export type { SnapshotResult, SnapshotSummary } from 'loredex'
 export type { InboxItem } from 'loredex'
 export type { ClientWorkspaceStatus, CreateClientSpec } from './types'
 export type { PermissionRule } from './types'
+export type { EditState, StagedEdit, StagedEditsReport } from './types'
 
 // ── ACP agent panels (acp blueprint 2026-07-18): shared types ───────────────
 
@@ -543,6 +545,9 @@ export interface CoreApi {
   /** Real round trip to the n8n API — a saved key that 401s is otherwise only
    *  discovered mid-conversation by an agent. */
   'workspace.n8n.test': { in: void; out: { ok: boolean; detail: string } }
+  /** agent-ops: fleet-wide staged pipeline edits. The genudo MCP is scoped to one
+   *  account, so only the host can answer "across all clients, what never shipped". */
+  'agentops.stagedEdits': { in: void; out: StagedEditsReport }
   /** Pull a client's LIVE pipeline config off the genudo platform into the vault.
    *  `preview: true` plans without writing, so the user sees it land first. */
   'clients.pull': {

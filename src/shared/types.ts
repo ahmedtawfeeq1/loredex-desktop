@@ -645,3 +645,29 @@ export interface DuplicateGroup {
   sourceRel: string
   copies: DuplicateCopy[]
 }
+
+// ── agent-ops: fleet-wide staged pipeline edits (2026-07-21) ────────────────
+
+export type EditState = 'staged' | 'pushed' | 'unknown'
+
+export interface StagedEdit {
+  client: string
+  /** vault-relative path to the version folder */
+  path: string
+  /** the folder's own name, e.g. `v2` or `v01_2026-07-20` */
+  version: string
+  /** pipeline name when derivable from the folder, else null */
+  pipeline: string | null
+  /** ISO date from the folder name, else its mtime */
+  when: string
+  fileCount: number
+  /** `unknown` is honest, NOT a synonym for staged — see staged-edits.ts */
+  state: EditState
+}
+
+export interface StagedEditsReport {
+  edits: StagedEdit[]
+  clientsScanned: number
+  /** true once any manifest/status was found — i.e. the MCP records pushes */
+  manifestsPresent: boolean
+}

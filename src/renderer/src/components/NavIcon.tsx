@@ -26,6 +26,13 @@ const GLYPHS: Record<AppView, React.JSX.Element> = {
       <rect x="10.3" y="3" width="3.2" height="8.2" rx="0.8" />
     </>
   ),
+  // staged edits: a stack with an up-arrow — work waiting to be pushed
+  'staged-edits': (
+    <>
+      <path d="M8 10.5V3.5M8 3.5 5.5 6M8 3.5 10.5 6" />
+      <path d="M2.5 12.5h11" />
+    </>
+  ),
   clients: (
     <>
       <circle cx="5.5" cy="5" r="2" />

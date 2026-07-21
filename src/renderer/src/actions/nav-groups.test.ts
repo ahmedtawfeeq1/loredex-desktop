@@ -14,14 +14,35 @@ describe('VIEW_ORDER nav groups', () => {
     expect(VIEW_ORDER.filter((e) => e.navHidden).map((e) => e.view)).toEqual(['contracts'])
   })
 
-  it('research dexes see the nine; agent-ops adds Clients; Plan flag retired', () => {
+  it('research dexes see the nine; agent-ops adds Clients + Staged edits', () => {
     useDex.setState({ type: 'research' })
     expect(visibleViews()).toHaveLength(9)
     expect(visibleViews().some((e) => e.view === 'clients')).toBe(false)
     expect(visibleViews().some((e) => e.view === 'plan')).toBe(true)
     useDex.setState({ type: 'agent-ops' })
-    expect(visibleViews()).toHaveLength(10)
+    expect(visibleViews()).toHaveLength(11)
     expect(visibleViews().some((e) => e.view === 'clients')).toBe(true)
+    useDex.setState({ type: null })
+  })
+
+  /**
+   * The research-safety invariant: a research dex must never grow an agent-ops
+   * surface. Asserted as a SET rather than a count so adding another agent-ops
+   * view cannot quietly leak into research by matching an off-by-one.
+   */
+  it('no agent-ops view is ever visible on a research dex', () => {
+    useDex.setState({ type: 'research' })
+    const research = new Set(visibleViews().map((e) => e.view))
+    for (const view of ['clients', 'staged-edits'] as const) {
+      expect(research.has(view), `${view} must not appear on a research dex`).toBe(false)
+    }
+    useDex.setState({ type: 'agent-ops' })
+    const agentOps = new Set(visibleViews().map((e) => e.view))
+    for (const view of ['clients', 'staged-edits'] as const) {
+      expect(agentOps.has(view), `${view} must appear on an agent-ops dex`).toBe(true)
+    }
+    // and research keeps every view it had — nothing was taken away
+    for (const view of research) expect(agentOps.has(view)).toBe(true)
     useDex.setState({ type: null })
   })
 

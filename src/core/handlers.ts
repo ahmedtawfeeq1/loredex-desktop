@@ -19,6 +19,7 @@ import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import { readClientTokens, storeClientToken } from './client-tokens'
 import { fetchBundles, planFiles } from './genudo-pull'
+import { scanStagedEdits } from './staged-edits'
 import {
   capDiff,
   computeLinks,
@@ -496,6 +497,12 @@ export function registerCoreHandlers(
   })
   ipc.register('workspace.n8n.get', () => n8nStatus())
   ipc.register('workspace.n8n.test', () => testN8nConnection())
+  ipc.register('agentops.stagedEdits', () => {
+    // agent-ops only — a research dex has no clients and no pipelines, and must
+    // never gain an agent-ops surface (the research-safety invariant)
+    requireAgentOps('staged edits')
+    return scanStagedEdits(engine.getConfig().vaultPath)
+  })
   ipc.register('workspace.n8n.set', async ({ url, key }) => {
     if (url !== undefined) setN8nUrl(url)
     if (key !== undefined) {

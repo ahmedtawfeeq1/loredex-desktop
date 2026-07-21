@@ -73,17 +73,22 @@ export const VIEW_ORDER: ReadonlyArray<{
   { view: 'settings', label: 'Settings', group: 'System' },
   // agent-ops only (nav row appears with the dex type)
   { view: 'clients', label: 'Clients', group: 'Workspace' },
+  { view: 'staged-edits', label: 'Staged edits', group: 'Workspace' },
   // §5 absorptions: views stay routable, nav rows retired
   { view: 'contracts', label: 'Contracts', group: 'Workspace', navHidden: true },
 ]
 
-/** Nav/shortcut views for the OPEN dex: Clients exists only on agent-ops dexes,
- *  and its removal renumbers ⌘1…⌘9 so research dexes keep their muscle memory. */
+/** Views that exist ONLY on an agent-ops dex. Removing them renumbers ⌘1…⌘9 so a
+ *  research dex keeps its muscle memory — and, more importantly, never grows an
+ *  agent-ops surface (the research-safety invariant). */
+const AGENT_OPS_ONLY: ReadonlySet<AppView> = new Set<AppView>(['clients', 'staged-edits'])
+
+/** Nav/shortcut views for the OPEN dex. */
 export function visibleViews(): ReadonlyArray<{ view: AppView; label: string; group: NavGroup }> {
   const agentOps = useDex.getState().type === 'agent-ops'
   // Plan's §6.4 preview flag retired: the work-item schema shipped (loredex ≥2.8)
   return VIEW_ORDER.filter(
-    (entry) => !entry.navHidden && (entry.view !== 'clients' || agentOps),
+    (entry) => !entry.navHidden && (agentOps || !AGENT_OPS_ONLY.has(entry.view)),
   )
 }
 

@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '../api'
 import type { AcpChatItem } from '../stores/agentPanel'
+import { openNoteWindow, popoutMode } from '../api'
 import { useApp } from '../stores/app'
 import { useReader } from '../stores/reader'
 import type { AcpToolContent } from '../../../shared/ipc-contract'
@@ -148,6 +149,14 @@ async function openFileRef(abs: string, needle?: string): Promise<void> {
     return
   }
   if (rel === abs) return // still absolute → outside the vault, nothing to open
+  // A chat POP-OUT window renders only the agent panel — it has no reader, so
+  // setView('reader') did nothing at all and the click silently failed. There,
+  // open the note in its own window (the BL-18 note pop-out) instead.
+  if (popoutMode() !== null) {
+    const vaultPath = useApp.getState().identity?.vaultPath ?? null
+    await openNoteWindow(vaultPath, rel)
+    return
+  }
   // BL-16: loading the note is not enough — if you're on Clients/Atlas/etc the
   // Reader isn't on screen, so the click looked like it did nothing. Navigate.
   useApp.getState().setView('reader')
@@ -201,14 +210,18 @@ export function ToolCallRow({ item }: { item: ToolItem }): React.JSX.Element {
 
   const line = (
     <>
-      <span className={`agent-state-chip ${chip.cls}`}>
-        {chip.glyph} {chip.label}
-      </span>
+      {/* elapsed sits LEFT of the state and carries a ring, so a running tool
+          reads as "working" at a glance rather than as a bare number that used
+          to collide with the tool name */}
       {elapsed && (
         <span className="agent-tool-elapsed" title="Time since this tool started">
+          <span className="agent-tool-ring" aria-hidden />
           {elapsed}
         </span>
       )}
+      <span className={`agent-state-chip ${chip.cls}`}>
+        {chip.glyph} {chip.label}
+      </span>
       <span className="agent-tool-title">{item.title}</span>
       {/* BL-16: notes this tool wrote are openable straight from the row — no
           expanding first. The whole point of a note appearing in chat is to go

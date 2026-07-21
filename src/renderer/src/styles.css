@@ -8664,6 +8664,7 @@ a.button-primary {
   flex: 0 0 auto;
   display: inline-flex;
   gap: 4px;
+  margin-left: 4px; /* it was touching the filename */
 }
 
 .agent-tool-open-btn {
@@ -8883,11 +8884,41 @@ a.button-primary {
 
 /* tool rows: mono machine line — tool TITLES only, never raw adapter output */
 .agent-tool-line {
+  /* was inline text, so `13s` and the tool name ran together as
+     `pending 13smcp__genudo__update_pipeline`. A flex row with a gap fixes that
+     collision and the open-button one in the same stroke. */
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font: 11px/1.8 var(--font-mono);
   color: var(--text-2);
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+/* a running tool reads as working, not as a stray number */
+.agent-tool-elapsed {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.agent-tool-ring {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  border-top-color: var(--accent);
+  animation: agent-tool-spin 0.9s linear infinite;
+}
+
+@keyframes agent-tool-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-tool-ring { animation: none; border-top-color: var(--hairline); }
 }
 
 .agent-tool-line .agent-state-chip {

@@ -29,11 +29,14 @@ const ALL_VIEWS: AppView[] = [
   'search', // back in the nav at ⌘8 (user 2026-07-18)
   'settings',
   'clients', // agent-ops only in nav; always present in VIEW_ORDER
+  'staged-edits', // agent-ops only — fleet view of staged pipeline edits
   'contracts', // absorbed per §5 — palette/deep-link only
 ]
 
-/** the nav on a research dex (clients + absorbed views hidden) */
-const RESEARCH_VIEWS = ALL_VIEWS.filter((v) => v !== 'clients' && v !== 'contracts')
+/** the nav on a research dex (agent-ops + absorbed views hidden) */
+const RESEARCH_VIEWS = ALL_VIEWS.filter(
+  (v) => v !== 'clients' && v !== 'staged-edits' && v !== 'contracts',
+)
 
 beforeEach(() => {
   useApp.setState({ view: 'home', cheatsheetOpen: false })
@@ -53,6 +56,8 @@ describe('the action registry (story 15.3)', () => {
       }
     })
     expect(actions.some((a) => a.id === 'view:clients')).toBe(false)
+    // agent-ops views must not reach a research dex's palette either
+    expect(actions.some((a) => a.id === 'view:staged-edits')).toBe(false)
     // Plan's preview flag is retired — the work-item schema shipped
     expect(actions.some((a) => a.id === 'view:plan')).toBe(true)
     // contracts stays ⌘K-complete without a number (§5); search is ⌘8 now

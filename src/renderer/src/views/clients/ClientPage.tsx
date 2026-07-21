@@ -564,7 +564,14 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
             </div>
             {probe?.state === 'fail' && (
               <div className="cp-conn-detail warn">
-                {probe.detail} — paste a fresh token below and Save.
+                {/* only suggest the token when the failure is actually about
+                    auth — this used to be appended to EVERY failure, sending
+                    people to re-paste a working credential while the real
+                    problem was Node not being on PATH */}
+                {probe.detail}
+                {/auth|401|unauthor|token|forbidden/i.test(probe.detail)
+                  ? ' — paste a fresh token below and Save.'
+                  : ''}
               </div>
             )}
             {conn.envRefs.map((ref) => {

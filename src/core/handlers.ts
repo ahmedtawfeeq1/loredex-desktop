@@ -20,6 +20,7 @@ import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import { readClientTokens, storeClientToken } from './client-tokens'
 import { fetchBundles, planFiles } from './genudo-pull'
 import { scanStagedEdits } from './staged-edits'
+import { explainSpawnFailure, widenWindowsPath } from './win-spawn'
 import {
   capDiff,
   computeLinks,
@@ -396,7 +397,10 @@ export function registerCoreHandlers(
     const conn = engine.clientConnections(client).find((c) => c.server === server)
     if (!conn) throw ipcError('INTERNAL', `no connection "${server}" in ${client}/workspace.yml`)
     const held = await readClientTokens(conn.envRefs)
-    const env = { ...process.env }
+    // Windows: a GUI-launched app cannot see a per-user Node install, so `cmd /c
+    // npx` fails with cmd's own "not recognized" message (CVE-2024-27980 forces
+    // the cmd wrap in the first place). Widen PATH before spawning.
+    const env = widenWindowsPath({ ...process.env })
     const unexpanded: string[] = []
     for (const [key, value] of Object.entries(conn.env)) {
       env[key] = value.replace(/\$\{([A-Z0-9_]+)\}/g, (whole, ref: string) => {
@@ -437,13 +441,15 @@ export function registerCoreHandlers(
       child.stdout?.on('data', (d: Buffer | string) => {
         if (String(d).includes('"result"')) done({ ok: true, detail: 'initialize ok' })
       })
-      child.on('error', (e) => done({ ok: false, detail: e.message }))
-      child.on('exit', (code) =>
-        done({
-          ok: false,
-          detail: stderr.trim().split('\n').pop() ?? `exited with code ${code}`,
-        }),
+      child.on('error', (e) =>
+        done({ ok: false, detail: explainSpawnFailure(e.message, conn.command) }),
       )
+      child.on('exit', (code) => {
+        const last = stderr.trim().split('\n').pop() ?? `exited with code ${code}`
+        // "operable program or batch file" is cmd.exe failing to FIND the
+        // command — a PATH problem. Saying so beats blaming the token.
+        done({ ok: false, detail: explainSpawnFailure(last, conn.command) })
+      })
       child.stdin?.write(
         `${JSON.stringify({
           jsonrpc: '2.0',

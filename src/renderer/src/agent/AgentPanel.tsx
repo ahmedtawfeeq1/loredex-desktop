@@ -852,6 +852,17 @@ export function AgentPanel(): React.JSX.Element | null {
               // biome-ignore lint/suspicious/noArrayIndexKey: append-only list
               <ThreadItem key={i} item={item} />
             ))}
+            {/* Nothing rendered between hitting send and the first chunk
+                arriving, so a slow first token read as a dead UI. The wait is
+                real — the model is starting up server-side and ACP has nothing
+                to report yet — so this is a LOCAL indicator, shown only while
+                the tail of the thread is still the user's own turn. */}
+            {active.busy && active.items[active.items.length - 1]?.type === 'user' && (
+              <div className="agent-working" role="status" aria-live="polite">
+                <span className="agent-working-ring" aria-hidden />
+                Working…
+              </div>
+            )}
             {(active.state === 'auth_required' || active.state === 'error') && (
               <StateNote s={active} />
             )}

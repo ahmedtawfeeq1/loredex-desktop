@@ -24,6 +24,7 @@
  */
 import { type Dirent, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { widenWindowsPath } from './win-spawn'
 
 /** Prose fields lifted out of the pipeline object into their own .md files. */
 const PIPELINE_PROSE = ['persona', 'instructions'] as const
@@ -284,12 +285,13 @@ export async function fetchBundles(
   const transport = new StdioClientTransport({
     command: 'npx',
     args: ['-y', 'genudo-mcp-client'],
-    env: {
-      PATH: process.env.PATH ?? '',
-      HOME: process.env.HOME ?? '',
+    // widenWindowsPath is a no-op off Windows; there it appends the per-user
+    // Node locations a desktop-launched app cannot otherwise see
+    env: widenWindowsPath({
+      ...process.env,
       GENUDO_TOKEN: token,
       GENUDO_BASE_URL: baseUrl,
-    },
+    }) as Record<string, string>,
   })
   const call = async (name: string, args: Record<string, unknown> = {}): Promise<unknown> => {
     const res = (await client.callTool({ name, arguments: args })) as {

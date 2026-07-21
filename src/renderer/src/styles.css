@@ -9920,3 +9920,28 @@ a.button-primary {
   border-radius: 6px; padding: 2px 9px; cursor: pointer; background: none;
 }
 .staged-open:hover { color: var(--text-1); border-color: var(--text-2); }
+
+/* the gap between send and the first streamed token — a local signal, since
+   ACP has nothing to report until the model actually starts */
+.agent-working {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  font: 11px var(--font-mono);
+  color: var(--text-3);
+}
+
+.agent-working-ring {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--hairline);
+  border-top-color: var(--accent);
+  animation: agent-tool-spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-working-ring { animation: none; border-top-color: var(--hairline); }
+}

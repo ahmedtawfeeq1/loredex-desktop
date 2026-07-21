@@ -25,8 +25,16 @@ import { useAgentPanel } from '../../stores/agentPanel'
 import { useReader } from '../../stores/reader'
 import { useTerminal } from '../../stores/terminal'
 import { useToasts } from '../../stores/toasts'
+import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import { sectionTint } from '../reader/sectionTint'
 import { buildClientPage, type UnitSection } from './client-page'
+
+/** The IPC layer rejects with a typed ErrEnvelope, not an Error — String() on
+ *  one renders the useless `[object Object]` a user cannot act on. */
+function reason(e: unknown): string {
+  if (isErrEnvelope(e)) return e.message
+  return e instanceof Error ? e.message : String(e)
+}
 
 const PAGE_CSS = `
 .client-page { padding: 24px 32px; overflow-y: auto; width: 100%; max-width: 1080px; }
@@ -416,7 +424,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
       // Chat Here just collapsed the picker. openHere reports its own failures.
       useToasts
         .getState()
-        .push('Could not start the chat', e instanceof Error ? e.message : String(e))
+        .push('Could not start the chat', reason(e))
     }
   }
 
@@ -469,7 +477,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
               .catch((e: unknown) =>
                 useToasts
                   .getState()
-                  .push('Pull failed', e instanceof Error ? e.message : String(e)),
+                  .push('Pull failed', reason(e)),
               )
               .finally(() => setPulling(false))
           }}

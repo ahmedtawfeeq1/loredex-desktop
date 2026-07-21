@@ -927,7 +927,22 @@ export function AgentPanel(): React.JSX.Element | null {
           command, arguments included. */}
       {invoked && (
         <div className="agent-cmd-strip" role="status">
-          <span className="agent-cmd-chip">/{invoked.name}</span>
+          <span className="agent-cmd-chip">
+            /{invoked.name}
+            <button
+              type="button"
+              className="agent-cmd-x"
+              title="Send as plain text instead of running the command"
+              aria-label={`Do not run /${invoked.name}`}
+              onClick={() => {
+                // strip the leading command, keep whatever was typed after it —
+                // discarding the command should not discard the message
+                useAgentPanel.getState().setDraft(commandArgs(draft))
+              }}
+            >
+              ×
+            </button>
+          </span>
           <span className="agent-cmd-desc">{invoked.description}</span>
           {commandArgs(draft).trim() !== '' && (
             <span className="agent-cmd-args">{commandArgs(draft).trim()}</span>

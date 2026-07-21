@@ -38,3 +38,30 @@ export function filterCommands(
   }
   return [...prefix, ...substr].slice(0, limit)
 }
+
+/**
+ * The command a draft actually INVOKES, or null.
+ *
+ * `slashQuery` only matches while the draft is still one bare token (`^/(\S*)$`),
+ * because it drives the autocomplete menu. But the moment you type
+ * `/compact focus on the webhook work` the draft stops being one token, the menu
+ * closes, and every signal that this is a command disappears — it reads as plain
+ * text right up to the moment you send it.
+ *
+ * This answers the different question "is the first word a real command?", so
+ * the composer can keep showing that it is, arguments and all.
+ */
+export function recognizedCommand(
+  draft: string,
+  commands: readonly AcpCommand[],
+): AcpCommand | null {
+  const m = /^\/(\S+)(?:\s|$)/.exec(draft)
+  if (!m) return null
+  const name = (m[1] ?? '').toLowerCase()
+  return commands.find((c) => c.name.toLowerCase() === name) ?? null
+}
+
+/** The argument text after a recognized command, for the composer hint. */
+export function commandArgs(draft: string): string {
+  return /^\/\S+\s+([\s\S]*)$/.exec(draft)?.[1] ?? ''
+}

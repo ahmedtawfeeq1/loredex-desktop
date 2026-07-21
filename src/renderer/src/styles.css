@@ -9945,3 +9945,40 @@ a.button-primary {
 @media (prefers-reduced-motion: reduce) {
   .agent-working-ring { animation: none; border-top-color: var(--hairline); }
 }
+
+/* Slash command recognition. A textarea holds plain text only, so the chip sits
+   on its own line above the composer rather than inside it — and stays visible
+   once arguments are typed, which is when the autocomplete menu closes. */
+.agent-cmd-strip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 12px 0;
+  font-size: 11px;
+  min-width: 0;
+}
+
+.agent-cmd-chip {
+  flex: none;
+  font: 600 11px var(--font-mono);
+  color: var(--accent);
+  background: var(--bg-inset);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+
+.agent-cmd-desc {
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-cmd-args {
+  flex: none;
+  font: 10.5px var(--font-mono);
+  color: var(--text-2);
+  border-left: 1px solid var(--hairline);
+  padding-left: 8px;
+}

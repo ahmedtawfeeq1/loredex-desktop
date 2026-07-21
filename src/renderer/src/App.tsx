@@ -32,7 +32,7 @@ import { useAtlas } from './stores/atlas'
 import { useContracts } from './stores/contracts'
 import { useDex } from './stores/dex'
 import { StagedEditsView } from './views/clients/StagedEditsView'
-import { useIdentity } from './stores/identity'
+import { effectiveIdentity, useIdentity } from './stores/identity'
 import { useFileSearch } from './stores/fileSearch'
 import { useFind } from './stores/find'
 import { useHandoffs } from './stores/handoffs'
@@ -153,6 +153,18 @@ export default function App(): React.JSX.Element {
   // the app reports ready, resolve the type for real (null = still unknown)
   useEffect(() => {
     if (status === 'ready' && useDex.getState().type === null) void useDex.getState().load()
+  }, [status])
+
+  /**
+   * Identity has the SAME boot race, and it bit harder because the failure is
+   * silent: load() catches, sets `loaded: true` with a null profile, and never
+   * retries — so a saved identity read as "no identity set" for the whole
+   * session, and every write that needs commit attribution refused. BL-23 added
+   * the boot call but not this guard.
+   */
+  useEffect(() => {
+    if (status !== 'ready') return
+    if (effectiveIdentity(useIdentity.getState()) === null) void useIdentity.getState().load()
   }, [status])
 
   useEffect(() => {

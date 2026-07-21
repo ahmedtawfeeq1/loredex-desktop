@@ -35,7 +35,10 @@ export const useIdentity = create<IdentityState>((set) => ({
       const { profile, ambient } = await invoke('settings.identity.get', undefined)
       set({ profile, ambient, loaded: true, error: null })
     } catch (e) {
-      set({ loaded: true, error: isErrEnvelope(e) ? e.message : String(e) })
+      // NOT `loaded: true` — the core was unreachable, so nothing was learned.
+      // Claiming otherwise made a saved identity read as "none set" for the rest
+      // of the session, because no caller ever retried.
+      set({ error: isErrEnvelope(e) ? e.message : String(e) })
     }
   },
 

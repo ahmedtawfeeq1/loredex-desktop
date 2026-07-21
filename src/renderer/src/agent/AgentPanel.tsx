@@ -24,7 +24,7 @@ import { renderAgentMarkdown } from './agentMarkdown'
 import { PanelResizeHandle } from './PanelResizeHandle'
 import { SessionInfoPanel } from './SessionInfoPanel'
 import { SlashCommandMenu } from './SlashCommandMenu'
-import { filterCommands, slashQuery } from './slashCommands'
+import { commandArgs, filterCommands, recognizedCommand, slashQuery } from './slashCommands'
 import { ToolCallRow } from './ToolCallRow'
 import { UsageBar } from './UsageBar'
 
@@ -705,6 +705,12 @@ export function AgentPanel(): React.JSX.Element | null {
     [query, active?.commands],
   )
   const slashOpen = slashMatches.length > 0 && !slashDismissed
+  // the draft INVOKES a real command — true even with arguments after it, which
+  // is exactly when the autocomplete menu closes and all other signal is lost
+  const invoked = useMemo(
+    () => recognizedCommand(draft, active?.commands ?? []),
+    [draft, active?.commands],
+  )
   // reset selection as the match set shifts; re-arm the menu once the draft
   // leaves slash mode so a later `/` reopens it
   useEffect(() => {
@@ -916,6 +922,18 @@ export function AgentPanel(): React.JSX.Element | null {
       {/* BL-1: the composer action strip is gone — "New conversation" lives in
           the header ＋ (its labeled twin), and Retry was redundant with simply
           re-typing. The thread keeps the vertical space instead. */}
+      {/* A textarea cannot render a chip inline, so the recognition lives on its
+          own line directly above — visible for as long as the draft is a
+          command, arguments included. */}
+      {invoked && (
+        <div className="agent-cmd-strip" role="status">
+          <span className="agent-cmd-chip">/{invoked.name}</span>
+          <span className="agent-cmd-desc">{invoked.description}</span>
+          {commandArgs(draft).trim() !== '' && (
+            <span className="agent-cmd-args">{commandArgs(draft).trim()}</span>
+          )}
+        </div>
+      )}
       <div className="agent-input">
         <input
           ref={fileInputRef}

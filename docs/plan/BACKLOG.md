@@ -641,6 +641,35 @@ a shared-prefix sibling (`/vault-two` must not read as inside `/vault`).
 
 ---
 
+## BL-28 — Environment secrets table (deferred)
+
+**Status:** deferred · **Area:** settings / terminal · **Size:** M
+
+**Ask.** A table in Settings to hold machine-local secrets (name + value), with
+add / edit / copy / delete, reachable from the in-app terminal when running
+commands — and never pushed to the remote.
+
+**Interim convention (agreed 2026-07-21).** A `.secrets.local` file at the vault
+root, `.gitignore`d, in `KEY=value` form like a `.env`. That gets the capability
+today with no UI: source it in the terminal, and it cannot reach a commit.
+
+**When built, the invariants that matter** — the same ones the n8n key and client
+credentials already hold to:
+- values live in the OS keychain, never in the vault and never in a commit;
+- only PRESENCE crosses the IPC seam, never the value, except on an explicit
+  reveal/copy;
+- `.secrets.local` must be in `.gitignore` BEFORE the file is ever written, not
+  after — the window between the two is how a secret reaches history;
+- injected into the pty's env at spawn, never into the core host's `process.env`
+  (which every child would then inherit).
+
+**Why deferred.** The user asked for the file convention now and the UI later.
+The invariant list above is why it is worth doing deliberately rather than
+tacking onto a UI batch: getting it wrong puts a secret in git history, which is
+not undoable by editing a file.
+
+---
+
 ## Notes
 
 - BL-1/2/3/7 are all in the agent panel and could ship as one pass — BL-1

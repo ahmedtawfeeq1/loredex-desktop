@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AcpCommand } from '../../../shared/ipc-contract'
-import { filterCommands, slashQuery } from './slashCommands'
+import { filterCommands, slashQuery , commandArgs, recognizedCommand } from './slashCommands'
 
 const cmd = (name: string): AcpCommand => ({ name, description: `${name} desc` })
 const CMDS = [cmd('commit'), cmd('compact'), cmd('review'), cmd('recommit'), cmd('verify')]
@@ -32,5 +32,45 @@ describe('filterCommands', () => {
   })
   it('no match → empty', () => {
     expect(filterCommands(CMDS, 'zzz')).toEqual([])
+  })
+})
+
+describe('recognizedCommand — survives arguments (the /compact case)', () => {
+  const cmds = [
+    { name: 'compact', description: 'Free up context by summarizing' },
+    { name: 'clear', description: 'Clear the conversation' },
+  ]
+
+  it('recognizes a bare command', () => {
+    expect(recognizedCommand('/compact', cmds)?.name).toBe('compact')
+  })
+
+  /**
+   * The actual bug: slashQuery is `^\/(\S*)$`, so the moment an argument is
+   * typed the draft stops being one token, the menu closes, and nothing shows
+   * it is still a command.
+   */
+  it('STILL recognizes it once arguments are typed', () => {
+    expect(recognizedCommand('/compact focus on the webhook work', cmds)?.name).toBe('compact')
+    expect(recognizedCommand('/compact ', cmds)?.name).toBe('compact')
+  })
+
+  it('does not recognize an unknown command', () => {
+    expect(recognizedCommand('/nope', cmds)).toBeNull()
+    expect(recognizedCommand('/nope with args', cmds)).toBeNull()
+  })
+
+  it('does not fire on ordinary prose that merely contains a slash', () => {
+    expect(recognizedCommand('use the /compact command later', cmds)).toBeNull()
+    expect(recognizedCommand('', cmds)).toBeNull()
+  })
+
+  it('is case-insensitive on the name', () => {
+    expect(recognizedCommand('/COMPACT', cmds)?.name).toBe('compact')
+  })
+
+  it('extracts the argument text for the hint', () => {
+    expect(commandArgs('/compact focus on webhooks')).toBe('focus on webhooks')
+    expect(commandArgs('/compact')).toBe('')
   })
 })

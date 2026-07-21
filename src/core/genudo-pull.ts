@@ -22,7 +22,7 @@
  * Nothing is stored as JSON-with-escaped-newlines, which is what makes the raw
  * platform export unreadable.
  */
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { type Dirent, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** Prose fields lifted out of the pipeline object into their own .md files. */
@@ -53,6 +53,15 @@ export interface PullPlan {
   warnings: string[]
 }
 
+/** readdir that answers [] for a missing dir — a first pull has no unit folder. */
+function safeEntries(dir: string): Dirent[] {
+  try {
+    return readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+}
+
 /** `Hazem tech` → `hazem-tech`; keeps unicode out of paths. */
 export function slugify(name: string): string {
   const s = name
@@ -66,10 +75,22 @@ export function slugify(name: string): string {
 
 /** Minimal YAML emitter — flat scalar maps and simple lists only, which is all
  *  the platform's config fields are. Avoids a dependency for one shape. */
+/** Identity first (that is what a reader looks for), then alphabetical. Fixed
+ *  order is what makes a refresh byte-identical: the API may return keys in a
+ *  different order between calls, and without this every pull would rewrite
+ *  every file and bury the real change in noise. */
+export function orderedEntries(obj: Record<string, unknown>): [string, unknown][] {
+  const FIRST = ['id', 'name', 'pipeline_id', 'stage_id', 'order', 'status']
+  const keys = Object.keys(obj)
+  const head = FIRST.filter((k) => keys.includes(k))
+  const tail = keys.filter((k) => !FIRST.includes(k)).sort()
+  return [...head, ...tail].map((k) => [k, obj[k]])
+}
+
 export function toYaml(obj: Record<string, unknown>, indent = 0): string {
   const pad = ' '.repeat(indent)
   const lines: string[] = []
-  for (const [k, v] of Object.entries(obj)) {
+  for (const [k, v] of orderedEntries(obj)) {
     if (v === undefined) continue
     if (v === null) lines.push(`${pad}${k}:`)
     else if (Array.isArray(v)) {
@@ -324,14 +345,37 @@ export async function fetchBundles(
 }
 
 /**
- * Write a plan to disk. Replaces `pipelines/` wholesale for the pipelines it
- * pulled: the platform is truth, and leaving a stale stage folder behind after
- * it was deleted upstream would be a lie. Everything outside `pipelines/` —
- * knowledge_tables, _inbox, _randoms, workspace.yml — is untouched.
+ * Files the pull OWNS inside a pipeline folder, and may therefore replace.
+ * Everything else in there belongs to someone else and is left alone — most
+ * importantly `versions/`, which the genudo MCP writes at push time and whose
+ * CHANGES.md records WHY a change was made. That reasoning never existed on the
+ * platform, so a re-pull cannot reconstruct it: deleting it is unrecoverable.
+ */
+function ownsFile(name: string): boolean {
+  return name === 'pipeline.yaml' || /^_.+\.(md|yaml)$/.test(name)
+}
+
+/**
+ * Write a plan to disk.
+ *
+ * Deletes only what it owns — the unit's own `_*` field files, `pipeline.yaml`,
+ * and `stages/` (regenerated wholesale, since a stage removed upstream must not
+ * linger). It never removes the pipeline folder itself, so anything another tool
+ * put there survives a refresh.
+ *
+ * Everything outside `pipelines/` — knowledge_tables, _inbox, _randoms,
+ * workspace.yml — was already untouched and still is.
  */
 export function writePlan(clientDirAbs: string, plan: PullPlan): { written: number } {
   for (const p of plan.pipelines) {
-    rmSync(join(clientDirAbs, 'pipelines', p.slug), { recursive: true, force: true })
+    const unitAbs = join(clientDirAbs, 'pipelines', p.slug)
+    // stages are fully regenerated: a stage deleted upstream must disappear here
+    rmSync(join(unitAbs, 'stages'), { recursive: true, force: true })
+    for (const entry of safeEntries(unitAbs)) {
+      if (entry.isFile() && ownsFile(entry.name)) {
+        rmSync(join(unitAbs, entry.name), { force: true })
+      }
+    }
   }
   for (const file of plan.files) {
     const abs = join(clientDirAbs, file.rel)

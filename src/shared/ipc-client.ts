@@ -25,8 +25,20 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>
 }
 
+/**
+ * Channels whose operation legitimately runs longer than the default cap. A
+ * fleet pull drives an external MCP for up to ~120s (genudo-pull.ts fetchBundles
+ * timeoutMs), so the blanket 10s cap reported it "failed" while it was still
+ * pulling — and it often finished and wrote successfully after the toast. The
+ * value sits just above the pull's own budget so the pull's error wins with a
+ * real message rather than this generic timeout.
+ */
+const CHANNEL_TIMEOUT_MS: Partial<Record<keyof CoreApi, number>> = {
+  'clients.pull': 125_000,
+}
+
 export function createIpcClient(opts: { timeoutMs?: number } = {}): IpcClient {
-  const timeoutMs = opts.timeoutMs ?? 10_000
+  const defaultTimeoutMs = opts.timeoutMs ?? 10_000
   const pending = new Map<number, Pending>()
   const listeners = new Set<(e: CoreEvent) => void>()
   const preAttachBuffer: unknown[] = []
@@ -78,6 +90,7 @@ export function createIpcClient(opts: { timeoutMs?: number } = {}): IpcClient {
 
     invoke(ch, arg) {
       const id = nextId++
+      const timeoutMs = CHANNEL_TIMEOUT_MS[ch] ?? defaultTimeoutMs
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           if (settle(id)) reject(ipcError('TIMEOUT', `invoke ${ch} timed out after ${timeoutMs}ms`))

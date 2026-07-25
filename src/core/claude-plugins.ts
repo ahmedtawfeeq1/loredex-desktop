@@ -16,9 +16,26 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { N8N_MCP_VERSION } from './n8n-install'
 
+/**
+ * `/reload-plugins` is needed TWICE, for two different reasons — both observed
+ * in real transcripts on 2026-07-23.
+ *
+ * 1. BETWEEN add and install. A marketplace added during this session is not
+ *    yet visible to `/plugin install`: the add reports "Successfully added
+ *    marketplace: X" and the very next install answers *"Couldn't load
+ *    marketplace X: not found in configuration"*, listing only marketplaces
+ *    that existed before the session started.
+ * 2. AFTER install. The install itself says so: *"✓ Installed langsmith-skills.
+ *    Run /reload-plugins to apply."* Without it the plugin is on disk but not
+ *    live in the session you are sitting in.
+ *
+ * Harmless when unnecessary, so both are unconditional.
+ */
+export const RELOAD_PLUGINS_COMMAND = '/reload-plugins'
+
 export const N8N_SKILLS_PLUGIN = 'n8n-mcp-skills'
 /**
- * TWO commands, in order, inside a running `claude` session.
+ * FOUR commands, in order, inside a running `claude` session.
  *
  * The repo README's "recommended" one-liner `/plugin install czlonkowski/
  * n8n-skills` DOES NOT WORK — Claude Code reads the argument as
@@ -27,8 +44,12 @@ export const N8N_SKILLS_PLUGIN = 'n8n-mcp-skills'
  * `n8n-mcp-skills` (from the repo's .claude-plugin/marketplace.json), not the
  * GitHub path. Verified against the live repo 2026-07-20.
  */
-export const N8N_SKILLS_COMMAND =
-  '/plugin marketplace add czlonkowski/n8n-skills\n/plugin install n8n-mcp-skills@n8n-mcp-skills'
+export const N8N_SKILLS_COMMAND = [
+  '/plugin marketplace add czlonkowski/n8n-skills',
+  RELOAD_PLUGINS_COMMAND,
+  '/plugin install n8n-mcp-skills@n8n-mcp-skills',
+  RELOAD_PLUGINS_COMMAND,
+].join('\n')
 
 /** The shell command that OPENS the session those slash commands need. They are
  *  claude slash commands, not shell commands — typed at a zsh prompt they just
@@ -101,17 +122,79 @@ export function terminalN8nCommand(url: string | null): string {
  * Fails closed: missing, unreadable or unexpected shape → false.
  */
 export function hasTerminalN8nMcp(vaultPath?: string | null, home: string = homedir()): boolean {
+  return hasTerminalMcp(N8N_MCP_SERVER_NAME, vaultPath, home)
+}
+
+/** The same question for any server name — `claude mcp add` writes to the global
+ *  map under `--scope user` and to `projects[<cwd>]` by default. */
+export function hasTerminalMcp(
+  serverName: string,
+  vaultPath?: string | null,
+  home: string = homedir(),
+): boolean {
   try {
     const raw = readFileSync(join(home, '.claude.json'), 'utf8')
     const cfg = JSON.parse(raw) as {
       mcpServers?: Record<string, unknown>
       projects?: Record<string, { mcpServers?: Record<string, unknown> }>
     }
-    if (cfg.mcpServers && N8N_MCP_SERVER_NAME in cfg.mcpServers) return true
+    if (cfg.mcpServers && serverName in cfg.mcpServers) return true
     if (!vaultPath) return false
     const project = cfg.projects?.[vaultPath]
-    return Boolean(project?.mcpServers && N8N_MCP_SERVER_NAME in project.mcpServers)
+    return Boolean(project?.mcpServers && serverName in project.mcpServers)
   } catch {
     return false
   }
 }
+
+// ── LangSmith ───────────────────────────────────────────────────────────────
+// LangSmith is here to READ the traces the user's own Python agent system
+// writes — never to trace loredex itself.
+//
+// The official `langsmith-tracing` plugin (hooks that send Claude Code's own
+// runs to LangSmith) was built and then REMOVED on request 2026-07-23: tracing
+// this app's sessions, in the panel or in the terminal, is explicitly not
+// wanted. Do not add it back without being asked.
+//
+// CORRECTION 2026-07-23: an earlier note here claimed plugins cannot load in
+// agent-panel sessions at all, reasoning from the adapter's `settingSources: []`.
+// That is WRONG — a panel session was observed listing `/genudo:*` skills and
+// `genudo:*` agents from an installed plugin. Whatever `settingSources` gates,
+// it is not plugin loading. Do not repeat that claim without testing it.
+//
+// Name verified against the repo's .claude-plugin/marketplace.json.
+
+export const LANGSMITH_SKILLS_PLUGIN = 'langsmith-skills'
+export const LANGSMITH_SKILLS_COMMAND = [
+  '/plugin marketplace add langchain-ai/langsmith-skills',
+  RELOAD_PLUGINS_COMMAND,
+  '/plugin install langsmith-skills@langsmith-skills',
+  RELOAD_PLUGINS_COMMAND,
+].join('\n')
+
+/** The server name `claude mcp add … langsmith` registers under. */
+export const LANGSMITH_MCP_SERVER_NAME = 'langsmith'
+
+/**
+ * The command that gives TERMINAL-run `claude` the LangSmith remote server.
+ *
+ * SECURITY: the key is a PLACEHOLDER, never the stored one — interpolating it
+ * would carry the secret across the IPC seam to the renderer, which no
+ * credential path in this app does. The endpoint is not secret, so it is filled.
+ *
+ * `--transport http` (not stdio): LangSmith's is a remote Streamable HTTP
+ * server, so there is no package to run. `--scope user` for the same reason the
+ * n8n command uses it — a project-scoped entry would be loaded ON TOP of the one
+ * loredex already injects into panel sessions, duplicating every tool.
+ */
+export function terminalLangsmithCommand(endpoint: string): string {
+  return [
+    'claude mcp add --scope user --transport http langsmith',
+    `${endpoint.replace(/\/+$/, '')}/mcp`,
+    '--header "X-Api-Key: <paste-your-langsmith-api-key>"',
+  ].join(' ')
+}
+
+// (removed 2026-07-23) terminalLangsmithTracingEnv — the env that turned the
+// tracing plugin on. Tracing this app's own sessions is not wanted; see the
+// note above.

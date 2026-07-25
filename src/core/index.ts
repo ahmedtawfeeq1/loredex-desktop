@@ -31,6 +31,7 @@ import {
 } from './settings'
 import { killAllAcpSessions } from './acp'
 import { loadAgentKeys } from './agent-keys'
+import { loadLangsmithConfig } from './langsmith-config'
 import { loadN8nConfig } from './n8n-config'
 import { killAllTerminals } from './terminals'
 import { startVaultWatcher } from './watcher'
@@ -71,6 +72,8 @@ void loadAgentKeys()
 // Same shape for the workspace n8n server: its keychain key + meta-table URL
 // are folded into the in-memory cache buildWorkspaceServers reads at spawn.
 void loadN8nConfig()
+// …and for LangSmith (remote MCP): keychain key + meta-table endpoint/project.
+void loadLangsmithConfig()
 
 // vault_id scopes every app-db row (story 9.2); null without a config or db.
 const vid = config && appDb ? vaultId(config.vaultPath, engine.identity().remote) : null

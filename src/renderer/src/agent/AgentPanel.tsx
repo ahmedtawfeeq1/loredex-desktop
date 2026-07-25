@@ -9,6 +9,7 @@
  */
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { AcpAgent, AcpConvSummary, AcpSessionState } from '../../../shared/ipc-contract'
+import type { TreeNode } from '../../../shared/types'
 import { invoke, pathForFile } from '../api'
 import { Button } from '../components/Button'
 import {
@@ -19,8 +20,12 @@ import {
   type AgentAttachment,
   type ProviderAuth,
 } from '../stores/agentPanel'
+import { useReader } from '../stores/reader'
+import { absVaultPath } from '../vaultPaths'
 import { AgentLoginCard } from './AgentLoginCard'
 import { renderAgentMarkdown } from './agentMarkdown'
+import { applyMention, mentionMatches, mentionQuery } from './fileMentions'
+import { FileMentionMenu } from './FileMentionMenu'
 import { PanelResizeHandle } from './PanelResizeHandle'
 import { SessionInfoPanel } from './SessionInfoPanel'
 import { SlashCommandMenu } from './SlashCommandMenu'
@@ -32,6 +37,37 @@ import {
 } from './slashCommands'
 import { ToolCallRow } from './ToolCallRow'
 import { UsageBar } from './UsageBar'
+
+/**
+ * The text this thread item's Copy button should carry, or undefined for no
+ * button. Only the CALLER can decide this — it needs the neighbours.
+ *
+ * Reported 2026-07-23: a Copy appeared under every statement. An assistant turn
+ * arrives as MANY `agent` items — one per burst of text between tool calls — and
+ * each was rendering its own button, so a turn with eight tool calls grew eight
+ * of them. Copy belongs in three places and no others: inside a code block
+ * (handled by the markdown renderer), on your own message, and once on the whole
+ * reply.
+ *
+ * "The whole reply" = every `agent` item since the last user message, joined —
+ * so the button at the end of a turn copies the answer, not the last paragraph
+ * of it. Thoughts and tool rows are excluded: they are not the reply.
+ */
+export function copyTextFor(items: AcpChatItem[], i: number): string | undefined {
+  const item = items[i]
+  if (item.type === 'user') return item.text
+  if (item.type !== 'agent') return undefined
+  // only the LAST agent item of this turn carries the button
+  const next = items[i + 1]
+  if (next && next.type !== 'user') return undefined
+  const parts: string[] = []
+  for (let j = i; j >= 0; j--) {
+    const it = items[j]
+    if (it.type === 'user') break
+    if (it.type === 'agent') parts.unshift(it.text)
+  }
+  return parts.join('\n\n')
+}
 
 /** Status = glyph + label, never color alone (design-fidelity law). */
 const STATE_CHIP: Record<AcpSessionState, { glyph: string; label: string; cls: string }> = {
@@ -205,11 +241,21 @@ function ConvHistoryMenu(): React.JSX.Element {
                         void useAgentPanel.getState().openConversation(c.id)
                       }}
                     >
-                      <span className="agent-history-name">
-                        {c.title ?? 'Untitled conversation'}
-                        <ClientChip slug={c.clientSlug} />
+                      {/* BL-29: two lines. The chip used to sit INSIDE
+                          .agent-history-name, which ellipsises — so the title's
+                          truncation ate the slug ("◈ be…"). On its own line it
+                          renders whole, and the title gets the width back. */}
+                      <span className="agent-history-line">
+                        <span className="agent-history-name">
+                          {c.title ?? 'Untitled conversation'}
+                        </span>
+                        <span className="agent-history-time">{relTime(c.updatedAt, Date.now())}</span>
                       </span>
-                      <span className="agent-history-time">{relTime(c.updatedAt, Date.now())}</span>
+                      {c.clientSlug ? (
+                        <span className="agent-history-meta">
+                          <ClientChip slug={c.clientSlug} />
+                        </span>
+                      ) : null}
                     </button>
                   )}
                   {renaming !== c.id && (
@@ -278,31 +324,119 @@ function fileToBase64(file: File): Promise<string> {
 
 /** B4 attachment tray: the staged attachments as removable chips above the
  *  composer (🖼 image · 📄 file). Kind is a glyph, not color alone. */
+/**
+ * Staged attachments. An image shows its THUMBNAIL, not just `image.png` —
+ * three files called `image.png` are indistinguishable otherwise, and you
+ * cannot tell you attached the wrong screenshot until the agent tells you.
+ * Click one to see it full size.
+ *
+ * The bytes are already here (`dataB64`, the same payload the prompt carries),
+ * so this costs nothing but an <img> — no reading back off disk.
+ */
 function AttachmentTray({ items }: { items: AgentAttachment[] }): React.JSX.Element {
+  const [preview, setPreview] = useState<string | null>(null)
   return (
     <div className="agent-attach-tray" role="list" aria-label="Attachments">
-      {items.map((a, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: staged list, remove-by-index
-        <span
-          key={i}
-          className="agent-attach-chip"
-          role="listitem"
-          title={a.type === 'resource' ? a.path : a.name}
-        >
-          <span className="agent-attach-kind" aria-hidden="true">
-            {a.type === 'image' ? '▦' : '▤'}
-          </span>
-          <span className="agent-attach-name">{a.name}</span>
-          <button
-            type="button"
-            className="agent-attach-remove"
-            aria-label={`Remove ${a.name}`}
-            onClick={() => useAgentPanel.getState().removeAttachment(i)}
+      {items.map((a, i) => {
+        const src = a.type === 'image' ? `data:${a.mimeType};base64,${a.dataB64}` : null
+        return (
+          // biome-ignore lint/suspicious/noArrayIndexKey: staged list, remove-by-index
+          <span
+            key={i}
+            className={`agent-attach-chip${src ? ' has-thumb' : ''}`}
+            role="listitem"
+            title={a.type === 'resource' ? a.path : a.name}
           >
-            ×
+            {src ? (
+              <button
+                type="button"
+                className="agent-attach-thumb"
+                title="Click to preview full size"
+                onClick={() => setPreview(src)}
+              >
+                <img src={src} alt={a.name} />
+              </button>
+            ) : (
+              <span className="agent-attach-kind" aria-hidden="true">
+                ▤
+              </span>
+            )}
+            <span className="agent-attach-name">{a.name}</span>
+            <button
+              type="button"
+              className="agent-attach-remove"
+              aria-label={`Remove ${a.name}`}
+              onClick={() => useAgentPanel.getState().removeAttachment(i)}
+            >
+              ×
+            </button>
+          </span>
+        )
+      })}
+      {preview && <ImageLightbox src={preview} onClose={() => setPreview(null)} />}
+    </div>
+  )
+}
+
+/**
+ * Images a past prompt carried, fetched from this DEVICE's media store.
+ *
+ * The transcript holds sha256 handles, never bytes — so a long conversation
+ * costs nothing to open, and only the pictures actually on screen are read.
+ * A handle whose file is gone (manual cleanup, moved userData) simply renders
+ * nothing; a missing picture is not worth failing a transcript over.
+ */
+function MessageMedia({ shas }: { shas: string[] }): React.JSX.Element {
+  const [srcs, setSrcs] = useState<Record<string, string>>({})
+  const [preview, setPreview] = useState<string | null>(null)
+  useEffect(() => {
+    let live = true
+    void Promise.all(
+      shas.map(async (sha) => {
+        const m = await invoke('agent.media.get', { sha256: sha }).catch(() => null)
+        return m ? ([sha, `data:${m.mime};base64,${m.dataB64}`] as const) : null
+      }),
+    ).then((pairs) => {
+      if (live) setSrcs(Object.fromEntries(pairs.filter((p) => p !== null)))
+    })
+    return () => {
+      live = false
+    }
+  }, [shas])
+
+  return (
+    <div className="agent-msg-media">
+      {shas.map((sha) =>
+        srcs[sha] ? (
+          <button
+            key={sha}
+            type="button"
+            className="agent-attach-thumb"
+            title="Click to preview full size"
+            onClick={() => setPreview(srcs[sha])}
+          >
+            <img src={srcs[sha]} alt="" />
           </button>
-        </span>
-      ))}
+        ) : null,
+      )}
+      {preview && <ImageLightbox src={preview} onClose={() => setPreview(null)} />}
+    </div>
+  )
+}
+
+/** Full-size preview. Esc or a click anywhere closes it — no chrome to hunt. */
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }): React.JSX.Element {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+  return (
+    // biome-ignore lint/a11y: click-away overlay; Esc is bound above
+    <div className="agent-lightbox" onMouseDown={onClose} role="dialog" aria-label="Image preview">
+      <img src={src} alt="" />
     </div>
   )
 }
@@ -465,7 +599,24 @@ function CopyButton({
  *  memo skips re-parsing markdown for the whole backlog on each streaming rAF
  *  frame — only the live bubble re-renders (the plan's per-item memo, achieved
  *  by reference equality instead of a hand-rolled key). */
-export const ThreadItem = memo(function ThreadItem({ item }: { item: AcpChatItem }): React.JSX.Element {
+/**
+ * `copy` is the text this item's Copy button should put on the clipboard, or
+ * undefined for no button.
+ *
+ * The DECISION is made by the caller, not here, because it needs the
+ * neighbours. An assistant turn arrives as many separate `agent` items — one
+ * per burst of text between tool calls — so a Copy per item put one under every
+ * statement (8 tool calls → 8 buttons). Copy belongs on the whole reply, once,
+ * at the end of the turn; on the user's own message; and inside code blocks.
+ * Nowhere else.
+ */
+export const ThreadItem = memo(function ThreadItem({
+  item,
+  copy,
+}: {
+  item: AcpChatItem
+  copy?: string
+}): React.JSX.Element {
   if (item.type === 'tool') {
     return <ToolCallRow item={item} />
   }
@@ -478,16 +629,28 @@ export const ThreadItem = memo(function ThreadItem({ item }: { item: AcpChatItem
       </details>
     )
   }
-  // user bubble: sanitized, syntax-highlighted markdown (no copy button — the
-  // user wrote it; fenced code inside still gets its own copy affordance)
+  // user bubble: sanitized, syntax-highlighted markdown. It gets a Copy too —
+  // re-sending or quoting your own prompt is a normal thing to want. Images
+  // attached to the prompt render from this device's media store.
   if (item.type === 'user') {
-    return <div className="agent-msg agent-msg-user agent-md">{renderAgentMarkdown(item.text)}</div>
+    return (
+      <div className="agent-msg agent-msg-user agent-md">
+        {renderAgentMarkdown(item.text)}
+        {item.media && item.media.length > 0 && <MessageMedia shas={item.media} />}
+        {copy !== undefined && (
+          <CopyButton text={copy} className="agent-copy-msg" label="Copy message" />
+        )}
+      </div>
+    )
   }
-  // agent bubble: markdown + a hover copy button (COPY: raw markdown of the reply)
+  // agent bubble: markdown, plus the whole-reply Copy when this item ENDS the
+  // turn (BL-31 put it below the reply; the caller decides which item that is).
   return (
     <div className="agent-msg agent-msg-agent agent-md">
       {renderAgentMarkdown(item.text)}
-      <CopyButton text={item.text} className="agent-copy-msg" label="Copy message" />
+      {copy !== undefined && (
+        <CopyButton text={copy} className="agent-copy-msg" label="Copy reply" />
+      )}
     </div>
   )
 })
@@ -622,8 +785,14 @@ export function AgentPanel(): React.JSX.Element | null {
 
   // Composing and sending are different rights (BL-2): you may type, edit,
   // paste and attach while the agent is mid-answer — only the SEND is held
-  // until the turn ends. Enter during a turn no-ops (submit() re-checks
-  // canSend) and leaves the draft intact rather than dropping it.
+  // until the turn ends.
+  //
+  // BL-30: `canSend` gates the cobalt Send button ONLY. It must never gate
+  // submit(): Queue/BTW render exactly when `busy` is true, so a submit() that
+  // checked canSend refused every click that could reach it — the buttons were
+  // dead by construction, and mid-turn ↵ silently dropped the draft despite the
+  // placeholder promising "sends when the turn ends". The busy branch belongs to
+  // the store (stores/agentPanel.ts send()), which queues instead of sending.
   const canCompose = active !== null && active.state === 'ready'
   const canSend = canCompose && !active.busy
   const hasContent = draft.trim().length > 0 || attachments.length > 0
@@ -636,7 +805,7 @@ export function AgentPanel(): React.JSX.Element | null {
   const [attachNotice, setAttachNotice] = useState<string | null>(null)
 
   function submit(): void {
-    if (!canSend || !hasContent) return
+    if (!canCompose || !hasContent) return
     const text = draft
     useAgentPanel.getState().setDraft('')
     setAttachNotice(null)
@@ -730,6 +899,40 @@ export function AgentPanel(): React.JSX.Element | null {
     setSlashDismissed(true)
     inputRef.current?.focus()
   }
+
+  // `@` file picker: browse the vault one folder at a time and drop a file's
+  // ABSOLUTE path into the prompt. The tree is the reader's — load it on demand,
+  // since the agent panel can be the first thing opened in a session.
+  const tree = useReader((s) => s.tree)
+  const mention = mentionQuery(draft)
+  useEffect(() => {
+    if (mention !== null && tree === null) void useReader.getState().loadTree()
+  }, [mention, tree])
+  const [mentionSel, setMentionSel] = useState(0)
+  const [mentionDismissed, setMentionDismissed] = useState(false)
+  const mentionItems = useMemo(
+    () => (mention === null ? [] : mentionMatches(tree, mention)),
+    [mention, tree],
+  )
+  const mentionOpen = mentionItems.length > 0 && !mentionDismissed
+  useEffect(() => {
+    setMentionSel(0)
+  }, [mention])
+  useEffect(() => {
+    if (mention === null) setMentionDismissed(false)
+  }, [mention])
+
+  function pickMention(node: TreeNode): void {
+    useAgentPanel.getState().setDraft(applyMention(draft, node, absVaultPath(node.path)))
+    // a folder keeps the picker open (you are still navigating); a file ends it
+    if (node.kind === 'file') setMentionDismissed(true)
+    inputRef.current?.focus()
+  }
+
+  // (removed 2026-07-23) the `◎` trace button. Pasting a conversation URL and
+  // asking for an analysis is a sentence, not a UI affordance — the agent calls
+  // the `langsmith_conversation` tool on our own MCP host instead, so any
+  // provider can do it mid-conversation with no button to find first.
 
   // Early return placed AFTER every hook above (Rules of Hooks): a conditional
   // return ahead of the hooks changes the hook count between the closed and open
@@ -861,7 +1064,7 @@ export function AgentPanel(): React.JSX.Element | null {
               // index keys are safe: the thread is append-only (the last item
               // grows in place, nothing reorders)
               // biome-ignore lint/suspicious/noArrayIndexKey: append-only list
-              <ThreadItem key={i} item={item} />
+              <ThreadItem key={i} item={item} copy={copyTextFor(active.items, i)} />
             ))}
             {/* Nothing rendered between hitting send and the first chunk
                 arriving, so a slow first token read as a dead UI. The wait is
@@ -916,6 +1119,14 @@ export function AgentPanel(): React.JSX.Element | null {
           selected={slashSel}
           onHover={setSlashSel}
           onPick={pickSlash}
+        />
+      )}
+      {mentionOpen && (
+        <FileMentionMenu
+          items={mentionItems}
+          selected={mentionSel}
+          onHover={setMentionSel}
+          onPick={pickMention}
         />
       )}
       {attachments.length > 0 && <AttachmentTray items={attachments} />}
@@ -1050,8 +1261,10 @@ export function AgentPanel(): React.JSX.Element | null {
             !canCompose
               ? 'Needs a ready session'
               : active.busy
-                ? 'Type your next message…  (sends when the turn ends)'
-                : 'Message the agent…  (↵ send · ⇧↵ newline)'
+                ? // the pickers work mid-turn too — the hint must not vanish
+                  // just because the agent is busy (reported 2026-07-23)
+                  'Type your next message…  (@ file · / command · sends when the turn ends)'
+                : 'Message the agent…  (↵ send · ⇧↵ newline · @ file · / command)'
           }
           value={draft}
           disabled={!canCompose}
@@ -1065,6 +1278,33 @@ export function AgentPanel(): React.JSX.Element | null {
               e.preventDefault()
               submit()
               return
+            }
+            // the `@` file picker steals nav keys the same way the slash menu
+            // does; the two can never be open at once (slash matches only a
+            // draft that is one bare `/token`)
+            if (mentionOpen) {
+              const n = mentionItems.length
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                setMentionSel((s) => (s + 1) % n)
+                return
+              }
+              if (e.key === 'ArrowUp') {
+                e.preventDefault()
+                setMentionSel((s) => (s - 1 + n) % n)
+                return
+              }
+              if (e.key === 'Enter' || e.key === 'Tab') {
+                // Enter/Tab descends into a folder, or references a file
+                e.preventDefault()
+                pickMention(mentionItems[mentionSel])
+                return
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                setMentionDismissed(true)
+                return
+              }
             }
             // slash menu steals nav keys while open
             if (slashOpen) {
@@ -1091,7 +1331,8 @@ export function AgentPanel(): React.JSX.Element | null {
                 return
               }
             }
-            // plain ↵ (menu closed) sends
+            // plain ↵ (menu closed) sends — or, mid-turn, queues (BL-30), which
+            // is what the placeholder has always promised
             if (e.key === 'Enter') {
               e.preventDefault()
               submit()
@@ -1102,10 +1343,14 @@ export function AgentPanel(): React.JSX.Element | null {
         {active?.busy ? (
           <span className="agent-queue-actions">
             {/* Two intents, never mixed: more work to start next, versus a small
-                aside about what is running now. */}
+                aside about what is running now.
+                Gated on TEXT, not `hasContent`: a queued message is text-only
+                (QueuedMessage carries no attachments), so an attachment-only
+                draft would enable the button and then queue nothing — the same
+                silent no-op BL-30 was about, one size smaller. */}
             <Button
               className="button-small"
-              disabled={!hasContent}
+              disabled={!draft.trim()}
               title="Queue as the next task — sent when this turn ends"
               onClick={() => {
                 useAgentPanel.getState().setQueueKind('next')
@@ -1116,7 +1361,7 @@ export function AgentPanel(): React.JSX.Element | null {
             </Button>
             <Button
               className="button-small"
-              disabled={!hasContent}
+              disabled={!draft.trim()}
               title="A quick side question about what's running — not a new task"
               onClick={() => {
                 useAgentPanel.getState().setQueueKind('btw')

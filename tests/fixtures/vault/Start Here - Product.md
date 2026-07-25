@@ -1,6 +1,7 @@
 ---
 type: brief
 date: 2026-07-01
+loredex: routed
 ---
 
 # Start Here — Fixture Product

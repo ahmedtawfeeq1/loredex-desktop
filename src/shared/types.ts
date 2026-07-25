@@ -671,3 +671,10 @@ export interface StagedEditsReport {
   /** true once any manifest/status was found — i.e. the MCP records pushes */
   manifestsPresent: boolean
 }
+
+/**
+ * Workspace-level MCP servers — ours, plus the optional integrations. Lives in
+ * `shared` rather than in core/workspace-mcp.ts because the IPC contract names
+ * it, and the contract must not import from the main process.
+ */
+export type WorkspaceServerId = 'loredex' | 'n8n' | 'langsmith'

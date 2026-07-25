@@ -14,10 +14,23 @@ vi.mock('./n8n-config', () => ({
   n8nEnv: () => env,
   n8nStatus: () => ({ hasKey: 'N8N_API_KEY' in env, url: env.N8N_API_URL ?? null }),
 }))
+let langsmith: { url: string; header: { name: string; value: string } } | null = null
+vi.mock('./langsmith-config', () => ({ langsmithHttp: () => langsmith }))
 
 const { buildWorkspaceServers } = await import('./workspace-mcp')
 
-const CTX = { loredex: null, httpOk: true, enabled: { loredex: true, n8n: true } }
+/** Enabled map for the servers a case cares about; the rest default off, so a
+ *  new server in the registry cannot silently join every existing assertion. */
+const on = (
+  v: Partial<Record<'loredex' | 'n8n' | 'langsmith', boolean>>,
+): Record<'loredex' | 'n8n' | 'langsmith', boolean> => ({
+  loredex: false,
+  n8n: false,
+  langsmith: false,
+  ...v,
+})
+
+const CTX = { loredex: null, httpOk: true, enabled: on({ loredex: true, n8n: true }) }
 
 /** The ACP McpServer union only exposes `args`/`env`/`headers` on the arm that
  *  has them; these tests assert across arms, so they read the payload as a bag. */
@@ -28,6 +41,7 @@ describe('buildWorkspaceServers', () => {
   beforeEach(() => {
     entry = null
     env = { MCP_MODE: 'stdio' }
+    langsmith = null
   })
 
   it('omits n8n entirely when it is not installed', () => {
@@ -55,7 +69,7 @@ describe('buildWorkspaceServers', () => {
 
   it('omits a server the user has disabled', () => {
     entry = '/ud/entry.js'
-    expect(buildWorkspaceServers({ ...CTX, enabled: { loredex: true, n8n: false } })).toEqual([])
+    expect(buildWorkspaceServers({ ...CTX, enabled: on({ loredex: true }) })).toEqual([])
   })
 
   it('emits the loredex http server when this window owns the host', () => {
@@ -63,10 +77,48 @@ describe('buildWorkspaceServers', () => {
       buildWorkspaceServers({
         ...CTX,
         loredex: { url: 'http://127.0.0.1:52017/', token: 'tok' },
-        enabled: { loredex: true, n8n: false },
+        enabled: on({ loredex: true }),
       }),
     )
     expect(server).toMatchObject({ type: 'http', name: 'loredex', url: 'http://127.0.0.1:52017/' })
     expect(server.headers).toContainEqual({ name: 'Authorization', value: 'Bearer tok' })
+  })
+})
+
+describe('buildWorkspaceServers — langsmith (remote, 2026-07-23)', () => {
+  beforeEach(() => {
+    entry = null
+    env = { MCP_MODE: 'stdio' }
+    langsmith = null
+  })
+
+  it('is omitted without a stored key — an unauthenticated entry fails every call', () => {
+    expect(buildWorkspaceServers({ ...CTX, enabled: on({ langsmith: true }) })).toEqual([])
+  })
+
+  it('emits a streamable-http server with the X-Api-Key header once a key is stored', () => {
+    langsmith = {
+      url: 'https://api.smith.langchain.com/mcp',
+      header: { name: 'X-Api-Key', value: 'lsv2_pt_secret' },
+    }
+    const [server] = bags(buildWorkspaceServers({ ...CTX, enabled: on({ langsmith: true }) }))
+    expect(server).toMatchObject({
+      type: 'http',
+      name: 'langsmith',
+      url: 'https://api.smith.langchain.com/mcp',
+    })
+    expect(server.headers).toContainEqual({ name: 'X-Api-Key', value: 'lsv2_pt_secret' })
+  })
+
+  it('is omitted when the adapter cannot do http, rather than emitted and broken', () => {
+    langsmith = { url: 'https://x/mcp', header: { name: 'X-Api-Key', value: 'k' } }
+    expect(
+      buildWorkspaceServers({ ...CTX, httpOk: false, enabled: on({ langsmith: true }) }),
+    ).toEqual([])
+  })
+
+  it('is omitted when disabled, key or no key', () => {
+    langsmith = { url: 'https://x/mcp', header: { name: 'X-Api-Key', value: 'k' } }
+    expect(buildWorkspaceServers({ ...CTX, enabled: on({}) })).toEqual([])
   })
 })

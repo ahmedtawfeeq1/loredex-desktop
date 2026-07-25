@@ -12,6 +12,8 @@ type Row = CoreApi['workspace.mcp.list']['out'][number]
 type Tools = CoreApi['workspace.mcp.tools']['out']
 type Skills = CoreApi['workspace.skills.status']['out']
 type N8n = CoreApi['workspace.n8n.get']['out']
+type Langsmith = CoreApi['workspace.langsmith.get']['out']
+type LangsmithStatus = CoreApi['workspace.langsmith.status']['out']
 
 /** The IPC layer rejects with a typed ENVELOPE, not an Error — `String(envelope)`
  *  renders the useless `[object Object]`. Every store here must unwrap it. */
@@ -26,6 +28,14 @@ interface State {
   skills: Skills | null
   /** stored n8n config — presence of a key + the (non-secret) instance URL */
   n8n: N8n | null
+  /** stored LangSmith config + its setup cards. Kept in its OWN test/saved
+   *  state: one shared `test` slot made an n8n result look like a LangSmith one
+   *  (they sit in the same section). */
+  langsmith: Langsmith | null
+  langsmithStatus: LangsmithStatus | null
+  langsmithTest: { ok: boolean; detail: string } | null
+  langsmithTesting: boolean
+  langsmithSaved: boolean
   busy: boolean
   /** true briefly after a successful save — the UI had no confirmation at all */
   saved: boolean
@@ -43,6 +53,9 @@ interface State {
   testN8n(): Promise<void>
   verifySkills(): Promise<void>
   verifyTerminal(): Promise<void>
+  saveLangsmith(v: { url?: string | null; key?: string | null; project?: string | null }): Promise<void>
+  testLangsmith(): Promise<void>
+  verifyLangsmith(): Promise<void>
 }
 
 export const useWorkspaceMcp = create<State>((set, get) => ({
@@ -50,6 +63,11 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
   tools: {},
   skills: null,
   n8n: null,
+  langsmith: null,
+  langsmithStatus: null,
+  langsmithTest: null,
+  langsmithTesting: false,
+  langsmithSaved: false,
   busy: false,
   saved: false,
   test: null,
@@ -64,13 +82,14 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
     // fetch via Promise.all made the whole section render empty for as long as
     // the slowest call took.
     try {
-      const [rows, n8n] = await Promise.all([
+      const [rows, n8n, langsmith] = await Promise.all([
         invoke('workspace.mcp.list', undefined),
         invoke('workspace.n8n.get', undefined),
+        invoke('workspace.langsmith.get', undefined),
       ])
-      // both are in-memory reads — pairing them costs nothing and lets the form
-      // show the instance URL that is actually stored
-      set({ rows, n8n, busy: false })
+      // all in-memory reads — pairing them costs nothing and lets the forms
+      // show the instance URL / endpoint that is actually stored
+      set({ rows, n8n, langsmith, busy: false })
       void Promise.all(rows.filter((r) => r.installed).map((r) => get().loadTools(r.id)))
     } catch (e) {
       // and a failure must SAY so rather than leaving an empty section that
@@ -81,6 +100,11 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
       set({ skills: await invoke('workspace.skills.status', undefined) })
     } catch {
       // the skills card is optional chrome — its absence is not a page failure
+    }
+    try {
+      set({ langsmithStatus: await invoke('workspace.langsmith.status', undefined) })
+    } catch {
+      // same — the LangSmith cards are chrome, not the page
     }
   },
 
@@ -152,5 +176,39 @@ export const useWorkspaceMcp = create<State>((set, get) => ({
   async verifySkills() {
     const skills = await invoke('workspace.skills.status', undefined)
     set({ skills })
+  },
+
+  async saveLangsmith(v) {
+    set({ langsmithSaved: false, error: null })
+    try {
+      await invoke('workspace.langsmith.set', v)
+      set({ langsmithSaved: true })
+      await get().load()
+      // saving is not working — verify at once, as the n8n path does, rather
+      // than let a wrong key surface later as a failed tool call
+      if (v.key) await get().testLangsmith()
+    } catch (e) {
+      set({ error: reason(e) })
+    }
+  },
+
+  async testLangsmith() {
+    set({ langsmithTesting: true, langsmithTest: null })
+    try {
+      set({
+        langsmithTest: await invoke('workspace.langsmith.test', undefined),
+        langsmithTesting: false,
+      })
+    } catch (e) {
+      set({ langsmithTesting: false, langsmithTest: { ok: false, detail: reason(e) } })
+    }
+  },
+
+  async verifyLangsmith() {
+    try {
+      set({ langsmithStatus: await invoke('workspace.langsmith.status', undefined) })
+    } catch {
+      // Verify is a re-read; a failure leaves the card as it was
+    }
   },
 }))

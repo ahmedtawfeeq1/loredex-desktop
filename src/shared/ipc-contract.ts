@@ -66,6 +66,7 @@ import type {
   TreeNode,
   TreeSectionsCollapsed,
   StagedEditsReport,
+  WorkspaceServerId,
   VaultIdentity,
   WizardFlow,
   WizardStepStatus,
@@ -79,6 +80,7 @@ export type { InboxItem } from 'loredex'
 export type { ClientWorkspaceStatus, CreateClientSpec } from './types'
 export type { PermissionRule } from './types'
 export type { EditState, StagedEdit, StagedEditsReport } from './types'
+export type { WorkspaceServerId } from './types'
 
 // ── ACP agent panels (acp blueprint 2026-07-18): shared types ───────────────
 
@@ -153,6 +155,11 @@ export type AcpAttachment =
 export interface AcpConvMessage {
   role: 'user' | 'agent' | 'thought' | 'tool'
   text?: string
+  /** sha256 handles into this DEVICE's session-media store (images attached to
+   *  the prompt). Hashes, never bytes: a long conversation must not drag
+   *  megabytes of screenshots through this seam. Fetch one with
+   *  `agent.media.get` only when it is actually displayed. */
+  media?: string[]
   tool?: {
     toolCallId: string
     title?: string
@@ -276,9 +283,11 @@ export interface CoreApi {
   /** agent-ops: LIVE health probe of one connection — spawns the mcp server with
    *  this machine's keychain tokens and completes a JSON-RPC initialize. The only
    *  honest "connected": a held token can still be revoked server-side. */
+  /** A real MCP handshake (initialize + tools/list), so "Connected" means an
+   *  agent would actually get these tools — not merely that a process started. */
   'clients.connections.test': {
     in: { client: string; server: string }
-    out: { ok: boolean; detail: string }
+    out: { ok: boolean; detail: string; tools: string[] }
   }
   /** agent-ops: the client's absolute directory — the in-app terminal's cwd for
    *  "Open in Terminal" (so `claude` runs in that client's folder) */
@@ -358,6 +367,23 @@ export interface CoreApi {
   }
   'clients.credentials.delete': { in: { client: string; id: string }; out: void }
   /** reveal one secret on demand — the only path a secret leaves the store. */
+  /** The OLD genudo platform, per client — a second connection alongside the
+   *  new-platform one during a migration. Presence only; the token never
+   *  crosses this seam. */
+  /** One image out of this device's session-media store, as base64, on demand.
+   *  Null when the index outlived the file. */
+  'agent.media.get': {
+    in: { sha256: string }
+    out: { dataB64: string; mime: string; name: string } | null
+  }
+  'clients.oldPlatform.get': { in: { client: string }; out: { hasToken: boolean; url: string } }
+  'clients.oldPlatform.set': { in: { client: string; token: string | null }; out: void }
+  /** A real MCP handshake with the stored token — green means an agent would
+   *  actually get these tools. */
+  'clients.oldPlatform.test': {
+    in: { client: string }
+    out: { ok: boolean; detail: string; tools: string[] }
+  }
   'clients.credentials.reveal': { in: { client: string; id: string }; out: { secret: string } }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,
@@ -538,17 +564,20 @@ export interface CoreApi {
   'workspace.mcp.list': {
     in: void
     out: {
-      id: 'loredex' | 'n8n'
+      id: WorkspaceServerId
       label: string
       enabled: boolean
       installed: boolean
-      /** 'documentation' when n8n has no key; 'full' with one; null for loredex */
+      /** 'documentation' when n8n has no key; 'full' with one; null for loredex
+       *  and for an unconfigured langsmith (which has no documentation tier) */
       mode: 'documentation' | 'full' | null
+      /** what "not installed" means: fetchable, needs a credential, or n/a */
+      setup: 'install' | 'key' | null
     }[]
   }
-  'workspace.mcp.setEnabled': { in: { id: 'loredex' | 'n8n'; on: boolean }; out: void }
+  'workspace.mcp.setEnabled': { in: { id: WorkspaceServerId; on: boolean }; out: void }
   'workspace.mcp.tools': {
-    in: { id: 'loredex' | 'n8n' }
+    in: { id: WorkspaceServerId }
     out: { ok: boolean; tools: string[]; detail: string }
   }
   /** Best-effort install; ok:false hands back the command for the setup card. */
@@ -564,6 +593,57 @@ export interface CoreApi {
   /** Real round trip to the n8n API — a saved key that 401s is otherwise only
    *  discovered mid-conversation by an agent. */
   'workspace.n8n.test': { in: void; out: { ok: boolean; detail: string } }
+  /** LangSmith: presence only, never the key. `url`/`project` are null when
+   *  unset — the UI shows the defaults as placeholders rather than pretending
+   *  they were chosen. */
+  'workspace.langsmith.get': {
+    in: void
+    out: {
+      hasKey: boolean
+      url: string | null
+      project: string | null
+      defaultUrl: string
+      defaultProject: string
+    }
+  }
+  'workspace.langsmith.set': {
+    in: { url?: string | null; key?: string | null; project?: string | null }
+    out: void
+  }
+  /** Real round trip to the LangSmith API, same reason as the n8n one. */
+  'workspace.langsmith.test': { in: void; out: { ok: boolean; detail: string } }
+  /**
+   * "Here is the conversation, tell me what happened."
+   *
+   * `text` is whatever the user pasted — a conversation link from their own
+   * platform, a bare conversation id, or a LangSmith run URL. The runs are
+   * written to a file under userData and only the PATH comes back: one of their
+   * runs is ~47 KB, and a conversation is many turns, so returning the payload
+   * would blow the agent's context before it read a word.
+   */
+  'langsmith.trace.fetch': {
+    in: { text: string }
+    out: {
+      ok: boolean
+      detail: string
+      path: string | null
+      count: number
+      truncated: boolean
+      /** what the paste was understood to mean, for the composer's summary */
+      ref: { kind: 'conversation'; id: string } | { kind: 'langsmith-run'; runId: string } | null
+    }
+  }
+  /** The LangSmith setup cards: the skills plugin and terminal `claude mcp add`.
+   *  There is deliberately no tracing card — tracing loredex's own sessions is
+   *  not a feature here (removed on request 2026-07-23). */
+  'workspace.langsmith.status': {
+    in: void
+    out: {
+      skills: { installed: boolean; command: string; plugin: string }
+      terminal: { installed: boolean; command: string }
+      launch: string
+    }
+  }
   /** agent-ops: fleet-wide staged pipeline edits. The genudo MCP is scoped to one
    *  account, so only the host can answer "across all clients, what never shipped". */
   'agentops.stagedEdits': { in: void; out: StagedEditsReport }
@@ -647,8 +727,25 @@ export interface CoreApi {
   /** B4: a turn's user text plus optional attachments (images base64-in-JSON,
    *  file paths as baseline resource blocks). Long turns still stream — this
    *  invoke just fires the prompt (long-job law), attachments ride the JSON. */
-  'acp.prompt': { in: { sessionId: string; text: string; attachments?: AcpAttachment[] }; out: void }
+  /** Returns the sha256 handles of any IMAGE attachments that were persisted to
+   *  this device's media store, so the bubble just posted can show them
+   *  immediately — without them the live turn showed only the text marker
+   *  `📎 image.png` until the conversation was reopened. */
+  'acp.prompt': {
+    in: { sessionId: string; text: string; attachments?: AcpAttachment[] }
+    out: { media: string[] }
+  }
   'acp.cancel': { in: { sessionId: string }; out: void }
+  /** Claude auth posture, for the pre-start guardrail. `mode: 'subscription'`
+   *  means no ANTHROPIC_API_KEY is set, so a session would authenticate with the
+   *  ~/.claude consumer login — which Anthropic prohibits for third-party apps.
+   *  `acknowledged` is the user's one-time "I accept the risk" for that path. */
+  'agent.claudeAuth': {
+    in: void
+    out: { mode: 'api' | 'subscription'; acknowledged: boolean }
+  }
+  /** Record the typed acknowledgment so the warning is one-time, not per-session. */
+  'agent.claudeAckSubscription': { in: void; out: void }
   /** optionId null = dismissed → outcome 'cancelled' (dismissing is rejecting) */
   'acp.permission': {
     in: { sessionId: string; requestId: string; optionId: string | null }

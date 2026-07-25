@@ -5,8 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
     />
+    <!--
+      img-src allows data: so a staged/attached IMAGE can be previewed. Without
+      it the directive fell through to `default-src 'self'`, which blocks data:
+      URLs outright — an attached screenshot rendered as a broken-image icon and
+      looked like a decoding bug rather than a policy one.
+      Narrow on purpose: data: images are inert (a script inside an SVG does not
+      execute when the SVG is loaded through <img>), and nothing else is widened
+      — script-src stays 'self', so this adds no execution surface.
+    -->
     <title>Loredex</title>
   </head>
   <body>

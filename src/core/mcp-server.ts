@@ -14,6 +14,7 @@ import { formatVaultIdentity } from '../shared/identity'
 import type { McpStatus } from '../shared/types'
 import { removeDiscovery, writeDiscovery } from './discovery'
 import * as engine from './engine'
+import { registerLangsmithTool } from './langsmith-tool'
 
 export const PREFERRED_MCP_PORT = 52017
 
@@ -111,6 +112,8 @@ export function loredexToolNames(writeTools: boolean): string[] {
     // seam stripWriteTools takes — a direct cast off McpServer is a type error
     const mcp: object = engine.createMcpServer()
     if (!writeTools) stripWriteTools(mcp)
+    // the inventory must match what a session actually gets, desktop tool included
+    registerLangsmithTool(mcp as never)
     const tools = (mcp as { _registeredTools?: Record<string, unknown> })._registeredTools
     return tools ? Object.keys(tools).sort() : []
   } catch {
@@ -214,6 +217,10 @@ async function handle(
 
     const mcp = engine.createMcpServer()
     if (writeTools() === false) stripWriteTools(mcp)
+    // desktop-only tool, added on top of the lib's dex tools: resolve a pasted
+    // conversation link to its LangSmith runs (2026-07-23). A tool rather than
+    // a button — see langsmith-tool.ts.
+    registerLangsmithTool(mcp as never)
     withIdentityEcho(mcp, formatVaultIdentity(engine.identity()))
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
     res.on('close', () => {

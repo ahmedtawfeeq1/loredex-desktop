@@ -34,7 +34,7 @@ import { useToasts } from './toasts'
 export { DEFAULT_PANEL_WIDTH } from '../agent/panelWidth'
 
 export type AcpChatItem =
-  | { type: 'user'; text: string }
+  | { type: 'user'; text: string; media?: string[] }
   | { type: 'agent'; text: string } // grows in place while streaming
   | { type: 'thought'; text: string }
   | {
@@ -204,7 +204,17 @@ export function quoteForChat(text: string, path: string): string {
  *  '' for no attachments. */
 export function attachmentSummary(attachments: AgentAttachment[]): string {
   if (attachments.length === 0) return ''
-  return `📎 ${attachments.map((a) => a.name).join(', ')}`
+  // Images are COUNTED, not named: they render as thumbnails on the bubble, and
+  // four repeats of the browser's generic `image.png` was noise standing where
+  // the pictures now are. The count stays as the record — if the media store
+  // ever refuses a file, the bubble still says something was attached rather
+  // than silently dropping it.
+  const images = attachments.filter((a) => a.type === 'image').length
+  const files = attachments.filter((a) => a.type !== 'image').map((a) => a.name)
+  const parts: string[] = []
+  if (images > 0) parts.push(`${images} image${images === 1 ? '' : 's'}`)
+  parts.push(...files)
+  return `📎 ${parts.join(', ')}`
 }
 
 /** Retry (chat-completeness): the text to resend on Retry — the most recent
@@ -242,6 +252,11 @@ interface AgentPanelState {
   activeId: string | null
   /** the surfaced permission request; more queue module-side (FIFO) */
   permission: AcpPermissionView | null
+  /** Claude-on-subscription guardrail (Anthropic ToS): when a Claude session is
+   *  about to start on the consumer login, openHere parks the start here and
+   *  the panel shows the consent modal. Approving runs `proceed`. null = no gate
+   *  pending. Only ever set for the claude provider on subscription auth. */
+  claudeGate: { proceed: () => void } | null
   /** WP-B: total awaiting decisions (surfaced + queued) — DERIVED, recomputed on
    *  every permission/queue change (never delta-mutated). Drives the TopBar
    *  badge when the panel is closed. */
@@ -275,6 +290,10 @@ interface AgentPanelState {
   /** BL-6: `provider` starts this session on a specific agent (the client
    *  page's Chat Here picker); omitted, it uses the panel's current selection. */
   openHere(cwd?: string, provider?: AcpAgent): Promise<void>
+  /** the user typed the acknowledgment phrase — persist it and run the parked
+   *  start (or just clear the gate on cancel). */
+  approveClaudeGate(): Promise<void>
+  cancelClaudeGate(): void
   /** B2 cross-provider continuation: take the ACTIVE session's conversation and
    *  continue it on `provider` (agent.continue) — a new session bound to the
    *  same transcript, hydrated so the prior thread shows while the target boots.
@@ -494,7 +513,13 @@ function toChatItem(m: AcpConvMessage): AcpChatItem {
       locations: m.tool.locations,
     }
   }
-  return { type: m.role as 'user' | 'agent' | 'thought', text: m.text ?? '' }
+  return {
+    type: m.role as 'user' | 'agent' | 'thought',
+    text: m.text ?? '',
+    // sha256 handles into this device's media store — the picture is fetched
+    // only if the bubble actually renders it
+    ...(m.media && m.media.length > 0 ? { media: m.media } : {}),
+  }
 }
 
 /** Hydrate a session's thread from its persisted conversation (B0). A fresh
@@ -586,6 +611,7 @@ async function startContinuation(
 
 export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   open: false,
+  claudeGate: null,
   width: DEFAULT_PANEL_WIDTH,
   resizing: false,
   agent: 'claude',
@@ -644,10 +670,31 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   async openHere(cwd, provider) {
     set({ open: true }) // optimistic — the panel appears while the start rides
     persist()
-    const gen = resetGen
     // BL-6: an explicit provider wins (Chat Here picker); otherwise the panel's
     // current selection, as before
     const agent = provider ?? get().agent
+    // Anthropic ToS guardrail (Feb 2026): a Claude session with no
+    // ANTHROPIC_API_KEY authenticates with the ~/.claude CONSUMER subscription,
+    // which their Consumer Terms prohibit for third-party apps. Warn once and
+    // require a typed acknowledgment before the first such session; an API key
+    // (mode 'api') or a prior acknowledgment sails straight through. Codex and
+    // Gemini are never even asked — this fences Claude only. Fails OPEN: an
+    // unreadable auth check (no bridge in tests) skips the gate rather than
+    // stranding the panel — the guardrail is advisory, not a hard control.
+    if (agent === 'claude') {
+      let auth: { mode: 'api' | 'subscription'; acknowledged: boolean } | null = null
+      try {
+        auth = await invoke('agent.claudeAuth', undefined)
+      } catch {
+        auth = null
+      }
+      if (auth && auth.mode === 'subscription' && !auth.acknowledged) {
+        // park the start; the modal calls approveClaudeGate() to run it
+        set({ claudeGate: { proceed: () => void get().openHere(cwd, provider) } })
+        return
+      }
+    }
+    const gen = resetGen
     // fast-fail race guard (see pendingSessionEvents): mark a start in flight so
     // a spawn-error acp.session event that beats the ack gets buffered, not
     // dropped — otherwise a missing adapter (gemini ENOENT) strands 'starting'.
@@ -706,6 +753,19 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       // registered (reset-race / a concurrently-closed session), bounding the map
       if (--startsInFlight === 0) pendingSessionEvents.clear()
     }
+  },
+
+  async approveClaudeGate() {
+    const gate = get().claudeGate
+    if (!gate) return
+    // persist first so the parked start (which re-checks auth) sees it granted
+    await invoke('agent.claudeAckSubscription', undefined).catch(() => {})
+    set({ claudeGate: null })
+    gate.proceed()
+  },
+
+  cancelClaudeGate() {
+    set({ claudeGate: null })
   },
 
   async continueIn(provider, atVaultRoot) {
@@ -832,16 +892,48 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       attachments: [],
       sessions: s.sessions.map((v) =>
         v.sessionId === id
-          ? { ...v, busy: true, title, items: [...v.items, { type: 'user' as const, text: bubble }] }
+          ? {
+              ...v,
+              busy: true,
+              title,
+              items: [
+                ...v.items,
+                // the core stores the bytes and returns nothing, so the live
+                // bubble has no handles yet — it gets them on the next hydrate.
+                { type: 'user' as const, text: bubble },
+              ],
+            }
           : v,
       ),
     }))
     try {
-      await invoke('acp.prompt', {
+      // optional-chained on purpose: a core that predates the media store (or
+      // any future shape change) returns nothing, and a destructure would throw
+      // straight into the catch below and report a healthy turn as failed
+      const res = await invoke('acp.prompt', {
         sessionId: id,
         text,
         ...(contractAttachments.length ? { attachments: contractAttachments } : {}),
       })
+      const media = res?.media ?? []
+      // Paint the stored images onto the bubble we already posted. Without this
+      // the live turn showed only the text marker `📎 image.png` and the
+      // pictures appeared only after reopening the conversation — the handles
+      // exist by now (core wrote them before the prompt went out), so there is
+      // nothing to wait for.
+      if (media.length > 0) {
+        set((s) => ({
+          sessions: s.sessions.map((v) => {
+            if (v.sessionId !== id) return v
+            const last = v.items.length - 1
+            const item = v.items[last]
+            if (!item || item.type !== 'user') return v
+            const items = [...v.items]
+            items[last] = { ...item, media }
+            return { ...v, items }
+          }),
+        }))
+      }
     } catch (e) {
       // ACP_BUSY / dead core: revert busy, surface the envelope as detail
       patchSession(id, { busy: false, detail: isErrEnvelope(e) ? e.message : String(e) })
@@ -964,6 +1056,7 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       sessions: [],
       activeId: null,
       permission: null,
+      claudeGate: null, // a pending consent gate belongs to the torn-down core
       pendingPermissions: 0,
       draft: '',
       attachments: [],

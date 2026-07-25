@@ -22,6 +22,7 @@ import { qualifiedId } from '../../../../shared/handoff-lanes'
 import { useHandoffs } from '../../stores/handoffs'
 import { useReader } from '../../stores/reader'
 import { useWork } from '../../stores/work'
+import { copyVaultPath } from '../../vaultPaths'
 
 const STATUS_TONE: Record<string, string> = {
   todo: 'is-warn',
@@ -195,6 +196,23 @@ export function MetaRail({
 
       {/* ThreadRail carries its own "Thread" heading */}
       {handoffRef && <ThreadRail id={qualifiedId(handoffRef)} />}
+
+      {/* the open note's own path, for handing to an agent or a terminal. Its
+          own section, not MANAGE — that one hides without a git identity, and
+          copying a path needs no identity at all. */}
+      <section>
+        <div className="rail-label">PATH</div>
+        <div className="rail-manage">
+          <button
+            type="button"
+            className="act-link"
+            title="Copy this note's absolute path — paste it to an agent or a terminal"
+            onClick={() => copyVaultPath(selected)}
+          >
+            Copy path
+          </button>
+        </div>
+      </section>
 
       <RemoveNote selected={selected} />
     </aside>

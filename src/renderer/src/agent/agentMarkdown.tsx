@@ -34,48 +34,11 @@ const agentSchema = {
   },
 }
 
-/** Custom <pre> for fenced code (chat-completeness COPY): the sanitized code
- *  plus a hover copy button. The button reads the <code>'s textContent on click
- *  (the raw code — the button itself lives outside <code>, so its label never
- *  pollutes the copy) and writes it to the clipboard, the same navigator API
- *  the settings device-flow uses. Injected via rehype-react's `components`
- *  AFTER sanitize, so it needs no schema widening.
- *
- *  The button lives in a NON-scrolling wrapper, never inside the <pre>: the
- *  <pre> is the horizontal scroll container, so a button positioned against it
- *  drifts across the code as you scroll sideways. Anchoring to the wrapper pins
- *  it to the visible top-right corner at any scroll offset. */
-function CodeBlock(props: React.HTMLAttributes<HTMLPreElement>): React.JSX.Element {
-  const { children, ...rest } = props
-  return (
-    <div className="agent-code-wrap">
-      <button
-        type="button"
-        className="agent-copy-code"
-        aria-label="Copy code"
-        title="Copy code"
-        onClick={(e) => {
-          // the button is a SIBLING of <pre> now — reach the code through the
-          // wrapper, not closest('pre') (which would find nothing)
-          const code = e.currentTarget.parentElement?.querySelector('code')
-          try {
-            void navigator.clipboard?.writeText(code?.textContent ?? '')
-          } catch {
-            // no clipboard (node/test) — best-effort, never throw mid-render
-          }
-        }}
-      >
-        Copy
-      </button>
-      <pre {...rest}>{children}</pre>
-    </div>
-  )
-}
-
-// panel-local options: the reader components (anchors / task checkboxes) plus
-// the copy-enabled <pre>. The shared `options` object is never mutated (arch
-// law) — this is a fresh object that only spreads its fields.
-const agentOptions = { ...options, components: { ...options.components, pre: CodeBlock } }
+// panel-local options: the shared reader components (anchors / task checkboxes
+// AND the copy-enabled <pre>, which now lives in markdown/pipeline.ts so notes
+// get it too) plus the agent-only sanitize widening. The shared `options` object
+// is never mutated (arch law) — this is a fresh object that only spreads it.
+const agentOptions = { ...options, components: { ...options.components } }
 
 const processor = unified()
   .use(remarkParse)

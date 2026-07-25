@@ -44,6 +44,12 @@ const session = (id: string, over: Partial<AcpSessionView> = {}): AcpSessionView
   ...over,
 })
 
+/** Drain a handful of microtask ticks — enough for the store's awaited invoke
+ *  chains (auth check → start) to settle in a test that doesn't await openHere. */
+const flush = async (): Promise<void> => {
+  for (let i = 0; i < 5; i++) await Promise.resolve()
+}
+
 const items = (id: string): AcpSessionView['items'] =>
   useAgentPanel.getState().sessions.find((s) => s.sessionId === id)?.items ?? []
 
@@ -117,6 +123,9 @@ describe('openHere', () => {
         : Promise.resolve(undefined),
     )
     const inFlight = useAgentPanel.getState().openHere()
+    // openHere now awaits the claude auth-mode check before acp.start — let that
+    // resolve so the pending acp.start (and resolveStart) actually exist
+    await flush()
     await useAgentPanel.getState().reset() // vault switch mid-start
     resolveStart({ sessionId: 'sz' })
     await inFlight
@@ -779,7 +788,7 @@ describe('B4 — attachments (paste / attach / images)', () => {
     expect(s.attachments).toEqual([]) // tray cleared as the turn fired
     // the thread bubble records what rode along (clean text + a mono marker line)
     expect(s.sessions[0].items).toEqual([
-      { type: 'user', text: 'here you go\n\n📎 shot.png, a.md' },
+      { type: 'user', text: 'here you go\n\n📎 1 image, a.md' },
     ])
   })
 
@@ -796,8 +805,9 @@ describe('B4 — attachments (paste / attach / images)', () => {
       attachments: [{ type: 'image', mimeType: 'image/png', dataB64: 'IMG' }],
     })
     expect(useAgentPanel.getState().sessions[0]).toMatchObject({
-      title: '📎 diagram.png',
-      items: [{ type: 'user', text: '📎 diagram.png' }],
+      // images are COUNTED, not named — they render as thumbnails on the bubble
+      title: '📎 1 image',
+      items: [{ type: 'user', text: '📎 1 image' }],
     })
   })
 
@@ -1008,5 +1018,85 @@ describe('queued messages while a turn runs', () => {
     const btw = framedQueued({ text: 'is the webhook live?', kind: 'btw' })
     expect(btw).toMatch(/side question/i)
     expect(btw).toContain('is the webhook live?')
+  })
+})
+
+/**
+ * Claude-on-subscription guardrail (Anthropic ToS, Feb 2026). A Claude session
+ * with no API key would sign in with the consumer subscription, which their
+ * Consumer Terms prohibit for third-party apps. openHere must park such a start
+ * behind a typed acknowledgment; an API key or a prior ack sails through; Codex
+ * and Gemini are never gated.
+ */
+describe('openHere — Claude subscription gate', () => {
+  const claudeAuth = (mode: 'api' | 'subscription', acknowledged: boolean) =>
+    (ch: string) => {
+      if (ch === 'agent.claudeAuth') return Promise.resolve({ mode, acknowledged })
+      if (ch === 'acp.start') return Promise.resolve({ sessionId: 's1' })
+      return Promise.resolve(undefined)
+    }
+
+  it('parks the start and raises the gate on subscription, unacknowledged', async () => {
+    invoke.mockImplementation(claudeAuth('subscription', false))
+    await useAgentPanel.getState().openHere()
+    // NOT started — the gate stands between the click and acp.start
+    expect(invoke).not.toHaveBeenCalledWith('acp.start', expect.anything())
+    expect(useAgentPanel.getState().claudeGate).not.toBeNull()
+    expect(useAgentPanel.getState().open).toBe(true) // panel still opens
+  })
+
+  it('an API key sails straight through — no gate', async () => {
+    invoke.mockImplementation(claudeAuth('api', false))
+    await useAgentPanel.getState().openHere()
+    expect(useAgentPanel.getState().claudeGate).toBeNull()
+    expect(invoke).toHaveBeenCalledWith('acp.start', { agent: 'claude' })
+  })
+
+  it('a prior acknowledgment sails through', async () => {
+    invoke.mockImplementation(claudeAuth('subscription', true))
+    await useAgentPanel.getState().openHere()
+    expect(useAgentPanel.getState().claudeGate).toBeNull()
+    expect(invoke).toHaveBeenCalledWith('acp.start', { agent: 'claude' })
+  })
+
+  it('Codex is never gated, even on subscription', async () => {
+    invoke.mockImplementation((ch: string) =>
+      ch === 'acp.start' ? Promise.resolve({ sessionId: 's1' }) : Promise.resolve(undefined),
+    )
+    await useAgentPanel.getState().openHere(undefined, 'codex')
+    // the auth check is claude-only — it must not even be asked for codex
+    expect(invoke).not.toHaveBeenCalledWith('agent.claudeAuth', expect.anything())
+    expect(invoke).toHaveBeenCalledWith('acp.start', { agent: 'codex' })
+  })
+
+  it('approving persists the ack and runs the parked start', async () => {
+    // first pass gates; after approve, the re-run sees acknowledged=true
+    let acked = false
+    invoke.mockImplementation((ch: string) => {
+      if (ch === 'agent.claudeAuth')
+        return Promise.resolve({ mode: 'subscription', acknowledged: acked })
+      if (ch === 'agent.claudeAckSubscription') {
+        acked = true
+        return Promise.resolve(undefined)
+      }
+      if (ch === 'acp.start') return Promise.resolve({ sessionId: 's1' })
+      return Promise.resolve(undefined)
+    })
+    await useAgentPanel.getState().openHere()
+    expect(useAgentPanel.getState().claudeGate).not.toBeNull()
+    await useAgentPanel.getState().approveClaudeGate()
+    expect(invoke).toHaveBeenCalledWith('agent.claudeAckSubscription', undefined)
+    expect(useAgentPanel.getState().claudeGate).toBeNull()
+    // proceed() re-runs openHere fire-and-forget; let it reach acp.start
+    await flush()
+    expect(invoke).toHaveBeenCalledWith('acp.start', { agent: 'claude' })
+  })
+
+  it('cancelling drops the gate and starts nothing', async () => {
+    invoke.mockImplementation(claudeAuth('subscription', false))
+    await useAgentPanel.getState().openHere()
+    useAgentPanel.getState().cancelClaudeGate()
+    expect(useAgentPanel.getState().claudeGate).toBeNull()
+    expect(invoke).not.toHaveBeenCalledWith('acp.start', expect.anything())
   })
 })

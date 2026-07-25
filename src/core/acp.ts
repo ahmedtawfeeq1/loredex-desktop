@@ -60,6 +60,8 @@ import {
   mintAgentToken,
   revokeAgentToken,
 } from './settings'
+import { oldPlatformServer } from './old-platform'
+import { storeSessionMedia } from './session-media'
 import { buildWorkspaceServers } from './workspace-mcp'
 import type { PermissionRule } from '../shared/types'
 
@@ -564,6 +566,16 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
     httpOk,
     enabled: loadWorkspaceEnabled(),
   })
+  // The OLD genudo platform, scoped to THIS client only (2026-07-23): a client
+  // mid-migration sits on both platforms, and a session for another client must
+  // never see it. Injected rather than declared in workspace.yml — that schema
+  // is stdio-only, and injecting keeps the token in the keychain instead of
+  // expanding it into a .mcp.json inside the vault. Remote http, so it rides the
+  // same capability the loredex host needs.
+  if (httpOk) {
+    const oldPlatform = await oldPlatformServer(s.clientSlug)
+    if (oldPlatform) mcpServers.push(oldPlatform as McpServer)
+  }
   // B2 continuation: a same-provider resume (session/load, loadSession cap) lets
   // the adapter restore its OWN context by replaying the whole conversation — we
   // suppress that replay (routeUpdate early-returns while replaying) because our
@@ -1044,7 +1056,11 @@ function routePermission(
 /** Fire-and-forget the minutes-long session/prompt request; the turn closes
  *  with an acp.turnEnd event (long-job law — never an invoke result). B4:
  *  attachments ride the prompt as extra ContentBlocks after the text. */
-export function acpPrompt(sessionId: string, text: string, attachments?: AcpAttachment[]): void {
+export function acpPrompt(
+  sessionId: string,
+  text: string,
+  attachments?: AcpAttachment[],
+): { media: string[] } {
   const s = sessions.get(sessionId)
   if (!s) throw ipcError('ACP_UNKNOWN', 'unknown agent session')
   if (s.state !== 'ready' || !s.agentCtx || !s.acpSessionId) {
@@ -1056,7 +1072,34 @@ export function acpPrompt(sessionId: string, text: string, attachments?: AcpAtta
   // the user turn joins the transcript before the prompt rides the wire (B0) —
   // adapters echo it as user_message_chunk, which mapUpdate ignores, so this is
   // the only place the user's words are persisted
-  persistMessage(s, { role: 'user', text })
+  // Persist any attached IMAGE to this device's media store before the turn
+  // rides the wire, and record its hash on the transcript row. Without this the
+  // bytes lived only in memory: reopening the conversation showed the marker
+  // `📎 image.png` and no picture. Best-effort — a media failure must never kill
+  // a live turn.
+  const media: string[] = []
+  if (s.persist) {
+    for (const a of attachments ?? []) {
+      if (a.type !== 'image') continue
+      try {
+        media.push(
+          storeSessionMedia(
+            s.persist.vaultId,
+            {
+              dataB64: a.dataB64,
+              mimeType: a.mimeType,
+              name: 'image',
+              convId: s.conversationId,
+            },
+            new Date().toISOString(),
+          ).sha256,
+        )
+      } catch {
+        // unsupported type or unwritable store — the turn still goes out
+      }
+    }
+  }
+  persistMessage(s, { role: 'user', text, ...(media.length > 0 ? { media } : {}) })
   // ceiling: one turn in flight per session (ACP_BUSY above)
   const sdk = sdkModule! // state 'ready' implies boot loaded it
   // B2: a cross-provider continuation seeds the prior transcript as the FIRST
@@ -1110,6 +1153,9 @@ export function acpPrompt(sessionId: string, text: string, attachments?: AcpAtta
       }
       cur.emit({ kind: 'acp.turnEnd', sessionId, stopReason: 'cancelled' })
     })
+  // the handles for the images just stored — the renderer paints them on the
+  // bubble it has already posted, instead of waiting for a re-hydrate
+  return { media }
 }
 
 /** Renderer's answer to an acp.permission event. Unknown requestId is a

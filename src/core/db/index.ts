@@ -69,6 +69,53 @@ export const migrations: Array<(db: AppDb) => void> = [
   (db) => {
     db.exec(`ALTER TABLE agent_conversations ADD COLUMN cwd TEXT;`)
   },
+  // 5 — session media (2026-07-23). An image attached to a prompt used to exist
+  // only in memory: the transcript kept the text marker `📎 image.png` and the
+  // bytes were gone, so reopening a conversation showed no picture. The BYTES
+  // live on disk under <userData>/session-media/ and this table is the index
+  // pointing at them.
+  //
+  // MACHINE-LOCAL BY CONSTRUCTION, which is the point: app.db and userData are
+  // per-device and neither is inside the vault, so a screenshot pasted into a
+  // chat can never reach a commit, a push, or a teammate's dex. `vault_id`
+  // scopes rows the way every other table here does; `sha256` is the identity,
+  // so the same image attached twice is stored once.
+  (db) => {
+    db.exec(`
+      CREATE TABLE session_media (sha256 TEXT NOT NULL, vault_id TEXT NOT NULL,
+                                  conv_id TEXT, name TEXT NOT NULL,
+                                  mime TEXT NOT NULL, bytes INTEGER NOT NULL,
+                                  rel_path TEXT NOT NULL, created_at TEXT NOT NULL,
+                                  PRIMARY KEY (sha256, vault_id));
+      CREATE INDEX idx_session_media_conv ON session_media (conv_id);
+    `)
+  },
+  // 6 — which media a transcript row carries. A JSON array of sha256 handles,
+  // never bytes: the transcript stays small and an image is read only when it is
+  // actually displayed. Nullable + additive, so every existing row is untouched.
+  (db) => {
+    db.exec(`ALTER TABLE agent_messages ADD COLUMN media_json TEXT;`)
+  },
+  // 7 — session_media's key was (sha256, vault_id), which said "this image
+  // belongs to one conversation". It does not: the same screenshot pasted into
+  // two threads is the same bytes, and the second attach silently REASSIGNED
+  // ownership — deleting that thread then blanked the picture in the first one.
+  // The key is (sha256, vault_id, conv_id): one row per image-in-a-conversation,
+  // which is what makes the delete refcount correct. Rebuilt rather than altered
+  // because SQLite cannot change a primary key in place.
+  (db) => {
+    db.exec(`
+      ALTER TABLE session_media RENAME TO session_media_old;
+      CREATE TABLE session_media (sha256 TEXT NOT NULL, vault_id TEXT NOT NULL,
+                                  conv_id TEXT, name TEXT NOT NULL,
+                                  mime TEXT NOT NULL, bytes INTEGER NOT NULL,
+                                  rel_path TEXT NOT NULL, created_at TEXT NOT NULL,
+                                  PRIMARY KEY (sha256, vault_id, conv_id));
+      INSERT INTO session_media SELECT * FROM session_media_old;
+      DROP TABLE session_media_old;
+      CREATE INDEX idx_session_media_conv ON session_media (conv_id);
+    `)
+  },
 ]
 
 export function runMigrations(db: AppDb): void {

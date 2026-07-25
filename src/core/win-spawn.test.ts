@@ -13,21 +13,33 @@ import {
   isCommandNotFound,
   withResolvedNpx,
   resolveNpx,
-  widenWindowsPath,
+  widenNodePath,
 } from './win-spawn'
 
-describe('widenWindowsPath', () => {
-  it('is a no-op off Windows — macOS/Linux behaviour is untouched', () => {
-    const env = { PATH: '/usr/bin' }
-    expect(widenWindowsPath(env, 'darwin')).toBe(env)
-    expect(widenWindowsPath(env, 'linux')).toBe(env)
+describe('widenNodePath', () => {
+  it('POSIX: appends an existing per-user Node dir (nvm), keeping PATH first', () => {
+    const home = mkdtempSync(join(tmpdir(), 'loredex-nodepath-'))
+    const nvmBin = join(home, '.nvm', 'versions', 'node', 'v20.20.1', 'bin')
+    mkdirSync(nvmBin, { recursive: true })
+    const out = widenNodePath({ PATH: '/usr/bin:/bin' }, 'darwin', home)
+    const parts = (out.PATH ?? '').split(':')
+    expect(parts[0]).toBe('/usr/bin') // never reordered
+    expect(parts).toContain(nvmBin)
+  })
+
+  it('POSIX: unchanged when the only candidates are already on PATH or absent', () => {
+    const home = mkdtempSync(join(tmpdir(), 'loredex-nodepath-empty-'))
+    // the two absolute system dirs candidateDirs might find are already present,
+    // and nvm/volta/asdf do not exist in this tmp home → nothing to append
+    const env = { PATH: '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin', X: '1' }
+    expect(widenNodePath(env, 'darwin', home)).toBe(env)
   })
 
   it('appends a per-user npm dir that exists, keeping the original PATH first', () => {
     const home = mkdtempSync(join(tmpdir(), 'loredex-winpath-'))
     const npmDir = join(home, 'AppData', 'Roaming', 'npm')
     mkdirSync(npmDir, { recursive: true })
-    const out = widenWindowsPath({ PATH: 'C:\\Windows\\System32' }, 'win32', home)
+    const out = widenNodePath({ PATH: 'C:\\Windows\\System32' }, 'win32', home)
     const parts = (out.PATH ?? '').split(';')
     expect(parts[0]).toBe('C:\\Windows\\System32') // never reordered
     expect(parts).toContain(npmDir)
@@ -35,7 +47,7 @@ describe('widenWindowsPath', () => {
 
   it('never adds a directory that does not exist', () => {
     const home = mkdtempSync(join(tmpdir(), 'loredex-winpath-empty-'))
-    const out = widenWindowsPath({ PATH: 'C:\\Windows\\System32' }, 'win32', home)
+    const out = widenNodePath({ PATH: 'C:\\Windows\\System32' }, 'win32', home)
     expect(out.PATH).toBe('C:\\Windows\\System32')
   })
 
@@ -43,7 +55,7 @@ describe('widenWindowsPath', () => {
     const home = mkdtempSync(join(tmpdir(), 'loredex-winpath-dup-'))
     const npmDir = join(home, 'AppData', 'Roaming', 'npm')
     mkdirSync(npmDir, { recursive: true })
-    const out = widenWindowsPath({ PATH: npmDir }, 'win32', home)
+    const out = widenNodePath({ PATH: npmDir }, 'win32', home)
     expect((out.PATH ?? '').split(';').filter((p) => p === npmDir)).toHaveLength(1)
   })
 
@@ -58,7 +70,7 @@ describe('widenWindowsPath', () => {
     const home = mkdtempSync(join(tmpdir(), 'loredex-winpath-case-'))
     const npmDir = join(home, 'AppData', 'Roaming', 'npm')
     mkdirSync(npmDir, { recursive: true })
-    const out = widenWindowsPath({ Path: 'C:\\Windows\\System32' }, 'win32', home)
+    const out = widenNodePath({ Path: 'C:\\Windows\\System32' }, 'win32', home)
     const pathKeys = Object.keys(out).filter((k) => k.toLowerCase() === 'path')
     expect(pathKeys).toHaveLength(1)
     const value = out[pathKeys[0] as string] ?? ''
@@ -69,7 +81,7 @@ describe('widenWindowsPath', () => {
   it('leaves unrelated variables alone', () => {
     const home = mkdtempSync(join(tmpdir(), 'loredex-winpath-other-'))
     mkdirSync(join(home, 'AppData', 'Roaming', 'npm'), { recursive: true })
-    const out = widenWindowsPath({ Path: 'C:\\', GENUDO_TOKEN: 'abc' }, 'win32', home)
+    const out = widenNodePath({ Path: 'C:\\', GENUDO_TOKEN: 'abc' }, 'win32', home)
     expect(out.GENUDO_TOKEN).toBe('abc')
   })
 })
@@ -99,8 +111,14 @@ describe('resolveNpx', () => {
     expect(resolveNpx({ Path: onPath }, 'win32', home)).toBe(join(onPath, 'npx.cmd'))
   })
 
-  it('is null off Windows — POSIX PATH lookup already works', () => {
-    expect(resolveNpx({}, 'darwin', '/home/x')).toBeNull()
+  it('resolves npx on POSIX — the nvm bin is checked ahead of system dirs', () => {
+    const home = mkdtempSync(join(tmpdir(), 'loredex-npx-posix-'))
+    const nvmBin = join(home, '.nvm', 'versions', 'node', 'v20.20.1', 'bin')
+    mkdirSync(nvmBin, { recursive: true })
+    writeFileSync(join(nvmBin, 'npx'), '#!/bin/sh')
+    // nvm is first in candidateDirs, so this wins over any /usr/local/bin/npx
+    // that happens to exist on the machine running the test
+    expect(resolveNpx({}, 'darwin', home)).toBe(join(nvmBin, 'npx'))
   })
 })
 
@@ -116,6 +134,15 @@ describe('explainSpawnFailure', () => {
 
   it('recognises the POSIX form too', () => {
     expect(isCommandNotFound('spawn npx ENOENT')).toBe(true)
+  })
+
+  it('POSIX: blames PATH, never the credentials, and never says "token"', () => {
+    // the word "token" must not appear — the client card keys its "re-paste
+    // token" hint off that word, and this failure is never about the credential
+    const home = mkdtempSync(join(tmpdir(), 'loredex-exp-posix-'))
+    const msg = explainSpawnFailure('spawn npx ENOENT', 'npx', 'darwin', home, {})
+    expect(msg).toMatch(/PATH problem/)
+    expect(msg).not.toMatch(/token/i)
   })
 
   it('passes a genuine auth failure through untouched', () => {
@@ -151,9 +178,19 @@ describe('withResolvedNpx', () => {
     expect(withResolvedNpx(safe, {}, 'win32', home)).toEqual(safe)
   })
 
-  it('is a no-op off Windows', () => {
-    const safe = { command: 'npx', args: ['-y', 'x'] }
-    expect(withResolvedNpx(safe, {}, 'darwin', '/home/x')).toBe(safe)
+  it('POSIX: rewrites the command itself to the absolute npx', () => {
+    const home = mkdtempSync(join(tmpdir(), 'loredex-wrn-posix-'))
+    const nvmBin = join(home, '.nvm', 'versions', 'node', 'v20.20.1', 'bin')
+    mkdirSync(nvmBin, { recursive: true })
+    writeFileSync(join(nvmBin, 'npx'), '#!/bin/sh')
+    const out = withResolvedNpx({ command: 'npx', args: ['-y', 'x'] }, {}, 'darwin', home)
+    expect(out.command).toBe(join(nvmBin, 'npx'))
+    expect(out.args).toEqual(['-y', 'x'])
+  })
+
+  it('POSIX: leaves a non-npx command alone', () => {
+    const safe = { command: 'uvx', args: ['thing'] }
+    expect(withResolvedNpx(safe, {}, 'darwin', mkdtempSync(join(tmpdir(), 'lx-')))).toBe(safe)
   })
 })
 

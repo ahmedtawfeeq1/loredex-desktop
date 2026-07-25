@@ -26,6 +26,7 @@ import { useReader } from '../../stores/reader'
 import { useTerminal } from '../../stores/terminal'
 import { useToasts } from '../../stores/toasts'
 import { isErrEnvelope } from '../../../../shared/ipc-contract'
+import { copyVaultPath } from '../../vaultPaths'
 import { sectionTint } from '../reader/sectionTint'
 import { buildClientPage, type UnitSection } from './client-page'
 
@@ -138,6 +139,15 @@ const PAGE_CSS = `
 .cp-conn-state.dim { color: var(--text-2); }
 .cp-conn-detail { font-size: 12px; margin: 2px 0 8px; }
 .cp-conn-detail.warn { color: var(--rust, #a33f2e); }
+.cp-conn-scope { font-family: var(--font-mono); font-size: 10px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 4px; padding: 0 5px; }
+.cp-conn-chip { font-size: 11px; font-weight: 650; border-radius: 999px; padding: 1px 9px; border: 1px solid; }
+.cp-conn-chip.is-ok { color: var(--ok, #2e6e5e); border-color: var(--ok, #2e6e5e); background: color-mix(in srgb, var(--ok, #2e6e5e) 12%, transparent); }
+.cp-conn-chip.is-fail { color: var(--rust, #a33f2e); border-color: var(--rust, #a33f2e); background: color-mix(in srgb, var(--rust, #a33f2e) 12%, transparent); }
+.cp-conn-chip.is-testing, .cp-conn-chip.is-untested { color: var(--text-2); border-color: var(--hairline); }
+.cp-conn-tools-toggle { margin-top: 8px; font-size: 11.5px; font-weight: 600; color: var(--text-2); cursor: pointer; }
+.cp-conn-tools-toggle:hover { color: var(--text-1); }
+.cp-conn-tools { list-style: none; margin: 6px 0 0; padding: 0 0 0 12px; display: flex; flex-wrap: wrap; gap: 5px; border-left: 2px solid var(--hairline); }
+.cp-conn-tools li { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 4px; padding: 1px 6px; }
 .cp-ws-refs { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .cp-ws-ref { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .cp-ws-ref-state { font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -253,7 +263,7 @@ function Unit({
   )
 }
 
-type ProbeState = { state: 'testing' | 'ok' | 'fail'; detail: string }
+type ProbeState = { state: 'testing' | 'ok' | 'fail'; detail: string; tools?: string[] }
 
 /**
  * A client with no tooling yet: the dex's STANDARD connections (derived from
@@ -372,6 +382,95 @@ function StandardToolingCard({
   )
 }
 
+/**
+ * The shell BOTH platform connections render in — same layout, same green chip,
+ * same tools disclosure. They are the same kind of thing (an MCP server for this
+ * client) and looked like two different features while one was a bordered card
+ * and the other was loose text.
+ */
+function ConnCard({
+  name,
+  source,
+  state,
+  detail,
+  tools,
+  onTest,
+  testing,
+  children,
+}: {
+  name: string
+  /** WHERE this server comes from — the thing that decides whether Re-wire
+   *  touches it. Both servers are already scoped to this client, so a
+   *  "this client only" chip on one of them read as if the other were global. */
+  source: 'workspace.yml' | 'keychain'
+  state: 'ok' | 'fail' | 'testing' | 'untested'
+  detail?: string
+  tools: string[]
+  onTest: () => void
+  testing: boolean
+  /** the token row(s), which differ per platform */
+  children: React.ReactNode
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const LABEL: Record<typeof state, string> = {
+    ok: '✓ Connected',
+    fail: '✗ Failed',
+    testing: '◌ Testing…',
+    untested: '○ Not tested',
+  }
+  return (
+    <div className="cp-conn">
+      <div className="cp-conn-head">
+        <span className="cp-conn-name">{name}</span>
+        {/* a CHIP, not coloured text — status is glyph + label on a surface, so
+            it reads as state rather than as emphasis (§4) */}
+        <span className={`cp-conn-chip is-${state}`}>{LABEL[state]}</span>
+        <span
+          className="cp-conn-scope"
+          title={
+            source === 'workspace.yml'
+              ? 'Declared in this client’s workspace.yml — Re-wire regenerates its .mcp.json'
+              : 'Injected by loredex from your OS keychain — Re-wire does not touch it'
+          }
+        >
+          {source === 'workspace.yml' ? 'workspace.yml' : 'keychain · injected'}
+        </span>
+        <span style={{ flex: 1 }} />
+        <button
+          type="button"
+          className="button-secondary"
+          disabled={testing}
+          title="Real MCP handshake with the stored token — green means an agent would get these tools"
+          onClick={onTest}
+        >
+          {testing ? 'Testing…' : 'Test'}
+        </button>
+      </div>
+      {detail && <div className={`cp-conn-detail ${state === 'fail' ? 'warn' : ''}`}>{detail}</div>}
+      {children}
+      {tools.length > 0 && (
+        <>
+          <button
+            type="button"
+            className="cp-conn-tools-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? '▾' : '▸'} {tools.length} tools
+          </button>
+          {open && (
+            <ul className="cp-conn-tools">
+              {tools.map((t) => (
+                <li key={t}>{t}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<WorkspaceResult | null>(null)
@@ -397,7 +496,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
       .then((r) =>
         setProbes((p) => ({
           ...p,
-          [server]: { state: r.ok ? 'ok' : 'fail', detail: r.detail },
+          [server]: { state: r.ok ? 'ok' : 'fail', detail: r.detail, tools: r.tools },
         })),
       )
       .catch((e) =>
@@ -478,7 +577,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           disabled={busy || !info.hasWorkspaceYml}
           title={
             info.hasWorkspaceYml
-              ? "Regenerate .mcp.json / .claude settings / AGENTS.md with this machine's stored tokens (gitignored files only)"
+              ? "Regenerate .mcp.json / .claude settings / AGENTS.md from workspace.yml with this machine's stored tokens (gitignored files only). Affects the workspace.yml servers ONLY — genudo-old-platform is injected from the keychain and is unaffected."
               : 'No workspace.yml in this client'
           }
           onClick={() => void rewire({})}
@@ -585,38 +684,36 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
       )}
       {conns.map((conn) => {
         const probe = probes[conn.server]
+        const state =
+          probe?.state === 'ok'
+            ? 'ok'
+            : probe?.state === 'fail'
+              ? 'fail'
+              : probe?.state === 'testing'
+                ? 'testing'
+                : 'untested'
         return (
-          <div key={conn.server} className="cp-conn">
-            <div className="cp-conn-head">
-              <span className="cp-conn-name">{conn.server}</span>
-              <span
-                className={`cp-conn-state ${probe?.state === 'ok' ? 'ok' : probe?.state === 'fail' ? 'warn' : 'dim'}`}
-              >
-                {probe ? PROBE_LABEL[probe.state] : '○ Not tested'}
-              </span>
-              <span style={{ flex: 1 }} />
-              <button
-                type="button"
-                className="button-secondary"
-                disabled={probe?.state === 'testing'}
-                title="Launch this connection with the stored token and verify the handshake"
-                onClick={() => testConnection(conn.server)}
-              >
-                Test
-              </button>
-            </div>
-            {probe?.state === 'fail' && (
-              <div className="cp-conn-detail warn">
-                {/* only suggest the token when the failure is actually about
-                    auth — this used to be appended to EVERY failure, sending
-                    people to re-paste a working credential while the real
-                    problem was Node not being on PATH */}
-                {probe.detail}
-                {/auth|401|unauthor|token|forbidden/i.test(probe.detail)
-                  ? ' — paste a fresh token below and Save.'
-                  : ''}
-              </div>
-            )}
+          <ConnCard
+            key={conn.server}
+            name={conn.server}
+            source="workspace.yml"
+            state={state}
+            testing={probe?.state === 'testing'}
+            onTest={() => testConnection(conn.server)}
+            tools={probe?.tools ?? []}
+            detail={
+              probe?.state === 'fail'
+                ? // only suggest the token when the failure is actually about
+                  // auth — this used to be appended to EVERY failure, sending
+                  // people to re-paste a working credential while the real
+                  // problem was Node not being on PATH.
+                  probe.detail +
+                  (/auth failed|401|unauthor|invalid token|forbidden/i.test(probe.detail)
+                    ? ' — paste a fresh token below and Save.'
+                    : '')
+                : undefined
+            }
+          >
             {conn.envRefs.map((ref) => {
               const missing = status?.missingRefs.includes(ref) ?? false
               const editing = missing || replacing.has(ref)
@@ -647,7 +744,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                 </div>
               )
             })}
-          </div>
+          </ConnCard>
         )
       })}
       {pastedReady.length > 0 && (
@@ -678,7 +775,112 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           )}
         </div>
       )}
+      <OldPlatformConnection client={info.slug} />
     </div>
+  )
+}
+
+/**
+ * The OLD genudo platform, for a client mid-migration — a second connection
+ * beside the new-platform one, with its own token and its own Test.
+ *
+ * It is NOT part of workspace.yml and deliberately so: that schema models stdio
+ * servers only (`command`/`args`/`env`), and the old platform is remote HTTP
+ * with a Bearer header. loredex injects it at spawn for THIS client's sessions,
+ * so the token stays in the OS keychain instead of being expanded into a
+ * `.mcp.json` inside the vault. Other clients' sessions never see it.
+ */
+function OldPlatformConnection({ client }: { client: string }): React.JSX.Element {
+  const [state, setState] = useState<{ hasToken: boolean; url: string } | null>(null)
+  const [token, setToken] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [probe, setProbe] = useState<{ ok: boolean; detail: string; tools: string[] } | null>(null)
+
+  const refresh = (): void => {
+    void invoke('clients.oldPlatform.get', { client })
+      .then(setState)
+      .catch(() => setState(null))
+  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload per client
+  useEffect(refresh, [client])
+
+  async function save(): Promise<void> {
+    setBusy(true)
+    try {
+      await invoke('clients.oldPlatform.set', { client, token: token.trim() })
+      setToken('')
+      setEditing(false)
+      refresh()
+      // saving is not working — verify at once, as every other credential here
+      setProbe(await invoke('clients.oldPlatform.test', { client }))
+    } catch (e) {
+      setProbe({ ok: false, detail: reason(e), tools: [] })
+    }
+    setBusy(false)
+  }
+
+  const showField = editing || state?.hasToken === false
+
+  return (
+    <ConnCard
+      name="genudo-old-platform"
+      source="keychain"
+      state={probe ? (probe.ok ? 'ok' : 'fail') : 'untested'}
+      testing={busy}
+      tools={probe?.tools ?? []}
+      // failures only, exactly like the new-platform card: the chip and the
+      // tools toggle already say "connected", and repeating it as a detail line
+      // was the visible difference between the two cards
+      detail={probe && !probe.ok ? probe.detail : undefined}
+      onTest={() => {
+        setBusy(true)
+        void invoke('clients.oldPlatform.test', { client })
+          .then(setProbe)
+          .catch((e) => setProbe({ ok: false, detail: reason(e), tools: [] }))
+          .finally(() => setBusy(false))
+      }}
+    >
+      <div className="cp-ws-ref">
+        <span className={state?.hasToken ? 'cp-ws-ref-state ok' : 'cp-ws-ref-state warn'}>
+          {state?.hasToken ? '✓ Token held' : '● Token needed'}
+        </span>
+        <span className="cp-ws-conn">{state?.url ?? ''}</span>
+        {showField ? (
+          <>
+            <input
+              className="cp-ws-token-input"
+              type="password"
+              placeholder="Paste the old-platform token"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+            <button
+              type="button"
+              className="button-secondary"
+              disabled={busy || !token.trim()}
+              onClick={() => void save()}
+            >
+              Save
+            </button>
+            {state?.hasToken && (
+              <button type="button" className="button-secondary" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            )}
+          </>
+        ) : (
+          <button
+            type="button"
+            className="button-secondary"
+            title="Paste a new token (replaces the stored one)"
+            onClick={() => setEditing(true)}
+          >
+            Replace
+          </button>
+        )}
+      </div>
+    </ConnCard>
   )
 }
 
@@ -1246,6 +1448,13 @@ function InboxPanel({
                 title="Open this intake file"
               >
                 Open
+              </button>
+              <button
+                type="button"
+                onClick={() => copyVaultPath(it.rel)}
+                title="Copy this file's absolute path — paste it to an agent or a terminal"
+              >
+                Copy path
               </button>
               <button type="button" onClick={() => void act('clients.inbox.toRandoms', it.name)}>
                 Keep → randoms

@@ -404,3 +404,122 @@ describe('Addendum D1: activity cards (story 16.6)', () => {
     expect(block('.feed-flips')).toContain('border-left: 2px solid var(--hairline);')
   })
 })
+
+/**
+ * BL-29 / BL-31: two layout invariants that were reported as "the control isn't
+ * there" — a chip eaten by a sibling's ellipsis, and copy buttons at opacity 0.
+ * Both live in the stylesheet, so they are asserted here.
+ */
+describe('agent panel: room for the meta, and copy you can see (BL-29 / BL-31)', () => {
+  it('the history popover is wide enough for a real title, and capped to the window', () => {
+    const menu = block('.agent-history-menu')
+    expect(menu).toContain('width: 380px;')
+    expect(menu).toContain('max-width: calc(100vw - 24px);')
+  })
+  it('a history row stacks: the client chip is its own line, never beside the ellipsised title', () => {
+    expect(block('.agent-history-open')).toContain('flex-direction: column;')
+    // the title alone truncates; the chip line is not inside it
+    expect(block('.agent-history-name')).toContain('text-overflow: ellipsis;')
+  })
+  it('the code-block Copy is visible at rest and pinned to the wrapper, not the scrolling <pre>', () => {
+    const btn = block('.agent-copy-code')
+    expect(btn).toContain('position: absolute;')
+    expect(btn).not.toContain('opacity: 0;')
+    expect(block('.agent-code-wrap')).toContain('position: relative;')
+  })
+  it('the whole-reply Copy sits below the reply, in flow — not floated at the top corner', () => {
+    const btn = block('.agent-copy-msg')
+    expect(btn).not.toContain('position: absolute;')
+    expect(btn).toContain('margin: 10px 0 0 auto;')
+  })
+})
+
+/** Reported 2026-07-23: every variant had a hover state and nothing on click. */
+describe('buttons acknowledge a press (2026-07-23)', () => {
+  it('the quiet variants nudge and change surface on :active', () => {
+    const b = block('.button-secondary:active:not(:disabled)')
+    expect(b).toContain('transform: translateY(1px);')
+    expect(b).toContain('background: var(--bg-hover);')
+    for (const v of ['emphasis', 'destructive', 'quiet']) {
+      expect(css).toContain(`.button-${v}:active:not(:disabled)`)
+    }
+  })
+
+  /** The cobalt primary already had a designed press state (flat +
+   *  --accent-press, §4); the generic rule must not overwrite it. */
+  it('the cobalt primary keeps its own press recipe', () => {
+    expect(block('.button-primary:active:not(:disabled)')).toContain(
+      'background: var(--accent-press);',
+    )
+  })
+  it('the ack state is glyph + colour, not colour alone (the ✓ is in the label)', () => {
+    expect(block('.button-primary.is-acked')).toContain('color: var(--ok);')
+  })
+  it('a setup-card command is drag-selectable despite body user-select:none', () => {
+    expect(block('.ws-setup-cmd')).toContain('user-select: text;')
+  })
+  it('setup-card steps are one row each, so each can carry its own Copy', () => {
+    expect(block('.ws-setup-steps')).toContain('flex-direction: column;')
+    expect(block('.ws-setup-step')).toContain('display: flex;')
+  })
+})
+
+/**
+ * Reported 2026-07-23: in dark mode the user's own message was indistinguishable
+ * from the agent's reply. Cause: `--bg-card` on the panel's `--bg-inset` is
+ * #FFFFFF on #EAE8E1 in light (obvious) but #12151C on #0F1218 in dark (three
+ * points per channel — invisible). The same recipe, opposite outcome.
+ */
+describe('the user message is findable in BOTH themes (2026-07-23)', () => {
+  const bubble = (): string => block('.agent-msg-user')
+
+  it('sits on the surface that actually lifts in dark, not the card', () => {
+    expect(bubble()).toContain('background: var(--bg-overlay);')
+    // the regression: --bg-card is invisible against --bg-inset in dark
+    expect(bubble()).not.toContain('background: var(--bg-card);')
+  })
+
+  it('dark --bg-overlay really is a lift over the panel surface', () => {
+    // #1D222C over #0F1218 — a real step, unlike #12151C over #0F1218
+    expect(dropin).toContain('--bg-overlay:  #1D222C;')
+    expect(dropin).toContain('--bg-inset:    #0F1218;')
+  })
+
+  it('light keeps the boundary it already had (overlay IS the card there)', () => {
+    expect(dropin).toContain('--bg-overlay:#FFFFFF;')
+  })
+
+  it('carries a cobalt left rail as a second, contrast-independent cue', () => {
+    expect(bubble()).toContain('border-left: 2px solid var(--accent);')
+  })
+
+  it('the agent reply stays unboxed — only ONE of the two is a bubble', () => {
+    expect(css).not.toMatch(/\.agent-msg-agent \{[^}]*background:/)
+  })
+})
+
+/**
+ * Settings › Integrations, restructured 2026-07-23. The page was organised by
+ * KIND — every server, then every credential form, then every skills card — so
+ * one integration's settings were spread across four sections with another
+ * integration's in between.
+ */
+describe('integration cards (2026-07-23)', () => {
+  it('a card is a disclosure whose whole header row is the hit target', () => {
+    const toggle = block('.ws-int-toggle')
+    expect(toggle).toContain('flex: 1;')
+    expect(toggle).toContain('cursor: pointer;')
+  })
+  it('the enable switch is not inside the disclosure button', () => {
+    // .ws-int-head is a flex row holding BOTH — toggling the switch must not
+    // also collapse the card
+    expect(block('.ws-int-head')).toContain('display: flex;')
+  })
+  it('Advanced is a rail-marked block, visually subordinate to the essentials', () => {
+    expect(block('.ws-adv')).toContain('border-left: 2px solid var(--hairline);')
+  })
+  it('cards are hairline-separated, first one flush (settings-section recipe)', () => {
+    expect(block('.ws-int')).toContain('border-top: 1px solid var(--hairline);')
+    expect(css).toContain('.ws-int:first-of-type')
+  })
+})

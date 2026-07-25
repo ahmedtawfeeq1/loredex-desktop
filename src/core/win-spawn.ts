@@ -1,32 +1,62 @@
 /**
- * Windows command resolution for spawning npm-shim executables (`npx`, `npm`).
+ * Command resolution for spawning npm-shim executables (`npx`, `npm`) from a
+ * GUI-launched desktop app, on every platform.
  *
- * Two distinct Windows problems stack here, and fixing only one leaves it broken:
+ * The root problem is shared: a Finder/Explorer-launched app does NOT inherit a
+ * login shell's PATH, and a per-user Node install (nvm, fnm, volta, homebrew,
+ * winget) lives outside the bare PATH the OS hands a GUI process. On macOS that
+ * bare PATH is `/usr/bin:/bin:/usr/sbin:/sbin` — nvm/homebrew are simply absent
+ * — so `execFile('npx', …)` fails with ENOENT even though Node is installed.
  *
- * 1. **CVE-2024-27980.** Since April 2024 Node REFUSES to spawn a `.cmd`/`.bat`
- *    directly — it errors EINVAL unless `shell: true` is passed. `npx` on
- *    Windows *is* `npx.cmd`. The loredex lib already handles this by wrapping as
- *    `cmd /c npx …`, which is correct and avoids `shell: true` (whose argument
- *    quoting is the actual injection surface the CVE was about).
- *    https://nodejs.org/en/blog/vulnerability/april-2024-security-releases-2
+ * Windows stacks a second problem on top: since April 2024 (CVE-2024-27980)
+ * Node REFUSES to spawn a `.cmd`/`.bat` directly (EINVAL unless `shell: true`),
+ * and `npx` on Windows *is* `npx.cmd`. The lib wraps it as `cmd /c npx …`, which
+ * is correct and avoids `shell: true` (the quoting surface the CVE was about) —
+ * but the wrap only helps if cmd can then FIND `npx`, so the PATH problem above
+ * still bites, surfacing as cmd's own "'npx' is not recognized …".
  *
- * 2. **PATH.** The wrap only helps if `cmd` can then FIND `npx`. A GUI-launched
- *    app does not inherit a login shell's PATH, and a per-user Node install
- *    (nvm-windows, fnm, winget) puts node outside the machine PATH entirely.
- *    The result is cmd.exe's own message — "'npx' is not recognized as an
- *    internal or external command, operable program or batch file" — which reads
- *    like a broken app rather than a missing PATH entry.
- *
- * This module addresses (2): it widens PATH with the standard per-user Node
- * locations before spawning, and recognises the resulting error so the UI can
- * say what is actually wrong.
+ * This module addresses PATH on every platform: it widens PATH with the
+ * standard Node locations and, better, resolves `npx` to an absolute path so the
+ * spawn does not depend on PATH at all — then recognises the residual error so
+ * the UI can say what is actually wrong (a PATH problem, never the credential).
  */
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-/** Where Node/npm land on Windows when not on the machine PATH. */
-function candidateDirs(home: string, env: NodeJS.ProcessEnv): string[] {
+/** Existing nvm node bin dirs, newest version first (empty when nvm absent).
+ *  ponytail: newest-first is a heuristic, not nvm's `default` alias — enough to
+ *  find *an* npx; resolve the alias only if a user reports the wrong version. */
+function nvmBins(home: string): string[] {
+  const root = join(home, '.nvm', 'versions', 'node')
+  let versions: string[]
+  try {
+    versions = readdirSync(root)
+  } catch {
+    return [] // no nvm on this machine
+  }
+  return versions
+    .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+    .map((v) => join(root, v, 'bin'))
+    .filter((d) => existsSync(d))
+}
+
+/** Where Node/npm land when a GUI-launched app's PATH cannot see them.
+ *  Windows: the per-user installers. POSIX: a Finder-launched app inherits only
+ *  the launchd PATH (`/usr/bin:/bin:/usr/sbin:/sbin`), so homebrew, the
+ *  nodejs.org prefix, and the version managers (nvm/volta/asdf) — all added by a
+ *  login shell, never by launchd — are invisible until we add them back. */
+function candidateDirs(home: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string[] {
+  if (platform !== 'win32') {
+    return [
+      ...nvmBins(home).slice(0, 1), // newest nvm node
+      '/opt/homebrew/bin', // Apple-Silicon homebrew
+      '/usr/local/bin', // Intel homebrew + the nodejs.org installer
+      join(home, '.volta', 'bin'),
+      join(home, '.asdf', 'shims'),
+      join(home, '.local', 'bin'),
+    ]
+  }
   const appData = env.APPDATA ?? join(home, 'AppData', 'Roaming')
   const localAppData = env.LOCALAPPDATA ?? join(home, 'AppData', 'Local')
   const programFiles = env.ProgramFiles ?? 'C:\\Program Files'
@@ -40,10 +70,10 @@ function candidateDirs(home: string, env: NodeJS.ProcessEnv): string[] {
   ]
 }
 
-/** The separator follows the TARGET platform, not the host: node:path's
- *  `delimiter` is ':' when this runs on macOS/Linux, which would silently
- *  corrupt a Windows PATH into one unusable entry. */
-const WIN_SEP = ';'
+/** PATH separator for the TARGET platform (';' on Windows, ':' on POSIX), not
+ *  the host — node:path's `delimiter` follows the host and would corrupt the
+ *  other platform's PATH into one unusable entry. */
+const sepFor = (platform: NodeJS.Platform): string => (platform === 'win32' ? ';' : ':')
 
 /** Windows spells it `Path`; POSIX spells it `PATH`. Find whichever is there. */
 function pathKeyOf(env: NodeJS.ProcessEnv): string | null {
@@ -51,46 +81,45 @@ function pathKeyOf(env: NodeJS.ProcessEnv): string | null {
 }
 
 /**
- * PATH widened with any Node location that actually exists on this machine.
- * Existing entries keep priority — we only ever APPEND, so a user's own PATH
- * ordering is never overridden.
+ * PATH widened with any Node location that actually exists on this machine, for
+ * the target platform. Existing entries keep priority — we only ever APPEND, so
+ * a user's own ordering (a deliberate nvm/fnm selection) is never overridden.
  *
- * The key's ORIGINAL casing is reused, and any other case-variant is dropped.
- * `process.env` on Windows is a case-insensitive proxy, but spreading it yields
- * a plain object whose key is whatever Windows stored — `Path`. Writing `PATH`
- * onto that left the object holding BOTH, so the environment block handed to
- * CreateProcess had two PATH entries and the un-widened one could win. The
- * widening then did nothing, on exactly the machines that needed it.
+ * On Windows the key's ORIGINAL casing is reused and any other case-variant is
+ * dropped: `process.env` there enumerates `Path`, and leaving both `Path` and
+ * `PATH` on the object handed to CreateProcess let the un-widened one win — the
+ * widening then did nothing, on exactly the machines that needed it. POSIX PATH
+ * is case-sensitive and always `PATH`, so the fold is a no-op there.
  */
-export function widenWindowsPath(
+export function widenNodePath(
   env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform = process.platform,
   home: string = homedir(),
 ): NodeJS.ProcessEnv {
-  if (platform !== 'win32') return env
+  const sep = sepFor(platform)
+  const fold = (p: string): string => (platform === 'win32' ? p.toLowerCase() : p)
   const key = pathKeyOf(env)
   const current = (key ? env[key] : '') ?? ''
-  const have = new Set(current.split(WIN_SEP).map((p) => p.toLowerCase()))
-  const extra = candidateDirs(home, env).filter((d) => !have.has(d.toLowerCase()) && existsSync(d))
+  const have = new Set(current.split(sep).map(fold))
+  const extra = candidateDirs(home, env, platform).filter((d) => !have.has(fold(d)) && existsSync(d))
   if (extra.length === 0) return env
 
   const out: NodeJS.ProcessEnv = {}
   for (const [k, v] of Object.entries(env)) {
     if (k.toLowerCase() !== 'path') out[k] = v
   }
-  out[key ?? 'Path'] = [current, ...extra].filter(Boolean).join(WIN_SEP)
+  out[key ?? (platform === 'win32' ? 'Path' : 'PATH')] = [current, ...extra]
+    .filter(Boolean)
+    .join(sep)
   return out
 }
 
 /**
- * The absolute path to `npx.cmd`, or null when Node is genuinely not installed.
- *
- * Widening PATH only helps if cmd.exe then performs the lookup we expect, and
- * that depends on how the process was launched and which shell profile ran.
- * Handing cmd an absolute path takes PATH out of the equation entirely for the
- * case where Node IS present — which is most of them. Null is then a real
- * answer, not a lookup failure: nothing on this machine has npx, so the UI can
- * say "install Node" and mean it.
+ * The absolute path to `npx` (`npx.cmd` on Windows), or null when Node is
+ * genuinely not installed anywhere we look. Handing spawn an absolute path takes
+ * PATH out of the equation for the common case where Node IS present — which,
+ * for a GUI-launched app with a stripped PATH, is most of them. Null is then a
+ * real answer ("install Node"), not a lookup failure.
  *
  * Directories already on PATH are checked first, so a deliberate nvm/fnm
  * selection wins over a stale global install.
@@ -100,24 +129,25 @@ export function resolveNpx(
   platform: NodeJS.Platform = process.platform,
   home: string = homedir(),
 ): string | null {
-  if (platform !== 'win32') return null
+  const bin = platform === 'win32' ? 'npx.cmd' : 'npx'
   const key = pathKeyOf(env)
-  const onPath = ((key ? env[key] : '') ?? '').split(WIN_SEP).filter(Boolean)
-  for (const dir of [...onPath, ...candidateDirs(home, env)]) {
-    const candidate = join(dir, 'npx.cmd')
+  const onPath = ((key ? env[key] : '') ?? '').split(sepFor(platform)).filter(Boolean)
+  for (const dir of [...onPath, ...candidateDirs(home, env, platform)]) {
+    const candidate = join(dir, bin)
     if (existsSync(candidate)) return candidate
   }
   return null
 }
 
 /**
- * Point a `cmd /c npx …` invocation at the absolute `npx.cmd` when one exists.
+ * Point an npx invocation at the absolute `npx`/`npx.cmd` when one exists, so
+ * the spawn does not depend on the GUI-launched app's stripped PATH.
  *
- * `windowsSafeCommand` produces `cmd /c npx -y <pkg>` to satisfy
- * CVE-2024-27980. That still leaves cmd.exe to FIND `npx`, which is the step
- * that fails on a GUI-launched app. Substituting the absolute path removes the
- * lookup; unchanged when nothing is found, so the caller still gets cmd's own
- * error and the "install Node" diagnosis rather than a silent no-op.
+ * Windows: `windowsSafeCommand` produces `cmd /c npx -y <pkg>` (CVE-2024-27980),
+ * and cmd still has to FIND `npx` — we swap the `npx` ARG for its absolute path.
+ * POSIX: the command IS `npx` — we swap the COMMAND itself. Unchanged when
+ * nothing is found, so the caller still gets the real ENOENT and the
+ * "install Node" diagnosis rather than a silent no-op.
  */
 export function withResolvedNpx(
   safe: { command: string; args: string[] },
@@ -125,14 +155,21 @@ export function withResolvedNpx(
   platform: NodeJS.Platform = process.platform,
   home: string = homedir(),
 ): { command: string; args: string[] } {
-  if (platform !== 'win32' || safe.command !== 'cmd') return safe
-  const i = safe.args.indexOf('npx')
-  if (i === -1) return safe
+  if (platform === 'win32') {
+    if (safe.command !== 'cmd') return safe
+    const i = safe.args.indexOf('npx')
+    if (i === -1) return safe
+    const abs = resolveNpx(env, platform, home)
+    if (!abs) return safe
+    const args = [...safe.args]
+    args[i] = abs
+    return { command: safe.command, args }
+  }
+  // POSIX: `{ command: 'npx', args: […] }`
+  if (safe.command !== 'npx') return safe
   const abs = resolveNpx(env, platform, home)
   if (!abs) return safe
-  const args = [...safe.args]
-  args[i] = abs
-  return { command: safe.command, args }
+  return { command: abs, args: safe.args }
 }
 
 /** cmd.exe's "not recognized" message, in the forms it actually appears. */
@@ -156,9 +193,22 @@ export function explainSpawnFailure(
 ): string {
   if (!isCommandNotFound(text)) return text
   if (platform !== 'win32') {
+    // Distinguish "Node is genuinely absent" from "it's installed via nvm/
+    // homebrew but the GUI launch stripped it off PATH" — different fixes. The
+    // word "token" is deliberately avoided: the failure is never the credential,
+    // and the client card keys its "re-paste token" hint off that word.
+    const found = resolveNpx(env, platform, home)
+    if (found) {
+      return (
+        `\`${command}\` exists at ${found} but the app could not reach it — a PATH problem, not a credentials problem. ` +
+        'Quit Loredex fully and reopen it. If it persists, launch the binary directly from a terminal so it ' +
+        'inherits your shell PATH: `/Applications/Loredex.app/Contents/MacOS/Loredex` (`open -a` will not — it ' +
+        'goes through LaunchServices, which hands the app launchd’s environment, not your shell’s).'
+      )
+    }
     return (
-      `\`${command}\` was not found on this machine — this is a PATH problem, not a token problem. ` +
-      'Install Node.js from nodejs.org, then restart Loredex.'
+      `\`${command}\` (Node.js) was not found in any of the usual locations — a PATH problem, not a credentials problem. ` +
+      'Install Node.js from nodejs.org or your version manager, then fully quit and reopen Loredex.'
     )
   }
   // We searched for it ourselves, so we can tell these two apart instead of

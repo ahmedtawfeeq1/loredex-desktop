@@ -108,14 +108,16 @@ export function appendMessage(db: AppDb, convId: string, msg: AcpConvMessage): v
   }
   const seq = nextSeq(db, convId)
   db.prepare(
-    `INSERT INTO agent_messages (conv_id, seq, role, text, tool_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO agent_messages (conv_id, seq, role, text, tool_json, media_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     convId,
     seq,
     msg.role,
     msg.role === 'tool' ? (msg.tool?.title ?? null) : (msg.text ?? null),
     msg.tool ? JSON.stringify(msg.tool) : null,
+    // sha256 handles into this device's session-media store, never bytes
+    msg.media && msg.media.length > 0 ? JSON.stringify(msg.media) : null,
     now,
   )
   touch(db, convId, now)
@@ -161,8 +163,15 @@ export function loadConversation(db: AppDb, convId: string): LoadedConversation 
     .prepare('SELECT provider, acp_session_id FROM agent_conv_providers WHERE conv_id = ? ORDER BY provider')
     .all(convId) as Array<{ provider: string; acp_session_id: string | null }>
   const msgRows = db
-    .prepare('SELECT role, text, tool_json FROM agent_messages WHERE conv_id = ? ORDER BY seq')
-    .all(convId) as Array<{ role: string; text: string | null; tool_json: string | null }>
+    .prepare(
+      'SELECT role, text, tool_json, media_json FROM agent_messages WHERE conv_id = ? ORDER BY seq',
+    )
+    .all(convId) as Array<{
+    role: string
+    text: string | null
+    tool_json: string | null
+    media_json: string | null
+  }>
   return {
     id: conv.id,
     vaultId: conv.vault_id,
@@ -306,9 +315,21 @@ function mergeTool(prev: ToolMsg, next: ToolMsg): ToolMsg {
   return merged
 }
 
-function rowToMessage(r: { role: string; text: string | null; tool_json: string | null }): AcpConvMessage {
+function rowToMessage(r: {
+  role: string
+  text: string | null
+  tool_json: string | null
+  media_json?: string | null
+}): AcpConvMessage {
   if (r.role === 'tool' && r.tool_json) {
     return { role: 'tool', tool: JSON.parse(r.tool_json) as ToolMsg }
+  }
+  if (r.media_json) {
+    return {
+      role: r.role as AcpConvMessage['role'],
+      text: r.text ?? undefined,
+      media: JSON.parse(r.media_json) as string[],
+    }
   }
   return {
     role: r.role as AcpConvMessage['role'],

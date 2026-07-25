@@ -12,10 +12,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  LANGSMITH_SKILLS_COMMAND,
   N8N_SKILLS_COMMAND,
   N8N_SKILLS_PLUGIN,
   hasPluginInstalled,
+  hasTerminalMcp,
   hasTerminalN8nMcp,
+  terminalLangsmithCommand,
   terminalN8nCommand,
 } from './claude-plugins'
 
@@ -65,10 +68,17 @@ describe('N8N_SKILLS_COMMAND', () => {
    * not found`. The marketplace must be added first, under the name from
    * marketplace.json (`n8n-mcp-skills`), not the GitHub path.
    */
-  it('adds the marketplace before installing, and installs by marketplace name', () => {
-    const [add, install] = N8N_SKILLS_COMMAND.split('\n')
+  it('adds the marketplace, RELOADS, installs, then RELOADS again', () => {
+    const [add, reload, install, apply] = N8N_SKILLS_COMMAND.split('\n')
     expect(add).toBe('/plugin marketplace add czlonkowski/n8n-skills')
+    // observed 2026-07-23: a marketplace added this session is invisible to
+    // `/plugin install` until reloaded — the install fails with
+    // "not found in configuration", listing only pre-session marketplaces
+    expect(reload).toBe('/reload-plugins')
     expect(install).toBe('/plugin install n8n-mcp-skills@n8n-mcp-skills')
+    // …and the install itself asks for one: "✓ Installed. Run /reload-plugins
+    // to apply." Without it the plugin is on disk but not live in this session.
+    expect(apply).toBe('/reload-plugins')
   })
 
   it('never uses the README one-liner that fails', () => {
@@ -145,4 +155,74 @@ describe('terminalN8nCommand', () => {
   it('registers at USER scope so it cannot duplicate the injected server', () => {
     expect(terminalN8nCommand('https://n8n.example.com')).toContain('--scope user')
   })
+})
+
+describe('LangSmith commands (2026-07-23)', () => {
+  it('the terminal MCP command carries a placeholder key, never a stored one', () => {
+    const cmd = terminalLangsmithCommand('https://api.smith.langchain.com')
+    expect(cmd).toContain('<paste-your-langsmith-api-key>')
+    expect(cmd).not.toMatch(/lsv2_[a-z]+_[A-Za-z0-9]/)
+  })
+
+  it('uses the http transport — LangSmith is a REMOTE server, nothing to run', () => {
+    expect(terminalLangsmithCommand('https://api.smith.langchain.com')).toContain(
+      '--transport http',
+    )
+  })
+
+  it('points at <endpoint>/mcp, trailing slash or not', () => {
+    expect(terminalLangsmithCommand('https://eu.api.smith.langchain.com/')).toContain(
+      'https://eu.api.smith.langchain.com/mcp',
+    )
+  })
+
+  it('registers at USER scope, for the same duplicate-server reason as n8n', () => {
+    expect(terminalLangsmithCommand('https://api.smith.langchain.com')).toContain('--scope user')
+  })
+
+  /** Both verified against each repo's .claude-plugin/marketplace.json — the
+   *  `<plugin>@<marketplace>` form is what Claude Code parses, and a GitHub
+   *  path in that slot fails with "Marketplace not found" (the n8n lesson). */
+  it('plugin install commands use <plugin>@<marketplace>, after adding the marketplace', () => {
+    expect(LANGSMITH_SKILLS_COMMAND).toContain(
+      '/plugin marketplace add langchain-ai/langsmith-skills',
+    )
+    expect(LANGSMITH_SKILLS_COMMAND).toContain('/plugin install langsmith-skills@langsmith-skills')
+  })
+
+  it('hasTerminalMcp answers for an arbitrary server name, user or project scope', () => {
+    const home = mkdtempSync(join(tmpdir(), 'ls-home-'))
+    writeFileSync(
+      join(home, '.claude.json'),
+      JSON.stringify({ projects: { '/vault': { mcpServers: { langsmith: {} } } } }),
+    )
+    expect(hasTerminalMcp('langsmith', '/vault', home)).toBe(true)
+    expect(hasTerminalMcp('langsmith', '/elsewhere', home)).toBe(false)
+    expect(hasTerminalMcp('nope', '/vault', home)).toBe(false)
+  })
+})
+
+/**
+ * Reported 2026-07-23 with a terminal transcript: `marketplace add` reported
+ * "Successfully added marketplace: langsmith-claude-code-plugins", and the very
+ * next `install` answered "Couldn't load marketplace … not found in
+ * configuration", listing only marketplaces registered before the session began.
+ * The footer said "Plugins changed. Run /reload-plugins to activate." — after
+ * the install had already failed.
+ */
+describe('every plugin command reloads between add/install AND after install', () => {
+  for (const [name, cmd] of [
+    ['n8n skills', N8N_SKILLS_COMMAND],
+    ['langsmith skills', LANGSMITH_SKILLS_COMMAND],
+  ] as const) {
+    it(`${name}: add → /reload-plugins → install → /reload-plugins`, () => {
+      const steps = cmd.split('\n')
+      expect(steps).toHaveLength(4)
+      expect(steps[0]).toMatch(/^\/plugin marketplace add /)
+      expect(steps[1]).toBe('/reload-plugins')
+      expect(steps[2]).toMatch(/^\/plugin install \S+@\S+$/)
+      // the LAST step, not just somewhere in the middle
+      expect(steps[3]).toBe('/reload-plugins')
+    })
+  }
 })

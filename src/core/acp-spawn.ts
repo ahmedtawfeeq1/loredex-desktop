@@ -10,6 +10,7 @@ import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, sep } from 'node:path'
 import type { AcpAgent } from '../shared/ipc-contract'
+import { widenNodePath } from './win-spawn'
 
 /** How an adapter process comes to exist. `node-module` adapters ship in OUR
  *  node_modules (claude, codex) and run their resolved dist/index.js under
@@ -146,7 +147,12 @@ export function adapterEnv(agent: AcpAgent, overlay?: Record<string, string>): N
       if (overlay[key] !== undefined) env[key] = overlay[key]
     }
   }
-  return env
+  // A client `.mcp.json` server is usually `{"command":"npx", …}`, spawned by
+  // the adapter with the env IT receives. A GUI-launched app's PATH omits the
+  // per-user Node install, so that npx would ENOENT. Widening only APPENDS
+  // existing Node dirs to the already-forwarded PATH — it adds no new env key,
+  // so the least-privilege allowlist above is unchanged.
+  return widenNodePath(env)
 }
 
 /** Bounded stderr tail for error surfacing (engine.ts stderr-tail pattern):

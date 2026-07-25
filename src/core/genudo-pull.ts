@@ -24,7 +24,7 @@
  */
 import { type Dirent, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { widenWindowsPath, withResolvedNpx } from './win-spawn'
+import { widenNodePath, withResolvedNpx } from './win-spawn'
 
 /** Prose fields lifted out of the pipeline object into their own .md files. */
 const PIPELINE_PROSE = ['persona', 'instructions'] as const
@@ -298,9 +298,9 @@ export async function fetchBundles(
   const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
   const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js')
   const client = new Client({ name: 'loredex-pull', version: '1.0.0' })
-  // widenWindowsPath is a no-op off Windows; there it appends the per-user
-  // Node locations a desktop-launched app cannot otherwise see
-  const env = widenWindowsPath({
+  // Appends the per-user Node locations a desktop-launched app cannot otherwise
+  // see — nvm/homebrew on macOS/Linux, the per-user installers on Windows
+  const env = widenNodePath({
     ...process.env,
     GENUDO_TOKEN: token,
     GENUDO_BASE_URL: baseUrl,

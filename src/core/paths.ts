@@ -23,3 +23,13 @@ export function mcpInstallDir(id: string): string {
   if (!userDataDir) throw new Error('no user-data directory — cannot install an MCP server')
   return join(userDataDir, 'mcp', id)
 }
+
+/**
+ * Scratch space for data fetched from someone else's system — LangSmith traces
+ * today. Deliberately NOT the vault: it is a working copy, not a note, and must
+ * never be routed into the dex or reach a commit.
+ */
+export function scratchDir(id: string): string {
+  if (!userDataDir) throw new Error(`no user-data directory — cannot write ${id}`)
+  return join(userDataDir, id)
+}

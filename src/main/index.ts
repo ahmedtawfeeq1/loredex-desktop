@@ -28,6 +28,7 @@ import {
 } from './dialogs'
 import { handleCoreMessage } from './notifications'
 import { registerShellOpen } from './shell-open'
+import { loadZoom, zoomIn, zoomOut, zoomReset } from './zoom'
 import { createMainWindow, type PopoutMode } from './windows'
 
 // Parity harness (docs/design/reference): LOREDEX_DEBUG_PORT exposes CDP so
@@ -226,13 +227,33 @@ function buildMenu(): void {
         ],
       },
       { role: 'editMenu' },
-      { role: 'viewMenu' },
+      {
+        // NOT `role: 'viewMenu'`: its zoom roles are per-webContents and bind
+        // `CommandOrControl+Plus` — a SHIFTED key, so `⌘=` does nothing. These
+        // drive the app-wide level in zoom.ts, which every window shares and
+        // which survives a restart. The raw keys are handled there too, so
+        // these entries are for discoverability, not the only way in.
+        label: 'View',
+        submenu: [
+          { role: 'reload' },
+          { role: 'forceReload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { label: 'Actual Size', accelerator: 'CmdOrCtrl+0', click: () => zoomReset() },
+          { label: 'Zoom In', accelerator: 'CmdOrCtrl+Plus', click: () => zoomIn() },
+          { label: 'Zoom Out', accelerator: 'CmdOrCtrl+-', click: () => zoomOut() },
+          { type: 'separator' },
+          { role: 'togglefullscreen' },
+        ],
+      },
       { role: 'windowMenu' },
     ]),
   )
 }
 
 app.whenReady().then(() => {
+  // remembered zoom, before any window is created (zoom.ts)
+  loadZoom()
   buildMenu()
   // story 9.1: window focus state drives ITS core host's poll cadence
   // (60 s focused / 5 min blurred). Forwarding only — no logic here.

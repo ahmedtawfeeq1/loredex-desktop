@@ -1,7 +1,7 @@
 ---
 type: brief
 date: '2026-07-09'
-loredex: brief
+loredex: routed
 ---
 # Start here — Product
 

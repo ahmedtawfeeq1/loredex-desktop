@@ -21,7 +21,7 @@ import { readClientTokens, storeClientToken } from './client-tokens'
 import { fetchBundles, planFiles } from './genudo-pull'
 import { buildKbWorkbook } from './kb-export'
 import { scanStagedEdits } from './staged-edits'
-import { explainSpawnFailure, widenWindowsPath, withResolvedNpx } from './win-spawn'
+import { explainSpawnFailure, widenNodePath, withResolvedNpx } from './win-spawn'
 import {
   capDiff,
   computeLinks,
@@ -62,15 +62,44 @@ import {
 } from './mcp-server'
 import {
   CLAUDE_LAUNCH_COMMAND,
+  LANGSMITH_MCP_SERVER_NAME,
+  LANGSMITH_SKILLS_COMMAND,
+  LANGSMITH_SKILLS_PLUGIN,
   N8N_SKILLS_COMMAND,
   N8N_SKILLS_PLUGIN,
   hasPluginInstalled,
+  hasTerminalMcp,
   hasTerminalN8nMcp,
+  terminalLangsmithCommand,
   terminalN8nCommand,
 } from './claude-plugins'
-import { probeStdioTools } from './mcp-tools'
+import {
+  LANGSMITH_DEFAULT_ENDPOINT,
+  LANGSMITH_DEFAULT_PROJECT,
+  clearLangsmithKey,
+  langsmithApiKey,
+  langsmithEndpoint,
+  langsmithHttp,
+  langsmithStatus,
+  setLangsmithEndpoint,
+  setLangsmithKey,
+  setLangsmithProject,
+  testLangsmithConnection,
+} from './langsmith-config'
+import { parseTraceRef } from './langsmith-links'
+import { deleteConversationMedia, readSessionMedia } from './session-media'
+import {
+  OLD_PLATFORM_URL,
+  clearOldPlatformToken,
+  oldPlatformStatus,
+  setOldPlatformToken,
+  testOldPlatform,
+} from './old-platform'
+import { fetchTraceForRef } from './langsmith-trace'
+import { probeHttpTools, probeStdioTools } from './mcp-tools'
 import { clearN8nKey, n8nEnv, n8nStatus, setN8nKey, setN8nUrl, testN8nConnection } from './n8n-config'
 import { installN8nMcp, n8nEntryPath, n8nInstallCommand } from './n8n-install'
+import { authMode } from './acp-spawn'
 import { workspaceServerRows } from './workspace-rows'
 import {
   authStatus,
@@ -94,7 +123,7 @@ import {
   acpStop,
   deriveClientSlug,
 } from './acp'
-import { agentKeyStatus, clearAgentKey, storeAgentKey } from './agent-keys'
+import { agentKeyEnv, agentKeyStatus, clearAgentKey, storeAgentKey } from './agent-keys'
 import {
   deleteConversation,
   listConversations,
@@ -135,6 +164,8 @@ import {
   removePermissionRule,
   loadWorkspaceEnabled,
   setWorkspaceEnabled,
+  loadClaudeSubscriptionAck,
+  saveClaudeSubscriptionAck,
 } from './settings'
 import { termCreate, termInput, termKill, termResize } from './terminals'
 import { buildThread, collectComments } from './threads'
@@ -398,10 +429,11 @@ export function registerCoreHandlers(
     const conn = engine.clientConnections(client).find((c) => c.server === server)
     if (!conn) throw ipcError('INTERNAL', `no connection "${server}" in ${client}/workspace.yml`)
     const held = await readClientTokens(conn.envRefs)
-    // Windows: a GUI-launched app cannot see a per-user Node install, so `cmd /c
-    // npx` fails with cmd's own "not recognized" message (CVE-2024-27980 forces
-    // the cmd wrap in the first place). Widen PATH before spawning.
-    const env = widenWindowsPath({ ...process.env })
+    // A GUI-launched app cannot see a per-user Node install (nvm/homebrew on
+    // POSIX, nvm-windows/winget on Windows), so a bare `npx` — or `cmd /c npx`
+    // on Windows, per CVE-2024-27980 — fails with ENOENT / "not recognized".
+    // Widen PATH before spawning; `withResolvedNpx` below also makes npx absolute.
+    const env = widenNodePath({ ...process.env })
     const unexpanded: string[] = []
     for (const [key, value] of Object.entries(conn.env)) {
       env[key] = value.replace(/\$\{([A-Z0-9_]+)\}/g, (whole, ref: string) => {
@@ -411,61 +443,27 @@ export function registerCoreHandlers(
       })
     }
     if (unexpanded.length > 0) {
-      return { ok: false, detail: `missing token: ${unexpanded.join(', ')}` }
+      return { ok: false, detail: `missing token: ${unexpanded.join(', ')}`, tools: [] }
     }
     // Windows can't spawn the npx shim directly (ENOENT) — same cmd /c wrap the
     // generated .mcp.json uses, so the probe matches what `claude` will run.
     // Absolute npx.cmd when we can find one: cmd /c still has to LOCATE `npx`,
     // and that lookup is the step that fails on a desktop-launched app.
     const safe = withResolvedNpx(engine.windowsSafeCommand(conn.command, conn.args), env)
-    return await new Promise<{ ok: boolean; detail: string }>((resolve) => {
-      const child = execFile(safe.command, safe.args, {
-        env,
-        cwd: engine.clientDirAbs(client),
-        timeout: 9000,
-      })
-      let stderr = ''
-      let settled = false
-      const done = (r: { ok: boolean; detail: string }): void => {
-        if (settled) return
-        settled = true
-        child.kill()
-        resolve(r)
-      }
-      const timer = setTimeout(() => done({ ok: false, detail: 'no response within 9s' }), 9000)
-      timer.unref?.()
-      child.stderr?.on('data', (d: Buffer | string) => {
-        stderr += String(d)
-        // fail fast on the common bridge patterns instead of burning the budget
-        if (/auth failed|401|unauthorized|invalid token/i.test(stderr)) {
-          done({ ok: false, detail: stderr.trim().split('\n').pop() ?? 'auth failed' })
-        }
-      })
-      child.stdout?.on('data', (d: Buffer | string) => {
-        if (String(d).includes('"result"')) done({ ok: true, detail: 'initialize ok' })
-      })
-      child.on('error', (e) =>
-        done({ ok: false, detail: explainSpawnFailure(e.message, conn.command) }),
-      )
-      child.on('exit', (code) => {
-        const last = stderr.trim().split('\n').pop() ?? `exited with code ${code}`
-        // "operable program or batch file" is cmd.exe failing to FIND the
-        // command — a PATH problem. Saying so beats blaming the token.
-        done({ ok: false, detail: explainSpawnFailure(last, conn.command) })
-      })
-      child.stdin?.write(
-        `${JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'initialize',
-          params: {
-            protocolVersion: '2024-11-05',
-            capabilities: {},
-            clientInfo: { name: 'loredex-desktop-probe', version: '0' },
-          },
-        })}\n`,
-      )
-    })
+    // A REAL MCP handshake (initialize + tools/list), not "a process started and
+    // printed something": green now means an agent would actually get these
+    // tools, and the card can list them. Spawned in the client's own folder, the
+    // way the adapter does it.
+    const res = await probeStdioTools(
+      safe.command,
+      safe.args,
+      env as Record<string, string>,
+      9000,
+      engine.clientDirAbs(client),
+    )
+    if (res.ok) return { ...res, detail: `Connected — ${res.tools.length} tools` }
+    // a spawn failure is usually PATH, not the credential — say which
+    return { ...res, detail: explainSpawnFailure(res.detail, conn.command) }
   })
   // The terminal-free bridge: drop the teammate exactly where `claude` runs.
   // "Open in Terminal" opens the IN-APP terminal drawer at this dir (renderer
@@ -474,7 +472,9 @@ export function registerCoreHandlers(
   // BL-19: read-only note history — the reader's before/after Changes panel
   ipc.register('note.diff', ({ path }) => engine.noteDiff(path))
   // ── Workspace MCP servers (2026-07-20 spec) ───────────────────────────────
-  ipc.register('workspace.mcp.list', () => workspaceServerRows(loadWorkspaceEnabled(), n8nStatus()))
+  ipc.register('workspace.mcp.list', () =>
+    workspaceServerRows(loadWorkspaceEnabled(), n8nStatus(), langsmithStatus()),
+  )
   ipc.register('workspace.mcp.setEnabled', ({ id, on }) => setWorkspaceEnabled(id, on))
   ipc.register('workspace.mcp.tools', async ({ id }) => {
     if (id === 'loredex') {
@@ -482,6 +482,14 @@ export function registerCoreHandlers(
       // switch, so no spawn and no drift from what a session actually gets
       const names = loredexToolNames(loadMcpWriteTools())
       return { ok: true, tools: names, detail: `${names.length} tools` }
+    }
+    if (id === 'langsmith') {
+      // remote: nothing to spawn, so this is a real network handshake. A wrong
+      // key surfaces here as a 401 during initialize rather than as an empty
+      // list that reads like "this server has no tools".
+      const remote = langsmithHttp()
+      if (!remote) return { ok: false, tools: [], detail: 'no API key set' }
+      return await probeHttpTools(remote.url, { [remote.header.name]: remote.header.value }, 8000)
     }
     const entry = n8nEntryPath()
     if (!entry) return { ok: false, tools: [], detail: 'not installed' }
@@ -536,6 +544,81 @@ export function registerCoreHandlers(
     // `claude mcp add` registers PROJECT-scoped by default, keyed by the cwd it
     // ran in — which is the vault, since that is where the card sends the user
     installed: hasTerminalN8nMcp(engine.getConfig().vaultPath),
+  }))
+  // ── LangSmith (2026-07-23) ────────────────────────────────────────────────
+  ipc.register('workspace.langsmith.get', () => ({
+    ...langsmithStatus(),
+    defaultUrl: LANGSMITH_DEFAULT_ENDPOINT,
+    defaultProject: LANGSMITH_DEFAULT_PROJECT,
+  }))
+  ipc.register('workspace.langsmith.set', async ({ url, key, project }) => {
+    if (url !== undefined) setLangsmithEndpoint(url)
+    if (project !== undefined) setLangsmithProject(project)
+    if (key !== undefined) {
+      if (key === null || key === '') await clearLangsmithKey()
+      else await setLangsmithKey(key)
+    }
+  })
+  ipc.register('workspace.langsmith.test', () => testLangsmithConnection())
+  // ── The old genudo platform, per client (2026-07-23) ──────────────────────
+  ipc.register('clients.oldPlatform.get', async ({ client }) => ({
+    ...(await oldPlatformStatus(client)),
+    url: OLD_PLATFORM_URL,
+  }))
+  ipc.register('clients.oldPlatform.set', async ({ client, token }) => {
+    if (token === null || token.trim() === '') await clearOldPlatformToken(client)
+    else await setOldPlatformToken(client, token)
+  })
+  ipc.register('clients.oldPlatform.test', ({ client }) => testOldPlatform(client))
+  ipc.register('langsmith.trace.fetch', async ({ text }) => {
+    const ref = parseTraceRef(text)
+    if (!ref) {
+      return {
+        ok: false,
+        // refusing beats guessing: a wrong id returns an empty result that
+        // reads exactly like "this conversation was never traced"
+        detail:
+          'Could not find a conversation id in that. Paste a conversation link, a bare id (126), `conv-126`, or a LangSmith run URL.',
+        path: null,
+        count: 0,
+        truncated: false,
+        ref: null,
+      }
+    }
+    const key = langsmithApiKey()
+    if (!key) {
+      return {
+        ok: false,
+        detail: 'No LangSmith API key — add one in Settings › Workspace servers.',
+        path: null,
+        count: 0,
+        truncated: false,
+        ref: null,
+      }
+    }
+    // the clock lives host-side, as it does for snapshots — the fetch layer
+    // stays pure and testable
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const res = await fetchTraceForRef(key, ref, langsmithStatus().project, stamp)
+    return {
+      ...res,
+      ref:
+        ref.kind === 'conversation'
+          ? { kind: 'conversation' as const, id: ref.id }
+          : { kind: 'langsmith-run' as const, runId: ref.runId },
+    }
+  })
+  ipc.register('workspace.langsmith.status', () => ({
+    skills: {
+      installed: hasPluginInstalled(LANGSMITH_SKILLS_PLUGIN),
+      command: LANGSMITH_SKILLS_COMMAND,
+      plugin: LANGSMITH_SKILLS_PLUGIN,
+    },
+    terminal: {
+      installed: hasTerminalMcp(LANGSMITH_MCP_SERVER_NAME, engine.getConfig().vaultPath),
+      command: terminalLangsmithCommand(langsmithEndpoint()),
+    },
+    launch: CLAUDE_LAUNCH_COMMAND,
   }))
   // WP-C: snapshot a pipeline/agent into _versions/<unit>/<stamp>/ (agent-ops).
   // One attributed commit under the write lock; the stamp is minted here (the
@@ -1106,7 +1189,15 @@ export function registerCoreHandlers(
   ipc.register('agent.conv.delete', ({ conversationId }) => {
     const db = getAppDb()
     const vid = currentVaultId()
-    if (db && vid) deleteConversation(db, vid, conversationId)
+    if (!db || !vid) return
+    // the pictures go with the conversation — otherwise the media store grows
+    // forever and holds screenshots of threads the user believes are deleted
+    deleteConversationMedia(vid, conversationId)
+    deleteConversation(db, vid, conversationId)
+  })
+  ipc.register('agent.media.get', ({ sha256 }) => {
+    const vid = currentVaultId()
+    return vid ? readSessionMedia(vid, sha256) : null
   })
   ipc.register('agent.conv.load', ({ conversationId }) => {
     const db = getAppDb()
@@ -1142,6 +1233,12 @@ export function registerCoreHandlers(
     acpPrompt(sessionId, text, attachments),
   )
   ipc.register('acp.cancel', ({ sessionId }) => acpCancel(sessionId))
+  ipc.register('agent.claudeAuth', () => ({
+    // include keychain-stored keys, exactly as the spawn path will at start
+    mode: authMode('claude', agentKeyEnv()),
+    acknowledged: loadClaudeSubscriptionAck(),
+  }))
+  ipc.register('agent.claudeAckSubscription', () => saveClaudeSubscriptionAck(true))
   ipc.register('acp.permission', ({ sessionId, requestId, optionId }) =>
     acpPermission(sessionId, requestId, optionId),
   )

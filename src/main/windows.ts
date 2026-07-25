@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { BrowserWindow, shell } from 'electron'
+import { attachZoom } from './zoom'
 
 /** A standalone pop-out shows ONE panel filling the window (chat or terminal),
  *  not the full app — signalled to the renderer via a `?popout=` URL query read
@@ -29,6 +30,8 @@ export function createMainWindow(popout?: PopoutMode): BrowserWindow {
     },
   })
   win.on('ready-to-show', () => win.show())
+  // standard ⌘+/⌘-/⌘0 in EVERY window, at the app's shared level (zoom.ts)
+  attachZoom(win)
 
   // Rendered notes may contain external links: never navigate the app window;
   // http(s) targets open in the default browser. Story 10.4 adds the Atlas

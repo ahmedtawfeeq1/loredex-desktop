@@ -6,10 +6,13 @@
  * Registry-driven so adding a server is one row, not a new branch in acp.ts.
  */
 import type { McpServer } from '@agentclientprotocol/sdk'
+import { langsmithHttp } from './langsmith-config'
 import { n8nEnv } from './n8n-config'
 import { n8nEntryPath } from './n8n-install'
 
-export type WorkspaceServerId = 'loredex' | 'n8n'
+import type { WorkspaceServerId } from '../shared/types'
+
+export type { WorkspaceServerId }
 
 export interface WorkspaceCtx {
   /** the loredex http host this session should use, or null when unreachable */
@@ -55,6 +58,22 @@ export function buildWorkspaceServers(ctx: WorkspaceCtx): McpServer[] {
           PATH: process.env.PATH ?? '',
           HOME: process.env.HOME ?? '',
         }),
+      } as McpServer)
+    }
+  }
+
+  // LangSmith is REMOTE — nothing to install, but it rides the same http
+  // capability the loredex host needs, and it is omitted without a stored key
+  // (an unauthenticated entry fails every tool call and reads as a broken
+  // feature rather than an unconfigured one).
+  if (ctx.enabled.langsmith && ctx.httpOk) {
+    const remote = langsmithHttp()
+    if (remote) {
+      servers.push({
+        type: 'http',
+        name: 'langsmith',
+        url: remote.url,
+        headers: [remote.header],
       } as McpServer)
     }
   }

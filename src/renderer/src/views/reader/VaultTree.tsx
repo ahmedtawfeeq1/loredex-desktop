@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import type { SearchHit } from '../../../../shared/ipc-contract'
 import type { TreeNode } from '../../../../shared/types'
-import { invoke, openInNewWindow, openPath } from '../../api'
+import { invoke, openNoteWindow, openPath, revealPath } from '../../api'
 import { RailChevron } from '../../components/NavIcon'
 import { humanizeTitle, noteDate } from '../../humanize'
 import { useApp } from '../../stores/app'
@@ -29,6 +29,7 @@ import { useRails } from '../../stores/rails'
 import { useReader } from '../../stores/reader'
 import { useTreeSections } from '../../stores/treeSections'
 import { openSearchResult } from '../../stores/search'
+import { copyVaultPath } from '../../vaultPaths'
 import { Highlight } from '../search/SearchView'
 import { sectionTint } from './sectionTint'
 import { filterTree } from './treeFilter'
@@ -101,12 +102,12 @@ const TREE_FILTER_CSS = `
 /** Right-click menu on note rows: every lifecycle action without hunting the
  *  meta rail — Open, Open in New Window, Archive/Unarchive, Delete. */
 const useNoteMenu = create<{
-  menu: { path: string; x: number; y: number } | null
+  menu: { path: string; x: number; y: number; kind: 'file' | 'dir' } | null
   close(): void
 }>((set) => ({ menu: null, close: () => set({ menu: null }) }))
 
-function openNoteMenu(path: string, x: number, y: number): void {
-  useNoteMenu.setState({ menu: { path, x, y } })
+function openNoteMenu(path: string, x: number, y: number, kind: 'file' | 'dir' = 'file'): void {
+  useNoteMenu.setState({ menu: { path, x, y, kind } })
 }
 
 function NoteContextMenu(): React.JSX.Element | null {
@@ -151,22 +152,44 @@ function NoteContextMenu(): React.JSX.Element | null {
           type="button"
           role="menuitem"
           onClick={() => {
-            void useReader.getState().open(menu.path)
+            // a folder has nothing to open in the reader — show it where it
+            // actually lives instead
+            if (menu.kind === 'dir') void revealPath(menu.path)
+            else void useReader.getState().open(menu.path)
             close()
           }}
         >
-          Open
+          {menu.kind === 'dir' ? 'Reveal in Finder' : 'Open'}
         </button>
+        {/* THIS note in its own window — the BL-18 pop-out the note header
+            already uses. It used to call `openInNewWindow()` with no argument,
+            which opens a blank second copy of the app on Today: the menu item
+            named a file and then ignored it. A folder has nothing to pop out,
+            so it does not get this. */}
+        {menu.kind === 'file' && (
+          <button
+            type="button"
+            role="menuitem"
+            title="Open this file in its own window"
+            onClick={() => {
+              const vaultPath = useApp.getState().identity?.vaultPath ?? null
+              void openNoteWindow(vaultPath, menu.path)
+              close()
+            }}
+          >
+            Open in New Window
+          </button>
+        )}
         <button
           type="button"
           role="menuitem"
-          title="Open this dex in a second window"
+          title="Copy this note's absolute path — paste it to an agent or a terminal"
           onClick={() => {
-            void openInNewWindow()
+            copyVaultPath(menu.path)
             close()
           }}
         >
-          Open in New Window
+          Copy path
         </button>
         {archived ? (
           <button
@@ -189,19 +212,26 @@ function NoteContextMenu(): React.JSX.Element | null {
             Archive
           </button>
         )}
-        <button
-          type="button"
-          role="menuitem"
-          className="ctx-menu-danger"
-          disabled={identity === null}
-          title={needsIdentity}
-          onClick={() => {
-            if (confirmDelete) void lifecycle('delete')
-            else setConfirmDelete(true)
-          }}
-        >
-          {confirmDelete ? 'Confirm delete' : 'Delete'}
-        </button>
+        {/* Delete is FILES only. `vault.removeNote` deletes with unlinkSync,
+            which throws on a directory — offering it here would fail with a raw
+            error. Archive DOES work on a folder (it is a rename) and is
+            reversible, so a folder still has a way out. A recursive folder
+            delete is a bigger, unasked-for power — see BL-42. */}
+        {menu.kind === 'file' && (
+          <button
+            type="button"
+            role="menuitem"
+            className="ctx-menu-danger"
+            disabled={identity === null}
+            title={needsIdentity}
+            onClick={() => {
+              if (confirmDelete) void lifecycle('delete')
+              else setConfirmDelete(true)
+            }}
+          >
+            {confirmDelete ? 'Confirm delete' : 'Delete'}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -219,8 +249,10 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
     <div
       className="tree-file-row"
       onContextMenu={(e) => {
-        // md notes only — data files have no archive/delete lifecycle here
-        if (isData) return
+        // EVERY file, not just markdown (2026-07-23): a .json intake, a .yaml
+        // workspace or an .xlsx knowledge table needs Copy path / Archive /
+        // Delete exactly as much as a note does. `removeNote` moves or unlinks
+        // by path and never cared about the extension — only this menu did.
         e.preventDefault()
         openNoteMenu(node.path, e.clientX, e.clientY)
       }}
@@ -243,21 +275,19 @@ function FileRow({ node, inProject }: { node: TreeNode; inProject: boolean }): R
           date && <span className="tree-file-date">{date}</span>
         )}
       </button>
-      {!isData && (
-        <button
-          type="button"
-          className="tree-file-menu"
-          aria-label={`Actions for ${humanizeTitle(node.name)}`}
-          title="Actions"
-          onClick={(e) => {
-            e.stopPropagation()
-            const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
-            openNoteMenu(node.path, r.right, r.bottom)
-          }}
-        >
-          ⋯
-        </button>
-      )}
+      <button
+        type="button"
+        className="tree-file-menu"
+        aria-label={`Actions for ${isData ? node.name : humanizeTitle(node.name)}`}
+        title="Actions"
+        onClick={(e) => {
+          e.stopPropagation()
+          const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+          openNoteMenu(node.path, r.right, r.bottom)
+        }}
+      >
+        ⋯
+      </button>
     </div>
   )
 }
@@ -428,7 +458,26 @@ function Branch({
                       />
                     </svg>
                   </span>
-                  {humanizeTitle(node.name)}
+                  <span className="tree-dir-name">{humanizeTitle(node.name)}</span>
+                  {/* folders get the same actions menu as files (2026-07-23) —
+                      Copy path and Archive are exactly as useful on a folder,
+                      and it is where you reach for them. */}
+                  <button
+                    type="button"
+                    className="tree-file-menu"
+                    aria-label={`Actions for ${humanizeTitle(node.name)}`}
+                    title="Actions"
+                    onClick={(e) => {
+                      // a click inside <summary> would otherwise toggle the
+                      // disclosure open/closed under the menu
+                      e.preventDefault()
+                      e.stopPropagation()
+                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                      openNoteMenu(node.path, r.right, r.bottom, 'dir')
+                    }}
+                  >
+                    ⋯
+                  </button>
                 </summary>
                 {node.children && node.children.length > 0 ? (
                   <Branch nodes={node.children} inProject={inProject} forceOpen={forceOpen} />

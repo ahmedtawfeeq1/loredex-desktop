@@ -341,6 +341,24 @@ describe('typeIntoActive (setup cards, 2026-07-20)', () => {
     expect(invoke).not.toHaveBeenCalledWith('term.input', expect.anything())
     expect(invoke).not.toHaveBeenCalledWith('term.create', expect.anything())
   })
+
+  /**
+   * Reported 2026-07-23: the skills card typed `/plugin marketplace add …`
+   * straight at a zsh prompt, which just errors — a slash command only means
+   * anything INSIDE a claude session. `enter` exists so the card can launch that
+   * session; the slash command itself must still arrive unexecuted.
+   */
+  it('submits ONLY when asked to — launching a session, never a typed command', async () => {
+    useTerminal.setState({ root: { kind: 'term', id: 't9' }, activeId: 't9' })
+    await useTerminal.getState().typeIntoActive('claude', true)
+    expect(invoke).toHaveBeenCalledWith('term.input', { id: 't9', data: 'claude\r' })
+
+    await useTerminal.getState().typeIntoActive('/plugin install langsmith-skills@langsmith-skills')
+    expect(invoke).toHaveBeenCalledWith('term.input', {
+      id: 't9',
+      data: '/plugin install langsmith-skills@langsmith-skills',
+    })
+  })
 })
 
 describe('dock + width — left dock (2026-07-19)', () => {

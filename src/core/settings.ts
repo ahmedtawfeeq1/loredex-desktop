@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { DEFAULT_FONT_SETTINGS, isFontSettings, type FontSettings } from '../shared/font-settings'
 import { isValidIdentity } from '../shared/identity'
 import { isThemeSetting, type ThemeSetting } from '../shared/theme'
+import type { WorkspaceServerId } from './workspace-mcp'
 import type {
   Identity,
   PermissionRule,
@@ -81,6 +82,23 @@ export function saveIdentityProfile(identity: Identity): void {
 }
 
 // ── Theme preference (story 14.1) ───────────────────────────────────────────
+
+/**
+ * Anthropic bans consumer-subscription OAuth in any third-party product,
+ * including the Agent SDK loredex drives (Feb 2026 Consumer Terms). A Claude
+ * session with no ANTHROPIC_API_KEY authenticates with the `~/.claude`
+ * subscription — the prohibited combination — so before one starts, the user is
+ * warned and must type a short phrase acknowledging the risk. That acknowledgment
+ * is recorded here, per device, so the gate is one-time not per-session.
+ * MACHINE-LOCAL: it is the user's own decision, and app.db is never in the vault.
+ */
+export function loadClaudeSubscriptionAck(): boolean {
+  return readKey('claude-subscription-ack') === 'true'
+}
+
+export function saveClaudeSubscriptionAck(acknowledged: boolean): void {
+  writeKey('claude-subscription-ack', acknowledged ? 'true' : null)
+}
 
 export function loadThemeSetting(): ThemeSetting {
   const theme = readJsonKey('theme')
@@ -426,13 +444,15 @@ export function saveMcpPortOverride(port: number | null): void {
 }
 
 /** Which workspace MCP servers are enabled. loredex defaults ON (it is ours and
- *  free); n8n defaults OFF because enabling it downloads ~154 MB. */
-export function loadWorkspaceEnabled(): { loredex: boolean; n8n: boolean } {
+ *  free); n8n defaults OFF because enabling it downloads ~154 MB; langsmith
+ *  defaults OFF because it sends prompts and tool output to a third party —
+ *  that is a decision to opt into, never one to inherit. */
+export function loadWorkspaceEnabled(): Record<WorkspaceServerId, boolean> {
   const raw = readJsonKey('workspace-mcp-enabled')
-  const v = (raw ?? {}) as Partial<Record<'loredex' | 'n8n', boolean>>
-  return { loredex: v.loredex !== false, n8n: v.n8n === true }
+  const v = (raw ?? {}) as Partial<Record<WorkspaceServerId, boolean>>
+  return { loredex: v.loredex !== false, n8n: v.n8n === true, langsmith: v.langsmith === true }
 }
 
-export function setWorkspaceEnabled(id: 'loredex' | 'n8n', on: boolean): void {
+export function setWorkspaceEnabled(id: WorkspaceServerId, on: boolean): void {
   writeKey('workspace-mcp-enabled', JSON.stringify({ ...loadWorkspaceEnabled(), [id]: on }))
 }

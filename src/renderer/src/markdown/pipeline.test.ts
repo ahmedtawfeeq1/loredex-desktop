@@ -29,3 +29,30 @@ describe('sanctioned markdown pipeline', () => {
     expect(out).toContain('href="https://example.com"')
   })
 })
+
+/**
+ * Reported 2026-07-23: a fenced block in a NOTE had no way to copy it. The
+ * copy-enabled <pre> lived in agent/agentMarkdown.tsx, so the affordance existed
+ * only in chat — the reader rendered a bare <pre>. A code block is copiable
+ * wherever it appears, so `pre: CodeBlock` now lives in the shared pipeline.
+ */
+describe('fenced code is copiable in the reader too (2026-07-23)', () => {
+  it('wraps a fenced block and gives it a Copy button', () => {
+    const out = html('```sh\nls -la\n```')
+    expect(out).toContain('agent-code-wrap')
+    expect(out).toContain('agent-copy-code')
+    // the button is a SIBLING of <pre>, never inside the scroll container (BL-3)
+    expect(out).toMatch(/<div class="agent-code-wrap"><button[^>]*agent-copy-code/)
+  })
+
+  it('a block with no language still gets one — that is the common case in notes', () => {
+    const out = html('```\nEnter ONLY when…\n```')
+    expect(out).toContain('agent-copy-code')
+  })
+
+  it('inline code in a sentence still gets nothing', () => {
+    const out = html('use `ls -la` here')
+    expect(out).toContain('<code>ls -la</code>')
+    expect(out).not.toContain('agent-copy-code')
+  })
+})

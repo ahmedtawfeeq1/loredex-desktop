@@ -18,7 +18,6 @@ import {
 import { parseJoinLink } from '../../shared/join-link'
 import { AgentPanel } from './agent/AgentPanel'
 import { AgentPermissionModal } from './agent/AgentPermissionModal'
-import { ClaudeSubscriptionGate } from './agent/ClaudeSubscriptionGate'
 import { SideNav } from './components/SideNav'
 import { TopBar } from './components/TopBar'
 import { QuickActionsMenu } from './components/QuickActionsMenu'
@@ -300,7 +299,6 @@ export default function App(): React.JSX.Element {
           <>
             <AgentPanel />
             <AgentPermissionModal />
-            <ClaudeSubscriptionGate />
           </>
         ) : popout === 'note' ? (
           // BL-18: reader-only window — the note fills it, no app shell
@@ -415,7 +413,6 @@ export default function App(): React.JSX.Element {
       <SnoozeUntilPicker />
       <LinkRequestModal />
       <AgentPermissionModal />
-      <ClaudeSubscriptionGate />
       <RouteConfirmCard />
       <ToastStack />
       <SuggestToastStack />

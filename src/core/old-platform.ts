@@ -8,14 +8,20 @@
  * WHY IT IS INJECTED HERE rather than declared in `workspace.yml`. That file's
  * schema (loredex lib `workspaceSchema`) models **stdio** servers only —
  * `command` / `args` / `env`. The old platform is remote HTTP with an
- * `Authorization: Bearer` header, which the schema cannot express. Extending the
- * lib was the alternative; injecting is better anyway, because the generated
- * `.mcp.json` would hold the expanded token in a file inside the vault, and this
- * keeps it in the OS keychain like every other credential in the app.
+ * `Authorization: Bearer` header, which the schema cannot express, so the
+ * keychain is its home and this module is what hands it out.
  *
- * Only PRESENCE crosses the IPC seam. The token itself reaches exactly two
- * places: the request header at spawn, and the Test round trip.
+ * TWO CONSUMERS, one source (2026-07-25). `oldPlatformServer` covers sessions
+ * this app spawns (Chat Here / ACP); `syncOldPlatformMcp` mirrors the same
+ * server into the client's generated `.mcp.json` so an EXTERNAL agent — Claude
+ * Code in the terminal, `Open in Terminal` — sees it too. Before that mirror,
+ * the old platform silently did not exist outside the app.
+ *
+ * Only PRESENCE crosses the IPC seam. The token itself reaches the request
+ * header at spawn, the Test round trip, and the gitignored `.mcp.json`.
  */
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { deleteClientToken, readClientToken, storeClientToken } from './client-tokens'
 import { probeHttpTools } from './mcp-tools'
 
@@ -65,6 +71,64 @@ export async function oldPlatformServer(
     url: OLD_PLATFORM_URL,
     headers: [{ name: 'Authorization', value: `Bearer ${token}` }],
   }
+}
+
+/**
+ * Byte-identical to the lib's own `.mcp.json` writer (sorted keys, 2-space,
+ * trailing newline) — a different shape here would make every `--check` report
+ * drift and light the Re-wire warning forever.
+ */
+function stableJson(value: unknown): string {
+  const sort = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(sort)
+    if (v && typeof v === 'object') {
+      const out: Record<string, unknown> = {}
+      for (const key of Object.keys(v as Record<string, unknown>).sort()) {
+        out[key] = sort((v as Record<string, unknown>)[key])
+      }
+      return out
+    }
+    return v
+  }
+  return `${JSON.stringify(sort(value), null, 2)}\n`
+}
+
+/**
+ * Mirror this client's old-platform server into its generated `.mcp.json`, so
+ * agents OUTSIDE this app get it too. No token → the entry is removed, which is
+ * what makes Replace-with-empty and Clear actually take effect in the terminal.
+ *
+ * The token lands expanded in that file. That tradeoff is already the standing
+ * one: `.mcp.json` is gitignored per client and the NEW platform's token sits
+ * there expanded for exactly the same reason — a file the agent can read is the
+ * only channel an external process has.
+ *
+ * Merge-preserving, like the lib's writer: foreign servers survive untouched.
+ * No generated file yet → nothing to mirror into; the next Wire calls us again.
+ */
+export async function syncOldPlatformMcp(clientDir: string, client: string): Promise<void> {
+  const path = join(clientDir, '.mcp.json')
+  if (!existsSync(path)) return
+  let json: { mcpServers?: Record<string, unknown> }
+  try {
+    json = JSON.parse(readFileSync(path, 'utf8')) as { mcpServers?: Record<string, unknown> }
+  } catch {
+    return // unreadable generated file — Re-wire rewrites it cleanly, then we run
+  }
+  json.mcpServers ??= {}
+  const token = await readClientToken(oldPlatformRef(client))
+  if (token) {
+    json.mcpServers[OLD_PLATFORM_SERVER] = {
+      type: 'http',
+      url: OLD_PLATFORM_URL,
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  } else if (!(OLD_PLATFORM_SERVER in json.mcpServers)) {
+    return // nothing stored, nothing written — leave the file's mtime alone
+  } else {
+    delete json.mcpServers[OLD_PLATFORM_SERVER]
+  }
+  writeFileSync(path, stableJson(json))
 }
 
 /**

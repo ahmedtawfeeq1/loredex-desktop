@@ -5,6 +5,17 @@
 > are the workflow's, spot-checked against the tree; treat step 1 as the load-bearing
 > refactor that proves them.
 
+> **Status (2026-07-25): the general extensions surface below is NOT being built.**
+> The user's real need was narrower — a *compliant* way to use Claude on a Pro/Max
+> subscription with a real UI, since ACP-on-subscription is prohibited. What shipped
+> instead: **opening Claude with no API key now hosts the official `claude` CLI in a
+> first-class left-dock terminal panel** (loredex hosts Anthropic's own first-party
+> client — the only sanctioned subscription path — the same posture as the official
+> VS Code extension), while an **API key** opens loredex's own ACP chat panel. The
+> old typed-consent gate was removed (routing to the compliant path beats warning
+> about the prohibited one). The tiered plan below remains valid as a *future*
+> direction, not current work.
+
 ## The ask, and the reframe
 
 The ask: *"add any extension — including Claude and Codex — and run it like an IDE, like

@@ -773,34 +773,6 @@ details > .tree-empty,
 
 /* right-click / three-dots action menu */
 
-/* Claude-on-subscription consent gate — a real modal, centered on the window
-   (a screenshot-wide warning does not belong in the 380px dock). */
-.cs-gate-backdrop {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgb(0 0 0 / 0.5);
-  z-index: 70;
-}
-.cs-gate {
-  width: min(460px, 92vw);
-  padding: 20px 22px;
-  background: var(--bg-card);
-  border: 1px solid var(--hairline-2);
-  border-radius: 12px;
-  box-shadow: 0 12px 44px rgb(0 0 0 / 0.4);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.cs-gate-head { display: flex; align-items: center; gap: 8px; }
-.cs-gate-glyph { color: var(--warn); font-size: 16px; }
-.cs-gate-title { font: 650 15px var(--font-ui); color: var(--text-1); }
-.cs-gate-body { margin: 0; font-size: 12.5px; line-height: 1.55; color: var(--text-2); }
-.cs-gate-body b { color: var(--text-1); }
-.cs-gate-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-2); }
-.cs-gate-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 2px; }
-
 .ctx-menu-backdrop {
   position: fixed;
   inset: 0;

@@ -60,6 +60,12 @@ interface TerminalState {
   /** open the drawer with a pty rooted at `cwd` — the client page's
    *  "Open in Terminal" so `claude` runs in that client's folder, in-app. */
   openAt(cwd: string): Promise<void>
+  /** Compliant-subscription agent host: dock LEFT (first-class side panel),
+   *  spawn a pty at `cwd` (vault root when omitted), and LAUNCH an interactive
+   *  first-party CLI (`claude`) in it. loredex hosts Anthropic's own client — it
+   *  is NOT the client — the only sanctioned way to use a Pro/Max subscription
+   *  in a third-party app. Best-effort: no core / spawn refused → no-op. */
+  openAgent(cwd: string | undefined, command: string): Promise<void>
   splitActive(dir: 'row' | 'column'): Promise<void>
   closePane(id: string): Promise<void>
   setActive(id: string): void
@@ -345,6 +351,29 @@ export const useTerminal = create<TerminalState>((set, get) => ({
           for (const id of collectTermIds(tree)) fitTerm(id)
         }),
       )
+  },
+
+  async openAgent(cwd, command) {
+    // First-class LEFT dock (the VS Code side-panel choice) so a hosted `claude`
+    // session reads as a Claude panel, not a debug drawer.
+    if (cwd) {
+      set({ dock: 'left', open: true })
+      persist()
+      await get().openAt(cwd) // fresh pane rooted at the working dir
+      const tree = get().root
+      if (tree)
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            for (const id of collectTermIds(tree)) fitTerm(id)
+          }),
+        )
+    } else {
+      // no cwd → vault root (term.create's handler default), dock left + refit
+      await get().openDock('left')
+    }
+    // launch the interactive session — `enter` submits (typeIntoActive's one
+    // sanctioned use: opening a REPL, which mutates nothing)
+    await get().typeIntoActive(command, true)
   },
 
   toggleDock() {

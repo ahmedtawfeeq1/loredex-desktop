@@ -83,23 +83,6 @@ export function saveIdentityProfile(identity: Identity): void {
 
 // ── Theme preference (story 14.1) ───────────────────────────────────────────
 
-/**
- * Anthropic bans consumer-subscription OAuth in any third-party product,
- * including the Agent SDK loredex drives (Feb 2026 Consumer Terms). A Claude
- * session with no ANTHROPIC_API_KEY authenticates with the `~/.claude`
- * subscription — the prohibited combination — so before one starts, the user is
- * warned and must type a short phrase acknowledging the risk. That acknowledgment
- * is recorded here, per device, so the gate is one-time not per-session.
- * MACHINE-LOCAL: it is the user's own decision, and app.db is never in the vault.
- */
-export function loadClaudeSubscriptionAck(): boolean {
-  return readKey('claude-subscription-ack') === 'true'
-}
-
-export function saveClaudeSubscriptionAck(acknowledged: boolean): void {
-  writeKey('claude-subscription-ack', acknowledged ? 'true' : null)
-}
-
 export function loadThemeSetting(): ThemeSetting {
   const theme = readJsonKey('theme')
   return isThemeSetting(theme) ? theme : 'system'

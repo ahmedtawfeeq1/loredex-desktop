@@ -27,6 +27,7 @@ import {
 import { clampPanelWidth, DEFAULT_PANEL_WIDTH } from '../agent/panelWidth'
 import { invoke, onEvent, openAgentWindow } from '../api'
 import { useApp } from './app'
+import { useTerminal } from './terminal'
 import { useToasts } from './toasts'
 
 // re-exported so existing importers (store test) keep their one entry point;
@@ -252,11 +253,6 @@ interface AgentPanelState {
   activeId: string | null
   /** the surfaced permission request; more queue module-side (FIFO) */
   permission: AcpPermissionView | null
-  /** Claude-on-subscription guardrail (Anthropic ToS): when a Claude session is
-   *  about to start on the consumer login, openHere parks the start here and
-   *  the panel shows the consent modal. Approving runs `proceed`. null = no gate
-   *  pending. Only ever set for the claude provider on subscription auth. */
-  claudeGate: { proceed: () => void } | null
   /** WP-B: total awaiting decisions (surfaced + queued) — DERIVED, recomputed on
    *  every permission/queue change (never delta-mutated). Drives the TopBar
    *  badge when the panel is closed. */
@@ -290,10 +286,6 @@ interface AgentPanelState {
   /** BL-6: `provider` starts this session on a specific agent (the client
    *  page's Chat Here picker); omitted, it uses the panel's current selection. */
   openHere(cwd?: string, provider?: AcpAgent): Promise<void>
-  /** the user typed the acknowledgment phrase — persist it and run the parked
-   *  start (or just clear the gate on cancel). */
-  approveClaudeGate(): Promise<void>
-  cancelClaudeGate(): void
   /** B2 cross-provider continuation: take the ACTIVE session's conversation and
    *  continue it on `provider` (agent.continue) — a new session bound to the
    *  same transcript, hydrated so the prior thread shows while the target boots.
@@ -542,6 +534,34 @@ async function hydrate(sessionId: string, conversationId: string): Promise<void>
   }))
 }
 
+/**
+ * Claude on a subscription (no ANTHROPIC_API_KEY) is prohibited over ACP by
+ * Anthropic's Consumer Terms for third-party apps. When the target is claude AND
+ * it would authenticate by subscription, route to the COMPLIANT path — host
+ * Anthropic's own first-party client (the `claude` CLI) in a first-class
+ * terminal panel; loredex is the HOST, not the client — and return true so the
+ * caller skips acp.start / agent.continue. An API key returns false (→ the ACP
+ * chat panel). Unreadable auth (no bridge in tests) returns false and fails OPEN
+ * to ACP, as the prior guardrail did. Codex/Gemini short-circuit to false.
+ */
+async function routeSubscriptionClaudeToTerminal(
+  provider: AcpAgent,
+  cwd: string | undefined,
+): Promise<boolean> {
+  if (provider !== 'claude') return false
+  let mode: 'api' | 'subscription' | null = null
+  try {
+    const auth = await invoke('agent.claudeAuth', undefined)
+    mode = auth?.mode ?? null
+  } catch {
+    mode = null
+  }
+  if (mode !== 'subscription') return false
+  // cwd omitted → openAgent spawns at the vault root (term.create's default)
+  await useTerminal.getState().openAgent(cwd, 'claude')
+  return true
+}
+
 /** Continuation body shared by B2 continueIn + B3 resumeConversation: open the
  *  panel, agent.continue on (conversationId → provider) — a new session bound to
  *  the SAME transcript — install it active, hydrate the thread. The resetGen race
@@ -554,6 +574,21 @@ async function startContinuation(
   /** BL-5: force the vault root instead of the thread's own folder. */
   atVaultRoot?: boolean,
 ): Promise<void> {
+  // Same subscription-Claude fence as openHere: continuing a thread INTO Claude
+  // on a subscription would drive it over ACP, which is prohibited. Host the
+  // compliant `claude` CLI instead and say the thread isn't carried into it. The
+  // `provider === 'claude'` short-circuit keeps codex/gemini fully SYNCHRONOUS up
+  // to `const gen = resetGen` below — the reset-race guard depends on gen being
+  // captured before the first await.
+  if (provider === 'claude' && (await routeSubscriptionClaudeToTerminal(provider, undefined))) {
+    useToasts
+      .getState()
+      .push(
+        'Opened Claude in the terminal',
+        'Claude on your subscription runs as a hosted CLI session — this thread isn’t carried into it. Add an API key to continue it in the chat panel.',
+      )
+    return
+  }
   useAgentPanel.setState({ open: true })
   const gen = resetGen
   // fast-fail race guard (see pendingSessionEvents): mark a start in flight so
@@ -611,7 +646,6 @@ async function startContinuation(
 
 export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   open: false,
-  claudeGate: null,
   width: DEFAULT_PANEL_WIDTH,
   resizing: false,
   agent: 'claude',
@@ -668,32 +702,20 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   },
 
   async openHere(cwd, provider) {
+    // BL-6: an explicit provider wins (Chat Here picker); otherwise the panel's
+    // current selection, as before.
+    const agent = provider ?? get().agent
+    // Claude on a subscription must NOT be driven over ACP (Anthropic Consumer
+    // Terms, Feb 2026 — prohibited for third-party apps). Route it to the
+    // compliant path instead: host the official `claude` CLI in a first-class
+    // terminal panel. An API key → the ACP chat panel below. Checked BEFORE the
+    // optimistic open so a subscription start raises the terminal, not an empty
+    // chat panel. Codex/Gemini and API-key Claude fall straight through. The
+    // `agent === 'claude'` short-circuit keeps codex/gemini synchronous up to the
+    // gen capture below (the reset-race guard needs gen before the first await).
+    if (agent === 'claude' && (await routeSubscriptionClaudeToTerminal(agent, cwd))) return
     set({ open: true }) // optimistic — the panel appears while the start rides
     persist()
-    // BL-6: an explicit provider wins (Chat Here picker); otherwise the panel's
-    // current selection, as before
-    const agent = provider ?? get().agent
-    // Anthropic ToS guardrail (Feb 2026): a Claude session with no
-    // ANTHROPIC_API_KEY authenticates with the ~/.claude CONSUMER subscription,
-    // which their Consumer Terms prohibit for third-party apps. Warn once and
-    // require a typed acknowledgment before the first such session; an API key
-    // (mode 'api') or a prior acknowledgment sails straight through. Codex and
-    // Gemini are never even asked — this fences Claude only. Fails OPEN: an
-    // unreadable auth check (no bridge in tests) skips the gate rather than
-    // stranding the panel — the guardrail is advisory, not a hard control.
-    if (agent === 'claude') {
-      let auth: { mode: 'api' | 'subscription'; acknowledged: boolean } | null = null
-      try {
-        auth = await invoke('agent.claudeAuth', undefined)
-      } catch {
-        auth = null
-      }
-      if (auth && auth.mode === 'subscription' && !auth.acknowledged) {
-        // park the start; the modal calls approveClaudeGate() to run it
-        set({ claudeGate: { proceed: () => void get().openHere(cwd, provider) } })
-        return
-      }
-    }
     const gen = resetGen
     // fast-fail race guard (see pendingSessionEvents): mark a start in flight so
     // a spawn-error acp.session event that beats the ack gets buffered, not
@@ -753,19 +775,6 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       // registered (reset-race / a concurrently-closed session), bounding the map
       if (--startsInFlight === 0) pendingSessionEvents.clear()
     }
-  },
-
-  async approveClaudeGate() {
-    const gate = get().claudeGate
-    if (!gate) return
-    // persist first so the parked start (which re-checks auth) sees it granted
-    await invoke('agent.claudeAckSubscription', undefined).catch(() => {})
-    set({ claudeGate: null })
-    gate.proceed()
-  },
-
-  cancelClaudeGate() {
-    set({ claudeGate: null })
   },
 
   async continueIn(provider, atVaultRoot) {
@@ -1056,7 +1065,6 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       sessions: [],
       activeId: null,
       permission: null,
-      claudeGate: null, // a pending consent gate belongs to the torn-down core
       pendingPermissions: 0,
       draft: '',
       attachments: [],

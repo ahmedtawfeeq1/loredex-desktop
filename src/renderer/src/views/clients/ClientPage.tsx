@@ -430,7 +430,7 @@ function ConnCard({
           title={
             source === 'workspace.yml'
               ? 'Declared in this client’s workspace.yml — Re-wire regenerates its .mcp.json'
-              : 'Injected by loredex from your OS keychain — Re-wire does not touch it'
+              : 'Injected by loredex from your OS keychain — into this app’s chats and into the generated .mcp.json, so terminal agents get it too'
           }
         >
           {source === 'workspace.yml' ? 'workspace.yml' : 'keychain · injected'}
@@ -577,7 +577,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           disabled={busy || !info.hasWorkspaceYml}
           title={
             info.hasWorkspaceYml
-              ? "Regenerate .mcp.json / .claude settings / AGENTS.md from workspace.yml with this machine's stored tokens (gitignored files only). Affects the workspace.yml servers ONLY — genudo-old-platform is injected from the keychain and is unaffected."
+              ? "Regenerate .mcp.json / .claude settings / AGENTS.md from workspace.yml with this machine's stored tokens (gitignored files only). genudo-old-platform is added from the keychain in the same pass."
               : 'No workspace.yml in this client'
           }
           onClick={() => void rewire({})}

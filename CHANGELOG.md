@@ -7,17 +7,23 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-25
+
 ### Added
-- **Claude-on-subscription guardrail (Anthropic Terms of Service).** Anthropic's
-  Feb 2026 Consumer Terms prohibit using a Pro/Max subscription login in any
-  third-party app — explicitly including the Agent SDK loredex drives. A Claude
-  session with no `ANTHROPIC_API_KEY` authenticates with exactly that consumer
-  login, so opening one now warns and requires the user to type a short
-  acknowledgment (`use my subscription`) before the FIRST such session. An API
-  key (billed per token, the sanctioned path) or a prior acknowledgment opens
-  with no prompt; the acknowledgment is recorded once per device. Codex and
-  Gemini are unaffected — the fence is Claude-only, applied at `openHere`, the
-  single `acp.start` chokepoint.
+- **Claude on a subscription opens the compliant hosted CLI, not ACP (Anthropic
+  Terms of Service).** Anthropic's Feb 2026 Consumer Terms prohibit using a
+  Pro/Max subscription login in any third-party app — including the Agent SDK
+  loredex drives over ACP. So opening Claude with no `ANTHROPIC_API_KEY` no longer
+  starts an ACP session at all: it hosts Anthropic's own first-party client — the
+  `claude` CLI — in a first-class **left-dock terminal panel** (loredex is the
+  HOST, not the client — the same posture as the official VS Code extension, which
+  is why it's allowed). An **API key** (billed per token) opens loredex's own ACP
+  chat panel exactly as before. The routing is applied at BOTH `acp.start` entry
+  points — new sessions (`openHere`) and cross-provider continuation
+  (`startContinuation`) — so no path can drive Claude over ACP on a subscription.
+  Codex and Gemini are unaffected. This replaces the typed-consent warning gate
+  from earlier in this cycle: routing to the compliant path beats warning about
+  the prohibited one.
 - **Both platform connections are one card recipe, with their tools listed.**
   The client page's `genudo` and `genudo-old-platform` rows now render through a
   single `ConnCard`: same layout, a green **chip** for Connected (glyph + label on

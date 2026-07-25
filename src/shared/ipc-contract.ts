@@ -736,16 +736,15 @@ export interface CoreApi {
     out: { media: string[] }
   }
   'acp.cancel': { in: { sessionId: string }; out: void }
-  /** Claude auth posture, for the pre-start guardrail. `mode: 'subscription'`
-   *  means no ANTHROPIC_API_KEY is set, so a session would authenticate with the
-   *  ~/.claude consumer login — which Anthropic prohibits for third-party apps.
-   *  `acknowledged` is the user's one-time "I accept the risk" for that path. */
+  /** Claude auth posture, for routing the panel's "open Claude" action.
+   *  `mode: 'subscription'` means no ANTHROPIC_API_KEY is set, so an ACP session
+   *  would authenticate with the ~/.claude consumer login — which Anthropic
+   *  prohibits for third-party apps. The renderer routes that case to the
+   *  compliant terminal-hosted `claude` CLI instead; `'api'` uses the ACP panel. */
   'agent.claudeAuth': {
     in: void
-    out: { mode: 'api' | 'subscription'; acknowledged: boolean }
+    out: { mode: 'api' | 'subscription' }
   }
-  /** Record the typed acknowledgment so the warning is one-time, not per-session. */
-  'agent.claudeAckSubscription': { in: void; out: void }
   /** optionId null = dismissed → outcome 'cancelled' (dismissing is rejecting) */
   'acp.permission': {
     in: { sessionId: string; requestId: string; optionId: string | null }

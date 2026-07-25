@@ -27,6 +27,13 @@ window.loredex = {
   },
 } as unknown as typeof window.loredex
 
+// The terminal store is mocked here: subscription-Claude routes to its openAgent,
+// and mocking it keeps xterm out of this store test (terminal.test.ts owns that).
+const { openAgentMock } = vi.hoisted(() => ({ openAgentMock: vi.fn(async () => {}) }))
+vi.mock('./terminal', () => ({
+  useTerminal: { getState: () => ({ openAgent: openAgentMock }) },
+}))
+
 // value imports MUST ride this dynamic import (never a static one) — a static
 // import hoists above the window.loredex assignment above, so the store's
 // onEvent subscription guard would see no bridge and emit would stay unset
@@ -56,6 +63,7 @@ const items = (id: string): AcpSessionView['items'] =>
 beforeEach(async () => {
   invoke.mockReset()
   invoke.mockResolvedValue(undefined)
+  openAgentMock.mockClear()
   await useAgentPanel.getState().reset() // clears sessions + module-scope sinks/queues
   invoke.mockClear()
   vi.useFakeTimers() // rAF + the setTimeout fallback both ride the fake clock
@@ -1022,44 +1030,42 @@ describe('queued messages while a turn runs', () => {
 })
 
 /**
- * Claude-on-subscription guardrail (Anthropic ToS, Feb 2026). A Claude session
- * with no API key would sign in with the consumer subscription, which their
- * Consumer Terms prohibit for third-party apps. openHere must park such a start
- * behind a typed acknowledgment; an API key or a prior ack sails through; Codex
- * and Gemini are never gated.
+ * Claude-on-subscription routing (Anthropic Consumer Terms, Feb 2026). A Claude
+ * session with no API key would authenticate with the consumer subscription,
+ * which the Terms prohibit over ACP for third-party apps. openHere must NOT start
+ * such a session over ACP — it routes to the COMPLIANT hosted `claude` CLI in the
+ * terminal (useTerminal.openAgent, mocked here). An API key uses the ACP panel;
+ * Codex/Gemini are never even auth-checked.
  */
-describe('openHere — Claude subscription gate', () => {
-  const claudeAuth = (mode: 'api' | 'subscription', acknowledged: boolean) =>
-    (ch: string) => {
-      if (ch === 'agent.claudeAuth') return Promise.resolve({ mode, acknowledged })
-      if (ch === 'acp.start') return Promise.resolve({ sessionId: 's1' })
-      return Promise.resolve(undefined)
-    }
+describe('openHere — Claude on subscription routes to the hosted terminal', () => {
+  const mockAuth = (mode: 'api' | 'subscription') => (ch: string) => {
+    if (ch === 'agent.claudeAuth') return Promise.resolve({ mode })
+    if (ch === 'acp.start') return Promise.resolve({ sessionId: 's1' })
+    return Promise.resolve(undefined)
+  }
 
-  it('parks the start and raises the gate on subscription, unacknowledged', async () => {
-    invoke.mockImplementation(claudeAuth('subscription', false))
+  it('subscription Claude hosts the claude CLI in the terminal, never starts ACP', async () => {
+    invoke.mockImplementation(mockAuth('subscription'))
     await useAgentPanel.getState().openHere()
-    // NOT started — the gate stands between the click and acp.start
     expect(invoke).not.toHaveBeenCalledWith('acp.start', expect.anything())
-    expect(useAgentPanel.getState().claudeGate).not.toBeNull()
-    expect(useAgentPanel.getState().open).toBe(true) // panel still opens
+    expect(openAgentMock).toHaveBeenCalledWith(undefined, 'claude')
   })
 
-  it('an API key sails straight through — no gate', async () => {
-    invoke.mockImplementation(claudeAuth('api', false))
+  it('an explicit cwd is passed to the hosted session', async () => {
+    invoke.mockImplementation(mockAuth('subscription'))
+    await useAgentPanel.getState().openHere('/some/project')
+    expect(openAgentMock).toHaveBeenCalledWith('/some/project', 'claude')
+    expect(invoke).not.toHaveBeenCalledWith('acp.start', expect.anything())
+  })
+
+  it('an API key starts the ACP chat panel, not the terminal', async () => {
+    invoke.mockImplementation(mockAuth('api'))
     await useAgentPanel.getState().openHere()
-    expect(useAgentPanel.getState().claudeGate).toBeNull()
     expect(invoke).toHaveBeenCalledWith('acp.start', { agent: 'claude' })
+    expect(openAgentMock).not.toHaveBeenCalled()
   })
 
-  it('a prior acknowledgment sails through', async () => {
-    invoke.mockImplementation(claudeAuth('subscription', true))
-    await useAgentPanel.getState().openHere()
-    expect(useAgentPanel.getState().claudeGate).toBeNull()
-    expect(invoke).toHaveBeenCalledWith('acp.start', { agent: 'claude' })
-  })
-
-  it('Codex is never gated, even on subscription', async () => {
+  it('Codex is never auth-checked and always uses ACP', async () => {
     invoke.mockImplementation((ch: string) =>
       ch === 'acp.start' ? Promise.resolve({ sessionId: 's1' }) : Promise.resolve(undefined),
     )
@@ -1067,36 +1073,15 @@ describe('openHere — Claude subscription gate', () => {
     // the auth check is claude-only — it must not even be asked for codex
     expect(invoke).not.toHaveBeenCalledWith('agent.claudeAuth', expect.anything())
     expect(invoke).toHaveBeenCalledWith('acp.start', { agent: 'codex' })
+    expect(openAgentMock).not.toHaveBeenCalled()
   })
 
-  it('approving persists the ack and runs the parked start', async () => {
-    // first pass gates; after approve, the re-run sees acknowledged=true
-    let acked = false
-    invoke.mockImplementation((ch: string) => {
-      if (ch === 'agent.claudeAuth')
-        return Promise.resolve({ mode: 'subscription', acknowledged: acked })
-      if (ch === 'agent.claudeAckSubscription') {
-        acked = true
-        return Promise.resolve(undefined)
-      }
-      if (ch === 'acp.start') return Promise.resolve({ sessionId: 's1' })
-      return Promise.resolve(undefined)
-    })
+  it('unreadable auth fails OPEN to ACP (no bridge → not the terminal)', async () => {
+    invoke.mockImplementation((ch: string) =>
+      ch === 'acp.start' ? Promise.resolve({ sessionId: 's1' }) : Promise.resolve(undefined),
+    )
     await useAgentPanel.getState().openHere()
-    expect(useAgentPanel.getState().claudeGate).not.toBeNull()
-    await useAgentPanel.getState().approveClaudeGate()
-    expect(invoke).toHaveBeenCalledWith('agent.claudeAckSubscription', undefined)
-    expect(useAgentPanel.getState().claudeGate).toBeNull()
-    // proceed() re-runs openHere fire-and-forget; let it reach acp.start
-    await flush()
     expect(invoke).toHaveBeenCalledWith('acp.start', { agent: 'claude' })
-  })
-
-  it('cancelling drops the gate and starts nothing', async () => {
-    invoke.mockImplementation(claudeAuth('subscription', false))
-    await useAgentPanel.getState().openHere()
-    useAgentPanel.getState().cancelClaudeGate()
-    expect(useAgentPanel.getState().claudeGate).toBeNull()
-    expect(invoke).not.toHaveBeenCalledWith('acp.start', expect.anything())
+    expect(openAgentMock).not.toHaveBeenCalled()
   })
 })

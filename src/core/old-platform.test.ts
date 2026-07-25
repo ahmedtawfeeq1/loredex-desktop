@@ -2,6 +2,9 @@
  * The old genudo platform is PER CLIENT: one client's token must never reach
  * another client's session, and only presence may cross the IPC seam.
  */
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const store = new Map<string, string>()
@@ -81,6 +84,68 @@ describe('oldPlatformServer — what a session gets', () => {
       url: mod.OLD_PLATFORM_URL,
       headers: [{ name: 'Authorization', value: 'Bearer gnd_x' }],
     })
+  })
+})
+
+describe('syncOldPlatformMcp — what an EXTERNAL agent gets', () => {
+  function clientDir(mcpJson?: unknown): string {
+    const dir = mkdtempSync(join(tmpdir(), 'oldp-'))
+    mkdirSync(dir, { recursive: true })
+    if (mcpJson !== undefined) writeFileSync(join(dir, '.mcp.json'), JSON.stringify(mcpJson, null, 2))
+    return dir
+  }
+  const read = (dir: string): { mcpServers: Record<string, unknown> } =>
+    JSON.parse(readFileSync(join(dir, '.mcp.json'), 'utf8'))
+
+  it('writes the http server the terminal can actually use', async () => {
+    await mod.setOldPlatformToken('c', 'gnd_x')
+    const dir = clientDir({ mcpServers: {} })
+    await mod.syncOldPlatformMcp(dir, 'c')
+    expect(read(dir).mcpServers['genudo-old-platform']).toEqual({
+      type: 'http',
+      url: mod.OLD_PLATFORM_URL,
+      headers: { Authorization: 'Bearer gnd_x' },
+    })
+  })
+
+  it('leaves the workspace.yml servers untouched — merge, never rewrite', async () => {
+    await mod.setOldPlatformToken('c', 'gnd_x')
+    const dir = clientDir({ mcpServers: { genudo: { command: 'npx', args: ['-y', 'genudo-mcp-client'] } } })
+    await mod.syncOldPlatformMcp(dir, 'c')
+    expect(read(dir).mcpServers.genudo).toEqual({ command: 'npx', args: ['-y', 'genudo-mcp-client'] })
+  })
+
+  /** Byte-stable, or every --check reports drift and the Re-wire warning sticks. */
+  it('writes sorted keys with a trailing newline, like the lib', async () => {
+    await mod.setOldPlatformToken('c', 'gnd_x')
+    const dir = clientDir({ mcpServers: {} })
+    await mod.syncOldPlatformMcp(dir, 'c')
+    const raw = readFileSync(join(dir, '.mcp.json'), 'utf8')
+    expect(raw.endsWith('\n')).toBe(true)
+    expect(raw.indexOf('"headers"')).toBeLessThan(raw.indexOf('"type"'))
+  })
+
+  it('clearing the token removes it — Clear must reach the terminal too', async () => {
+    const dir = clientDir({
+      mcpServers: { 'genudo-old-platform': { type: 'http', url: 'x' }, genudo: { command: 'npx' } },
+    })
+    await mod.syncOldPlatformMcp(dir, 'c')
+    const servers = read(dir).mcpServers
+    expect(servers['genudo-old-platform']).toBeUndefined()
+    expect(servers.genudo).toBeDefined()
+  })
+
+  it('no token and no entry: nothing to do, no write', async () => {
+    const dir = clientDir({ mcpServers: { genudo: { command: 'npx' } } })
+    await mod.syncOldPlatformMcp(dir, 'c')
+    expect(readFileSync(join(dir, '.mcp.json'), 'utf8')).toBe(
+      JSON.stringify({ mcpServers: { genudo: { command: 'npx' } } }, null, 2),
+    )
+  })
+
+  it('unwired client (no .mcp.json) is a no-op, not a crash', async () => {
+    await mod.setOldPlatformToken('c', 'gnd_x')
+    await expect(mod.syncOldPlatformMcp(clientDir(), 'c')).resolves.toBeUndefined()
   })
 })
 

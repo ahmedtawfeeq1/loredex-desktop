@@ -93,6 +93,7 @@ import {
   clearOldPlatformToken,
   oldPlatformStatus,
   setOldPlatformToken,
+  syncOldPlatformMcp,
   testOldPlatform,
 } from './old-platform'
 import { fetchTraceForRef } from './langsmith-trace'
@@ -164,8 +165,6 @@ import {
   removePermissionRule,
   loadWorkspaceEnabled,
   setWorkspaceEnabled,
-  loadClaudeSubscriptionAck,
-  saveClaudeSubscriptionAck,
 } from './settings'
 import { termCreate, termInput, termKill, termResize } from './terminals'
 import { buildThread, collectComments } from './threads'
@@ -299,7 +298,13 @@ export function registerCoreHandlers(
   ipc.register('vault.readRaw', ({ path }) => engine.readRawFile(path))
   ipc.register('clients.fleet', () => engine.fleet())
   ipc.register('clients.lints', () => engine.agentOpsLints())
-  ipc.register('clients.workspace', ({ client, check }) => engine.generateWorkspace(client, check))
+  ipc.register('clients.workspace', async ({ client, check }) => {
+    const result = engine.generateWorkspace(client, check)
+    // the lib writes the workspace.yml servers; the old platform is keychain-only
+    // and rides in after, so a generate leaves the terminal's view complete
+    if (!check) await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+    return result
+  })
   // Add-Client (docs/plan/agent-ops-desktop-flow.md): tokens land in the OS
   // keychain FIRST, then one lib write op scaffolds + copies the golden
   // tooling + materializes with the keychain env — never a token in git.
@@ -344,7 +349,9 @@ export function registerCoreHandlers(
         if (token) await storeClientToken(ref, token)
       }
       const held = await readClientTokens(engine.clientEnvRefs(client))
-      return engine.generateWorkspace(client, false, held)
+      const result = engine.generateWorkspace(client, false, held)
+      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+      return result
     }),
   )
   ipc.register('clients.connections', ({ client }) => engine.clientConnections(client))
@@ -568,6 +575,8 @@ export function registerCoreHandlers(
   ipc.register('clients.oldPlatform.set', async ({ client, token }) => {
     if (token === null || token.trim() === '') await clearOldPlatformToken(client)
     else await setOldPlatformToken(client, token)
+    // keep the terminal's .mcp.json in step with the keychain, both directions
+    await syncOldPlatformMcp(engine.clientDirAbs(client), client)
   })
   ipc.register('clients.oldPlatform.test', ({ client }) => testOldPlatform(client))
   ipc.register('langsmith.trace.fetch', async ({ text }) => {
@@ -1236,9 +1245,7 @@ export function registerCoreHandlers(
   ipc.register('agent.claudeAuth', () => ({
     // include keychain-stored keys, exactly as the spawn path will at start
     mode: authMode('claude', agentKeyEnv()),
-    acknowledged: loadClaudeSubscriptionAck(),
   }))
-  ipc.register('agent.claudeAckSubscription', () => saveClaudeSubscriptionAck(true))
   ipc.register('acp.permission', ({ sessionId, requestId, optionId }) =>
     acpPermission(sessionId, requestId, optionId),
   )

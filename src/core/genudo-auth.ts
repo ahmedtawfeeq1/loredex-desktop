@@ -20,6 +20,7 @@ import {
   auth,
   discoverOAuthServerInfo,
   refreshAuthorization,
+  selectResourceURL,
 } from '@modelcontextprotocol/sdk/client/auth.js'
 import type {
   AuthorizationServerMetadata,
@@ -35,7 +36,7 @@ import { GENUDO_BASE_URL } from './genudo-http'
  * sign-ins. If the port is busy the sign-in fails loudly rather than silently
  * registering a redirect the authorization server will later reject.
  */
-const CALLBACK_PORT = 47821
+export const CALLBACK_PORT = 47821
 const REDIRECT_URI = `http://127.0.0.1:${CALLBACK_PORT}/callback`
 const SCOPE = 'mcp:use'
 /** Refresh this far ahead of expiry, so a token handed out is still valid on arrival. */
@@ -47,6 +48,11 @@ interface GenudoSession {
   expiresAt: number | null
   account?: string
   tokenEndpoint?: string
+  /** RFC 9728: the authorization server's own base URL, when discovery found one. */
+  authorizationServerUrl?: string
+  tokenEndpointAuthMethodsSupported?: string[]
+  /** RFC 8707 resource indicator, echoed back on every refresh once the auth server requires it. */
+  resource?: string
   client?: OAuthClientInformation & { redirect_uri?: string }
 }
 
@@ -89,19 +95,63 @@ function stamp(tokens: OAuthTokens): number | null {
 }
 
 /**
- * Metadata for a token-endpoint-only call (refresh). `authorization_endpoint` is
- * required by the SDK's `AuthorizationServerMetadata` type but is never read by
- * `refreshAuthorization`/`executeTokenRequest` — only `token_endpoint` is — so this
- * reuses the token endpoint as a placeholder rather than performing a discovery
- * round-trip just to satisfy the type.
+ * Best-effort account label from the token response's OIDC `id_token` —
+ * decoded, NOT verified (no JWKS fetch, no network call: it only ever
+ * populates a display label, never anything security-relevant). Prefers
+ * `email`, falls back to `sub`, and returns undefined for anything else
+ * (no id_token, malformed JWT, neither claim present) — callers keep
+ * whatever label they already had rather than blanking it out.
  */
-function refreshMetadata(tokenEndpoint: string): AuthorizationServerMetadata {
+function accountFromIdToken(idToken: string | undefined): string | undefined {
+  if (!idToken) return undefined
+  const payload = idToken.split('.')[1]
+  if (!payload) return undefined
+  try {
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      email?: unknown
+      sub?: unknown
+    }
+    if (typeof claims.email === 'string' && claims.email) return claims.email
+    if (typeof claims.sub === 'string' && claims.sub) return claims.sub
+    return undefined
+  } catch {
+    return undefined // malformed id_token — no label, not fatal
+  }
+}
+
+/**
+ * Metadata for a token-endpoint-only call (refresh). `authorization_endpoint`
+ * is required by the SDK's `AuthorizationServerMetadata` type but is never
+ * read by `refreshAuthorization`/`executeTokenRequest` — only `token_endpoint`
+ * (and, when present, `token_endpoint_auth_methods_supported`) are — so this
+ * reuses the token endpoint as an `authorization_endpoint` placeholder rather
+ * than performing a discovery round-trip just to satisfy the type. `issuer`
+ * and the supported-auth-methods list use whatever sign-in persisted, when
+ * available, instead of being fabricated.
+ */
+function refreshMetadata(session: GenudoSession, tokenEndpoint: string): AuthorizationServerMetadata {
   return {
-    issuer: new URL(tokenEndpoint).origin,
+    issuer: session.authorizationServerUrl ?? new URL(tokenEndpoint).origin,
     authorization_endpoint: tokenEndpoint,
     token_endpoint: tokenEndpoint,
     response_types_supported: ['code'],
+    ...(session.tokenEndpointAuthMethodsSupported
+      ? { token_endpoint_auth_methods_supported: session.tokenEndpointAuthMethodsSupported }
+      : {}),
   }
+}
+
+/**
+ * A refresh failure's message comes from the authorization server's own
+ * response (`parseErrorResponse` in the SDK) — normally a short
+ * `invalid_grant`-style code, but its fallback branch embeds the ENTIRE raw
+ * response body verbatim (e.g. an nginx 502 page) with no length limit.
+ * Clamp before it reaches a user-facing error, and strip the refresh token on
+ * the outside chance a misbehaving/compromised server reflected it back.
+ */
+function clampServerMessage(message: string, refreshToken: string): string {
+  const redacted = refreshToken ? message.split(refreshToken).join('[redacted]') : message
+  return redacted.length > 200 ? `${redacted.slice(0, 200)}…` : redacted
 }
 
 /**
@@ -126,9 +176,13 @@ export async function genudoAccessToken(client: string): Promise<string | null> 
   }
   try {
     const tokens = await refreshAuthorization(new URL(tokenEndpoint).origin, {
-      metadata: refreshMetadata(tokenEndpoint),
+      metadata: refreshMetadata(session, tokenEndpoint),
       clientInformation: session.client,
       refreshToken,
+      // RFC 8707: the auth server may require the exact resource it granted
+      // originally to be re-asserted on every refresh, or reject with
+      // invalid_target.
+      ...(session.resource ? { resource: new URL(session.resource) } : {}),
     })
     await writeSession(client, {
       ...session,
@@ -139,16 +193,39 @@ export async function genudoAccessToken(client: string): Promise<string | null> 
     return tokens.access_token
   } catch (e) {
     await genudoSignOut(client)
+    const detail = e instanceof Error ? e.message : String(e)
     throw new Error(
-      `Genudo session for ${client} could not be renewed (${
-        e instanceof Error ? e.message : String(e)
-      }) — sign in again on the client page`,
+      `Genudo session for ${client} could not be renewed (${clampServerMessage(detail, refreshToken)}) — sign in again on the client page`,
     )
   }
 }
 
-/** One-shot loopback listener: resolves with the `code` the browser is redirected to. */
-function awaitCallback(timeoutMs = 300_000): { url: string; code: Promise<string> } {
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}
+
+/** The `error` query param lands in the loopback page's HTML verbatim — it is
+ * server/redirect controlled, so escape it (reflected XSS on the loopback
+ * origin otherwise). */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c)
+}
+
+/**
+ * One-shot loopback listener: resolves with the `code` the browser is
+ * redirected to. `close()` tears the listener and timer down and is
+ * idempotent — every settle/fail path below (`got`/`error` query param,
+ * listen-error, timeout) routes through it via `code.then(close, close)`, so
+ * a caller that exits BEFORE any of those ever fire (genudoSignIn throwing
+ * early, or `auth()` returning AUTHORIZED without a redirect at all) is the
+ * only remaining case, and can still guarantee the port comes free by
+ * calling `close()` itself in a `finally`.
+ */
+export function awaitCallback(timeoutMs = 300_000): { url: string; code: Promise<string>; close: () => void } {
   let settle: ((code: string) => void) | null = null
   let fail: ((e: Error) => void) | null = null
   const code = new Promise<string>((resolve, reject) => {
@@ -157,38 +234,44 @@ function awaitCallback(timeoutMs = 300_000): { url: string; code: Promise<string
   })
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', REDIRECT_URI)
+    if (url.pathname !== '/callback') {
+      // a stray favicon/probe request mid-sign-in must not settle (or fail)
+      // the listener — only the actual redirect path counts
+      res.writeHead(404)
+      res.end()
+      return
+    }
     const got = url.searchParams.get('code')
     const error = url.searchParams.get('error')
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
     res.end(
       `<body style="font:14px system-ui;padding:3rem">${
-        got ? 'Signed in to Genudo. You can close this tab.' : `Sign-in failed: ${error ?? 'no code'}`
+        got
+          ? 'Signed in to Genudo. You can close this tab.'
+          : `Sign-in failed: ${escapeHtml(error ?? 'no code')}`
       }</body>`,
     )
-    server.close()
     if (got) settle?.(got)
     else fail?.(new Error(`Genudo sign-in was refused (${error ?? 'no authorization code'})`))
   })
   server.on('error', (e) => {
-    // most binding failures (EADDRINUSE) never actually attach a socket, but a
-    // later runtime error could — close defensively so no failure path can
-    // leave this port held.
-    server.close()
     fail?.(
       new Error(`could not listen on ${REDIRECT_URI} (${e.message}) — close whatever holds that port`),
     )
   })
   server.listen(CALLBACK_PORT, '127.0.0.1')
   const timer = setTimeout(() => {
-    server.close()
     fail?.(new Error('Genudo sign-in timed out — no response from the browser'))
   }, timeoutMs)
-  // every settle/fail path above must also close the listener — the timeout path
-  // closes it directly (its own `server.close()`), and the other paths run inside
-  // the request handler which closes on entry, so this only ever needs to clear
-  // the timer once the promise is done, on every branch.
-  void code.finally(() => clearTimeout(timer))
-  return { url: REDIRECT_URI, code }
+  let closed = false
+  const close = (): void => {
+    if (closed) return
+    closed = true
+    clearTimeout(timer)
+    server.close()
+  }
+  code.then(close, close)
+  return { url: REDIRECT_URI, code, close }
 }
 
 /**
@@ -228,7 +311,12 @@ export async function genudoSignIn(
     },
     tokens: () => (stored.tokens.access_token ? stored.tokens : undefined),
     saveTokens: (tokens: OAuthTokens) => {
-      stored = { ...stored, tokens, expiresAt: stamp(tokens) }
+      stored = {
+        ...stored,
+        tokens,
+        expiresAt: stamp(tokens),
+        account: accountFromIdToken(tokens.id_token) ?? stored.account,
+      }
     },
     redirectToAuthorization: async (authorizationUrl: URL) => {
       await shell.openExternal(authorizationUrl.toString())
@@ -239,27 +327,44 @@ export async function genudoSignIn(
     codeVerifier: () => verifier,
   }
 
-  const first = await auth(provider, { serverUrl: mcpUrl, scope: SCOPE })
-  if (first === 'AUTHORIZED') {
-    await writeSession(client, stored)
+  // `awaitCallback` closes itself on every path that settles `code`, but
+  // `auth()` returning AUTHORIZED on the first call (a silent refresh — the
+  // common re-sign-in case) or throwing before the callback ever arrives
+  // never touch `code` at all, so the listener needs an owner here too.
+  try {
+    const first = await auth(provider, { serverUrl: mcpUrl, scope: SCOPE })
+    if (first === 'AUTHORIZED') {
+      await writeSession(client, stored)
+      return { account: stored.account ?? null }
+    }
+    const code = await callback.code
+    const result = await auth(provider, {
+      serverUrl: mcpUrl,
+      authorizationCode: code,
+      scope: SCOPE,
+    })
+    if (result !== 'AUTHORIZED') throw new Error('Genudo sign-in did not complete')
+    // RFC 9728 + RFC 8414 discovery, same as `auth()` used internally — NOT
+    // `discoverAuthorizationServerMetadata(mcpUrl)` directly, because Genudo's
+    // authorization server can live at a different origin than the resource
+    // server; skipping the RFC 9728 protected-resource-metadata hop would risk
+    // persisting a token endpoint the token exchange never actually used.
+    const { authorizationServerUrl, authorizationServerMetadata, resourceMetadata } =
+      await discoverOAuthServerInfo(mcpUrl)
+    // Same resource the SDK's own `auth()` would have sent (RFC 8707) — persist
+    // it so a later manual refresh (genudoAccessToken) can re-assert it too;
+    // an auth server that enforces resource indicators rejects a refresh that
+    // omits one with invalid_target.
+    const resource = await selectResourceURL(mcpUrl, provider, resourceMetadata)
+    await writeSession(client, {
+      ...stored,
+      tokenEndpoint: authorizationServerMetadata?.token_endpoint,
+      authorizationServerUrl,
+      tokenEndpointAuthMethodsSupported: authorizationServerMetadata?.token_endpoint_auth_methods_supported,
+      resource: resource?.href,
+    })
     return { account: stored.account ?? null }
+  } finally {
+    callback.close()
   }
-  const code = await callback.code
-  const result = await auth(provider, {
-    serverUrl: mcpUrl,
-    authorizationCode: code,
-    scope: SCOPE,
-  })
-  if (result !== 'AUTHORIZED') throw new Error('Genudo sign-in did not complete')
-  // RFC 9728 + RFC 8414 discovery, same as `auth()` used internally — NOT
-  // `discoverAuthorizationServerMetadata(mcpUrl)` directly, because Genudo's
-  // authorization server can live at a different origin than the resource
-  // server; skipping the RFC 9728 protected-resource-metadata hop would risk
-  // persisting a token endpoint the token exchange never actually used.
-  const { authorizationServerMetadata } = await discoverOAuthServerInfo(mcpUrl)
-  await writeSession(client, {
-    ...stored,
-    tokenEndpoint: authorizationServerMetadata?.token_endpoint,
-  })
-  return { account: stored.account ?? null }
 }

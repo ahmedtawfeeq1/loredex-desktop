@@ -1,4 +1,4 @@
-import { createServer, type Server } from 'node:http'
+import { Agent, createServer, get, type Server } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const store = new Map<string, string>()
@@ -21,7 +21,14 @@ vi.mock('electron', () => ({
   shell: { openExternal: vi.fn() },
 }))
 
-import { genudoAccessToken, genudoSessionRef, genudoSignOut, genudoStatus } from './genudo-auth'
+import {
+  awaitCallback,
+  CALLBACK_PORT,
+  genudoAccessToken,
+  genudoSessionRef,
+  genudoSignOut,
+  genudoStatus,
+} from './genudo-auth'
 
 let server: Server | null = null
 let refreshCalls = 0
@@ -119,5 +126,123 @@ describe('genudo sign-in session', () => {
     seed({ tokens: { access_token: 'acme-tok', token_type: 'Bearer' }, expiresAt: null })
     expect(await genudoAccessToken('acme')).toBe('acme-tok')
     expect(await genudoAccessToken('other-client')).toBeNull()
+  })
+
+  it('preserves the existing refresh token when the refresh response omits one', async () => {
+    const base = await tokenServer(() => ({
+      status: 200,
+      // no refresh_token in the reply — the server is allowed to omit it
+      body: { access_token: 'fresh2', token_type: 'Bearer', expires_in: 3600 },
+    }))
+    seed({
+      tokens: { access_token: 'stale', token_type: 'Bearer', refresh_token: 'original-refresh' },
+      expiresAt: Date.now() + 5_000,
+      tokenEndpoint: `${base}/oauth/token`,
+      client: { client_id: 'cid', redirect_uri: 'http://127.0.0.1:47821/callback' },
+    })
+    expect(await genudoAccessToken('acme')).toBe('fresh2')
+    const saved = JSON.parse(store.get(genudoSessionRef('acme')) as string)
+    expect(saved.tokens.access_token).toBe('fresh2')
+    expect(saved.tokens.refresh_token).toBe('original-refresh')
+  })
+})
+
+/** Polls for the port coming free rather than asserting immediately —
+ * `server.close()` stops new connections synchronously but the underlying
+ * handle release is a libuv callback, not guaranteed to land in the same
+ * microtask as `code` settling. */
+async function isPortFree(port: number, attempts = 15): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    const free = await new Promise<boolean>((resolve) => {
+      const probe = createServer()
+      probe.once('error', () => resolve(false))
+      probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(true)))
+    })
+    if (free) return true
+    await new Promise((r) => setTimeout(r, 20))
+  }
+  return false
+}
+
+/**
+ * A single non-keep-alive request, like a browser navigating to the loopback
+ * callback URL once. Deliberately NOT the global `fetch` — undici's default
+ * dispatcher pools connections per-origin, and these tests repeatedly bind
+ * and tear down a real server on the SAME fixed port; a pooled socket left
+ * over from a prior test's (now-dead) server produces a flaky ECONNRESET
+ * instead of exercising the new one. A fresh `agent: false` request opens
+ * its own socket and closes it, matching how sign-in actually happens (one
+ * real page navigation, not a reused connection).
+ */
+function getOnce(path: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    get(
+      `http://127.0.0.1:${CALLBACK_PORT}${path}`,
+      { agent: new Agent({ keepAlive: false }) },
+      (res) => {
+        const chunks: Buffer[] = []
+        res.on('data', (c: Buffer) => chunks.push(c))
+        res.on('end', () =>
+          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }),
+        )
+        res.on('error', reject)
+      },
+    ).on('error', reject)
+  })
+}
+
+describe('awaitCallback (loopback listener)', () => {
+  // every test below closes its own listener, but `server.close()`'s actual
+  // handle release can land a tick after the test body returns — wait for
+  // the OS to confirm the port is free before the next test binds it again,
+  // or a slow CI box can turn this into a flaky EADDRINUSE/ECONNRESET.
+  afterEach(async () => {
+    await isPortFree(CALLBACK_PORT)
+  })
+
+  it('resolves the code from a real callback request and frees the port after', async () => {
+    const { code, close } = awaitCallback(5_000)
+    try {
+      const res = await getOnce('/callback?code=abc123')
+      expect(res.status).toBe(200)
+      await expect(code).resolves.toBe('abc123')
+    } finally {
+      close()
+    }
+    expect(await isPortFree(CALLBACK_PORT)).toBe(true)
+  })
+
+  it('rejects and frees the port when no callback ever arrives (timeout)', async () => {
+    const { code, close } = awaitCallback(50)
+    await expect(code).rejects.toThrow(/timed out/i)
+    close() // idempotent — the promise settling already closed it
+    expect(await isPortFree(CALLBACK_PORT)).toBe(true)
+  })
+
+  it('ignores a request to any path other than /callback', async () => {
+    const { code, close } = awaitCallback(5_000)
+    try {
+      const stray = await getOnce('/favicon.ico')
+      expect(stray.status).toBe(404)
+      // the listener is still up and the code promise is still pending —
+      // the real callback still resolves it
+      const real = await getOnce('/callback?code=xyz')
+      expect(real.status).toBe(200)
+      await expect(code).resolves.toBe('xyz')
+    } finally {
+      close()
+    }
+  })
+
+  it('HTML-escapes the error query param in the failure page', async () => {
+    const { code, close } = awaitCallback(5_000)
+    try {
+      const res = await getOnce(`/callback?error=${encodeURIComponent('<script>alert(1)</script>')}`)
+      expect(res.body).not.toContain('<script>')
+      expect(res.body).toContain('&lt;script&gt;')
+      await expect(code).rejects.toThrow(/sign-in was refused/i)
+    } finally {
+      close()
+    }
   })
 })

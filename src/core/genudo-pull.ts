@@ -24,7 +24,7 @@
  */
 import { type Dirent, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { widenNodePath, withResolvedNpx } from './win-spawn'
+import { genudoRpc } from './genudo-http'
 
 /**
  * The npm bridge version every stdio spawn of genudo-mcp-client pins to.
@@ -307,87 +307,28 @@ export async function fetchBundles(
 ): Promise<{
   bundles: { pipeline: RawPipeline; stages: RawStage[]; actions: unknown[]; variables: unknown[] }[]
 }> {
-  const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
-  const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js')
-  const client = new Client({ name: 'loredex-pull', version: '1.0.0' })
-  // Appends the per-user Node locations a desktop-launched app cannot otherwise
-  // see — nvm/homebrew on macOS/Linux, the per-user installers on Windows
-  const env = widenNodePath({
-    ...process.env,
-    GENUDO_TOKEN: token,
-    GENUDO_BASE_URL: baseUrl,
-  })
-  // Windows cannot spawn the `npx.cmd` shim directly — Node refuses since
-  // CVE-2024-27980 — so it goes through `cmd /c`, with the absolute path
-  // substituted when we can find one so cmd has no lookup left to fail.
-  // PINNED, deliberately. npx caches by spec string, so an unpinned
-  // `genudo-mcp-client` keeps serving whatever a machine installed earlier —
-  // and every release before 2.5.0 speaks the SSE transport the backend retired
-  // (GET {BASE}/api/user/mcp/sse now 404s on production and staging). A stale
-  // cache therefore fails as a connect timeout with nothing pointing at the
-  // cause. Remediate a poisoned machine with `rm -rf ~/.npm/_npx`.
-  const spawn = withResolvedNpx(
-    process.platform === 'win32'
-      ? { command: 'cmd', args: ['/c', 'npx', '-y', `genudo-mcp-client@${GENUDO_BRIDGE_VERSION}`] }
-      : { command: 'npx', args: ['-y', `genudo-mcp-client@${GENUDO_BRIDGE_VERSION}`] },
-    env,
-  )
-  const transport = new StdioClientTransport({
-    command: spawn.command,
-    args: spawn.args,
-    env: env as Record<string, string>,
-  })
-  const call = async (name: string, args: Record<string, unknown> = {}): Promise<unknown> => {
-    const res = (await client.callTool({ name, arguments: args })) as {
-      content: { type: string; text?: string }[]
-    }
-    const text = res.content
-      .filter((c) => c.type === 'text')
-      .map((c) => c.text ?? '')
-      .join('\n')
-    try {
-      return JSON.parse(text)
-    } catch {
-      return text
-    }
+  const rpc = genudoRpc(baseUrl, token, timeoutMs)
+  // `verbose: true` is now a no-op the backend ignores — response slimming was a
+  // BRIDGE feature, so a direct connection returns full persona and instruction
+  // text by default. It stays passed so this still works against the bridge.
+  const list = (await rpc.callTool('list_pipelines', { verbose: true })) as {
+    pipelines?: RawPipeline[]
   }
-  const deadline = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`genudo pull timed out after ${timeoutMs}ms`)), timeoutMs),
-  )
-  try {
-    await Promise.race([client.connect(transport), deadline])
-    // verbose:true matters — without it the platform TRUNCATES persona and
-    // instructions with a "…re-call with verbose:true" marker, and we would
-    // mirror the truncation into the vault as if it were the real content
-    const list = (await Promise.race([
-      call('list_pipelines', { verbose: true }),
-      deadline,
-    ])) as { pipelines?: RawPipeline[] }
-    const bundles = []
-    for (const pipeline of list.pipelines ?? []) {
-      const [stages, actions, variables] = (await Promise.race([
-        Promise.all([
-          call('list_pipeline_stages', { pipeline_id: pipeline.id, verbose: true }),
-          call('list_actions', { pipeline_id: pipeline.id }),
-          call('list_variables', { pipeline_id: pipeline.id }),
-        ]),
-        deadline,
-      ])) as [{ stages?: RawStage[] }, { actions?: unknown[] }, { variables?: unknown[] }]
-      bundles.push({
-        pipeline,
-        stages: stages.stages ?? [],
-        actions: actions.actions ?? [],
-        variables: variables.variables ?? [],
-      })
-    }
-    return { bundles }
-  } finally {
-    try {
-      await client.close()
-    } catch {
-      // the bridge exits on stdin close — a failed close is not a pull failure
-    }
+  const bundles = []
+  for (const pipeline of list?.pipelines ?? []) {
+    const [stages, actions, variables] = (await Promise.all([
+      rpc.callTool('list_pipeline_stages', { pipeline_id: pipeline.id, verbose: true }),
+      rpc.callTool('list_actions', { pipeline_id: pipeline.id }),
+      rpc.callTool('list_variables', { pipeline_id: pipeline.id }),
+    ])) as [{ stages?: RawStage[] }, { actions?: unknown[] }, { variables?: unknown[] }]
+    bundles.push({
+      pipeline,
+      stages: stages?.stages ?? [],
+      actions: actions?.actions ?? [],
+      variables: variables?.variables ?? [],
+    })
   }
+  return { bundles }
 }
 
 /**

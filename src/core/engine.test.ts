@@ -3,13 +3,13 @@
  * config/read/search over the typed IPC seam. Runs in plain node against
  * tests/fixtures/vault (no Electron).
  */
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createIpcClient } from '../shared/ipc-client'
 import type { PortLike } from '../shared/ipc-contract'
-import { getConfig, initEngine, readNote, recurateProject, search } from './engine'
+import { clientConnections, getConfig, initEngine, readNote, recurateProject, search } from './engine'
 import { registerCoreHandlers } from './handlers'
 import { createCoreIpc } from './ipc'
 
@@ -113,4 +113,52 @@ describe('recurateProject argv guard', () => {
       await expect(recurateProject(bad)).rejects.toThrow(/invalid project name/)
     },
   )
+})
+
+describe('clientConnections filters remote (http) servers', () => {
+  // task-1 stopgap regression test: clientConnections only understands the
+  // stdio launch shape (command/args/env). A remote (type: http) server must
+  // be filtered out rather than crash or leak a half-formed entry, and a
+  // stdio server alongside it must still come back with everything intact.
+  const client = 'mcp-filter-test-client'
+  const clientDir = join(FIXTURE_VAULT, 'projects', client)
+
+  beforeAll(() => {
+    mkdirSync(clientDir, { recursive: true })
+    writeFileSync(
+      join(clientDir, 'workspace.yml'),
+      `mcp:
+  crm-remote:
+    type: http
+    url: https://api.example.com/mcp
+    headers: { Authorization: "Bearer \${CRM_TOKEN_X}" }
+  crm-bridge:
+    command: npx
+    args: ['-y', 'some-mcp-client']
+    env:
+      CRM_TOKEN: \${CRM_TOKEN_X}
+plugins:
+  claude: []
+skills: []
+`,
+    )
+  })
+
+  afterAll(() => {
+    rmSync(clientDir, { recursive: true, force: true })
+  })
+
+  it('drops the remote server and keeps the stdio one with command/args/env/envRefs intact', () => {
+    const conns = clientConnections(client)
+    expect(conns.map((c) => c.server)).toEqual(['crm-bridge'])
+    expect(conns).toEqual([
+      {
+        server: 'crm-bridge',
+        envRefs: ['CRM_TOKEN_X'],
+        command: 'npx',
+        args: ['-y', 'some-mcp-client'],
+        env: { CRM_TOKEN: '${CRM_TOKEN_X}' },
+      },
+    ])
+  })
 })

@@ -262,6 +262,18 @@ export interface CoreApi {
     in: { client?: string; identity: Identity }
     out: { normalized: number }
   }
+  /** agent-ops: file a client under a manager (null unfiles it). Manager
+   *  grouping is product membership — `_index/products.json`. One commit. */
+  'clients.manager.set': {
+    in: { client: string; manager: string | null; identity: Identity }
+    out: { manager: string | null }
+  }
+  /** agent-ops: replace a client's tags (`_index/clients.json`). Whole set, so
+   *  editing chips is one write and one commit. */
+  'clients.tags.set': {
+    in: { client: string; tags: string[]; identity: Identity }
+    out: { tags: string[] }
+  }
   /** agent-ops: the dex's standard tooling — deduped connection union across all
    *  tooled clients, each with its copy source. The UI asks for tokens only. */
   'clients.standardTooling': {

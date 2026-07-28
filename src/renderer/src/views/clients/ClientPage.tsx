@@ -5,7 +5,7 @@
  * clients.workspace — writes only gitignored files). Every file name is a
  * reader open target (hyperlink-everything).
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type {
   ClientCredential,
   ClientInfo,
@@ -64,6 +64,30 @@ const PAGE_CSS = `
 .cp-tags { display: flex; gap: 6px; }
 .cp-tag { font-size: 11px; font-weight: 600; color: var(--text-2); border: 1px solid var(--hairline); border-radius: 12px; padding: 1px 9px; }
 .cp-counts { font-size: 12.5px; color: var(--text-2); margin-bottom: 18px; }
+/* editable client metadata — the manager a client is filed under and its tags.
+   Both used to be readable here and changeable only by hand-editing
+   _index/*.json, which is the one thing this app exists to remove. */
+.cp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 14px; }
+.cp-meta-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cp-meta-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
+.cp-meta-input, .cp-meta-select {
+  font: 12.5px var(--font-ui); padding: 5px 8px; min-height: 28px;
+  border: 1px solid var(--hairline); border-radius: 7px;
+  background: var(--bg-inset); color: var(--text-1);
+}
+.cp-meta-input { width: 148px; }
+.cp-meta-input:focus, .cp-meta-select:focus { outline: none; border-color: var(--accent-hi); }
+.cp-meta-btn {
+  font: 600 12px var(--font-ui); padding: 5px 12px; min-height: 28px;
+  border: 1px solid var(--hairline); border-radius: 7px;
+  background: var(--bg-card); color: var(--text-1); cursor: pointer;
+}
+.cp-meta-btn:hover:not(:disabled) { border-color: var(--accent-hi); }
+.cp-meta-btn:disabled { opacity: 0.45; cursor: default; }
+.cp-tag-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-1); border: 1px solid var(--hairline); border-radius: 12px; padding: 3px 6px 3px 10px; }
+.cp-tag-remove { font: 13px var(--font-ui); line-height: 1; color: var(--text-2); background: none; border: 0; border-radius: 50%; width: 18px; height: 18px; cursor: pointer; }
+.cp-tag-remove:hover { color: var(--rust-text); background: var(--bg-inset); }
+.cp-meta-none { font-size: 12.5px; color: var(--text-3); }
 .cp-errors { color: var(--rust, #a33f2e); font-weight: 600; }
 .cp-attention {
   display: flex; align-items: center; gap: 8px; padding: 8px 12px; margin-bottom: 16px;
@@ -1470,6 +1494,199 @@ function InboxPanel({
   )
 }
 
+const NEW_MANAGER = ' new' // sentinel option — never a real manager name
+
+/**
+ * Manager assignment + tag editing, on the client page (reported: the fleet
+ * groups by manager and shows tag chips, but neither could be changed anywhere
+ * in the app). Writes go straight through — a Save button guarding a
+ * one-field change is ceremony; the vault.changed event re-reads the fleet, so
+ * the grouping on the Clients view moves with it.
+ *
+ * Both fields ACCEPT NEW VALUES: picking "New manager…" or typing an unseen tag
+ * creates it. There is no separate manager-creation screen because a manager is
+ * nothing but a key in products.json.
+ */
+function ClientMeta({
+  info,
+  identity,
+}: {
+  info: ClientInfo
+  identity: Identity | null
+}): React.JSX.Element {
+  // suggestions come from the FLEET the store already holds — every manager and
+  // every tag in the dex is in it. An IPC call for this was worse than useless:
+  // it duplicated data the renderer had, and when the core host was a version
+  // behind it failed silently and the picker offered nothing.
+  const fleet = useDex((s) => s.fleet) ?? []
+  const vocab = useMemo(() => {
+    const managers = new Set<string>()
+    const tags = new Set<string>()
+    for (const c of fleet) {
+      if (c.manager) managers.add(c.manager)
+      for (const t of c.tags) tags.add(t)
+    }
+    const sorted = (s: Set<string>): string[] => [...s].sort((a, b) => a.localeCompare(b))
+    return { managers: sorted(managers), tags: sorted(tags) }
+  }, [fleet])
+  const [busy, setBusy] = useState(false)
+  const [naming, setNaming] = useState(false) // "New manager…" chosen
+  const [managerDraft, setManagerDraft] = useState('')
+  const [tagDraft, setTagDraft] = useState('')
+
+  const blocked = identity === null
+  const blockedWhy = blocked ? 'Set your name and email in Settings first' : undefined
+
+  async function saveManager(manager: string | null): Promise<void> {
+    if (!identity || busy) return
+    setBusy(true)
+    try {
+      await invoke('clients.manager.set', { client: info.slug, manager, identity })
+      setNaming(false)
+      setManagerDraft('')
+    } catch (e) {
+      useToasts.getState().push('Could not assign manager', reason(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveTags(tags: string[]): Promise<void> {
+    if (!identity || busy) return
+    setBusy(true)
+    try {
+      await invoke('clients.tags.set', { client: info.slug, tags, identity })
+      setTagDraft('')
+    } catch (e) {
+      useToasts.getState().push('Could not save tags', reason(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const addTag = (): void => {
+    const tag = tagDraft.trim().replace(/^#/, '')
+    if (!tag || info.tags.includes(tag)) {
+      setTagDraft('')
+      return
+    }
+    void saveTags([...info.tags, tag])
+  }
+
+  return (
+    <div className="cp-meta">
+      <div className="cp-meta-group">
+        <span className="cp-meta-label">Manager</span>
+        {naming ? (
+          <>
+            <input
+              className="cp-meta-input"
+              autoFocus
+              placeholder="Manager name"
+              value={managerDraft}
+              onChange={(e) => setManagerDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && managerDraft.trim()) void saveManager(managerDraft)
+                if (e.key === 'Escape') setNaming(false)
+              }}
+            />
+            <button
+              type="button"
+              className="cp-meta-btn"
+              disabled={busy || !managerDraft.trim()}
+              onClick={() => void saveManager(managerDraft)}
+            >
+              Assign
+            </button>
+            <button type="button" className="cp-meta-btn" onClick={() => setNaming(false)}>
+              Cancel
+            </button>
+          </>
+        ) : (
+          <select
+            className="cp-meta-select"
+            value={info.manager ?? ''}
+            disabled={busy || blocked}
+            title={blockedWhy}
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === NEW_MANAGER) {
+                setNaming(true)
+                return
+              }
+              void saveManager(v === '' ? null : v)
+            }}
+          >
+            <option value="">Unassigned</option>
+            {vocab.managers.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+            {info.manager && !vocab.managers.includes(info.manager) && (
+              <option value={info.manager}>{info.manager}</option>
+            )}
+            <option value={NEW_MANAGER}>New manager…</option>
+          </select>
+        )}
+      </div>
+
+      <div className="cp-meta-group">
+        <span className="cp-meta-label">Tags</span>
+        {info.tags.length === 0 && <span className="cp-meta-none">None yet</span>}
+        {info.tags.map((tag) => (
+          <span key={tag} className="cp-tag-chip">
+            #{tag}
+            <button
+              type="button"
+              className="cp-tag-remove"
+              aria-label={`Remove tag ${tag}`}
+              title={blockedWhy ?? `Remove #${tag}`}
+              disabled={busy || blocked}
+              onClick={() => void saveTags(info.tags.filter((t) => t !== tag))}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          className="cp-meta-input"
+          list={`cp-tags-${info.slug}`}
+          placeholder="Add tag"
+          value={tagDraft}
+          disabled={busy || blocked}
+          title={blockedWhy}
+          onChange={(e) => setTagDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') addTag()
+            if (e.key === 'Escape') setTagDraft('')
+          }}
+          // a typed tag left behind on click-away reads as saved and is not —
+          // blur commits it. Clicking Add fires blur first; the second call is
+          // a no-op (the write is in flight, and the tag is already in the set)
+          onBlur={addTag}
+        />
+        {/* the dex's existing tags — typing a new one is still allowed, which is
+            how a tag is created */}
+        <datalist id={`cp-tags-${info.slug}`}>
+          {vocab.tags.map((t) => (
+            <option key={t} value={t} />
+          ))}
+        </datalist>
+        <button
+          type="button"
+          className="cp-meta-btn"
+          disabled={busy || blocked || !tagDraft.trim()}
+          title={blockedWhy}
+          onClick={addTag}
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function ClientPage({
   info,
   onBack,
@@ -1535,15 +1752,9 @@ export function ClientPage({
       <div className="cp-header">
         <span className="cp-dot" aria-hidden />
         <span className="cp-title">{page.header.slug}</span>
-        {page.header.manager && <span className="cp-manager">manager: {page.header.manager}</span>}
-        <span className="cp-tags">
-          {page.header.tags.map((tag) => (
-            <span key={tag} className="cp-tag">
-              #{tag}
-            </span>
-          ))}
-        </span>
       </div>
+      {/* manager + tags are EDITED here (they used to be read-only labels) */}
+      <ClientMeta info={info} identity={identity} />
       <div className="cp-counts">
         {page.header.pipelineCount} pipeline{page.header.pipelineCount === 1 ? '' : 's'} ·{' '}
         {page.header.stageCount} stage{page.header.stageCount === 1 ? '' : 's'} ·{' '}

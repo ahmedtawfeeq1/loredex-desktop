@@ -3,7 +3,7 @@
  * remark-parse → remark-gfm → remark-rehype → rehype-sanitize → rehype-react.
  * Never bypass it; rehype-sanitize is mandatory.
  */
-import type { ReactNode } from 'react'
+import { Children, isValidElement, type ReactNode } from 'react'
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
 import rehypeReact, { type Options as RehypeReactOptions } from 'rehype-react'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
@@ -35,9 +35,20 @@ import { MarkdownAnchor } from '../components/WikiLink'
  *  <pre> is the horizontal scroll container, so a button positioned against it
  *  drifts across the code as you scroll sideways. Anchoring to the wrapper pins
  *  it to the visible top-right corner at any scroll offset. */
+/** the fence's text, walked out of the highlighted <code> subtree */
+function codeText(node: ReactNode): string {
+  if (typeof node === 'string') return node
+  if (Array.isArray(node)) return node.map(codeText).join('')
+  if (isValidElement(node)) return codeText((node.props as { children?: ReactNode }).children)
+  return ''
+}
+
 function CodeBlock(props: React.HTMLAttributes<HTMLPreElement>): React.JSX.Element {
   const { children, ...rest } = props
-  return (
+  const code = Children.toArray(children).find(isValidElement) as
+    | React.ReactElement<{ className?: string; children?: ReactNode }>
+    | undefined
+  const block = (
     <div className="agent-code-wrap">
       <button
         type="button"
@@ -60,8 +71,15 @@ function CodeBlock(props: React.HTMLAttributes<HTMLPreElement>): React.JSX.Eleme
       <pre {...rest}>{children}</pre>
     </div>
   )
+  // ```mermaid is a DIAGRAM, not code — the viewer keeps `block` behind its
+  // Code toggle, so the copy affordance survives (Mermaid.tsx)
+  if (/(^|\s)language-mermaid(\s|$)/.test(code?.props.className ?? '')) {
+    return <MermaidBlock code={codeText(code?.props.children).replace(/\n$/, '')} source={block} />
+  }
+  return block
 }
 
+import { MermaidBlock } from './Mermaid'
 import { remarkShaLinks } from './shaLinks'
 import { remarkTaskIndexes } from './tasks'
 import { remarkWikilinks } from './wikilinks'

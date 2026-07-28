@@ -10330,3 +10330,104 @@ a.button-primary {
   gap: 4px;
   align-items: center;
 }
+
+/* ── mermaid diagrams (```mermaid fences render as the diagram) ─────────── */
+
+/* the viewer is a CARD, not a code block: the diagram is the content, the
+   toolbar sits on the card's edge. Shared by the reader and the agent panel,
+   since both go through the sanctioned pipeline's <pre> override. */
+.mermaid-block {
+  position: relative;
+  margin: 0 0 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+/* fullscreen (native Fullscreen API on the <figure>): fill the screen and keep
+   the app ground, or the OS paints the backdrop black under a dark diagram */
+.mermaid-block:fullscreen {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--bg-app);
+}
+
+/* NO height/max-height rule for .mermaid-viewport, in or out of fullscreen:
+   Mermaid.tsx computes the box from the fitted diagram. A CSS cap here is what
+   clipped every fitted diagram and left it with a permanent scrollbar. */
+
+.mermaid-tools {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* real buttons, readable labels — the diagram controls are used, not decorative */
+.mermaid-tool {
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-2);
+  font: 11px var(--font-ui);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 120ms ease-out;
+}
+
+.mermaid-tool:hover,
+.mermaid-tool:focus-visible {
+  opacity: 1;
+  color: var(--text-1);
+  border-color: var(--accent);
+}
+
+.mermaid-zoom {
+  font-family: var(--font-mono);
+  min-width: 46px;
+}
+
+/* the scroll container IS the pan: past fit the sizer overflows and the
+   trackpad/scrollbars move it, so no drag-to-pan code and no pan-zoom library.
+   PADDING IS MIRRORED in Mermaid.tsx (PAD_TOP/PAD_X/PAD_BOTTOM) — the box
+   height is computed there; change one, change both. Top clears the toolbar. */
+.mermaid-viewport {
+  overflow: auto;
+  padding: 34px 12px 12px;
+}
+
+/* the fitted diagram's real footprint (transforms do not lay out), centered
+   while it is narrower than the box */
+.mermaid-sizer {
+  margin: 0 auto;
+}
+
+.mermaid-canvas {
+  transform-origin: top left;
+}
+
+.mermaid-canvas svg {
+  display: block;
+  width: 100%; /* the sizer decides the size, not mermaid's own max-width */
+  height: 100%;
+  max-width: none;
+}
+
+.mermaid-pending,
+.mermaid-error {
+  padding: 34px 12px 12px;
+  color: var(--text-3);
+  font: 11px var(--font-mono);
+  white-space: pre-wrap;
+}
+
+.mermaid-error {
+  color: var(--rust-text);
+}

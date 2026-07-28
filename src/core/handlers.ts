@@ -356,6 +356,34 @@ export function registerCoreHandlers(
   )
   ipc.register('clients.connections', ({ client }) => engine.clientConnections(client))
   ipc.register('clients.standardTooling', () => engine.standardTooling())
+  // Client metadata from the client page. Both write ONE manifest under _index/
+  // and commit — the fleet grouping and the tag chips were previously reachable
+  // only by hand-editing that json, which is exactly what this app exists to
+  // stop people doing.
+  ipc.register('clients.manager.set', ({ client, manager, identity }) =>
+    withWriteLock(() => {
+      requireAgentOps('assigning a manager')
+      if (!isValidIdentity(identity)) {
+        throw ipcError('INTERNAL', 'assigning a manager needs an identity — set name and email in Settings')
+      }
+      const result = engine.setClientManager(client, manager, identity)
+      ipc.emit({ kind: 'vault.changed', paths: ['_index/products.json'] })
+      notifier.refresh()
+      return result
+    }),
+  )
+  ipc.register('clients.tags.set', ({ client, tags, identity }) =>
+    withWriteLock(() => {
+      requireAgentOps('editing tags')
+      if (!isValidIdentity(identity)) {
+        throw ipcError('INTERNAL', 'editing tags needs an identity — set name and email in Settings')
+      }
+      const result = engine.setClientTagsFor(client, tags, identity)
+      ipc.emit({ kind: 'vault.changed', paths: ['_index/clients.json'] })
+      notifier.refresh()
+      return result
+    }),
+  )
   ipc.register('clients.normalize', ({ client, identity }) =>
     withWriteLock(() => {
       requireAgentOps('normalize') // never scaffold client structure onto a research dex

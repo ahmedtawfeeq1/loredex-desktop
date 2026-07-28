@@ -104,6 +104,11 @@ import {
   scaffoldStage as scaffoldStageLib,
   listClientInbox as listClientInboxLib,
   type InboxItem,
+  // client metadata: manager grouping (products.json) + tags (clients.json).
+  // Reads are NOT here — the client page derives its manager/tag suggestions
+  // from the fleet the renderer already holds.
+  setProduct,
+  setClientTags,
 } from 'loredex'
 import { writePlan } from './genudo-pull'
 import { toVaultRelative } from '../shared/handoff-lanes'
@@ -197,6 +202,54 @@ export function managerOf(project: string): string | null {
 /** Fleet read model: every client with pipelines/agents/stages/tables/inbox. */
 export function fleet(): ClientInfo[] {
   return scanFleet(getConfig().vaultPath)
+}
+
+/**
+ * File a client under a manager (or unfile it with null). Manager grouping IS
+ * product membership — `_index/products.json`, the same manifest the research
+ * tree groups by — so this is `setProduct` with the agent-ops name for it.
+ */
+export function setClientManager(
+  client: string,
+  manager: string | null,
+  identity: Identity,
+): { manager: string | null } {
+  const config = getConfig()
+  const next = manager?.trim() ? manager.trim() : null
+  setProduct(config.vaultPath, client, next)
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(
+      config.vaultPath,
+      config,
+      next
+        ? `loredex: assign ${client} to ${next} (${identity.name})`
+        : `loredex: unassign ${client} (${identity.name})`,
+    ),
+  )
+  return { manager: next }
+}
+
+/**
+ * Replace a client's tags (`_index/clients.json`). Whole-set replace, not
+ * add/remove verbs: the UI edits a chip list, so it always knows the full set,
+ * and one write means one commit instead of one per chip.
+ */
+export function setClientTagsFor(
+  client: string,
+  tags: string[],
+  identity: Identity,
+): { tags: string[] } {
+  const config = getConfig()
+  const clean = [...new Set(tags.map((t) => t.trim().replace(/^#/, '')).filter(Boolean))].sort(
+    (a, b) => a.localeCompare(b),
+  )
+  const map = setClientTags(config.vaultPath, client, clean)
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(config.vaultPath, config, `loredex: tags for ${client} (${identity.name})`),
+  )
+  return { tags: map[client]?.tags ?? clean }
 }
 
 /** Agent-ops lint findings (schema violations, drift, secrets) — read-only. */

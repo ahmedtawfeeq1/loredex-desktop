@@ -56,3 +56,31 @@ describe('fenced code is copiable in the reader too (2026-07-23)', () => {
     expect(out).not.toContain('agent-copy-code')
   })
 })
+
+/**
+ * ```mermaid renders as the diagram (Mermaid.tsx). mermaid itself only loads in
+ * the browser (dynamic import inside the effect), so on this node-side render
+ * the block is present but still pending — which is exactly the assertion that
+ * would fail if the fence ever fell back to a plain code block again.
+ */
+describe('mermaid fences render as a diagram viewer', () => {
+  const flow = '```mermaid\nflowchart TD\n  A --> B\n```'
+
+  it('replaces the code block with the viewer', () => {
+    const out = html(flow)
+    expect(out).toContain('mermaid-block')
+    expect(out).toContain('Rendering diagram')
+    expect(out).not.toContain('agent-code-wrap')
+  })
+
+  it('keeps zoom and expand controls', () => {
+    const out = html(flow)
+    expect(out).toContain('Zoom in')
+    expect(out).toContain('Expand')
+    expect(out).toContain('100%')
+  })
+
+  it('leaves other languages alone', () => {
+    expect(html('```js\nconst mermaid = 1\n```')).not.toContain('mermaid-block')
+  })
+})

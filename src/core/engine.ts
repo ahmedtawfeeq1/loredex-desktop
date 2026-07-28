@@ -22,7 +22,9 @@ import {
   type Config,
   copyWorkspaceSpec,
   type DexType,
+  isRemoteServer,
   type LintFinding,
+  type StdioServerSpec,
   type WorkspaceResult,
   lintAgentOps,
   loadDexType,
@@ -394,19 +396,25 @@ export function clientConnections(client: string): Array<{
 }> {
   const spec = loadWorkspaceSpec(join(getConfig().vaultPath, 'projects', client))
   const ENV_REF = /\$\{([A-Z0-9_]+)\}/g
-  return Object.entries(spec.mcp).map(([server, def]) => {
-    const refs = new Set<string>()
-    for (const value of Object.values(def.env ?? {})) {
-      for (const m of value.matchAll(ENV_REF)) refs.add(m[1] as string)
-    }
-    return {
-      server,
-      envRefs: [...refs].sort(),
-      command: def.command,
-      args: def.args ?? [],
-      env: def.env ?? {},
-    }
-  })
+  // Remote (http) servers are excluded here — this call site (and its callers:
+  // the Add-Client modal, connection health probe) only understands the stdio
+  // launch shape. loredex's schema already accepts remote servers; a later
+  // task teaches this function the {type:'http', url, headers} shape too.
+  return Object.entries(spec.mcp)
+    .filter((entry): entry is [string, StdioServerSpec] => !isRemoteServer(entry[1]))
+    .map(([server, def]) => {
+      const refs = new Set<string>()
+      for (const value of Object.values(def.env ?? {})) {
+        for (const m of value.matchAll(ENV_REF)) refs.add(m[1] as string)
+      }
+      return {
+        server,
+        envRefs: [...refs].sort(),
+        command: def.command,
+        args: def.args ?? [],
+        env: def.env ?? {},
+      }
+    })
 }
 
 /** Absolute path of a client's directory — the Open-in-Terminal target. */

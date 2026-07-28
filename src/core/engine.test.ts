@@ -115,11 +115,12 @@ describe('recurateProject argv guard', () => {
   )
 })
 
-describe('clientConnections filters remote (http) servers', () => {
-  // task-1 stopgap regression test: clientConnections only understands the
-  // stdio launch shape (command/args/env). A remote (type: http) server must
-  // be filtered out rather than crash or leak a half-formed entry, and a
-  // stdio server alongside it must still come back with everything intact.
+describe('clientConnections resolves both the remote (http) and stdio shapes', () => {
+  // Task 1 left this filtering remote servers out (a stopgap — see git
+  // history). Task 4 replaces that filter with the real union-shaped return:
+  // a remote server comes back with type/url/headers and its envRefs resolved
+  // from `headers`; a stdio server still comes back with command/args/env and
+  // its envRefs resolved from `env`. This test pins THAT contract.
   const client = 'mcp-filter-test-client'
   const clientDir = join(FIXTURE_VAULT, 'projects', client)
 
@@ -148,17 +149,26 @@ skills: []
     rmSync(clientDir, { recursive: true, force: true })
   })
 
-  it('drops the remote server and keeps the stdio one with command/args/env/envRefs intact', () => {
+  it('returns the remote server with type/url/headers and the stdio one with command/args/env', () => {
     const conns = clientConnections(client)
-    expect(conns.map((c) => c.server)).toEqual(['crm-bridge'])
-    expect(conns).toEqual([
-      {
-        server: 'crm-bridge',
-        envRefs: ['CRM_TOKEN_X'],
-        command: 'npx',
-        args: ['-y', 'some-mcp-client'],
-        env: { CRM_TOKEN: '${CRM_TOKEN_X}' },
-      },
-    ])
+    expect(conns.map((c) => c.server).sort()).toEqual(['crm-bridge', 'crm-remote'])
+    expect(conns).toEqual(
+      expect.arrayContaining([
+        {
+          server: 'crm-remote',
+          envRefs: ['CRM_TOKEN_X'],
+          type: 'http',
+          url: 'https://api.example.com/mcp',
+          headers: { Authorization: 'Bearer ${CRM_TOKEN_X}' },
+        },
+        {
+          server: 'crm-bridge',
+          envRefs: ['CRM_TOKEN_X'],
+          command: 'npx',
+          args: ['-y', 'some-mcp-client'],
+          env: { CRM_TOKEN: '${CRM_TOKEN_X}' },
+        },
+      ]),
+    )
   })
 })

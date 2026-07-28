@@ -244,16 +244,15 @@ export interface CoreApi {
     in: { client: string; tokens: Record<string, string> }
     out: WorkspaceResult
   }
-  /** agent-ops: the golden client's mcp connections — Add-Client modal checkboxes */
+  /** agent-ops: the golden client's mcp connections — Add-Client modal checkboxes.
+   *  A remote (http) server comes back with type/url/headers; a stdio server
+   *  comes back with command/args/env — consumers must branch on the shape. */
   'clients.connections': {
     in: { client: string }
-    out: Array<{
-      server: string
-      envRefs: string[]
-      command: string
-      args: string[]
-      env: Record<string, string>
-    }>
+    out: Array<
+      | { server: string; envRefs: string[]; type: 'http'; url: string; headers: Record<string, string> }
+      | { server: string; envRefs: string[]; command: string; args: string[]; env: Record<string, string> }
+    >
   }
   /** agent-ops: bring one client (or whole fleet if client omitted) up to the
    *  canonical structure — folders, .gitkeep, starter pipeline/stage/agent —
@@ -396,6 +395,14 @@ export interface CoreApi {
     in: { client: string }
     out: { ok: boolean; detail: string; tools: string[] }
   }
+  /** Per-client Genudo sign-in (OAuth session, keychain-backed). Secrets never
+   *  cross this seam — only signedIn/account/expiresAt do. */
+  'clients.genudo.status': {
+    in: { client: string }
+    out: { signedIn: boolean; account: string | null; expiresAt: number | null }
+  }
+  'clients.genudo.signIn': { in: { client: string }; out: { account: string | null } }
+  'clients.genudo.signOut': { in: { client: string }; out: void }
   'clients.credentials.reveal': { in: { client: string; id: string }; out: { secret: string } }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,

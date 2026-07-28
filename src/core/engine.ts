@@ -24,7 +24,7 @@ import {
   type DexType,
   isRemoteServer,
   type LintFinding,
-  type StdioServerSpec,
+  secretFields,
   type WorkspaceResult,
   lintAgentOps,
   loadDexType,
@@ -383,38 +383,28 @@ export function copyTooling(
 }
 
 /**
- * A client's mcp connections with their launch config (env values still
+ * A client's mcp connections with their launch config (env/header values still
  * `${VAR}`-refs — secret-free). Feeds the Add-Client modal checkboxes and the
- * connection health probe.
+ * connection health probe. A remote (http) server comes back with
+ * `type`/`url`/`headers`; a stdio server comes back with `command`/`args`/`env` —
+ * callers must branch on the shape rather than assume stdio.
  */
-export function clientConnections(client: string): Array<{
-  server: string
-  envRefs: string[]
-  command: string
-  args: string[]
-  env: Record<string, string>
-}> {
+export function clientConnections(client: string): Array<
+  | { server: string; envRefs: string[]; type: 'http'; url: string; headers: Record<string, string> }
+  | { server: string; envRefs: string[]; command: string; args: string[]; env: Record<string, string> }
+> {
   const spec = loadWorkspaceSpec(join(getConfig().vaultPath, 'projects', client))
   const ENV_REF = /\$\{([A-Z0-9_]+)\}/g
-  // Remote (http) servers are excluded here — this call site (and its callers:
-  // the Add-Client modal, connection health probe) only understands the stdio
-  // launch shape. loredex's schema already accepts remote servers; a later
-  // task teaches this function the {type:'http', url, headers} shape too.
-  return Object.entries(spec.mcp)
-    .filter((entry): entry is [string, StdioServerSpec] => !isRemoteServer(entry[1]))
-    .map(([server, def]) => {
-      const refs = new Set<string>()
-      for (const value of Object.values(def.env ?? {})) {
-        for (const m of value.matchAll(ENV_REF)) refs.add(m[1] as string)
-      }
-      return {
-        server,
-        envRefs: [...refs].sort(),
-        command: def.command,
-        args: def.args ?? [],
-        env: def.env ?? {},
-      }
-    })
+  return Object.entries(spec.mcp).map(([server, def]) => {
+    const refs = new Set<string>()
+    for (const value of Object.values(secretFields(def))) {
+      for (const m of value.matchAll(ENV_REF)) refs.add(m[1] as string)
+    }
+    const base = { server, envRefs: [...refs].sort() }
+    return isRemoteServer(def)
+      ? { ...base, type: 'http' as const, url: def.url, headers: def.headers ?? {} }
+      : { ...base, command: def.command, args: def.args ?? [], env: def.env ?? {} }
+  })
 }
 
 /** Absolute path of a client's directory — the Open-in-Terminal target. */

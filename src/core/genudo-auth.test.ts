@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { Agent, createServer, get, type Server } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -25,6 +26,7 @@ import {
   genudoSessionRef,
   genudoSignOut,
   genudoStatus,
+  openInBrowser,
 } from './genudo-auth'
 
 let server: Server | null = null
@@ -279,5 +281,29 @@ describe('awaitCallback (loopback listener)', () => {
     } finally {
       close()
     }
+  })
+})
+
+/**
+ * The authorization URL is NOT fully trusted: its origin is server-supplied OAuth
+ * metadata, discovered against a host the user can type in themselves. A flagged
+ * finding on the first version of `openInBrowser` — it used `cmd /c start` on
+ * Windows, where cmd.exe re-parses its own command line and a `&` in the URL
+ * escapes the argument (the CVE-2024-27980 class this repo already works around
+ * for npx).
+ */
+describe('openInBrowser', () => {
+  it('refuses every scheme except http and https', async () => {
+    for (const bad of ['file:///etc/passwd', 'javascript:alert(1)', 'ms-msdt:/id', 'vbscript:x']) {
+      await expect(openInBrowser(new URL(bad))).rejects.toThrow(/only http and https/i)
+    }
+  })
+
+  it('never routes through cmd.exe on Windows — no shell re-parses the URL', () => {
+    // the guard is structural: cmd /c would re-parse `&`, `|`, `^`, `<`, `>`
+    const src = readFileSync(new URL('./genudo-auth.ts', import.meta.url), 'utf8')
+    const opener = src.slice(src.indexOf('export function openInBrowser'))
+    expect(opener).not.toMatch(/['"]cmd['"]/)
+    expect(opener).toMatch(/rundll32/)
   })
 })

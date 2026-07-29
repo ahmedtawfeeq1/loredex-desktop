@@ -57,17 +57,35 @@ const SCOPE = 'mcp:use'
  *   named 'shell'
  *
  * So spawn the platform's own opener, which is what `shell.openExternal` does
- * anyway. Arguments go through `execFile`'s array form — never a shell string —
- * so a URL cannot inject a command. `no-electron-import.test.ts` keeps the whole
- * of `src/core` free of this import class.
+ * anyway. `no-electron-import.test.ts` keeps the whole of `src/core` free of this
+ * import class.
+ *
+ * TWO THINGS KEEP THIS SAFE, because the URL is NOT fully trusted input: the
+ * authorization endpoint comes from server-supplied OAuth metadata, discovered
+ * against a host the user can now type in themselves.
+ *
+ * 1. NEVER `cmd /c start` on Windows. `execFile`'s array form stops injection on
+ *    POSIX, but cmd.exe re-parses its own command line, so `&`, `|`, `^`, `<`,
+ *    `>` in a URL break straight out of the argument — the same Windows
+ *    argument-parsing class as CVE-2024-27980, which this repo already works
+ *    around for npx. `rundll32 url.dll,FileProtocolHandler` opens the default
+ *    browser without a shell anywhere in the chain.
+ * 2. Only `https:` and `http:` are opened. That refuses `file:`, `javascript:`,
+ *    `vbscript:`, `ms-msdt:` and every other scheme a hostile authorization
+ *    server could hand back to be launched by the platform opener.
  */
-function openInBrowser(url: URL): Promise<void> {
+export function openInBrowser(url: URL): Promise<void> {
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    return Promise.reject(
+      new Error(`refusing to open a ${url.protocol} URL — only http and https are allowed`),
+    )
+  }
   const href = url.toString()
   const [cmd, args] =
     process.platform === 'darwin'
       ? (['open', [href]] as const)
       : process.platform === 'win32'
-        ? (['cmd', ['/c', 'start', '', href]] as const)
+        ? (['rundll32.exe', ['url.dll,FileProtocolHandler', href]] as const)
         : (['xdg-open', [href]] as const)
   return new Promise((resolve, reject) => {
     execFile(cmd, [...args], (error) => {

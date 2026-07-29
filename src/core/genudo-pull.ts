@@ -26,18 +26,6 @@ import { type Dirent, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path'
 import { genudoRpc } from './genudo-http'
 
-/**
- * The npm bridge version every stdio spawn of genudo-mcp-client pins to.
- *
- * 2.5.0 is the first release that speaks Streamable HTTP; everything before it
- * speaks the SSE transport the backend retired on 2026-07-28.
- *
- * A STOPGAP: it keeps a stale-cache machine working until every client is
- * migrated to the remote endpoint, after which nothing spawns the bridge and
- * this goes away with the last spawn site.
- */
-export const GENUDO_BRIDGE_VERSION = '2.5.0'
-
 /** Prose fields lifted out of the pipeline object into their own .md files. */
 const PIPELINE_PROSE = ['persona', 'instructions'] as const
 /**

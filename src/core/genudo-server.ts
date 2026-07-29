@@ -17,6 +17,15 @@ export async function genudoServerFor(
   client: string | null,
   httpOk: boolean,
 ): Promise<McpServer | null> {
+  // Checked FIRST, before any credential is touched. resolveConnEnv below
+  // calls through to genudoAccessToken, which SIGNS THE CLIENT OUT when a
+  // live session exists but cannot be renewed — a real, silent side effect.
+  // `httpOk` goes false on any handshake that omits the capability field, not
+  // just a hypothetical stdio-only adapter, so an ordinary session could hit
+  // that path today. Bail before resolving anything so a doomed lookup (the
+  // server is discarded either way once we reach the bottom) can never
+  // destroy a stored OAuth session on its way to being thrown away.
+  if (!httpOk) return null
   if (!client) return null
   // Flattened rather than the discriminated union `clientConnections` returns:
   // every field but `server`/`envRefs` only exists on one branch of that union,
@@ -48,13 +57,20 @@ export async function genudoServerFor(
     // same rule old-platform.ts and workspace-mcp.ts already follow.
     return null
   }
-  if (!httpOk) return null // no remote transport on this adapter — omit, never half-build
   const token = (resolved.Authorization ?? '').replace(/^Bearer\s+/i, '') || resolved.GENUDO_TOKEN
   if (!token) return null
   return {
     type: 'http',
     name: GENUDO_SERVER,
-    url: conn.url ?? `${GENUDO_BASE_URL}/mcp`,
+    // `conn.url` is already the FULL endpoint (`.../mcp`) — passed through
+    // unmodified, never stripped/re-appended (that's handlers.ts's
+    // `genudoBaseUrl`, a different code path for callers that append their
+    // own suffix). The fallback is for an unmigrated client's stdio shape,
+    // which has no `url` at all: `resolved.GENUDO_BASE_URL` is that
+    // connection's OWN expanded env var (e.g. a self-hosted override), so it
+    // wins over the production default — an unmigrated self-hosted client
+    // must not get silently pointed at prod.
+    url: conn.url ?? `${(resolved.GENUDO_BASE_URL ?? GENUDO_BASE_URL).replace(/\/+$/, '')}/mcp`,
     headers: [{ name: 'Authorization', value: `Bearer ${token}` }],
   } as McpServer
 }

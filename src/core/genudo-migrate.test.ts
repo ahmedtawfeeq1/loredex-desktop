@@ -173,6 +173,39 @@ skills: []
     expect(changed).toBe(true)
     expect(text).toContain('genudo-no-connector@genudo-ai')
   })
+
+  // Review finding (2026-07-29): the re-review flagged this as the weak
+  // spot — migrateWorkspaceYml REBUILDS the entire matched block from
+  // scratch (unlike setGenudoUrl, which only replaces a single line within
+  // it), so an over-matched block boundary here wouldn't just misplace a
+  // rewrite, it would DESTROY the sibling's content by omitting it from the
+  // reconstruction entirely. setGenudoUrl's existing sibling test cannot
+  // catch that class of bug — it never rebuilds anything.
+  it('does not destroy a sibling genudo-old-platform: block when rebuilding the matched genudo: block', () => {
+    const withOldPlatform = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}"
+      GENUDO_BASE_URL: "https://api.genudo.ai"
+  genudo-old-platform:
+    type: http
+    url: https://old.genudo.ai/mcp
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = migrateWorkspaceYml(withOldPlatform)
+    expect(changed).toBe(true)
+    expect(text).toContain('type: http')
+    expect(text).toContain('url: https://api.genudo.ai/mcp')
+    expect(text).toContain('Authorization: "Bearer ${GENUDO_TOKEN_ACME}"')
+    // the sibling block must survive COMPLETELY intact — not swallowed into
+    // the rebuilt genudo: block, not silently dropped
+    expect(text).toContain('genudo-old-platform:')
+    expect(text).toContain('url: https://old.genudo.ai/mcp')
+  })
 })
 
 describe('pruneEnabledPlugins', () => {
@@ -302,6 +335,98 @@ skills: []
     const { text, changed } = setGenudoUrl(overridden, null)
     expect(changed).toBe(true)
     expect(text).toContain('GENUDO_BASE_URL: https://api.genudo.ai')
+  })
+
+  it('is a no-op (changed: false) on the stdio shape when already at the requested value', () => {
+    const overridden = setGenudoUrl(STDIO_WS, 'https://genudo.acme.internal').text
+    const { text, changed } = setGenudoUrl(overridden, 'https://genudo.acme.internal')
+    expect(changed).toBe(false)
+    expect(text).toBe(overridden)
+  })
+
+  // Review finding (2026-07-29), New Important 2: the ORDINARY, most common
+  // stdio client — no GENUDO_BASE_URL override at all, defaulted for at
+  // migrateWorkspaceYml's line 53 and modeled at genudo-server.test.ts's
+  // "falls back to the production default" case. The old version only ever
+  // rewrote an EXISTING line, so this client's environment field rendered
+  // but was permanently unsettable — the exact stranding this function
+  // exists to prevent, just for a different fixture shape than round 1 fixed.
+  it('INSERTS GENUDO_BASE_URL (block-style) when the key is absent entirely', () => {
+    const noOverride = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(noOverride, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('GENUDO_BASE_URL: https://genudo.acme.internal')
+    expect(text).not.toContain('/mcp')
+    // the existing key, and everything else, survives untouched
+    expect(text).toContain('GENUDO_TOKEN: "${GENUDO_TOKEN_ACME}"')
+    expect(text).toContain('command: npx')
+    expect(text).toContain('genudo@genudo-ai')
+  })
+
+  // Review finding (2026-07-29): flow-style env is the loredex scaffold
+  // TEMPLATE's own convention (agent-ops-scaffold.ts's WORKSPACE_TEMPLATE)
+  // and the shape clients-create.test.ts's fixtures use — a real shape, not
+  // a hypothetical one.
+  it('rewrites GENUDO_BASE_URL in place for flow-style env with the key present', () => {
+    const flowWithKey = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env: { GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}", GENUDO_BASE_URL: "https://api.genudo.ai" }
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(flowWithKey, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('GENUDO_BASE_URL: https://genudo.acme.internal')
+    expect(text).not.toContain('/mcp')
+    expect(text).toContain('GENUDO_TOKEN: "${GENUDO_TOKEN_ACME}"')
+    // still one line, still flow-style — not exploded into block-style
+    expect(text).toContain(
+      'env: { GENUDO_TOKEN: "${GENUDO_TOKEN_ACME}", GENUDO_BASE_URL: https://genudo.acme.internal }',
+    )
+  })
+
+  it('INSERTS GENUDO_BASE_URL into flow-style env when the key is absent', () => {
+    const flowNoKey = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env: { GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}" }
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(flowNoKey, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain(
+      'env: { GENUDO_TOKEN: "${GENUDO_TOKEN_ACME}", GENUDO_BASE_URL: https://genudo.acme.internal }',
+    )
+  })
+
+  it('INSERTS GENUDO_BASE_URL into a completely empty flow-style env', () => {
+    const emptyFlow = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env: {}
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(emptyFlow, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('env: { GENUDO_BASE_URL: https://genudo.acme.internal }')
   })
 
   it('leaves a workspace.yml with no genudo block at all alone', () => {

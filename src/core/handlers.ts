@@ -19,7 +19,7 @@ import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
 import { storeClientToken } from './client-tokens'
 import { genudoSignIn, genudoSignOut, genudoStatus } from './genudo-auth'
-import { clientTokenOverlay, resolveConnEnv } from './genudo-credential'
+import { clientTokenOverlay, resolveConnEnv, stdioGenudoBaseUrl } from './genudo-credential'
 import { GENUDO_BASE_URL } from './genudo-http'
 import { fetchBundles, planFiles } from './genudo-pull'
 import { buildKbWorkbook } from './kb-export'
@@ -640,7 +640,7 @@ export function registerCoreHandlers(
   // non-production host (self-hosted/staging) must run discovery, DCR and the
   // token exchange against that host, not silently default to production.
   ipc.register('clients.genudo.status', ({ client }) => genudoStatus(client))
-  ipc.register('clients.genudo.signIn', ({ client }) => {
+  ipc.register('clients.genudo.signIn', async ({ client }) => {
     const conn = engine.clientConnections(client).find((c) => c.server === 'genudo')
     // Review finding (2026-07-29) — CRITICAL: this used to call
     // genudoBaseUrl(conn) with NO env, so for a still-stdio connection (the
@@ -651,15 +651,22 @@ export function registerCoreHandlers(
     // GENUDO_BASE_URL. A self-hosted client would sign in — discovery, DCR,
     // token exchange, all of it — against the wrong tenant.
     //
-    // Fixed by passing the connection's OWN declared env: `conn.env` on the
-    // stdio shape carries GENUDO_BASE_URL as a plain literal (never a
-    // `${VAR}` secret ref — see the genudo-migrate.ts fixtures), so this is
-    // NOT routed through resolveConnEnv, which resolves CREDENTIALS and can
-    // sign the client out as a side effect (genudo-credential.ts's module
-    // doc) — wrong on a sign-in path that hasn't signed in yet. The http
+    // Round 2 (2026-07-29): the first fix passed `conn.env` straight through,
+    // but `clientConnections` returns env values UNEXPANDED — a client
+    // configured as `env: { GENUDO_BASE_URL: '${GENUDO_BASE_URL}' }` (the
+    // exact shape genudo-server.test.ts models, and which the client page
+    // renders a paste field for) would then call genudoSignIn with the
+    // literal string `'${GENUDO_BASE_URL}'`. `stdioGenudoBaseUrl` expands a
+    // `${VAR}` ref from the keychain (the same primitive clientTokenOverlay
+    // uses) and THROWS — rather than silently falling back to production —
+    // when the ref can't be expanded. Not resolveConnEnv/clientTokenOverlay:
+    // those also resolve the live OAuth token and can sign the client out as
+    // a side effect on a dead session, wrong on a path that hasn't signed in
+    // yet. A literal (non-ref) value passes through unchanged, and the http
     // branch of genudoBaseUrl ignores `env` entirely (it reads conn.url
     // instead), so this is a no-op for an already-migrated connection.
-    const env = conn && 'env' in conn ? conn.env : {}
+    const baseUrl = conn && 'env' in conn ? await stdioGenudoBaseUrl(client, conn) : undefined
+    const env: Record<string, string> = baseUrl !== undefined ? { GENUDO_BASE_URL: baseUrl } : {}
     return genudoSignIn(client, genudoBaseUrl(conn, env))
   })
   ipc.register('clients.genudo.signOut', ({ client }) => genudoSignOut(client))

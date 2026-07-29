@@ -48,6 +48,63 @@ function liveGenudoToken(client: string): Promise<string | null> {
 }
 
 /**
+ * The subset of a genudo connection's `envRefs` that actually carry the
+ * CREDENTIAL — the ref(s) named inside the `Authorization` header (http
+ * shape) or `GENUDO_TOKEN` (stdio shape). Review finding (2026-07-29): both
+ * callers below used to overwrite EVERY envRef with the live session token
+ * unconditionally — so a client whose `GENUDO_BASE_URL` is itself a `${VAR}`
+ * ref (a real, modeled shape — `genudo-server.test.ts`, and the paste field
+ * the client page renders for it) got the live BEARER TOKEN substituted into
+ * a URL field once a session existed. `genudo-server.ts` then builds an
+ * endpoint out of that value. A token in a URL is a token in logs.
+ */
+function credentialRefs(conn: ClientConnection): Set<string> {
+  const source = conn.headers?.Authorization ?? conn.env?.GENUDO_TOKEN
+  const refs = new Set<string>()
+  if (!source) return refs
+  for (const m of source.matchAll(ENV_REF)) refs.add(m[1] as string)
+  return refs
+}
+
+/**
+ * Round-2 review finding (2026-07-29): a still-stdio connection's
+ * `GENUDO_BASE_URL` can itself be a `${VAR}` ref — not a literal host — the
+ * shape `genudo-server.test.ts` models, and the shape a user sets via the
+ * SAME per-envRef paste field the client page renders for a token. Sign-in
+ * needs this value BEFORE any session exists, so it must not go through
+ * `resolveConnEnv`/`clientTokenOverlay` (those also resolve the live OAuth
+ * token and can sign the client out as a side effect on a dead, unrenewable
+ * session — wrong on a path that has no session yet). This reads ONLY the
+ * keychain, via the same `readClientTokens` primitive those two use
+ * internally.
+ *
+ * Returns `undefined` when the connection has no `GENUDO_BASE_URL` field at
+ * all — the caller falls through to `conn.url` / the production default,
+ * both correct. Returns the value UNCHANGED when it isn't a `${VAR}` ref (a
+ * literal host, as most fixtures declare it). THROWS — never silently falls
+ * back to production — when it IS a ref but nothing is stored for it yet;
+ * that silent fallback is the exact class of bug this whole review round
+ * started with.
+ */
+export async function stdioGenudoBaseUrl(
+  client: string,
+  conn: ClientConnection,
+): Promise<string | undefined> {
+  const raw = conn.env?.GENUDO_BASE_URL
+  if (raw === undefined) return undefined
+  const ref = /^\$\{([A-Z0-9_]+)\}$/.exec(raw)?.[1]
+  if (!ref) return raw // a literal host — nothing to expand
+  const held = await readClientTokens([ref])
+  const value = held[ref]
+  if (!value) {
+    throw new Error(
+      `${client}'s genudo connection declares GENUDO_BASE_URL as \${${ref}}, but nothing is stored for it yet — paste the host in Agent tooling before signing in`,
+    )
+  }
+  return value
+}
+
+/**
  * Every `${VAR}` this machine can fill for one client, ref → value.
  *
  * This is what `generateWorkspace` is fed, so a materialized `.mcp.json` carries a
@@ -71,7 +128,7 @@ export async function clientTokenOverlay(
     } catch {
       live = null // session existed but couldn't be renewed — read as "not held"
     }
-    if (live) for (const ref of genudo.envRefs) held[ref] = live
+    if (live) for (const ref of credentialRefs(genudo)) held[ref] = live
   }
   return held
 }
@@ -91,7 +148,7 @@ export async function resolveConnEnv(
   const held = await readClientTokens(conn.envRefs)
   if (conn.server === GENUDO_SERVER) {
     const live = await liveGenudoToken(client) // bare — a renewal failure propagates
-    if (live) for (const ref of conn.envRefs) held[ref] = live
+    if (live) for (const ref of credentialRefs(conn)) held[ref] = live
   }
   const source = conn.headers ?? conn.env ?? {}
   const out: Record<string, string> = {}

@@ -121,6 +121,74 @@ export function normalizeGenudoUrl(input: string): string {
 }
 
 /**
+ * Rewrite (or insert) `GENUDO_BASE_URL` inside a still-stdio genudo block's
+ * `env:` — either shape a real workspace.yml uses:
+ *   - block-style, key already present: `env:\n  GENUDO_BASE_URL: x\n` — value
+ *     replaced in place.
+ *   - flow-style, key already present: `env: { …, GENUDO_BASE_URL: x }` — same
+ *     replace, just not anchored to line-start (the key sits mid-line).
+ *   - block-style, key ABSENT (the ordinary production-default client —
+ *     `genudo-server.test.ts`'s "falls back to the production default" case):
+ *     a new `GENUDO_BASE_URL: <target>` line is INSERTED after the block's
+ *     last existing key, at the same indent.
+ *   - flow-style, key ABSENT (the loredex scaffold's own template convention,
+ *     `agent-ops-scaffold.ts`'s `WORKSPACE_TEMPLATE`, and the shape
+ *     `clients-create.test.ts`'s fixtures use): inserted before the closing
+ *     `}`.
+ *
+ * Review finding (2026-07-29): the PREVIOUS version only ever rewrote an
+ * EXISTING block-style line — both "no key at all" (the common,
+ * production-default case) and flow-style env were silent no-ops, which
+ * meant the environment field rendered but was permanently unsettable for
+ * most real clients, the exact stranding finding this function exists to fix.
+ *
+ * Returns `changed: false` only when there is truly no `env:` to attach to
+ * (block or flow) — malformed input the caller should treat as a hard
+ * failure, same as any other no-op here.
+ */
+function setStdioGenudoBaseUrl(block: string, target: string): { block: string; changed: boolean } {
+  // Case 1: an existing key, in EITHER style — rewrite the value in place.
+  // Not anchored to line-start: flow-style has the key mid-line.
+  if (/GENUDO_BASE_URL:/.test(block)) {
+    let changed = false
+    const next = block.replace(
+      /GENUDO_BASE_URL:\s*("[^"]*"|'[^']*'|[^,}\s][^,}\n]*)/,
+      (whole) => {
+        const replacement = `GENUDO_BASE_URL: ${target}`
+        if (replacement !== whole) changed = true
+        return replacement
+      },
+    )
+    return { block: next, changed }
+  }
+  // Case 2: flow-style `env: { … }` with no GENUDO_BASE_URL key — insert one.
+  // `[^{}]*` would stop at the FIRST brace it hits — and a `${VAR}` ref
+  // (e.g. GENUDO_TOKEN: "${GENUDO_TOKEN_ACME}") is itself brace-delimited, so
+  // that naive class breaks on every realistic fixture. Flow style is
+  // single-line by definition, so `.*` (greedy, backtracks to the LAST `}`
+  // on the line, anchored at end-of-line) is the correct — and simpler —
+  // match.
+  const flowEnv = /^([ \t]+)env:[ \t]*\{(.*)\}[ \t]*$/m.exec(block)
+  if (flowEnv) {
+    const inner = flowEnv[2].trim()
+    const sep = inner.length > 0 ? ', ' : ''
+    const replacement = `${flowEnv[1]}env: { ${inner}${sep}GENUDO_BASE_URL: ${target} }`
+    return { block: block.replace(flowEnv[0], replacement), changed: true }
+  }
+  // Case 3: block-style `env:\n  KEY: val\n  …` with no GENUDO_BASE_URL key —
+  // append a new line at the same indent as the block's existing keys.
+  const blockEnv = /^([ \t]+)env:\n((?:\1[ \t]+.*\n)+)/m.exec(block)
+  if (blockEnv) {
+    const keyIndent = /^([ \t]+)/.exec(blockEnv[2])?.[1] ?? `${blockEnv[1]}  `
+    const replacement = `${blockEnv[0]}${keyIndent}GENUDO_BASE_URL: ${target}\n`
+    return { block: block.replace(blockEnv[0], replacement), changed: true }
+  }
+  // No `env:` at all to attach to — leave it for a human (same
+  // omit-rather-than-half-build rule as everywhere else in this file).
+  return { block, changed: false }
+}
+
+/**
  * Rewrite the `genudo` connection's declared base host in a client's
  * workspace.yml — TEXT-level, exactly like `migrateWorkspaceYml` above, so
  * comments and unrelated formatting in this committed, human-authored file
@@ -130,17 +198,17 @@ export function normalizeGenudoUrl(input: string): string {
  * unsettable just because a client hasn't been through the fleet migration,
  * which is dry-by-default and has not touched the fleet yet):
  *   - already-http: rewrites the `url:` line to the canonical `.../mcp` endpoint.
- *   - still-stdio (unmigrated): rewrites the `GENUDO_BASE_URL:` line inside the
- *     block's `env:` — as a BARE HOST, matching the existing fixture
- *     convention (`genudo-server.ts`'s stdio fallback appends `/mcp` itself at
- *     read time; writing the endpoint form here would eventually double it).
- *     Only rewrites an EXISTING line — every real fixture already declares
- *     one — never inserts a new one.
+ *   - still-stdio (unmigrated): rewrites (or inserts) `GENUDO_BASE_URL` inside
+ *     the block's `env:`, block-style or flow-style — as a BARE HOST, matching
+ *     the existing fixture convention (`genudo-server.ts`'s stdio fallback
+ *     appends `/mcp` itself at read time; writing the endpoint form here
+ *     would eventually double it). See `setStdioGenudoBaseUrl` above.
  *
  * A no-op (`changed: false`) when the block has neither a `url:` line (http
- * shape) nor a `GENUDO_BASE_URL:` line (stdio shape) to rewrite, or no genudo
- * block at all. The caller (engine/handlers) treats that as a hard failure —
- * see `setGenudoBaseUrl` in engine.ts — rather than silently reporting success.
+ * shape) nor any `env:` to attach `GENUDO_BASE_URL` to (stdio shape), or no
+ * genudo block at all. The caller (engine/handlers) treats that as a hard
+ * failure — see `setGenudoBaseUrl` in engine.ts — rather than silently
+ * reporting success.
  */
 export function setGenudoUrl(text: string, url: string | null): { text: string; changed: boolean } {
   let changed = false
@@ -156,11 +224,9 @@ export function setGenudoUrl(text: string, url: string | null): { text: string; 
     // stdio (unmigrated) shape: the override lives in env.GENUDO_BASE_URL, as
     // a bare host (see doc comment above — no /mcp suffix here).
     const target = url === null ? GENUDO_BASE_URL : stripGenudoSuffix(url)
-    return block.replace(/^([ \t]+)GENUDO_BASE_URL:[ \t]*.*$/m, (line: string, indent: string) => {
-      const next = `${indent}GENUDO_BASE_URL: ${target}`
-      if (next !== line) changed = true
-      return next
-    })
+    const result = setStdioGenudoBaseUrl(block, target)
+    if (result.changed) changed = true
+    return result.block
   })
   return { text: out, changed }
 }

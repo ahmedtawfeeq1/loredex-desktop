@@ -33,7 +33,18 @@ const GENUDO_BLOCK =
 // quote characters, so setGenudoUrl silently no-op'd on any block a human (or
 // a future codegen path) happened to quote. Tolerate an optional `'`/`"` on
 // either side; unquoted `type: http` still matches exactly as before.
-const HTTP_TYPE_RE = /type:\s*['"]?http['"]?/
+//
+// Review finding (2026-07-29, round 2): this was ALSO unanchored — a bare
+// substring search over the whole block, so a comment like `# TODO: migrate
+// this connection to type: http eventually` made `.test()` return true on a
+// block that is genuinely still stdio. In `migrateWorkspaceYml` that client
+// was then silently treated as already-migrated and skipped: no error, no
+// log line, and it would not show up in a dry-run diff to catch before
+// `--apply`. Anchored to line-start (only leading whitespace before the
+// literal `type:` key) so a comment — whose first non-whitespace character is
+// always `#` — can never satisfy it, same anchoring discipline as
+// `setStdioGenudoBaseUrl`'s `blockKey`/`flowKey` below.
+const HTTP_TYPE_RE = /^[ \t]+type:[ \t]*['"]?http['"]?/m
 
 // NOTE: deliberately NOT reused with `.test()`. A global regex's `.test()`/`.exec()`
 // carries `lastIndex` across calls, so calling `migrateWorkspaceYml` on a second file
@@ -45,12 +56,52 @@ const OLD_PLUGIN = /\bgenudo@genudo-ai\b/g
 const NEW_PLUGIN = 'genudo-no-connector@genudo-ai'
 export const STALE_PLUGIN_KEY = 'genudo@genudo-ai'
 
+/**
+ * Extract a `KEY: value` mapping's value from inside a genudo block's `env:`,
+ * anchored to the REAL key — never a bare substring search over the block.
+ *
+ * Review finding (2026-07-29, round 3): `migrateWorkspaceYml`'s `${VAR}` ref
+ * extractor and its `GENUDO_BASE_URL` extractor were both unanchored
+ * (`/\$\{([A-Z0-9_]+)\}/.exec(block)` and `/GENUDO_BASE_URL:\s*"?([^"\s]+)"?/
+ * .exec(block)`), so either one matched the FIRST occurrence anywhere in the
+ * block — including a comment. A line like `# previously used
+ * ${GENUDO_TOKEN_LEGACY} before rotation` above the real
+ * `GENUDO_TOKEN: "${GENUDO_TOKEN_ACME}"` line captured the decoy ref, which
+ * then got baked into the rebuilt block's `Authorization: "Bearer
+ * ${GENUDO_TOKEN_LEGACY}"` — a reference to a credential that may not exist
+ * in the keychain at all, auth silently broken while the migration reports
+ * success. A comment naming a former host did the same to the base URL, and
+ * because `migrateWorkspaceYml` REBUILDS the whole block (unlike
+ * `setGenudoUrl`, which rewrites a single `url:` line), the wrong host gets
+ * baked in permanently: the next run sees `type: http` and treats the block
+ * as already migrated, so there is no second chance.
+ *
+ * Same two anchors as `setStdioGenudoBaseUrl`'s `blockKey`/`flowKey` below —
+ * line-start (block-style) or an immediately-preceding `{`/`,` (flow-style) —
+ * so a comment that merely MENTIONS the key can never be mistaken for the key
+ * itself: a comment's first non-whitespace character is always `#`, which
+ * can't satisfy either anchor. The block-style bare-value alternative
+ * deliberately does NOT exclude `}`/`,` (unlike the flow-style one) — an
+ * unquoted `${VAR}` value contains a literal `}`, and on a real fleet fixture
+ * (block-style, unquoted env values — the majority shape in
+ * clients_work/projects) excluding it left the value truncated one character
+ * short of the closing brace, which then failed the trailing `[ \t]*$` anchor
+ * and matched nothing at all.
+ */
+function extractEnvValue(block: string, key: string): string | undefined {
+  const blockKey = new RegExp(`^[ \\t]+${key}:[ \\t]*("[^"]*"|'[^']*'|[^\\s][^\\n]*)?[ \\t]*$`, 'm')
+  const flowKey = new RegExp(`[{,][ \\t]*${key}:[ \\t]*("[^"]*"|'[^']*'|[^,}\\s][^,}\\n]*)?`)
+  const raw = (blockKey.exec(block) ?? flowKey.exec(block))?.[1]
+  return raw === undefined ? undefined : raw.trim().replace(/^["']|["']$/g, '')
+}
+
 export function migrateWorkspaceYml(text: string): { text: string; changed: boolean } {
   let changed = false
   let out = text.replace(GENUDO_BLOCK, (block, indent: string) => {
     if (HTTP_TYPE_RE.test(block)) return block // already migrated
-    const ref = /\$\{([A-Z0-9_]+)\}/.exec(block)?.[1]
-    const base = /GENUDO_BASE_URL:\s*"?([^"\s]+)"?/.exec(block)?.[1] ?? 'https://api.genudo.ai'
+    const tokenValue = extractEnvValue(block, 'GENUDO_TOKEN')
+    const ref = tokenValue ? /\$\{([A-Z0-9_]+)\}/.exec(tokenValue)?.[1] : undefined
+    const base = extractEnvValue(block, 'GENUDO_BASE_URL') ?? 'https://api.genudo.ai'
     if (!ref) return block // nothing to carry over — leave it for a human
     changed = true
     const inner = `${indent}  `

@@ -206,6 +206,88 @@ skills: []
     expect(text).toContain('genudo-old-platform:')
     expect(text).toContain('url: https://old.genudo.ai/mcp')
   })
+
+  // Review finding (2026-07-30): a later reviewer found the same unanchored-
+  // match class already fixed twice elsewhere in this file (setStdioGenudoBaseUrl,
+  // HTTP_TYPE_RE for setGenudoUrl) in three more places, all inside
+  // migrateWorkspaceYml itself. This is the worst of the three: the `${VAR}`
+  // ref extractor (`/\$\{([A-Z0-9_]+)\}/.exec(block)`) searched the whole
+  // block as a bare substring, so a comment mentioning an OLD ref matched
+  // first and got baked into the rebuilt block's Authorization header — a
+  // reference to a credential that may not exist in the keychain at all,
+  // auth silently broken while the migration reports success.
+  it('extracts the ${VAR} ref from the real GENUDO_TOKEN key, not a comment mentioning one', () => {
+    const decoyRef = `mcp:
+  genudo:
+    command: npx
+    # previously used \${GENUDO_TOKEN_LEGACY} before rotation
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}"
+      GENUDO_BASE_URL: "https://api.genudo.ai"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = migrateWorkspaceYml(decoyRef)
+    expect(changed).toBe(true)
+    expect(text).toContain('Authorization: "Bearer ${GENUDO_TOKEN_ACME}"')
+    expect(text).not.toContain('GENUDO_TOKEN_LEGACY')
+  })
+
+  // Review finding (2026-07-30): same root cause, the base-URL extractor
+  // (`/GENUDO_BASE_URL:\s*"?([^"\s]+)"?/.exec(block)`). Because
+  // migrateWorkspaceYml REBUILDS the whole block (unlike setGenudoUrl, which
+  // rewrites a single `url:` line), a wrong host baked in from a decoy
+  // comment is PERMANENT — the next run sees `type: http` and treats the
+  // block as already migrated, so there is no second chance to fix it.
+  it('extracts GENUDO_BASE_URL from the real key, not a comment naming a former host', () => {
+    const decoyBase = `mcp:
+  genudo:
+    command: npx
+    # formerly pointed at https://old-genudo.staging.internal
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}"
+      GENUDO_BASE_URL: "https://api.genudo.ai"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = migrateWorkspaceYml(decoyBase)
+    expect(changed).toBe(true)
+    expect(text).toContain('url: https://api.genudo.ai/mcp')
+    expect(text).not.toContain('old-genudo.staging.internal')
+  })
+
+  // Review finding (2026-07-30): HTTP_TYPE_RE itself (shared with
+  // setGenudoUrl) was ALSO an unanchored substring search, so a comment
+  // merely MENTIONING "type: http" (a plausible TODO note in a
+  // human-maintained ops vault) made `.test(block)` return true on a block
+  // that is genuinely still stdio. migrateWorkspaceYml then treated it as
+  // already-migrated and returned it byte-for-byte unchanged — no error, no
+  // log line, and the client would not appear in a dry-run's output at all,
+  // silently missing the migration entirely.
+  it('migrates a still-stdio block even when a comment inside it mentions "type: http"', () => {
+    const decoyType = `mcp:
+  genudo:
+    command: npx
+    # TODO: migrate this connection to type: http eventually
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}"
+      GENUDO_BASE_URL: "https://api.genudo.ai"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = migrateWorkspaceYml(decoyType)
+    expect(changed).toBe(true)
+    expect(text).toContain('type: http')
+    expect(text).toContain('url: https://api.genudo.ai/mcp')
+    expect(text).toContain('Authorization: "Bearer ${GENUDO_TOKEN_ACME}"')
+    expect(text).not.toContain('command: npx')
+  })
 })
 
 describe('pruneEnabledPlugins', () => {

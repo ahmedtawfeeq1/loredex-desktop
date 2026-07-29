@@ -16,6 +16,12 @@ vi.mock('./client-tokens', () => ({
 }))
 const accessToken = vi.fn(async (_client: string) => null as string | null)
 vi.mock('./genudo-auth', () => ({ genudoAccessToken: (c: string) => accessToken(c) }))
+// This file covers the behaviour when sign-in is ENABLED — session outranks a
+// pasted token. The shipped flag is currently false (see genudo-flags.ts), so
+// it is forced on here rather than deleting the coverage: flipping the switch
+// back must restore exactly this, and genudo-credential.signin-off.test.ts
+// pins what ships today.
+vi.mock('../shared/genudo-flags', () => ({ GENUDO_SIGN_IN_ENABLED: true }))
 
 import { clientTokenOverlay, resolveConnEnv } from './genudo-credential'
 

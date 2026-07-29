@@ -16,6 +16,7 @@ import type {
   WorkspaceResult,
 } from '../../../../shared/ipc-contract'
 import type { AcpAgent } from '../../../../shared/ipc-contract'
+import { GENUDO_SIGN_IN_ENABLED } from '../../../../shared/genudo-flags'
 import type { Identity } from '../../../../shared/types'
 import { AGENT_META, AGENTS } from '../../agent/AgentPanel'
 import { invoke, revealPath, saveExport } from '../../api'
@@ -839,7 +840,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                 discovery/DCR/the token exchange against staging, not
                 silently against production. */}
             <div className="cp-facts">
-            {conn.server === 'genudo' && genudo && genudoStatusLabel && (
+            {GENUDO_SIGN_IN_ENABLED && conn.server === 'genudo' && genudo && genudoStatusLabel && (
               <>
                 <span className="cp-fact-label">Sign-in</span>
                 <span className={genudoSettled ? 'cp-fact-value' : 'cp-fact-value warn'}>

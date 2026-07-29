@@ -25,6 +25,7 @@
  * text. `liveGenudoToken` is the shared, uncaught call; `clientTokenOverlay`
  * is the only one of the two that wraps it.
  */
+import { GENUDO_SIGN_IN_ENABLED } from '../shared/genudo-flags'
 import { readClientTokens } from './client-tokens'
 import { genudoAccessToken } from './genudo-auth'
 
@@ -42,8 +43,13 @@ export interface ClientConnection {
 }
 
 /** Bare — may throw when a session exists but could not be renewed (the
- *  caller decides whether that's fatal; this function never catches it). */
+ *  caller decides whether that's fatal; this function never catches it).
+ *
+ *  Returns null without touching the keychain when sign-in is switched off, so
+ *  a session stored before the switch cannot keep outranking the pasted token
+ *  the user can actually see and replace. */
 function liveGenudoToken(client: string): Promise<string | null> {
+  if (!GENUDO_SIGN_IN_ENABLED) return Promise.resolve(null)
   return genudoAccessToken(client)
 }
 

@@ -14,8 +14,8 @@
  * Secrets never leave this process: only `signedIn`, the account label and an expiry
  * cross the IPC seam.
  */
+import { execFile } from 'node:child_process'
 import { createServer } from 'node:http'
-import { shell } from 'electron'
 import {
   auth,
   discoverOAuthServerInfo,
@@ -44,6 +44,38 @@ import { GENUDO_BASE_URL } from './genudo-http'
 export const CALLBACK_PORT = 47821
 const REDIRECT_URI = `http://127.0.0.1:${CALLBACK_PORT}/callback`
 const SCOPE = 'mcp:use'
+
+/**
+ * Open a URL in the user's default browser, WITHOUT `electron`.
+ *
+ * This module is bundled into `core.js`, which runs in Electron's utilityProcess
+ * — and that process does not export `shell`. `import { shell } from 'electron'`
+ * type-checks, passes every test that mocks `electron`, and then kills the core
+ * host on the first real launch:
+ *
+ *   SyntaxError: The requested module 'electron' does not provide an export
+ *   named 'shell'
+ *
+ * So spawn the platform's own opener, which is what `shell.openExternal` does
+ * anyway. Arguments go through `execFile`'s array form — never a shell string —
+ * so a URL cannot inject a command. `no-electron-import.test.ts` keeps the whole
+ * of `src/core` free of this import class.
+ */
+function openInBrowser(url: URL): Promise<void> {
+  const href = url.toString()
+  const [cmd, args] =
+    process.platform === 'darwin'
+      ? (['open', [href]] as const)
+      : process.platform === 'win32'
+        ? (['cmd', ['/c', 'start', '', href]] as const)
+        : (['xdg-open', [href]] as const)
+  return new Promise((resolve, reject) => {
+    execFile(cmd, [...args], (error) => {
+      if (error) reject(new Error(`could not open the browser (${error.message})`))
+      else resolve()
+    })
+  })
+}
 /** Refresh this far ahead of expiry, so a token handed out is still valid on arrival. */
 const REFRESH_MARGIN_MS = 60_000
 
@@ -354,7 +386,7 @@ export async function genudoSignIn(
       }
     },
     redirectToAuthorization: async (authorizationUrl: URL) => {
-      await shell.openExternal(authorizationUrl.toString())
+      await openInBrowser(authorizationUrl)
     },
     saveCodeVerifier: (v: string) => {
       verifier = v

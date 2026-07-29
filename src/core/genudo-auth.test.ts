@@ -12,14 +12,11 @@ vi.mock('./client-tokens', () => ({
   }),
 }))
 
-// genudo-auth.ts imports `shell` from 'electron' for the interactive sign-in
-// path. Outside a real Electron process that module has no such export, so
-// vitest's node environment needs the same stub other src/main/*.test.ts
-// files use (shell-open.test.ts, zoom.test.ts) — none of these tests drive
-// sign-in, but the static import still has to resolve.
-vi.mock('electron', () => ({
-  shell: { openExternal: vi.fn() },
-}))
+// NOTE: there is deliberately no `vi.mock('electron')` here. genudo-auth.ts used
+// to import `shell` from 'electron', and this mock is what let that pass — while
+// the real core host, running in Electron's utilityProcess, died on launch with
+// "does not provide an export named 'shell'". Sign-in now spawns the platform's
+// own opener instead, and `no-electron-import.test.ts` keeps core electron-free.
 
 import {
   awaitCallback,

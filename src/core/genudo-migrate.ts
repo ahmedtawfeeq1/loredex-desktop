@@ -148,17 +148,37 @@ export function normalizeGenudoUrl(input: string): string {
  */
 function setStdioGenudoBaseUrl(block: string, target: string): { block: string; changed: boolean } {
   // Case 1: an existing key, in EITHER style — rewrite the value in place.
-  // Not anchored to line-start: flow-style has the key mid-line.
-  if (/GENUDO_BASE_URL:/.test(block)) {
+  // Two anchors, tried in order: line-start (block-style), then a `{`/`,`
+  // boundary (flow-style — the key sits mid-line).
+  //
+  // Review finding (2026-07-29, round 3): the PREVIOUS version searched for
+  // a bare "GENUDO_BASE_URL:" anywhere in the block, unanchored. Two
+  // consequences, both reproduced:
+  //   1. A COMMENT that merely mentions "GENUDO_BASE_URL:" matched FIRST —
+  //      the comment got rewritten, the real key was left stale, and the
+  //      function still reported changed:true. That walks straight past the
+  //      round-1 throw-on-no-op guard (engine.ts) and turns a loud failure
+  //      back into a silent WRONG result: the panel reports success, the
+  //      commit lands, and the host never actually changed.
+  //   2. `\s*` after the colon can match a NEWLINE. A block-style key with
+  //      an EMPTY value let the match cross onto the following line and
+  //      swallow it whole — verified output destroyed the GENUDO_TOKEN line
+  //      entirely. Data loss in a committed, human-authored vault file.
+  // `^([ \t]+)GENUDO_BASE_URL:` (line-start) and `([{,][ \t]*)GENUDO_BASE_URL:`
+  // (flow boundary) can only ever match the REAL key, never prose that
+  // happens to contain the same text — and `[ \t]*`, never `\s*`, cannot
+  // cross a newline, so an empty value ends the match at end-of-line/`}`/`,`
+  // rather than consuming whatever comes next.
+  const blockKey = /^([ \t]+)GENUDO_BASE_URL:[ \t]*("[^"]*"|'[^']*'|[^,}\s][^,}\n]*)?[ \t]*$/m
+  const flowKey = /([{,][ \t]*)GENUDO_BASE_URL:[ \t]*("[^"]*"|'[^']*'|[^,}\s][^,}\n]*)?/
+  for (const keyRe of [blockKey, flowKey]) {
+    if (!keyRe.test(block)) continue
     let changed = false
-    const next = block.replace(
-      /GENUDO_BASE_URL:\s*("[^"]*"|'[^']*'|[^,}\s][^,}\n]*)/,
-      (whole) => {
-        const replacement = `GENUDO_BASE_URL: ${target}`
-        if (replacement !== whole) changed = true
-        return replacement
-      },
-    )
+    const next = block.replace(keyRe, (whole: string, prefix: string) => {
+      const replacement = `${prefix}GENUDO_BASE_URL: ${target}`
+      if (replacement !== whole) changed = true
+      return replacement
+    })
     return { block: next, changed }
   }
   // Case 2: flow-style `env: { … }` with no GENUDO_BASE_URL key — insert one.

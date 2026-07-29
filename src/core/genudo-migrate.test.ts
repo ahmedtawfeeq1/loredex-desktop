@@ -344,6 +344,61 @@ skills: []
     expect(text).toBe(overridden)
   })
 
+  // Review finding (2026-07-29), round 3: the previous "existing key" match
+  // was a bare, unanchored "GENUDO_BASE_URL:" search — a COMMENT that merely
+  // MENTIONS the key text matched first, got rewritten in place of the real
+  // key, and still reported changed:true. The real key was left stale while
+  // the panel reported success — a silent wrong result that walks straight
+  // past the round-1 throw-on-no-op guard (engine.ts).
+  it('rewrites the REAL key, not a comment that merely mentions GENUDO_BASE_URL:', () => {
+    const withComment = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    # old config used GENUDO_BASE_URL: https://legacy.example — replaced below
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_X}"
+      GENUDO_BASE_URL: "https://api.genudo.ai"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(withComment, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    // the real key is rewritten...
+    expect(text).toContain('GENUDO_BASE_URL: https://genudo.acme.internal')
+    // ...and the comment survives COMPLETELY untouched — not rewritten,
+    // not duplicated, not dropped
+    expect(text).toContain(
+      '# old config used GENUDO_BASE_URL: https://legacy.example — replaced below',
+    )
+  })
+
+  // Review finding (2026-07-29), round 3: `\s*` after the colon can match a
+  // NEWLINE. A block-style key with an EMPTY value let the match cross onto
+  // the FOLLOWING line and swallow it whole — verified to destroy the
+  // GENUDO_TOKEN line entirely. Data loss in a committed, human-authored
+  // vault file. `[ \t]*` (never `\s*`) cannot cross a newline.
+  it('an EMPTY block-style GENUDO_BASE_URL value does not swallow the following line', () => {
+    const emptyValue = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_BASE_URL:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_X}"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(emptyValue, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('GENUDO_BASE_URL: https://genudo.acme.internal')
+    // the following line survives completely intact
+    expect(text).toContain('GENUDO_TOKEN: "${GENUDO_TOKEN_X}"')
+    expect(text).not.toContain('/mcp')
+  })
+
   // Review finding (2026-07-29), New Important 2: the ORDINARY, most common
   // stdio client — no GENUDO_BASE_URL override at all, defaulted for at
   // migrateWorkspaceYml's line 53 and modeled at genudo-server.test.ts's

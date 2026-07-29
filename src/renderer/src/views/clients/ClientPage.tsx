@@ -5,7 +5,7 @@
  * clients.workspace — writes only gitignored files). Every file name is a
  * reader open target (hyperlink-everything).
  */
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import type {
   ClientCredential,
   ClientInfo,
@@ -192,6 +192,21 @@ const PAGE_CSS = `
   flex: 1; font-size: 12px; color: var(--text-1); background: var(--bg-inset);
   border: 1px solid var(--hairline); border-radius: 6px; padding: 4px 8px;
 }
+/* A connection's facts read as a table, not as a stack of sentences: label,
+   value, action. Every action lands on ONE right edge instead of wherever its
+   own label happened to stop — the ragged left-to-right was the whole reason
+   this panel was hard to scan. minmax(0,1fr) lets a long endpoint ellipsize
+   instead of pushing the action column off the card. */
+.cp-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 7px 14px; align-items: center; margin-top: 10px; }
+.cp-fact-label { font-size: 11.5px; font-weight: 600; color: var(--text-2); white-space: nowrap; }
+.cp-fact-value { font-size: 12px; color: var(--text-1); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Red is reserved for "you must act". A working credential is not news — the
+   header chip already carries the one ✓ this card needs. */
+.cp-fact-value.warn { color: var(--rust, #a33f2e); font-weight: 600; }
+.cp-fact-value .mono { font-family: var(--font-mono); font-size: 11px; color: var(--text-2); }
+.cp-fact-actions { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.cp-fact-actions .cp-ws-token-input { flex: 0 0 210px; }
+.cp-ws-drift { font-size: 12px; color: var(--amber, #b3801f); font-weight: 600; }
 .cp-empty { font-size: 12.5px; color: var(--text-2); }
 `
 
@@ -675,6 +690,10 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
         >
           {status?.generated ? 'Re-wire' : 'Wire'}
         </button>
+        {/* The drift notice sits WITH the button that resolves it. It used to
+            float between the two connection cards, where it read as a comment
+            on the card above it rather than as an instruction about Re-wire. */}
+        {status?.drift && !busy && <span className="cp-ws-drift">Generated files out of date</span>}
         {/* WP-PULL: the vault's pipeline folders were empty scaffolding until this
             existed — the real config only ever lived on the platform. */}
         <button
@@ -811,12 +830,14 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                 GENUDO_BASE_URL) — a client pointed at staging runs
                 discovery/DCR/the token exchange against staging, not
                 silently against production. */}
+            <div className="cp-facts">
             {conn.server === 'genudo' && genudo && genudoStatusLabel && (
-              <div className="cp-ws-ref">
-                <span className={genudoSettled ? 'cp-ws-ref-state ok' : 'cp-ws-ref-state warn'}>
-                  {genudoSettled ? '✓ ' : '● '}
+              <>
+                <span className="cp-fact-label">Sign-in</span>
+                <span className={genudoSettled ? 'cp-fact-value' : 'cp-fact-value warn'}>
                   {genudoStatusLabel.text}
                 </span>
+                <div className="cp-fact-actions">
                 <Button
                   variant={genudoSettled ? 'secondary' : 'primary'}
                   disabled={signingIn}
@@ -848,7 +869,8 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                       : 'Waiting for the browser…'
                     : genudoStatusLabel.action}
                 </Button>
-              </div>
+                </div>
+              </>
             )}
             {/* Task 7: the environment override. Both shapes: an already-http
                 connection's `url:` line, or a still-stdio (unmigrated)
@@ -862,11 +884,14 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
               (() => {
                 const currentUrl = 'url' in conn ? conn.url : conn.env.GENUDO_BASE_URL
                 return (
-                  <div className="cp-ws-ref">
-                    <span className="cp-ws-ref-state">Environment</span>
-                    <span className="cp-ws-conn">
-                      {genudoUrlFieldValue(currentUrl) || 'production (default)'}
+                  <>
+                    <span className="cp-fact-label">Environment</span>
+                    <span className="cp-fact-value">
+                      <span className="mono">
+                        {genudoUrlFieldValue(currentUrl) || 'production (default)'}
+                      </span>
                     </span>
+                    <div className="cp-fact-actions">
                     {urlEditing ? (
                       <>
                         <input
@@ -916,21 +941,23 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                           setUrlEditing(true)
                         }}
                       >
-                        Change environment
+                        Change
                       </Button>
                     )}
-                  </div>
+                    </div>
+                  </>
                 )
               })()}
             {conn.envRefs.map((ref) => {
               const missing = status?.missingRefs.includes(ref) ?? false
               const editing = missing || replacing.has(ref)
               return (
-                <div key={ref} className="cp-ws-ref">
-                  <span className={missing ? 'cp-ws-ref-state warn' : 'cp-ws-ref-state ok'}>
-                    {missing ? '● Token needed' : '✓ Token held'}
+                <React.Fragment key={ref}>
+                  <span className="cp-fact-label">Token</span>
+                  <span className={missing ? 'cp-fact-value warn' : 'cp-fact-value'}>
+                    {missing ? 'Needed — paste it to finish wiring' : <span className="mono">{ref}</span>}
                   </span>
-                  <span className="cp-ws-conn">{ref}</span>
+                  <div className="cp-fact-actions">
                   {editing ? (
                     <input
                       className="cp-ws-token-input"
@@ -949,9 +976,11 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                       Replace
                     </button>
                   )}
-                </div>
+                  </div>
+                </React.Fragment>
               )
             })}
+            </div>
           </ConnCard>
         )
       })}
@@ -964,9 +993,6 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
         >
           Save token{pastedReady.length === 1 ? '' : 's'} &amp; Re-wire
         </button>
-      )}
-      {status?.drift && !busy && (
-        <div className="cp-ws-result warn">Generated files out of date — press Re-wire.</div>
       )}
       {error && <div className="cp-ws-result warn">{error}</div>}
       {result && !error && (
@@ -1109,11 +1135,20 @@ function OldPlatformConnection({ client }: { client: string }): React.JSX.Elemen
           .finally(() => setBusy(false))
       }}
     >
-      <div className="cp-ws-ref">
-        <span className={state?.hasToken ? 'cp-ws-ref-state ok' : 'cp-ws-ref-state warn'}>
-          {state?.hasToken ? '✓ Token held' : '● Token needed'}
+      {/* same label/value/action grid as the new-platform card — the two used to
+          read as different kinds of thing purely because their rows were built
+          differently */}
+      <div className="cp-facts">
+        <span className="cp-fact-label">Endpoint</span>
+        <span className="cp-fact-value" title={state?.url ?? ''}>
+          <span className="mono">{state?.url ?? ''}</span>
         </span>
-        <span className="cp-ws-conn">{state?.url ?? ''}</span>
+        <div className="cp-fact-actions" />
+        <span className="cp-fact-label">Token</span>
+        <span className={state?.hasToken ? 'cp-fact-value' : 'cp-fact-value warn'}>
+          {state?.hasToken ? 'Stored in your keychain' : 'Needed — paste it to connect'}
+        </span>
+        <div className="cp-fact-actions">
         {showField ? (
           <>
             <input
@@ -1147,6 +1182,7 @@ function OldPlatformConnection({ client }: { client: string }): React.JSX.Elemen
             Replace
           </button>
         )}
+        </div>
       </div>
     </ConnCard>
   )

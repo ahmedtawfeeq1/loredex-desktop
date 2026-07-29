@@ -7,6 +7,52 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-07-29
+
+### Added
+- **Sign in to Genudo per client, from the client page.** A browser sign-in
+  (OAuth 2.1 — dynamic client registration, PKCE, scope `mcp:use`) replaces
+  pasting a token per client. The session lives in your OS keychain, one entry
+  per client, and renews itself; nothing but the account label and an expiry
+  ever crosses into the UI. Pasted tokens keep working exactly as before — a
+  sign-in only fills the same `${VAR}` slot `workspace.yml` already declared,
+  which is what makes self-hosted deployments and CI unaffected.
+- **The Genudo host is a per-client field, settable before sign-in.** Point one
+  client at staging and another at production. It must be set first, because
+  discovery, client registration and the token exchange all run against that
+  host — changing it while signed in warns that the stored session belongs to
+  the other environment and offers to sign out.
+- **`loredex agent-ops migrate-genudo-http`** — a dry-by-default migration that
+  rewrites every client's `genudo` connection from the stdio bridge to the
+  remote endpoint, carries the existing `${VAR}` ref across, swaps the plugin id
+  to `genudo-no-connector`, and prunes the stale plugin key that `.claude/
+  settings.json` never removes on its own. Text-level, so comments survive.
+
+### Changed
+- **Genudo speaks Streamable HTTP; the npm bridge is gone from the app.** The
+  backend retired SSE, so every per-client connection is now a remote HTTP MCP
+  server (`POST {host}/mcp` with a Bearer header) declared in `workspace.yml`.
+  Nothing spawns `genudo-mcp-client` any more: the pull, the health probe and
+  agent sessions all speak HTTP directly. That deletes the Node runtime
+  dependency, the nvm/homebrew PATH widening, the Windows `cmd /c` wrapper and
+  npx cache staleness from this path — and Genudo tools now work in sessions a
+  local process could never reach.
+- **`workspace.yml` can declare remote MCP servers** (`type: http`, `url`,
+  `headers`), with `${VAR}` expanded inside `headers` exactly as it is inside
+  `env`. Previously the schema modelled stdio servers only, which is why the
+  old platform had to be injected out-of-band.
+- **Connection cards read as a table** — label, value, action — so every action
+  sits on one right edge instead of wherever its own label happened to stop, and
+  the card carries a single status rather than three overlapping ticks.
+
+### Fixed
+- Signing in or out now re-materializes the client's generated files. The panel
+  could otherwise report a healthy connection while `.mcp.json` still carried
+  the pre-sign-in header, and an external agent in that folder kept getting 401s.
+- A dead session no longer makes the client page render a green "token held"
+  badge for the credential that just failed to renew, and a failed refresh no
+  longer deletes a working session over a transport error.
+
 ## [0.11.0] - 2026-07-25
 
 ### Added
@@ -632,7 +678,8 @@ The platform the agent-ops work builds on (previously unreleased in this log):
   loredex vault: reader with working wikilinks, handoff inbox/outbox, search,
   sync health, activity feed, and an in-app MCP server — no Obsidian required.
 
-[Unreleased]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.11.0...v0.12.0
 [0.4.0]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.2.0...v0.2.1

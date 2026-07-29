@@ -134,3 +134,77 @@ export function buildClientPage(info: ClientInfo, lints: LintFinding[]): ClientP
     lints: mine,
   }
 }
+
+export interface GenudoStatus {
+  signedIn: boolean
+  account: string | null
+  expiresAt: number | null
+}
+
+/** Copy for the genudo row: signed-out, live, or expired. Pure, so it is testable. */
+export function genudoLabel(status: GenudoStatus): { text: string; action: string } {
+  if (!status.signedIn) return { text: 'Not connected to Genudo', action: 'Sign in to Genudo' }
+  if (status.expiresAt !== null && status.expiresAt <= Date.now()) {
+    return { text: 'Genudo session expired', action: 'Sign in again' }
+  }
+  return {
+    text: status.account
+      ? `Signed in as ${status.account} · renews automatically`
+      : 'Signed in to Genudo · renews automatically',
+    action: 'Sign out',
+  }
+}
+
+/** The production default a client's genudo `url` reads as unset (Task 7). */
+export const GENUDO_DEFAULT_BASE_URL = 'https://api.genudo.ai'
+const GENUDO_DEFAULT_ENDPOINT = `${GENUDO_DEFAULT_BASE_URL}/mcp`
+
+/**
+ * Strip-then-append normalisation, mirrored from `genudo-migrate.ts`'s
+ * `normalizeGenudoUrl` (itself mirroring `genudo-server.ts`'s own fallback) —
+ * this is the renderer reading the SAME shape to decide what the field shows
+ * and whether Save has anything to do, not a second definition of what the
+ * endpoint means. The core-side setter is the one source of truth for what
+ * actually gets written.
+ */
+function normalizeGenudoEndpoint(input: string): string {
+  return `${input.trim().replace(/\/mcp\/?$/, '').replace(/\/+$/, '')}/mcp`
+}
+
+/**
+ * What the environment field shows: '' (so the placeholder carries the
+ * default) when the client's genudo connection IS the production default,
+ * else the override with the `/mcp` suffix stripped back off — editing shows
+ * a host, not the full endpoint the setter will re-append `/mcp` to.
+ */
+export function genudoUrlFieldValue(url: string | undefined): string {
+  if (!url) return ''
+  const host = url.trim().replace(/\/mcp\/?$/, '').replace(/\/+$/, '')
+  return host === GENUDO_DEFAULT_BASE_URL ? '' : host
+}
+
+export interface GenudoUrlDecision {
+  /** payload for `clients.genudo.setBaseUrl` — empty input restores the default */
+  payload: string | null
+  /** the resolved endpoint actually differs from what's stored now */
+  changed: boolean
+  /** a live session needs a warn-and-offer-sign-out step before Save proceeds —
+   *  its token was minted against the OLD host and would 401 against the new
+   *  one with no obvious cause */
+  warn: boolean
+}
+
+/** Decide what Save does with the environment field: the IPC payload, whether
+ *  it is actually a change, and whether a live session needs the warn step. */
+export function genudoUrlDecision(
+  input: string,
+  currentUrl: string | undefined,
+  signedIn: boolean,
+): GenudoUrlDecision {
+  const trimmed = input.trim()
+  const payload = trimmed === '' ? null : trimmed
+  const nextEndpoint = payload === null ? GENUDO_DEFAULT_ENDPOINT : normalizeGenudoEndpoint(payload)
+  const currentEndpoint = currentUrl ? normalizeGenudoEndpoint(currentUrl) : GENUDO_DEFAULT_ENDPOINT
+  const changed = nextEndpoint !== currentEndpoint
+  return { payload, changed, warn: changed && signedIn }
+}

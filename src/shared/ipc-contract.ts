@@ -403,6 +403,16 @@ export interface CoreApi {
   }
   'clients.genudo.signIn': { in: { client: string }; out: { account: string | null } }
   'clients.genudo.signOut': { in: { client: string }; out: void }
+  /** Task 7: the per-client Genudo host override — editable BEFORE sign-in,
+   *  because OAuth discovery, dynamic client registration and the token
+   *  exchange all run against this host. `baseUrl: null` restores the
+   *  production default (`https://api.genudo.ai`). Text-level rewrite of
+   *  workspace.yml's `url:`, re-materialized, ONE attributed commit — never a
+   *  hand-edit. */
+  'clients.genudo.setBaseUrl': {
+    in: { client: string; baseUrl: string | null; identity: Identity }
+    out: WorkspaceResult
+  }
   'clients.credentials.reveal': { in: { client: string; id: string }; out: { secret: string } }
   'vault.search': { in: { q: string; facets?: Facets }; out: SearchHit[] }
   /** app-local contract evolution (story 2.4): facet dropdown vocabulary,

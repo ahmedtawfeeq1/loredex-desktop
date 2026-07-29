@@ -10,6 +10,7 @@ import type {
   ClientCredential,
   ClientInfo,
   ClientWorkspaceStatus,
+  CoreApi,
   InboxItem,
   SnapshotSummary,
   WorkspaceResult,
@@ -18,6 +19,7 @@ import type { AcpAgent } from '../../../../shared/ipc-contract'
 import type { Identity } from '../../../../shared/types'
 import { AGENT_META, AGENTS } from '../../agent/AgentPanel'
 import { invoke, revealPath, saveExport } from '../../api'
+import { Button } from '../../components/Button'
 import { useApp } from '../../stores/app'
 import { useDex } from '../../stores/dex'
 import { effectiveIdentity, useIdentity } from '../../stores/identity'
@@ -28,7 +30,15 @@ import { useToasts } from '../../stores/toasts'
 import { isErrEnvelope } from '../../../../shared/ipc-contract'
 import { copyVaultPath } from '../../vaultPaths'
 import { sectionTint } from '../reader/sectionTint'
-import { buildClientPage, type UnitSection } from './client-page'
+import {
+  buildClientPage,
+  GENUDO_DEFAULT_BASE_URL,
+  genudoLabel,
+  genudoUrlDecision,
+  genudoUrlFieldValue,
+  type GenudoStatus,
+  type UnitSection,
+} from './client-page'
 
 /** The IPC layer rejects with a typed ErrEnvelope, not an Error — String() on
  *  one renders the useless `[object Object]` a user cannot act on. */
@@ -504,15 +514,25 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   const [pulling, setPulling] = useState(false)
   const identity = useIdentity((s) => effectiveIdentity(s))
   const providerAuth = useAgentPanel((s) => s.providerAuth)
-  const [conns, setConns] = useState<
-    Array<{ server: string; envRefs: string[] }>
-  >([])
+  // widened past {server, envRefs} (Task 7): the genudo row needs its own
+  // `url` to seed the environment field — a stdio connection has no `url` at
+  // all, so every read below narrows with `'url' in conn` first.
+  const [conns, setConns] = useState<CoreApi['clients.connections']['out']>([])
   // per-connection LIVE probe — the only honest "Connected": a held token can
   // still be revoked server-side, so green must mean a real handshake passed
   const [probes, setProbes] = useState<Record<string, ProbeState>>({})
   const [pasted, setPasted] = useState<Record<string, string>>({})
   const [replacing, setReplacing] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  // Task 7: sign-in control + the per-client environment override.
+  const [genudo, setGenudo] = useState<GenudoStatus | null>(null)
+  const [signingIn, setSigningIn] = useState(false)
+  const [urlEditing, setUrlEditing] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
+  const [urlBusy, setUrlBusy] = useState(false)
+  // set only when Save needs the warn-and-offer-sign-out step; the payload it
+  // carries is what commitUrl sends once the user confirms (or signs out first)
+  const [urlConfirm, setUrlConfirm] = useState<{ payload: string | null } | null>(null)
 
   const testConnection = (server: string): void => {
     setProbes((p) => ({ ...p, [server]: { state: 'testing', detail: '' } }))
@@ -542,6 +562,10 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
         if (probe) for (const c of list) testConnection(c.server)
       })
       .catch(() => setConns([]))
+    // Task 7: never a token, never a secret — signedIn/account/expiresAt only.
+    void invoke('clients.genudo.status', { client: info.slug })
+      .then(setGenudo)
+      .catch(() => setGenudo(null))
   }
   // biome-ignore lint/correctness/useExhaustiveDependencies: refetch per client only
   useEffect(() => refreshAll(true), [info.slug])
@@ -561,6 +585,28 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
       setError(String((e as { message?: string }).message ?? e))
     } finally {
       setBusy(false)
+    }
+  }
+
+  // Task 7: commit the environment field. Reuses the same result/error state
+  // Re-wire does — this is the same kind of workspace.yml write, just of the
+  // `url` instead of a token. `identity` is required by the IPC contract; the
+  // Change button below is disabled without one, so this is belt-and-braces.
+  async function commitUrl(payload: string | null): Promise<void> {
+    if (!identity) return
+    setUrlBusy(true)
+    setError(null)
+    try {
+      setResult(
+        await invoke('clients.genudo.setBaseUrl', { client: info.slug, baseUrl: payload, identity }),
+      )
+      setUrlEditing(false)
+      setUrlConfirm(null)
+      refreshAll(true)
+    } catch (e) {
+      setError(String((e as { message?: string }).message ?? e))
+    } finally {
+      setUrlBusy(false)
     }
   }
 
@@ -587,6 +633,12 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   }
 
   const pastedReady = Object.entries(pasted).filter(([, v]) => v.trim())
+  // Task 7: computed once, not per-connection-row — "Sign out" is the only
+  // action string that means an ACTIVE session (genudo.signedIn alone is not
+  // enough: an EXPIRED session still has signedIn: true, but the label reads
+  // "Sign in again", the same primary-CTA case as never having signed in).
+  const genudoStatusLabel = genudo ? genudoLabel(genudo) : null
+  const genudoActive = genudoStatusLabel?.action === 'Sign out'
   const PROBE_LABEL: Record<ProbeState['state'], string> = {
     testing: '◌ Testing…',
     ok: '✓ Connected',
@@ -738,6 +790,99 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                 : undefined
             }
           >
+            {/* Task 7: sign-in control. The host comes from THIS connection's
+                own `url` (server-side, via genudoBaseUrl) — a client pointed
+                at staging runs discovery/DCR/the token exchange against
+                staging, not silently against production. */}
+            {conn.server === 'genudo' && genudo && genudoStatusLabel && (
+              <div className="cp-ws-ref">
+                <span className={genudoActive ? 'cp-ws-ref-state ok' : 'cp-ws-ref-state warn'}>
+                  {genudoActive ? '✓ ' : '● '}
+                  {genudoStatusLabel.text}
+                </span>
+                <Button
+                  variant={genudoActive ? 'secondary' : 'primary'}
+                  disabled={signingIn}
+                  onClick={() => {
+                    setSigningIn(true)
+                    const channel = genudoActive ? 'clients.genudo.signOut' : 'clients.genudo.signIn'
+                    void invoke(channel, { client: info.slug })
+                      .then(() => {
+                        setSigningIn(false)
+                        refreshAll(true)
+                      })
+                      .catch((e) => {
+                        setSigningIn(false)
+                        useToasts.getState().push('Genudo sign-in failed', reason(e))
+                      })
+                  }}
+                >
+                  {signingIn ? 'Waiting for the browser…' : genudoStatusLabel.action}
+                </Button>
+              </div>
+            )}
+            {/* Task 7: the environment override. Only for an already-migrated
+                (http-shaped) connection — a still-stdio genudo block has no
+                `url:` line to rewrite, same omit-rather-than-half-build rule
+                genudo-server.ts follows. Editable value seeds on entering
+                edit mode (not kept in sync live) so a background refresh
+                mid-edit can never stomp on what the user is typing. */}
+            {conn.server === 'genudo' && 'url' in conn && (
+              <div className="cp-ws-ref">
+                <span className="cp-ws-ref-state">Environment</span>
+                <span className="cp-ws-conn">
+                  {genudoUrlFieldValue(conn.url) || 'production (default)'}
+                </span>
+                {urlEditing ? (
+                  <>
+                    <input
+                      className="cp-ws-token-input"
+                      type="text"
+                      value={urlInput}
+                      placeholder={GENUDO_DEFAULT_BASE_URL}
+                      onChange={(e) => setUrlInput(e.target.value)}
+                    />
+                    <Button
+                      variant="secondary"
+                      disabled={urlBusy}
+                      onClick={() => {
+                        const decision = genudoUrlDecision(urlInput, conn.url, genudo?.signedIn ?? false)
+                        if (!decision.changed) {
+                          setUrlEditing(false)
+                          return
+                        }
+                        if (decision.warn) {
+                          setUrlConfirm({ payload: decision.payload })
+                          return
+                        }
+                        void commitUrl(decision.payload)
+                      }}
+                    >
+                      Save
+                    </Button>
+                    <Button variant="quiet" disabled={urlBusy} onClick={() => setUrlEditing(false)}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="secondary"
+                    disabled={!identity}
+                    title={
+                      identity
+                        ? "Point this client at a different Genudo host — must be set before Sign in, since that host is where sign-in registers"
+                        : 'Changing the environment needs an identity — set name and email in Settings'
+                    }
+                    onClick={() => {
+                      setUrlInput(genudoUrlFieldValue(conn.url))
+                      setUrlEditing(true)
+                    }}
+                  >
+                    Change Environment
+                  </Button>
+                )}
+              </div>
+            )}
             {conn.envRefs.map((ref) => {
               const missing = status?.missingRefs.includes(ref) ?? false
               const editing = missing || replacing.has(ref)
@@ -797,6 +942,49 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           {result.ok && result.wrote.length === 0 && (
             <div className="ok">Workspace up to date.</div>
           )}
+        </div>
+      )}
+      {/* Task 7: the environment is where OAuth discovery/DCR/the token
+          exchange run — a stored session belongs to whichever host it was
+          issued against, so pointing the client somewhere else without
+          signing out first leaves it holding a token the new host will
+          reject (a silent 401, no obvious cause). */}
+      {urlConfirm && genudo && (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss is a mouse affordance; Cancel button + Esc-free modal
+        <div className="cp-modal-backdrop" onClick={() => setUrlConfirm(null)}>
+          <div
+            className="cp-modal"
+            role="dialog"
+            aria-modal="true"
+            // biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation guard, not an interactive control
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cp-modal-title">Change Genudo environment?</div>
+            <div className="cp-modal-field">
+              {info.slug} is signed in to Genudo{genudo.account ? ` as ${genudo.account}` : ''}. That
+              session was issued by the current environment — changing it leaves the client holding
+              a token the new host will reject, which shows up later as an unexplained sign-in
+              failure. Sign out now, then sign back in once you're ready.
+            </div>
+            <div className="cp-modal-actions">
+              <Button variant="secondary" disabled={urlBusy} onClick={() => setUrlConfirm(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                disabled={urlBusy}
+                onClick={() => {
+                  const payload = urlConfirm.payload
+                  setUrlBusy(true)
+                  void invoke('clients.genudo.signOut', { client: info.slug })
+                    .catch((e) => useToasts.getState().push('Sign-out failed', reason(e)))
+                    .then(() => commitUrl(payload))
+                }}
+              >
+                Sign Out And Change
+              </Button>
+            </div>
+          </div>
         </div>
       )}
       <OldPlatformConnection client={info.slug} />

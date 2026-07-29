@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { migrateWorkspaceYml, pruneEnabledPlugins } from './genudo-migrate'
+import { migrateWorkspaceYml, normalizeGenudoUrl, pruneEnabledPlugins, setGenudoUrl } from './genudo-migrate'
 
 const BEFORE = `# Agent tooling for this client — committed, secret-free.
 mcp:
@@ -190,5 +190,106 @@ describe('pruneEnabledPlugins', () => {
 
   it('leaves unparseable json alone', () => {
     expect(pruneEnabledPlugins('not json').changed).toBe(false)
+  })
+})
+
+describe('normalizeGenudoUrl', () => {
+  it('appends /mcp to a bare host', () => {
+    expect(normalizeGenudoUrl('https://staging.genudo.ai')).toBe('https://staging.genudo.ai/mcp')
+  })
+
+  it('does not double the /mcp suffix when the user pastes the full endpoint', () => {
+    expect(normalizeGenudoUrl('https://staging.genudo.ai/mcp')).toBe('https://staging.genudo.ai/mcp')
+  })
+
+  it('strips a trailing slash before appending /mcp', () => {
+    expect(normalizeGenudoUrl('https://staging.genudo.ai/')).toBe('https://staging.genudo.ai/mcp')
+  })
+
+  it('strips a trailing slash AFTER an existing /mcp too', () => {
+    expect(normalizeGenudoUrl('https://staging.genudo.ai/mcp/')).toBe('https://staging.genudo.ai/mcp')
+  })
+
+  it('trims surrounding whitespace from a pasted value', () => {
+    expect(normalizeGenudoUrl('  https://staging.genudo.ai  ')).toBe('https://staging.genudo.ai/mcp')
+  })
+})
+
+describe('setGenudoUrl', () => {
+  const HTTP_WS = `# Agent tooling for this client — committed, secret-free.
+mcp:
+  genudo:
+    type: http
+    url: https://api.genudo.ai/mcp
+    headers:
+      Authorization: "Bearer \${GENUDO_TOKEN_2ME}"
+plugins:
+  claude: [genudo-no-connector@genudo-ai]
+skills: []
+`
+
+  it('rewrites the url line to a self-hosted/staging host, appending /mcp', () => {
+    const { text, changed } = setGenudoUrl(HTTP_WS, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('url: https://genudo.acme.internal/mcp')
+    // everything else in the block, and the rest of the file, is untouched
+    expect(text).toContain('Authorization: "Bearer ${GENUDO_TOKEN_2ME}"')
+    expect(text).toContain('genudo-no-connector@genudo-ai')
+  })
+
+  it('does not double the /mcp suffix when a user pastes the full endpoint they see in the file', () => {
+    const { text } = setGenudoUrl(HTTP_WS, 'https://api.genudo.ai/mcp')
+    expect(text).toContain('url: https://api.genudo.ai/mcp')
+    expect(text).not.toContain('/mcp/mcp')
+  })
+
+  it('null restores the production default', () => {
+    const overridden = setGenudoUrl(HTTP_WS, 'https://genudo.acme.internal').text
+    const { text, changed } = setGenudoUrl(overridden, null)
+    expect(changed).toBe(true)
+    expect(text).toContain('url: https://api.genudo.ai/mcp')
+  })
+
+  it('is a no-op (changed: false) when the new value normalises to what is already stored', () => {
+    const { text, changed } = setGenudoUrl(HTTP_WS, 'https://api.genudo.ai/mcp/')
+    expect(changed).toBe(false)
+    expect(text).toBe(HTTP_WS)
+  })
+
+  it('preserves comments and unrelated formatting elsewhere in the file', () => {
+    const { text } = setGenudoUrl(HTTP_WS, 'https://genudo.acme.internal')
+    expect(text).toContain('# Agent tooling for this client — committed, secret-free.')
+    expect(text).toContain('skills: []')
+  })
+
+  it('leaves a still-stdio (unmigrated) genudo block alone — nothing to rewrite', () => {
+    const stdio = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_X}"
+      GENUDO_BASE_URL: "https://api.genudo.ai"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(stdio, 'https://genudo.acme.internal')
+    expect(changed).toBe(false)
+    expect(text).toBe(stdio)
+  })
+
+  it('leaves a workspace.yml with no genudo block at all alone', () => {
+    const noGenudo = `mcp:
+  crm:
+    command: npx
+    args: [-y, crm-client]
+plugins:
+  claude: []
+skills: []
+`
+    const { text, changed } = setGenudoUrl(noGenudo, 'https://genudo.acme.internal')
+    expect(changed).toBe(false)
+    expect(text).toBe(noGenudo)
   })
 })

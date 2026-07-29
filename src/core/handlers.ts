@@ -645,6 +645,47 @@ export function registerCoreHandlers(
     return genudoSignIn(client, genudoBaseUrl(conn))
   })
   ipc.register('clients.genudo.signOut', ({ client }) => genudoSignOut(client))
+  /**
+   * Task 7: the per-client Genudo environment override. Must run BEFORE
+   * sign-in — OAuth discovery/DCR/the token exchange all run against
+   * workspace.yml's `url`, so the renderer blocks editing this once a session
+   * is live without an explicit sign-out first; this handler still checks
+   * identity + connection shape itself rather than trust that gate.
+   *
+   * Same write shape as `clients.tooling.copy`: write lock, identity, the
+   * SAME token overlay `clients.tokens.set` uses (so a live session's bearer
+   * survives the regenerated .mcp.json — this write touches no tokens), then
+   * vault.changed + notifier.refresh. `syncOldPlatformMcp` re-mirrors the old
+   * platform's keychain entry into the regenerated .mcp.json, exactly like
+   * every other path that calls materializeWorkspace does.
+   */
+  ipc.register('clients.genudo.setBaseUrl', ({ client, baseUrl, identity }) =>
+    withWriteLock(async () => {
+      if (!isValidIdentity(identity)) {
+        throw ipcError(
+          'INTERNAL',
+          'changing the genudo environment needs an identity — set name and email in Settings',
+        )
+      }
+      const conn = engine.clientConnections(client).find((c) => c.server === 'genudo')
+      if (!conn) {
+        throw ipcError('INTERNAL', `${client} has no genudo connection in workspace.yml`)
+      }
+      if (!('url' in conn)) {
+        throw ipcError(
+          'INTERNAL',
+          `${client}'s genudo connection still uses the legacy connector — migrate it to remote HTTP first`,
+        )
+      }
+      const held = await clientTokenOverlay(client, engine.clientConnections(client))
+      const result = engine.setGenudoBaseUrl(client, baseUrl, identity, held)
+      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+      invalidateAtlas()
+      ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
+      notifier.refresh()
+      return result
+    }),
+  )
   ipc.register('langsmith.trace.fetch', async ({ text }) => {
     const ref = parseTraceRef(text)
     if (!ref) {

@@ -9,6 +9,7 @@
  * The `${VAR}` ref is deliberately CARRIED OVER rather than dropped — a pasted token
  * keeps working the moment this lands, before anyone signs in.
  */
+import { GENUDO_BASE_URL } from './genudo-http'
 const GENUDO_BLOCK =
   // The end-of-block lookahead needs a real "true end of string" branch: `\Z` is not
   // a recognized escape in JS regex (it is silently read as a literal "Z"), so a file
@@ -71,4 +72,44 @@ export function pruneEnabledPlugins(json: string): { json: string; changed: bool
   }
   delete parsed.enabledPlugins[STALE_PLUGIN_KEY]
   return { json: `${JSON.stringify(parsed, null, 2)}\n`, changed: true }
+}
+
+/**
+ * Task 7: normalise what a user TYPES (a bare host, or the full endpoint pasted
+ * verbatim out of workspace.yml — the obvious copy-paste mistake) into the
+ * canonical `url:` shape. Strip an existing trailing `/mcp` and any trailing
+ * slashes, then append `/mcp` exactly once, so pasting the endpoint whole never
+ * doubles the suffix. Mirrors `genudo-server.ts`'s own fallback normalisation
+ * (`.replace(/\/mcp\/?$/, '').replace(/\/+$/, '')` + `/mcp`) so the two paths —
+ * "what a session actually connects to" and "what gets written to disk" — can
+ * never disagree about what a given input resolves to.
+ */
+export function normalizeGenudoUrl(input: string): string {
+  return `${input.trim().replace(/\/mcp\/?$/, '').replace(/\/+$/, '')}/mcp`
+}
+
+/**
+ * Rewrite the `genudo` connection's `url:` line in a client's workspace.yml —
+ * TEXT-level, exactly like `migrateWorkspaceYml` above, so comments and
+ * unrelated formatting in this committed, human-authored file survive.
+ * `url === null` restores the production default.
+ *
+ * A no-op (`changed: false`) when there is no ALREADY-http genudo block to
+ * rewrite — a client still on the legacy stdio shape has no `url:` line, and
+ * this only ever edits one, never introduces one (same omit-rather-than-
+ * half-build rule `genudo-server.ts`'s module doc names). The caller (engine/
+ * handlers) is responsible for telling the user why nothing happened.
+ */
+export function setGenudoUrl(text: string, url: string | null): { text: string; changed: boolean } {
+  const target = url === null ? `${GENUDO_BASE_URL}/mcp` : normalizeGenudoUrl(url)
+  let changed = false
+  const out = text.replace(GENUDO_BLOCK, (block: string) => {
+    if (!/type:\s*http/.test(block)) return block // stdio (unmigrated) — nothing to set
+    return block.replace(/^([ \t]+)url:[ \t]*.*$/m, (line: string, indent: string) => {
+      const next = `${indent}url: ${target}`
+      if (next !== line) changed = true
+      return next
+    })
+  })
+  return { text: out, changed }
 }

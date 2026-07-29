@@ -1568,15 +1568,19 @@ git commit -m "feat(genudo): fleet migration to remote http, dry by default"
 
 ---
 
-### Task 7: Sign-in control in the client's connection row
+### Task 7: Sign-in control and the environment field in the client's connection row
 
 **Files:**
 - Modify: `src/renderer/src/views/clients/ClientPage.tsx` (`WorkspacePanel`, from line 498)
+- Modify: `src/core/handlers.ts`, `src/shared/ipc-contract.ts` (the base-URL setter)
+- Modify: `src/core/genudo-migrate.ts` or a sibling — whichever owns rewriting a client's `workspace.yml` `url`
 - Test: `src/renderer/src/views/clients/client-page.test.ts`
 
 **Interfaces:**
 - Consumes: `clients.genudo.status` / `.signIn` / `.signOut` (Task 4).
-- Produces: nothing downstream.
+- Produces: `clients.genudo.setBaseUrl` — `{ client, baseUrl: string | null }` → rewrites the `genudo` connection's `url` in that client's `workspace.yml` (`null` restores the production default), re-materializes, and commits. Never a hand-edit: this is the only way the field changes.
+
+**The environment field (user decision, 2026-07-29).** The base URL is an optional per-client field, editable **before** sign-in — OAuth discovery, dynamic client registration and the token exchange all run against that host, so pointing a client at staging has to happen first or the sign-in registers against the wrong environment. Default is `https://api.genudo.ai`; the field shows that as a placeholder rather than a stored value, so an unset client stays unset. Changing it while a session exists must warn that the existing session belongs to the other environment and offer sign-out — a staging token is not valid against production and would fail as a 401 with no obvious cause.
 
 - [ ] **Step 1: Write the failing test**
 

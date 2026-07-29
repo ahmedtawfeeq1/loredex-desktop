@@ -112,6 +112,7 @@ import {
   setProduct,
   setClientTags,
 } from 'loredex'
+import { setGenudoUrl } from './genudo-migrate'
 import { writePlan } from './genudo-pull'
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { abbreviatePath } from '../shared/identity'
@@ -405,6 +406,48 @@ export function clientConnections(client: string): Array<
       ? { ...base, type: 'http' as const, url: def.url, headers: def.headers ?? {} }
       : { ...base, command: def.command, args: def.args ?? [], env: def.env ?? {} }
   })
+}
+
+/**
+ * Task 7: rewrite this client's `genudo` connection `url` in workspace.yml —
+ * TEXT-level (`setGenudoUrl`, genudo-migrate.ts), so the file's comments and
+ * formatting survive, the same discipline `migrateWorkspaceYml` uses on the
+ * same file. `baseUrl === null` restores the production default. Must run
+ * BEFORE sign-in: OAuth discovery, dynamic client registration, and the token
+ * exchange all run against whatever host `workspace.yml` names.
+ *
+ * Materializes with the caller's token overlay (so a live session's bearer
+ * survives the regenerated `.mcp.json` — this write touches no tokens itself)
+ * and, only when the url actually changed, reindexes + ONE attributed commit —
+ * same shape as `copyTooling`. workspace.yml is vault content; never a
+ * hand-edit. A no-op write (nothing to rewrite, or the value is unchanged)
+ * skips the commit rather than create an empty one.
+ */
+export function setGenudoBaseUrl(
+  client: string,
+  baseUrl: string | null,
+  identity: Identity,
+  env?: Record<string, string>,
+): WorkspaceResult {
+  const config = getConfig()
+  const wsPath = join(config.vaultPath, 'projects', client, 'workspace.yml')
+  const before = readFileSync(wsPath, 'utf8')
+  const { text, changed } = setGenudoUrl(before, baseUrl)
+  if (changed) writeFileSync(wsPath, text)
+  const workspace = materializeWorkspace(config.vaultPath, client, {
+    env: { ...process.env, ...env },
+  })
+  if (changed) {
+    rebuildIndexes(config.vaultPath)
+    withGitIdentity(identity, () =>
+      gitAutoCommit(
+        config.vaultPath,
+        config,
+        `loredex: genudo base url for ${client} (${identity.name})`,
+      ),
+    )
+  }
+  return workspace
 }
 
 /** Absolute path of a client's directory — the Open-in-Terminal target. */

@@ -509,7 +509,21 @@ export function registerCoreHandlers(
     if ('url' in conn) {
       const res = await probeHttpTools(conn.url, resolved)
       if (res.ok) return { ...res, detail: `Connected — ${res.tools.length} tools` }
-      return res
+      // Name the endpoint and interpret the two failures the environment field
+      // makes easy to hit. Reported twice on the same client: pointing it at a
+      // web console gave "Unexpected content type: text/html" (the console
+      // redirects to its login page), and a token minted on the OTHER
+      // environment gave Genudo's own `{"code":404,"message":"Not Found"}` —
+      // its API says "unknown principal" as a 404, not a 401. Both are
+      // accurate and neither says which host was called or what to do.
+      const html = /content type: text\/html|<!doctype|<html/i.test(res.detail)
+      const notFound = /"code":\s*404|\b404\b.*not found/i.test(res.detail)
+      const hint = html
+        ? ' — that host served a web page, so it looks like the console rather than the API. The MCP endpoint lives on the API host.'
+        : notFound
+          ? ' — the endpoint answered "not found" for this credential, which usually means the token belongs to a different environment than the host above.'
+          : ''
+      return { ...res, detail: `${conn.url}: ${res.detail}${hint}` }
     }
     // A GUI-launched app cannot see a per-user Node install (nvm/homebrew on
     // POSIX, nvm-windows/winget on Windows), so a bare `npx` — or `cmd /c npx`

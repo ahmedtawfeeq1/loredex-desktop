@@ -859,9 +859,18 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                     void invoke(signingOut ? 'clients.genudo.signOut' : 'clients.genudo.signIn', {
                       client: info.slug,
                     })
-                      .then(() => {
+                      .then(async () => {
+                        // Signing in or out CHANGES what the generated files
+                        // should contain, so re-materialize rather than just
+                        // re-reading status. Without this the panel went green
+                        // while the client's .mcp.json still carried the
+                        // pre-sign-in header — an external Claude Code session
+                        // in that folder kept getting 401s with the app
+                        // insisting it was connected, and the only clue was a
+                        // drift line the user had to notice and act on.
+                        // Gitignored generated files only; no commit.
+                        await rewire({})
                         setSigningIn(false)
-                        refreshAll(true)
                       })
                       .catch((e) => {
                         setSigningIn(false)

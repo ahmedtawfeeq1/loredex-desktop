@@ -1,0 +1,331 @@
+/**
+ * One-shot fleet migration: the per-client `genudo` connection moves from the stdio
+ * npx bridge to the remote Streamable HTTP endpoint.
+ *
+ * TEXT-level, not parse-and-redump, so comments and unrelated formatting survive in
+ * files that are committed vault content. Idempotent: running it twice changes
+ * nothing the second time, which is what makes a --check run trustworthy.
+ *
+ * The `${VAR}` ref is deliberately CARRIED OVER rather than dropped — a pasted token
+ * keeps working the moment this lands, before anyone signs in.
+ */
+import { GENUDO_BASE_URL } from './genudo-http'
+const GENUDO_BLOCK =
+  // The end-of-block lookahead needs a real "true end of string" branch: `\Z` is not
+  // a recognized escape in JS regex (it is silently read as a literal "Z"), so a file
+  // whose `genudo:` block is the very last content would never match without this.
+  // `(?![\s\S])` is the correct JS idiom — it only succeeds with zero characters left,
+  // so it can't fire early at a blank line inside the block (unlike `$` with the `m`
+  // flag, which would end the match right before that blank line's own `\n`).
+  //
+  // Review finding (2026-07-29): each repeated line ALSO needs a "true end of
+  // string" branch, not just the block-end lookahead — a genudo block whose
+  // last line has no trailing `\n` (a file that just doesn't end in a
+  // newline) previously failed to match AT ALL, because the repetition
+  // required every line, including the last, to be `\n`-terminated. `(?:\n|
+  // (?![\s\S]))` accepts either a real newline or true end-of-string, so the
+  // very last line of the file is no longer a silent no-match.
+  /^([ \t]+)genudo:\n(?:\1[ \t]+.*(?:\n|(?![\s\S]))|\s*\n)*?(?=^\1\S|^\S|(?![\s\S]))/m
+
+// Review finding (2026-07-29): `type: "http"` (quoted) is valid YAML and the
+// lib's schema-level `isRemoteServer` check (and thus `'url' in conn`) already
+// treats it as remote — but a bare `/type:\s*http/` does not match through the
+// quote characters, so setGenudoUrl silently no-op'd on any block a human (or
+// a future codegen path) happened to quote. Tolerate an optional `'`/`"` on
+// either side; unquoted `type: http` still matches exactly as before.
+//
+// Review finding (2026-07-29, round 2): this was ALSO unanchored — a bare
+// substring search over the whole block, so a comment like `# TODO: migrate
+// this connection to type: http eventually` made `.test()` return true on a
+// block that is genuinely still stdio. In `migrateWorkspaceYml` that client
+// was then silently treated as already-migrated and skipped: no error, no
+// log line, and it would not show up in a dry-run diff to catch before
+// `--apply`. Anchored to line-start (only leading whitespace before the
+// literal `type:` key) so a comment — whose first non-whitespace character is
+// always `#` — can never satisfy it, same anchoring discipline as
+// `setStdioGenudoBaseUrl`'s `blockKey`/`flowKey` below.
+const HTTP_TYPE_RE = /^[ \t]+type:[ \t]*['"]?http['"]?/m
+
+// NOTE: deliberately NOT reused with `.test()`. A global regex's `.test()`/`.exec()`
+// carries `lastIndex` across calls, so calling `migrateWorkspaceYml` on a second file
+// right after a first would silently start the search past the match and report no
+// plugin swap needed — corrupting an unpredictable subset of a 59-client run. `.replace`
+// is safe: for a global pattern it resets `lastIndex` to 0 on entry and exit, so the
+// `changed` flag below is derived from a before/after string compare instead of `.test()`.
+const OLD_PLUGIN = /\bgenudo@genudo-ai\b/g
+const NEW_PLUGIN = 'genudo-no-connector@genudo-ai'
+export const STALE_PLUGIN_KEY = 'genudo@genudo-ai'
+
+/**
+ * Extract a `KEY: value` mapping's value from inside a genudo block's `env:`,
+ * anchored to the REAL key — never a bare substring search over the block.
+ *
+ * Review finding (2026-07-29, round 3): `migrateWorkspaceYml`'s `${VAR}` ref
+ * extractor and its `GENUDO_BASE_URL` extractor were both unanchored
+ * (`/\$\{([A-Z0-9_]+)\}/.exec(block)` and `/GENUDO_BASE_URL:\s*"?([^"\s]+)"?/
+ * .exec(block)`), so either one matched the FIRST occurrence anywhere in the
+ * block — including a comment. A line like `# previously used
+ * ${GENUDO_TOKEN_LEGACY} before rotation` above the real
+ * `GENUDO_TOKEN: "${GENUDO_TOKEN_ACME}"` line captured the decoy ref, which
+ * then got baked into the rebuilt block's `Authorization: "Bearer
+ * ${GENUDO_TOKEN_LEGACY}"` — a reference to a credential that may not exist
+ * in the keychain at all, auth silently broken while the migration reports
+ * success. A comment naming a former host did the same to the base URL, and
+ * because `migrateWorkspaceYml` REBUILDS the whole block (unlike
+ * `setGenudoUrl`, which rewrites a single `url:` line), the wrong host gets
+ * baked in permanently: the next run sees `type: http` and treats the block
+ * as already migrated, so there is no second chance.
+ *
+ * Same two anchors as `setStdioGenudoBaseUrl`'s `blockKey`/`flowKey` below —
+ * line-start (block-style) or an immediately-preceding `{`/`,` (flow-style) —
+ * so a comment that merely MENTIONS the key can never be mistaken for the key
+ * itself: a comment's first non-whitespace character is always `#`, which
+ * can't satisfy either anchor. The block-style bare-value alternative
+ * deliberately does NOT exclude `}`/`,` (unlike the flow-style one) — an
+ * unquoted `${VAR}` value contains a literal `}`, and on a real fleet fixture
+ * (block-style, unquoted env values — the majority shape in
+ * clients_work/projects) excluding it left the value truncated one character
+ * short of the closing brace, which then failed the trailing `[ \t]*$` anchor
+ * and matched nothing at all.
+ */
+// Review finding (2026-07-29, final branch review — round 4 of this same
+// class): the block-style bare-value alternative (`[^\s][^\n]*`) is greedy
+// and unbounded, so it also swallowed an inline trailing YAML comment —
+// `GENUDO_BASE_URL: "https://staging.genudo.ai"  # staging tenant` extracted
+// as `https://staging.genudo.ai"  # staging tenant` (verified by execution:
+// the quoted alternative can't satisfy the old `[ \t]*$` tail with a comment
+// after it, so the regex backtracks into the bare-value alternative, which
+// happily eats the leftover quote and the whole comment). Because
+// `migrateWorkspaceYml` REBUILDS the block, that garbage would be baked in
+// permanently — same no-second-chance property as the other three fixes
+// documented above. Fixed two ways together: the bare-value alternative is
+// now LAZY and excludes a leading `#` (so it can't start matching AT a
+// comment, e.g. `KEY: # comment` with no real value), and the trailing
+// anchor now accepts an optional `[ \t]+#...` tail — which also lets the
+// QUOTED alternative match cleanly up to the comment instead of ever falling
+// through to the bare-value alternative at all.
+function extractEnvValue(block: string, key: string): string | undefined {
+  const blockKey = new RegExp(
+    `^[ \\t]+${key}:[ \\t]*("[^"]*"|'[^']*'|[^\\s#][^\\n]*?)?(?:[ \\t]+#[^\\n]*|[ \\t]*)$`,
+    'm',
+  )
+  const flowKey = new RegExp(`[{,][ \\t]*${key}:[ \\t]*("[^"]*"|'[^']*'|[^,}\\s][^,}\\n]*)?`)
+  const raw = (blockKey.exec(block) ?? flowKey.exec(block))?.[1]
+  return raw === undefined ? undefined : raw.trim().replace(/^["']|["']$/g, '')
+}
+
+export function migrateWorkspaceYml(text: string): { text: string; changed: boolean } {
+  let changed = false
+  let out = text.replace(GENUDO_BLOCK, (block, indent: string) => {
+    if (HTTP_TYPE_RE.test(block)) return block // already migrated
+    const tokenValue = extractEnvValue(block, 'GENUDO_TOKEN')
+    const ref = tokenValue ? /\$\{([A-Z0-9_]+)\}/.exec(tokenValue)?.[1] : undefined
+    const base = extractEnvValue(block, 'GENUDO_BASE_URL') ?? 'https://api.genudo.ai'
+    if (!ref) return block // nothing to carry over — leave it for a human
+    changed = true
+    const inner = `${indent}  `
+    return (
+      `${indent}genudo:\n` +
+      `${inner}type: http\n` +
+      // Review finding (2026-07-29): was `${base.replace(/\/+$/, '')}/mcp`,
+      // which does not strip an EXISTING /mcp suffix — a self-hosted
+      // GENUDO_BASE_URL already ending in /mcp migrated to a doubled
+      // `/mcp/mcp`. normalizeGenudoUrl is the one canonical strip-then-append
+      // rule (also used by setGenudoUrl and mirrored by genudo-server.ts) —
+      // this was the third copy silently disagreeing with the other two.
+      `${inner}url: ${normalizeGenudoUrl(base)}\n` +
+      `${inner}headers:\n` +
+      `${inner}  Authorization: "Bearer \${${ref}}"\n`
+    )
+  })
+  const swapped = out.replace(OLD_PLUGIN, NEW_PLUGIN)
+  if (swapped !== out) {
+    out = swapped
+    changed = true
+  }
+  return { text: out, changed }
+}
+
+/**
+ * `renderClaudeSettings` only ever ADDS keys, so swapping workspace.yml leaves the
+ * old plugin enabled forever — and that plugin bundles its own Genudo connector,
+ * which would authenticate as whichever account Claude last signed in to. Removing
+ * the key is what makes the swap actually take effect.
+ */
+export function pruneEnabledPlugins(json: string): { json: string; changed: boolean } {
+  let parsed: { enabledPlugins?: Record<string, boolean> }
+  try {
+    parsed = JSON.parse(json) as { enabledPlugins?: Record<string, boolean> }
+  } catch {
+    return { json, changed: false }
+  }
+  if (!parsed.enabledPlugins || !(STALE_PLUGIN_KEY in parsed.enabledPlugins)) {
+    return { json, changed: false }
+  }
+  delete parsed.enabledPlugins[STALE_PLUGIN_KEY]
+  return { json: `${JSON.stringify(parsed, null, 2)}\n`, changed: true }
+}
+
+/**
+ * Strip an existing trailing `/mcp` and any trailing slashes — the shared half
+ * of both normalisers below. A bare host (`https://x`) passes through
+ * unchanged; the full endpoint pasted verbatim out of workspace.yml
+ * (`https://x/mcp`, `https://x/mcp/`) collapses to the same host either way.
+ *
+ * Exported (review finding, 2026-07-29, final branch review): `handlers.ts`'s
+ * `genudoBaseUrl` used to return a still-stdio connection's resolved
+ * `GENUDO_BASE_URL` verbatim, with no strip — the only one of six
+ * normalisation sites on this branch that disagreed (`genudo-server.ts`
+ * strips it, `genudoRpc`/`genudoSignIn` both append `/mcp` unconditionally),
+ * so a stdio client whose `GENUDO_BASE_URL` was the full endpoint got
+ * `/mcp/mcp` on pull and sign-in. Routed through this shared helper instead
+ * of a fourth ad hoc copy of the same regex.
+ */
+export function stripGenudoSuffix(input: string): string {
+  return input.trim().replace(/\/mcp\/?$/, '').replace(/\/+$/, '')
+}
+
+/**
+ * Task 7: normalise what a user TYPES (a bare host, or the full endpoint pasted
+ * verbatim out of workspace.yml — the obvious copy-paste mistake) into the
+ * canonical `url:` shape (the already-migrated/http block). Strip-then-append
+ * `/mcp` exactly once, so pasting the endpoint whole never doubles the suffix.
+ * Mirrors `genudo-server.ts`'s own fallback normalisation
+ * (`.replace(/\/mcp\/?$/, '').replace(/\/+$/, '')` + `/mcp`) so the two paths —
+ * "what a session actually connects to" and "what gets written to disk" — can
+ * never disagree about what a given input resolves to.
+ */
+export function normalizeGenudoUrl(input: string): string {
+  return `${stripGenudoSuffix(input)}/mcp`
+}
+
+/**
+ * Rewrite (or insert) `GENUDO_BASE_URL` inside a still-stdio genudo block's
+ * `env:` — either shape a real workspace.yml uses:
+ *   - block-style, key already present: `env:\n  GENUDO_BASE_URL: x\n` — value
+ *     replaced in place.
+ *   - flow-style, key already present: `env: { …, GENUDO_BASE_URL: x }` — same
+ *     replace, just not anchored to line-start (the key sits mid-line).
+ *   - block-style, key ABSENT (the ordinary production-default client —
+ *     `genudo-server.test.ts`'s "falls back to the production default" case):
+ *     a new `GENUDO_BASE_URL: <target>` line is INSERTED after the block's
+ *     last existing key, at the same indent.
+ *   - flow-style, key ABSENT (the loredex scaffold's own template convention,
+ *     `agent-ops-scaffold.ts`'s `WORKSPACE_TEMPLATE`, and the shape
+ *     `clients-create.test.ts`'s fixtures use): inserted before the closing
+ *     `}`.
+ *
+ * Review finding (2026-07-29): the PREVIOUS version only ever rewrote an
+ * EXISTING block-style line — both "no key at all" (the common,
+ * production-default case) and flow-style env were silent no-ops, which
+ * meant the environment field rendered but was permanently unsettable for
+ * most real clients, the exact stranding finding this function exists to fix.
+ *
+ * Returns `changed: false` only when there is truly no `env:` to attach to
+ * (block or flow) — malformed input the caller should treat as a hard
+ * failure, same as any other no-op here.
+ */
+function setStdioGenudoBaseUrl(block: string, target: string): { block: string; changed: boolean } {
+  // Case 1: an existing key, in EITHER style — rewrite the value in place.
+  // Two anchors, tried in order: line-start (block-style), then a `{`/`,`
+  // boundary (flow-style — the key sits mid-line).
+  //
+  // Review finding (2026-07-29, round 3): the PREVIOUS version searched for
+  // a bare "GENUDO_BASE_URL:" anywhere in the block, unanchored. Two
+  // consequences, both reproduced:
+  //   1. A COMMENT that merely mentions "GENUDO_BASE_URL:" matched FIRST —
+  //      the comment got rewritten, the real key was left stale, and the
+  //      function still reported changed:true. That walks straight past the
+  //      round-1 throw-on-no-op guard (engine.ts) and turns a loud failure
+  //      back into a silent WRONG result: the panel reports success, the
+  //      commit lands, and the host never actually changed.
+  //   2. `\s*` after the colon can match a NEWLINE. A block-style key with
+  //      an EMPTY value let the match cross onto the following line and
+  //      swallow it whole — verified output destroyed the GENUDO_TOKEN line
+  //      entirely. Data loss in a committed, human-authored vault file.
+  // `^([ \t]+)GENUDO_BASE_URL:` (line-start) and `([{,][ \t]*)GENUDO_BASE_URL:`
+  // (flow boundary) can only ever match the REAL key, never prose that
+  // happens to contain the same text — and `[ \t]*`, never `\s*`, cannot
+  // cross a newline, so an empty value ends the match at end-of-line/`}`/`,`
+  // rather than consuming whatever comes next.
+  const blockKey = /^([ \t]+)GENUDO_BASE_URL:[ \t]*("[^"]*"|'[^']*'|[^,}\s][^,}\n]*)?[ \t]*$/m
+  const flowKey = /([{,][ \t]*)GENUDO_BASE_URL:[ \t]*("[^"]*"|'[^']*'|[^,}\s][^,}\n]*)?/
+  for (const keyRe of [blockKey, flowKey]) {
+    if (!keyRe.test(block)) continue
+    let changed = false
+    const next = block.replace(keyRe, (whole: string, prefix: string) => {
+      const replacement = `${prefix}GENUDO_BASE_URL: ${target}`
+      if (replacement !== whole) changed = true
+      return replacement
+    })
+    return { block: next, changed }
+  }
+  // Case 2: flow-style `env: { … }` with no GENUDO_BASE_URL key — insert one.
+  // `[^{}]*` would stop at the FIRST brace it hits — and a `${VAR}` ref
+  // (e.g. GENUDO_TOKEN: "${GENUDO_TOKEN_ACME}") is itself brace-delimited, so
+  // that naive class breaks on every realistic fixture. Flow style is
+  // single-line by definition, so `.*` (greedy, backtracks to the LAST `}`
+  // on the line, anchored at end-of-line) is the correct — and simpler —
+  // match.
+  const flowEnv = /^([ \t]+)env:[ \t]*\{(.*)\}[ \t]*$/m.exec(block)
+  if (flowEnv) {
+    const inner = flowEnv[2].trim()
+    const sep = inner.length > 0 ? ', ' : ''
+    const replacement = `${flowEnv[1]}env: { ${inner}${sep}GENUDO_BASE_URL: ${target} }`
+    return { block: block.replace(flowEnv[0], replacement), changed: true }
+  }
+  // Case 3: block-style `env:\n  KEY: val\n  …` with no GENUDO_BASE_URL key —
+  // append a new line at the same indent as the block's existing keys.
+  const blockEnv = /^([ \t]+)env:\n((?:\1[ \t]+.*\n)+)/m.exec(block)
+  if (blockEnv) {
+    const keyIndent = /^([ \t]+)/.exec(blockEnv[2])?.[1] ?? `${blockEnv[1]}  `
+    const replacement = `${blockEnv[0]}${keyIndent}GENUDO_BASE_URL: ${target}\n`
+    return { block: block.replace(blockEnv[0], replacement), changed: true }
+  }
+  // No `env:` at all to attach to — leave it for a human (same
+  // omit-rather-than-half-build rule as everywhere else in this file).
+  return { block, changed: false }
+}
+
+/**
+ * Rewrite the `genudo` connection's declared base host in a client's
+ * workspace.yml — TEXT-level, exactly like `migrateWorkspaceYml` above, so
+ * comments and unrelated formatting in this committed, human-authored file
+ * survive. `url === null` restores the production default.
+ *
+ * Handles BOTH shapes (review finding, 2026-07-29 — the field must not be
+ * unsettable just because a client hasn't been through the fleet migration,
+ * which is dry-by-default and has not touched the fleet yet):
+ *   - already-http: rewrites the `url:` line to the canonical `.../mcp` endpoint.
+ *   - still-stdio (unmigrated): rewrites (or inserts) `GENUDO_BASE_URL` inside
+ *     the block's `env:`, block-style or flow-style — as a BARE HOST, matching
+ *     the existing fixture convention (`genudo-server.ts`'s stdio fallback
+ *     appends `/mcp` itself at read time; writing the endpoint form here
+ *     would eventually double it). See `setStdioGenudoBaseUrl` above.
+ *
+ * A no-op (`changed: false`) when the block has neither a `url:` line (http
+ * shape) nor any `env:` to attach `GENUDO_BASE_URL` to (stdio shape), or no
+ * genudo block at all. The caller (engine/handlers) treats that as a hard
+ * failure — see `setGenudoBaseUrl` in engine.ts — rather than silently
+ * reporting success.
+ */
+export function setGenudoUrl(text: string, url: string | null): { text: string; changed: boolean } {
+  let changed = false
+  const out = text.replace(GENUDO_BLOCK, (block: string) => {
+    if (HTTP_TYPE_RE.test(block)) {
+      const target = url === null ? `${GENUDO_BASE_URL}/mcp` : normalizeGenudoUrl(url)
+      return block.replace(/^([ \t]+)url:[ \t]*.*$/m, (line: string, indent: string) => {
+        const next = `${indent}url: ${target}`
+        if (next !== line) changed = true
+        return next
+      })
+    }
+    // stdio (unmigrated) shape: the override lives in env.GENUDO_BASE_URL, as
+    // a bare host (see doc comment above — no /mcp suffix here).
+    const target = url === null ? GENUDO_BASE_URL : stripGenudoSuffix(url)
+    const result = setStdioGenudoBaseUrl(block, target)
+    if (result.changed) changed = true
+    return result.block
+  })
+  return { text: out, changed }
+}

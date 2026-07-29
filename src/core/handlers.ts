@@ -17,7 +17,11 @@ import type {
 } from '../shared/types'
 import * as engine from './engine'
 import { atlasGraph, atlasPath, atlasTours, invalidateAtlas } from './atlas'
-import { readClientTokens, storeClientToken } from './client-tokens'
+import { storeClientToken } from './client-tokens'
+import { genudoSignIn, genudoSignOut, genudoStatus } from './genudo-auth'
+import { clientTokenOverlay, resolveConnEnv, stdioGenudoBaseUrl } from './genudo-credential'
+import { GENUDO_BASE_URL } from './genudo-http'
+import { stripGenudoSuffix } from './genudo-migrate'
 import { fetchBundles, planFiles } from './genudo-pull'
 import { buildKbWorkbook } from './kb-export'
 import { scanStagedEdits } from './staged-edits'
@@ -191,6 +195,34 @@ function requireAgentOps(action: string): void {
   }
 }
 
+/** One connection out of `engine.clientConnections` — remote (http) or stdio. */
+type Connection = ReturnType<typeof engine.clientConnections>[number]
+
+/**
+ * The Genudo host to talk to for pull/sign-in: a remote connection's own
+ * `url` (its origin, `/mcp` suffix stripped) when the client is wired for the
+ * new transport, else — for a client still on the legacy stdio bridge — its
+ * resolved `GENUDO_BASE_URL` env var, else the production default. One
+ * function so `clients.pull` and `clients.genudo.signIn` cannot drift on
+ * which host they mean (Task 7 adds an explicit per-client override that
+ * writes into `conn.url` itself, so this keeps working unchanged then too).
+ *
+ * Review finding (2026-07-29, final branch review): the stdio branch used to
+ * return `env.GENUDO_BASE_URL` verbatim — the only one of six normalisation
+ * sites on this branch that did not strip a trailing `/mcp` — so a stdio
+ * client whose declared GENUDO_BASE_URL was the FULL endpoint (not a bare
+ * host) got `/mcp/mcp` once `genudoRpc`/`genudoSignIn` appended their own
+ * `/mcp`. Both branches now go through the same `stripGenudoSuffix` the rest
+ * of this suffix's normalisers already share (genudo-migrate.ts,
+ * genudo-server.ts), so this helper can no longer disagree with itself.
+ */
+function genudoBaseUrl(conn: Connection | undefined, env: Record<string, string> = {}): string {
+  if (conn && 'url' in conn) {
+    return stripGenudoSuffix(conn.url) || GENUDO_BASE_URL
+  }
+  return stripGenudoSuffix(env.GENUDO_BASE_URL ?? GENUDO_BASE_URL) || GENUDO_BASE_URL
+}
+
 /** WP-C: `YYYY-MM-DD_HHMMSS` local-time stamp = the snapshot dir name. The clock
  *  lives host-side (`stampNow` isn't lib-exported; handlers never import loredex). */
 function stampNow(): string {
@@ -325,12 +357,15 @@ export function registerCoreHandlers(
       return { slug, workspace }
     }),
   )
-  // Per-machine wiring state: declared ${VAR} refs vs keychain + file drift.
+  // Per-machine wiring state: declared ${VAR} refs vs keychain/session + file
+  // drift. `clientTokenOverlay` — not a raw keychain read — so a live Genudo
+  // session counts as "held" and a check against generateWorkspace sees the
+  // same fresh bearer a real materialize would write.
   ipc.register('clients.workspace.status', async ({ client }) => {
-    const declaredRefs = engine.clientEnvRefs(client)
-    const held = await readClientTokens(declaredRefs)
-    const missingRefs = declaredRefs.filter((r) => !(r in held))
     const connections = engine.clientConnections(client)
+    const held = await clientTokenOverlay(client, connections)
+    const declaredRefs = engine.clientEnvRefs(client)
+    const missingRefs = declaredRefs.filter((r) => !(r in held))
     const check = engine.generateWorkspace(client, true, held)
     return {
       hasTooling: connections.length > 0,
@@ -342,13 +377,15 @@ export function registerCoreHandlers(
   })
   // Paste/replace tokens on THIS machine + re-materialize. Only the keychain
   // and gitignored generated files change — no commit, but the write lock
-  // still serializes against the poller's pull.
+  // still serializes against the poller's pull. The overlay means a client
+  // with a live Genudo session gets that session's bearer written into
+  // .mcp.json here too, not just whatever was last pasted.
   ipc.register('clients.tokens.set', ({ client, tokens }) =>
     withWriteLock(async () => {
       for (const [ref, token] of Object.entries(tokens)) {
         if (token) await storeClientToken(ref, token)
       }
-      const held = await readClientTokens(engine.clientEnvRefs(client))
+      const held = await clientTokenOverlay(client, engine.clientConnections(client))
       const result = engine.generateWorkspace(client, false, held)
       await syncOldPlatformMcp(engine.clientDirAbs(client), client)
       return result
@@ -431,23 +468,15 @@ export function registerCoreHandlers(
       if (!conn) {
         throw ipcError('INTERNAL', `${client} has no genudo connection in workspace.yml`)
       }
-      const held = await readClientTokens(conn.envRefs)
-      const env: Record<string, string> = {}
-      const missing: string[] = []
-      for (const [key, value] of Object.entries(conn.env)) {
-        env[key] = value.replace(/\$\{([A-Z0-9_]+)\}/g, (whole, ref: string) => {
-          const token = held[ref]
-          if (token === undefined) missing.push(ref)
-          return token ?? whole
-        })
-      }
-      if (missing.length > 0) {
-        throw ipcError('INTERNAL', `no token held for ${missing.join(', ')} — paste it in Agent tooling first`)
-      }
-      const { bundles } = await fetchBundles(
-        env.GENUDO_TOKEN ?? '',
-        env.GENUDO_BASE_URL ?? 'https://api.genudo.ai',
-      )
+      // resolveConnEnv prefers a live Genudo session over a pasted token, and
+      // throws an actionable "not signed in to Genudo" error when neither
+      // exists — that error propagates as-is (the ipc dispatcher wraps a
+      // thrown Error as an INTERNAL envelope carrying its message verbatim),
+      // which is the whole point: an explicit Pull click should tell the user
+      // to sign in, not fail with a bare 401.
+      const env = await resolveConnEnv(client, conn)
+      const token = (env.Authorization ?? '').replace(/^Bearer\s+/i, '') || env.GENUDO_TOKEN || ''
+      const { bundles } = await fetchBundles(token, genudoBaseUrl(conn, env))
       const plan = planFiles(client, bundles)
       if (preview) {
         return { ...plan, files: plan.files.map((f) => f.rel), written: false }
@@ -458,28 +487,35 @@ export function registerCoreHandlers(
       return { ...plan, files: plan.files.map((f) => f.rel), written: true }
     }),
   )
-  // Health probe: spawn the connection's mcp server with keychain-expanded env
-  // and complete an initialize handshake. 8s budget — inside the invoke limit.
+  // Health probe: complete a real initialize+tools/list handshake against the
+  // connection, with its ${VAR}s resolved (live Genudo session first, keychain
+  // fallback otherwise). 8s budget — inside the invoke limit.
   ipc.register('clients.connections.test', async ({ client, server }) => {
     const conn = engine.clientConnections(client).find((c) => c.server === server)
     if (!conn) throw ipcError('INTERNAL', `no connection "${server}" in ${client}/workspace.yml`)
-    const held = await readClientTokens(conn.envRefs)
+    // Unlike clients.pull, this endpoint's contract is "never throws — always
+    // resolves {ok, detail, tools}" (it drives a Test-connection button, not
+    // an action that should surface as an app-level error). resolveConnEnv's
+    // throw — missing pasted token OR "not signed in to Genudo" OR a session
+    // that could not be renewed — is exactly the kind of actionable detail
+    // this card exists to show, so it's caught and folded into `detail`
+    // rather than let the whole IPC call reject.
+    let resolved: Record<string, string>
+    try {
+      resolved = await resolveConnEnv(client, conn)
+    } catch (e) {
+      return { ok: false, detail: e instanceof Error ? e.message : String(e), tools: [] }
+    }
+    if ('url' in conn) {
+      const res = await probeHttpTools(conn.url, resolved)
+      if (res.ok) return { ...res, detail: `Connected — ${res.tools.length} tools` }
+      return res
+    }
     // A GUI-launched app cannot see a per-user Node install (nvm/homebrew on
     // POSIX, nvm-windows/winget on Windows), so a bare `npx` — or `cmd /c npx`
     // on Windows, per CVE-2024-27980 — fails with ENOENT / "not recognized".
     // Widen PATH before spawning; `withResolvedNpx` below also makes npx absolute.
-    const env = widenNodePath({ ...process.env })
-    const unexpanded: string[] = []
-    for (const [key, value] of Object.entries(conn.env)) {
-      env[key] = value.replace(/\$\{([A-Z0-9_]+)\}/g, (whole, ref: string) => {
-        const token = held[ref]
-        if (token === undefined) unexpanded.push(ref)
-        return token ?? whole
-      })
-    }
-    if (unexpanded.length > 0) {
-      return { ok: false, detail: `missing token: ${unexpanded.join(', ')}`, tools: [] }
-    }
+    const env = { ...widenNodePath({ ...process.env }), ...resolved }
     // Windows can't spawn the npx shim directly (ENOENT) — same cmd /c wrap the
     // generated .mcp.json uses, so the probe matches what `claude` will run.
     // Absolute npx.cmd when we can find one: cmd /c still has to LOCATE `npx`,
@@ -607,6 +643,86 @@ export function registerCoreHandlers(
     await syncOldPlatformMcp(engine.clientDirAbs(client), client)
   })
   ipc.register('clients.oldPlatform.test', ({ client }) => testOldPlatform(client))
+  // Per-client Genudo sign-in (OAuth session, keychain-backed). Secrets never
+  // cross this seam — only signedIn/account/expiresAt do. The host comes from
+  // the SAME genudoBaseUrl helper clients.pull uses — a client wired at a
+  // non-production host (self-hosted/staging) must run discovery, DCR and the
+  // token exchange against that host, not silently default to production.
+  ipc.register('clients.genudo.status', ({ client }) => genudoStatus(client))
+  ipc.register('clients.genudo.signIn', async ({ client }) => {
+    const conn = engine.clientConnections(client).find((c) => c.server === 'genudo')
+    // Review finding (2026-07-29) — CRITICAL: this used to call
+    // genudoBaseUrl(conn) with NO env, so for a still-stdio connection (the
+    // shape genudo-server.test.ts models, and the shape most of the fleet is
+    // STILL on — the migration is dry-by-default) genudoBaseUrl's stdio
+    // branch (`env.GENUDO_BASE_URL ?? GENUDO_BASE_URL`) always fell through
+    // to production, ignoring that connection's own declared
+    // GENUDO_BASE_URL. A self-hosted client would sign in — discovery, DCR,
+    // token exchange, all of it — against the wrong tenant.
+    //
+    // Round 2 (2026-07-29): the first fix passed `conn.env` straight through,
+    // but `clientConnections` returns env values UNEXPANDED — a client
+    // configured as `env: { GENUDO_BASE_URL: '${GENUDO_BASE_URL}' }` (the
+    // exact shape genudo-server.test.ts models, and which the client page
+    // renders a paste field for) would then call genudoSignIn with the
+    // literal string `'${GENUDO_BASE_URL}'`. `stdioGenudoBaseUrl` expands a
+    // `${VAR}` ref from the keychain (the same primitive clientTokenOverlay
+    // uses) and THROWS — rather than silently falling back to production —
+    // when the ref can't be expanded. Not resolveConnEnv/clientTokenOverlay:
+    // those also resolve the live OAuth token and can sign the client out as
+    // a side effect on a dead session, wrong on a path that hasn't signed in
+    // yet. A literal (non-ref) value passes through unchanged, and the http
+    // branch of genudoBaseUrl ignores `env` entirely (it reads conn.url
+    // instead), so this is a no-op for an already-migrated connection.
+    const baseUrl = conn && 'env' in conn ? await stdioGenudoBaseUrl(client, conn) : undefined
+    const env: Record<string, string> = baseUrl !== undefined ? { GENUDO_BASE_URL: baseUrl } : {}
+    return genudoSignIn(client, genudoBaseUrl(conn, env))
+  })
+  ipc.register('clients.genudo.signOut', ({ client }) => genudoSignOut(client))
+  /**
+   * Task 7: the per-client Genudo environment override. Must run BEFORE
+   * sign-in — OAuth discovery/DCR/the token exchange all run against
+   * workspace.yml's declared host, so the renderer blocks editing this once a
+   * session is live without an explicit sign-out first; this handler still
+   * checks identity + connection presence itself rather than trust that gate.
+   *
+   * engine.setGenudoBaseUrl (via genudo-migrate.ts's setGenudoUrl) handles
+   * BOTH the already-http and the still-stdio (unmigrated) shape — review
+   * finding (2026-07-29): the fleet migration is dry-by-default and has not
+   * touched the fleet yet, so gating this on `'url' in conn` would have left
+   * the field permanently unsettable for most real clients. Only "no genudo
+   * connection at all" is checked here; a block in some OTHER unexpected
+   * shape surfaces as an actionable error from setGenudoBaseUrl itself
+   * (throws rather than silently reporting success).
+   *
+   * Same write shape as `clients.tooling.copy`: write lock, identity, the
+   * SAME token overlay `clients.tokens.set` uses (so a live session's bearer
+   * survives the regenerated .mcp.json — this write touches no tokens), then
+   * vault.changed + notifier.refresh. `syncOldPlatformMcp` re-mirrors the old
+   * platform's keychain entry into the regenerated .mcp.json, exactly like
+   * every other path that calls materializeWorkspace does.
+   */
+  ipc.register('clients.genudo.setBaseUrl', ({ client, baseUrl, identity }) =>
+    withWriteLock(async () => {
+      if (!isValidIdentity(identity)) {
+        throw ipcError(
+          'INTERNAL',
+          'changing the genudo environment needs an identity — set name and email in Settings',
+        )
+      }
+      const conn = engine.clientConnections(client).find((c) => c.server === 'genudo')
+      if (!conn) {
+        throw ipcError('INTERNAL', `${client} has no genudo connection in workspace.yml`)
+      }
+      const held = await clientTokenOverlay(client, engine.clientConnections(client))
+      const result = engine.setGenudoBaseUrl(client, baseUrl, identity, held)
+      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+      invalidateAtlas()
+      ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
+      notifier.refresh()
+      return result
+    }),
+  )
   ipc.register('langsmith.trace.fetch', async ({ text }) => {
     const ref = parseTraceRef(text)
     if (!ref) {

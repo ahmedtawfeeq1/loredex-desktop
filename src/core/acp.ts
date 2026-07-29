@@ -60,6 +60,7 @@ import {
   mintAgentToken,
   revokeAgentToken,
 } from './settings'
+import { genudoServerFor } from './genudo-server'
 import { oldPlatformServer } from './old-platform'
 import { storeSessionMedia } from './session-media'
 import { buildWorkspaceServers } from './workspace-mcp'
@@ -576,6 +577,11 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
     const oldPlatform = await oldPlatformServer(s.clientSlug)
     if (oldPlatform) mcpServers.push(oldPlatform as McpServer)
   }
+  // The NEW platform, scoped to THIS client — remote, like the old one. Both
+  // shipped adapters advertise http (codex-acp 1.1.4: {acp:false, http:true,
+  // sse:false}), so this is the only path; an adapter without it gets no Genudo.
+  const genudo = await genudoServerFor(s.clientSlug, httpOk)
+  if (genudo) mcpServers.push(genudo)
   // B2 continuation: a same-provider resume (session/load, loadSession cap) lets
   // the adapter restore its OWN context by replaying the whole conversation — we
   // suppress that replay (routeUpdate early-returns while replaying) because our

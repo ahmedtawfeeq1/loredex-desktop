@@ -3,13 +3,13 @@
  * config/read/search over the typed IPC seam. Runs in plain node against
  * tests/fixtures/vault (no Electron).
  */
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createIpcClient } from '../shared/ipc-client'
 import type { PortLike } from '../shared/ipc-contract'
-import { getConfig, initEngine, readNote, recurateProject, search } from './engine'
+import { clientConnections, getConfig, initEngine, readNote, recurateProject, search } from './engine'
 import { registerCoreHandlers } from './handlers'
 import { createCoreIpc } from './ipc'
 
@@ -113,4 +113,62 @@ describe('recurateProject argv guard', () => {
       await expect(recurateProject(bad)).rejects.toThrow(/invalid project name/)
     },
   )
+})
+
+describe('clientConnections resolves both the remote (http) and stdio shapes', () => {
+  // Task 1 left this filtering remote servers out (a stopgap — see git
+  // history). Task 4 replaces that filter with the real union-shaped return:
+  // a remote server comes back with type/url/headers and its envRefs resolved
+  // from `headers`; a stdio server still comes back with command/args/env and
+  // its envRefs resolved from `env`. This test pins THAT contract.
+  const client = 'mcp-filter-test-client'
+  const clientDir = join(FIXTURE_VAULT, 'projects', client)
+
+  beforeAll(() => {
+    mkdirSync(clientDir, { recursive: true })
+    writeFileSync(
+      join(clientDir, 'workspace.yml'),
+      `mcp:
+  crm-remote:
+    type: http
+    url: https://api.example.com/mcp
+    headers: { Authorization: "Bearer \${CRM_TOKEN_X}" }
+  crm-bridge:
+    command: npx
+    args: ['-y', 'some-mcp-client']
+    env:
+      CRM_TOKEN: \${CRM_TOKEN_X}
+plugins:
+  claude: []
+skills: []
+`,
+    )
+  })
+
+  afterAll(() => {
+    rmSync(clientDir, { recursive: true, force: true })
+  })
+
+  it('returns the remote server with type/url/headers and the stdio one with command/args/env', () => {
+    const conns = clientConnections(client)
+    expect(conns.map((c) => c.server).sort()).toEqual(['crm-bridge', 'crm-remote'])
+    expect(conns).toEqual(
+      expect.arrayContaining([
+        {
+          server: 'crm-remote',
+          envRefs: ['CRM_TOKEN_X'],
+          type: 'http',
+          url: 'https://api.example.com/mcp',
+          headers: { Authorization: 'Bearer ${CRM_TOKEN_X}' },
+        },
+        {
+          server: 'crm-bridge',
+          envRefs: ['CRM_TOKEN_X'],
+          command: 'npx',
+          args: ['-y', 'some-mcp-client'],
+          env: { CRM_TOKEN: '${CRM_TOKEN_X}' },
+        },
+      ]),
+    )
+  })
 })

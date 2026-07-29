@@ -22,7 +22,9 @@ import {
   type Config,
   copyWorkspaceSpec,
   type DexType,
+  isRemoteServer,
   type LintFinding,
+  secretFields,
   type WorkspaceResult,
   lintAgentOps,
   loadDexType,
@@ -110,6 +112,7 @@ import {
   setProduct,
   setClientTags,
 } from 'loredex'
+import { setGenudoUrl } from './genudo-migrate'
 import { writePlan } from './genudo-pull'
 import { toVaultRelative } from '../shared/handoff-lanes'
 import { abbreviatePath } from '../shared/identity'
@@ -381,32 +384,106 @@ export function copyTooling(
 }
 
 /**
- * A client's mcp connections with their launch config (env values still
+ * A client's mcp connections with their launch config (env/header values still
  * `${VAR}`-refs — secret-free). Feeds the Add-Client modal checkboxes and the
- * connection health probe.
+ * connection health probe. A remote (http) server comes back with
+ * `type`/`url`/`headers`; a stdio server comes back with `command`/`args`/`env` —
+ * callers must branch on the shape rather than assume stdio.
  */
-export function clientConnections(client: string): Array<{
-  server: string
-  envRefs: string[]
-  command: string
-  args: string[]
-  env: Record<string, string>
-}> {
+export function clientConnections(client: string): Array<
+  | { server: string; envRefs: string[]; type: 'http'; url: string; headers: Record<string, string> }
+  | { server: string; envRefs: string[]; command: string; args: string[]; env: Record<string, string> }
+> {
   const spec = loadWorkspaceSpec(join(getConfig().vaultPath, 'projects', client))
   const ENV_REF = /\$\{([A-Z0-9_]+)\}/g
   return Object.entries(spec.mcp).map(([server, def]) => {
     const refs = new Set<string>()
-    for (const value of Object.values(def.env ?? {})) {
+    for (const value of Object.values(secretFields(def))) {
       for (const m of value.matchAll(ENV_REF)) refs.add(m[1] as string)
     }
-    return {
-      server,
-      envRefs: [...refs].sort(),
-      command: def.command,
-      args: def.args ?? [],
-      env: def.env ?? {},
-    }
+    const base = { server, envRefs: [...refs].sort() }
+    return isRemoteServer(def)
+      ? { ...base, type: 'http' as const, url: def.url, headers: def.headers ?? {} }
+      : { ...base, command: def.command, args: def.args ?? [], env: def.env ?? {} }
   })
+}
+
+/**
+ * Task 7: rewrite this client's `genudo` connection host in workspace.yml —
+ * TEXT-level (`setGenudoUrl`, genudo-migrate.ts, both the http and the
+ * still-stdio shape), so the file's comments and formatting survive, the same
+ * discipline `migrateWorkspaceYml` uses on the same file. `baseUrl === null`
+ * restores the production default. Must run BEFORE sign-in: OAuth discovery,
+ * dynamic client registration, and the token exchange all run against
+ * whatever host `workspace.yml` names.
+ *
+ * Materializes with the caller's token overlay (so a live session's bearer
+ * survives the regenerated `.mcp.json` — this write touches no tokens itself)
+ * and reindexes + ONE attributed commit — same shape as `copyTooling`.
+ * workspace.yml is vault content; never a hand-edit.
+ *
+ * Review finding (2026-07-29): a caller only ever reaches this once it has
+ * decided a real change is needed (the renderer's `genudoUrlDecision` gates
+ * the call), so `setGenudoUrl` reporting `changed: false` means it failed to
+ * find what it expected — an unusual block shape, or a bug in the text-level
+ * matcher — NOT "already up to date". Throwing here, rather than silently
+ * returning the unchanged workspace, is what stops the panel from printing
+ * "Workspace up to date." while the value quietly reverts on the next refresh.
+ *
+ * Final branch review finding (2026-07-29): `setGenudoUrl`'s text-level
+ * rewrite and `normalizeGenudoUrl` both accept a scheme-less host (e.g. the
+ * natural-to-type "staging.genudo.ai"), but loredex's own schema
+ * (`remoteServerSchema`'s `z.string().url()`) rejects it once
+ * `materializeWorkspace` re-parses the file this function just wrote — and it
+ * used to write BEFORE that validation ran, with no rollback. A rejected
+ * value left an invalid workspace.yml on disk with no commit to explain it:
+ * `clientConnections` then throws for that client, and the renderer's
+ * `.catch(() => setConns([]))` silently empties the whole connection panel —
+ * including the control that could fix it — with no hand-edit escape hatch
+ * (this project's automation-first rule). The write now happens first (so a
+ * WorkspaceResult from a successful materialize still reflects real disk
+ * state), but a failure restores the ORIGINAL bytes before the error
+ * surfaces, so a rejected value leaves workspace.yml exactly as it was.
+ */
+export function setGenudoBaseUrl(
+  client: string,
+  baseUrl: string | null,
+  identity: Identity,
+  env?: Record<string, string>,
+): WorkspaceResult {
+  const config = getConfig()
+  const wsPath = join(config.vaultPath, 'projects', client, 'workspace.yml')
+  const before = readFileSync(wsPath, 'utf8')
+  const { text, changed } = setGenudoUrl(before, baseUrl)
+  if (!changed) {
+    throw ipcError(
+      'INTERNAL',
+      `could not set ${client}'s genudo environment — workspace.yml's genudo block was not in the expected shape`,
+    )
+  }
+  writeFileSync(wsPath, text)
+  let workspace: WorkspaceResult
+  try {
+    workspace = materializeWorkspace(config.vaultPath, client, {
+      env: { ...process.env, ...env },
+    })
+  } catch (e) {
+    // Roll back — a value that fails materialize's schema validation must
+    // never leave a broken workspace.yml on disk with no commit to explain
+    // it (see finding above).
+    writeFileSync(wsPath, before)
+    const detail = e instanceof Error ? e.message : String(e)
+    throw ipcError('INTERNAL', `could not set ${client}'s genudo environment — ${detail}`)
+  }
+  rebuildIndexes(config.vaultPath)
+  withGitIdentity(identity, () =>
+    gitAutoCommit(
+      config.vaultPath,
+      config,
+      `loredex: genudo base url for ${client} (${identity.name})`,
+    ),
+  )
+  return workspace
 }
 
 /** Absolute path of a client's directory — the Open-in-Terminal target. */

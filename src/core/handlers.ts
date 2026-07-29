@@ -194,6 +194,26 @@ function requireAgentOps(action: string): void {
   }
 }
 
+/** One connection out of `engine.clientConnections` — remote (http) or stdio. */
+type Connection = ReturnType<typeof engine.clientConnections>[number]
+
+/**
+ * The Genudo host to talk to for pull/sign-in: a remote connection's own
+ * `url` (its origin, `/mcp` suffix stripped) when the client is wired for the
+ * new transport, else — for a client still on the legacy stdio bridge — its
+ * resolved `GENUDO_BASE_URL` env var, else the production default. One
+ * function so `clients.pull` and `clients.genudo.signIn` cannot drift on
+ * which host they mean (Task 7 adds an explicit per-client override that
+ * writes into `conn.url` itself, so this keeps working unchanged then too).
+ */
+function genudoBaseUrl(conn: Connection | undefined, env: Record<string, string> = {}): string {
+  if (conn && 'url' in conn) {
+    const stripped = conn.url.replace(/\/mcp\/?$/, '')
+    return stripped || GENUDO_BASE_URL
+  }
+  return env.GENUDO_BASE_URL ?? GENUDO_BASE_URL
+}
+
 /** WP-C: `YYYY-MM-DD_HHMMSS` local-time stamp = the snapshot dir name. The clock
  *  lives host-side (`stampNow` isn't lib-exported; handlers never import loredex). */
 function stampNow(): string {
@@ -447,7 +467,7 @@ export function registerCoreHandlers(
       // to sign in, not fail with a bare 401.
       const env = await resolveConnEnv(client, conn)
       const token = (env.Authorization ?? '').replace(/^Bearer\s+/i, '') || env.GENUDO_TOKEN || ''
-      const { bundles } = await fetchBundles(token, env.GENUDO_BASE_URL ?? GENUDO_BASE_URL)
+      const { bundles } = await fetchBundles(token, genudoBaseUrl(conn, env))
       const plan = planFiles(client, bundles)
       if (preview) {
         return { ...plan, files: plan.files.map((f) => f.rel), written: false }
@@ -615,9 +635,15 @@ export function registerCoreHandlers(
   })
   ipc.register('clients.oldPlatform.test', ({ client }) => testOldPlatform(client))
   // Per-client Genudo sign-in (OAuth session, keychain-backed). Secrets never
-  // cross this seam — only signedIn/account/expiresAt do.
+  // cross this seam — only signedIn/account/expiresAt do. The host comes from
+  // the SAME genudoBaseUrl helper clients.pull uses — a client wired at a
+  // non-production host (self-hosted/staging) must run discovery, DCR and the
+  // token exchange against that host, not silently default to production.
   ipc.register('clients.genudo.status', ({ client }) => genudoStatus(client))
-  ipc.register('clients.genudo.signIn', ({ client }) => genudoSignIn(client))
+  ipc.register('clients.genudo.signIn', ({ client }) => {
+    const conn = engine.clientConnections(client).find((c) => c.server === 'genudo')
+    return genudoSignIn(client, genudoBaseUrl(conn))
+  })
   ipc.register('clients.genudo.signOut', ({ client }) => genudoSignOut(client))
   ipc.register('langsmith.trace.fetch', async ({ text }) => {
     const ref = parseTraceRef(text)

@@ -47,6 +47,17 @@ describe('resolveConnEnv', () => {
     expect(await resolveConnEnv('acme', other)).toEqual({ CRM: 'pasted-tok' })
     expect(accessToken).not.toHaveBeenCalledWith('acme')
   })
+
+  // review finding (2026-07-29): a session that EXISTS but can't be renewed
+  // must not be swallowed into the generic "not signed in" text here — the
+  // caller explicitly asked for something that needs a credential, so the
+  // specific "could not be renewed, sign in again" message is the useful one.
+  it('propagates the exact renewal-failure message rather than the generic "not signed in" one', async () => {
+    accessToken.mockRejectedValueOnce(
+      new Error('Genudo session for acme could not be renewed (invalid_grant) — sign in again on the client page'),
+    )
+    await expect(resolveConnEnv('acme', conn)).rejects.toThrow(/could not be renewed/i)
+  })
 })
 
 describe('clientTokenOverlay', () => {
@@ -59,5 +70,24 @@ describe('clientTokenOverlay', () => {
   it('leaves the pasted token in place when there is no session', async () => {
     accessToken.mockResolvedValueOnce(null)
     expect(await clientTokenOverlay('acme', [conn])).toEqual({ GENUDO_TOKEN_ACME: 'pasted-tok' })
+  })
+
+  // review finding (2026-07-29): this is the OPPOSITE of resolveConnEnv above,
+  // on purpose — a passive read (client-page status on mount, or
+  // re-materializing because an unrelated token was pasted) must not blow up
+  // just because Genudo's session died. genudoAccessToken already signs the
+  // client out before throwing, so falling back to "no live token" here reads
+  // exactly like a client that never signed in — the correct, informative UI.
+  it('does not throw when the session cannot be renewed — falls back to the pasted token', async () => {
+    accessToken.mockRejectedValueOnce(
+      new Error('Genudo session for acme could not be renewed (invalid_grant) — sign in again on the client page'),
+    )
+    await expect(clientTokenOverlay('acme', [conn])).resolves.toEqual({ GENUDO_TOKEN_ACME: 'pasted-tok' })
+  })
+
+  it('does not throw when the session cannot be renewed and nothing was pasted either', async () => {
+    accessToken.mockRejectedValueOnce(new Error('renewal failed'))
+    const noFallback = { ...conn, envRefs: ['GENUDO_TOKEN_OTHER'] }
+    await expect(clientTokenOverlay('acme', [noFallback])).resolves.toEqual({})
   })
 })

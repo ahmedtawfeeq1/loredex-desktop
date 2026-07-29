@@ -44,6 +44,23 @@ vi.mock('./client-tokens', () => ({
   deleteClientToken: async (ref: string) => void heldTokens.delete(ref),
 }))
 
+// review finding (2026-07-29): clients.tokens.set used to store every pasted
+// token BEFORE resolving the genudo overlay, so a dead-and-unrenewable Genudo
+// session threw partway through and left the keychain write done but
+// generateWorkspace/syncOldPlatformMcp never run. Mocking genudoAccessToken to
+// always reject exercises that path directly. This is safe for every OTHER
+// test in this file — none of their clients declare a `genudo` server, so
+// clientTokenOverlay/resolveConnEnv never call it for them regardless of what
+// it does here.
+vi.mock('./genudo-auth', () => ({
+  genudoAccessToken: async () => {
+    throw new Error('Genudo session could not be renewed (invalid_grant) — sign in again on the client page')
+  },
+  genudoSignIn: async () => ({ account: null }),
+  genudoSignOut: async () => {},
+  genudoStatus: async () => ({ signedIn: false, account: null, expiresAt: null }),
+}))
+
 const GOLDEN_WS = `mcp:
   new-platform:
     command: npx
@@ -170,5 +187,62 @@ describe('clients.create — the Add-Client button end-to-end', () => {
     expect(conns.find((c) => c.server === 'new-platform')?.envRefs).toEqual([
       'NEW_TOKEN_BRIGHTSMILE_DENTAL',
     ])
+  })
+})
+
+describe('clients.tokens.set does not partial-write when Genudo cannot be renewed', () => {
+  // review finding (2026-07-29): a client whose Genudo session died must not
+  // turn "paste a CRM token" into a half-done write — the CRM token stored,
+  // .mcp.json left stale. dead-session-clinic has a genudo connection (so
+  // clientTokenOverlay actually calls the always-rejecting genudoAccessToken
+  // mock above) alongside an unrelated crm one.
+  const SLUG = 'dead-session-clinic'
+
+  beforeAll(() => {
+    scaffoldClient(vault, 'dead session clinic', { manager: 'sara' })
+    writeFileSync(
+      join(vault, 'projects', SLUG, 'workspace.yml'),
+      `mcp:
+  genudo:
+    type: http
+    url: https://api.genudo.ai/mcp
+    headers: { Authorization: "Bearer \${GENUDO_TOKEN_DEAD_SESSION_CLINIC}" }
+  crm:
+    command: npx
+    args: [-y, crm-mcp]
+    env:
+      CRM_TOKEN: \${CRM_TOKEN_DEAD_SESSION_CLINIC}
+plugins:
+  claude: []
+skills: []
+`,
+    )
+    git('add', '-A')
+    git(
+      '-c',
+      'user.name=Seed',
+      '-c',
+      'user.email=seed@brightsmile.dev',
+      'commit',
+      '-m',
+      'seed dead-session-clinic',
+    )
+  })
+
+  it('stores the pasted CRM token and regenerates .mcp.json even though the Genudo session cannot be renewed', async () => {
+    const result = await client.invoke('clients.tokens.set', {
+      client: SLUG,
+      tokens: { CRM_TOKEN_DEAD_SESSION_CLINIC: 'crm-tok-789' },
+    })
+    // the write completed end-to-end — not aborted partway through by the
+    // dead-session throw (the old bug: keychain written, generateWorkspace
+    // and syncOldPlatformMcp never reached)
+    expect(heldTokens.get('CRM_TOKEN_DEAD_SESSION_CLINIC')).toBe('crm-tok-789')
+    const mcp = JSON.parse(readFileSync(join(vault, 'projects', SLUG, '.mcp.json'), 'utf8'))
+    expect(mcp.mcpServers.crm.env.CRM_TOKEN).toBe('crm-tok-789')
+    // the genudo ref legitimately still reads as missing — the session died
+    // and nothing was pasted for it — which is the correct "needs attention"
+    // state, not a crash
+    expect(result.missingEnv).toContain('GENUDO_TOKEN_DEAD_SESSION_CLINIC')
   })
 })

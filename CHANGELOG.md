@@ -7,6 +7,29 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-07-29
+
+### Fixed
+- **Pasting an image into the terminal panel now reaches the `claude` CLI on
+  every OS.** It did nothing on Windows and Linux while working on macOS, which
+  read as intermittent but was platform-determined. Nothing about an image can
+  travel through a PTY, and the CLI knows that — its docs say an image is pasted
+  "into the CLI with Ctrl+V", meaning it receives the keystroke and reads the OS
+  clipboard itself. Both paths swallowed that keystroke: Electron's `editMenu`
+  role binds Paste to `CmdOrCtrl+V` and a menu accelerator is consumed before the
+  page sees the key, and whatever survived hit xterm's text-only paste handler,
+  which reads `text/plain` — empty for an image. The Edit menu now leaves the key
+  to the page (the shortcut still shows), and the terminal sends `Ctrl+V` down
+  the PTY when the clipboard holds an image. Ordinary text pasting is unchanged.
+
+### Changed
+- **Genudo sign-in is switched off; pasted tokens are the credential.** Browser
+  sign-in has problems in practice. The switch also gates the credential
+  resolver, not just the button — a stored session outranks a pasted token, so
+  hiding the control alone would have left a client that signed in earlier still
+  authenticating with that session while the visible token did nothing. Nothing
+  is deleted: sessions, channels and refresh all remain behind one flag.
+
 ## [0.12.0] - 2026-07-29
 
 ### Added
@@ -678,7 +701,8 @@ The platform the agent-ops work builds on (previously unreleased in this log):
   loredex vault: reader with working wikilinks, handoff inbox/outbox, search,
   sync health, activity feed, and an in-app MCP server — no Obsidian required.
 
-[Unreleased]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.11.0...v0.12.0
 [0.4.0]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ahmedtawfeeq1/loredex-desktop/compare/v0.2.1...v0.3.0

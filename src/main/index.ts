@@ -226,7 +226,27 @@ function buildMenu(): void {
           { role: 'close' },
         ],
       },
-      { role: 'editMenu' },
+      {
+        // NOT `role: 'editMenu'`: that binds Paste to CmdOrCtrl+V, and a menu
+        // accelerator is consumed BEFORE the page sees the key. On Windows and
+        // Linux that ate Ctrl+V, which is the keystroke the `claude` CLI needs
+        // in order to read an image off the clipboard itself (its docs: "paste
+        // it into the CLI with Ctrl+V") — so image paste in the terminal panel
+        // silently did nothing there while working on macOS, where Ctrl+V is
+        // not the accelerator. `registerAccelerator: false` keeps the shortcut
+        // VISIBLE in the menu but leaves the key to the page: Chromium still
+        // pastes natively into inputs, and the terminal can act on it.
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste', registerAccelerator: false },
+          { role: 'selectAll' },
+        ],
+      },
       {
         // NOT `role: 'viewMenu'`: its zoom roles are per-webContents and bind
         // `CommandOrControl+Plus` — a SHIFTED key, so `⌘=` does nothing. These

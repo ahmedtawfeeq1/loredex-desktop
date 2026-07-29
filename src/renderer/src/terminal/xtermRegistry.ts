@@ -66,6 +66,52 @@ function xtermTheme(): ITheme {
   }
 }
 
+/** Ctrl+V as a raw byte (SYN). This is what a real terminal delivers to the
+ *  foreground program, and what the `claude` CLI watches for to read an image
+ *  off the system clipboard itself. */
+const CTRL_V = '\x16'
+
+/**
+ * Does this paste carry an image rather than text?
+ *
+ * `clipboardData.items` is populated synchronously on the paste event, for a
+ * keyboard paste AND for a programmatic one (Electron's Edit ▸ Paste menu role
+ * calls `webContents.paste()`, which goes through the same Chromium path).
+ */
+export function pasteHasImage(data: DataTransfer | null): boolean {
+  if (!data) return false
+  if (Array.from(data.items ?? []).some((i) => i.type.startsWith('image/'))) return true
+  return Array.from(data.files ?? []).some((f) => f.type.startsWith('image/'))
+}
+
+/**
+ * Image paste into a hosted terminal.
+ *
+ * Nothing about an image can travel through a PTY — `term.onData` carries text
+ * and only text. The `claude` CLI knows this: per its docs an image is pasted
+ * "into the CLI with Ctrl+V", meaning the CLI receives that keystroke and then
+ * reads the OS clipboard ITSELF. So the fix is not to move image bytes; it is
+ * to make sure the keystroke arrives.
+ *
+ * It did not, because both paths swallowed it:
+ *   - Electron's `role: 'editMenu'` binds Paste to CmdOrCtrl+V, so on WINDOWS
+ *     the menu accelerator consumed Ctrl+V before the page ever saw it;
+ *   - whatever survived reached xterm's `handlePaste`, which reads
+ *     `getData("text/plain")` — empty for an image, so nothing was written.
+ * On macOS Ctrl+V is not the accelerator, so it fell through to xterm as a
+ * control byte and image paste worked. That asymmetry is why this failed on
+ * Windows and looked intermittent.
+ *
+ * Now: an image paste sends Ctrl+V down the PTY and stops the text path; a text
+ * paste is left entirely to xterm, so ordinary pasting is unchanged.
+ */
+function onPaste(id: string, e: ClipboardEvent): void {
+  if (!pasteHasImage(e.clipboardData)) return
+  e.preventDefault()
+  e.stopPropagation()
+  void invoke('term.input', { id, data: CTRL_V }).catch(() => {})
+}
+
 /** Mount (or re-parent) the terminal for `id` into `container`. Creates the
  *  Terminal + fit/search/web-links addons on first attach and replays any
  *  buffered output; on a React remount (a split moved the leaf) the live
@@ -94,6 +140,8 @@ export function attachTerm(id: string, container: HTMLElement): void {
   term.loadAddon(new WebLinksAddon())
   term.open(container)
   term.onData((data) => void invoke('term.input', { id, data }).catch(() => {}))
+  // CAPTURE phase, so this runs before xterm's own paste handler on its textarea.
+  container.addEventListener('paste', (e) => onPaste(id, e as ClipboardEvent), true)
   terms.set(id, { term, fit, search })
   const queued = pending.get(id)
   if (queued) {

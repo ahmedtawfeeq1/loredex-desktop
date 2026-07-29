@@ -411,12 +411,20 @@ function StandardToolingCard({
                 className="cp-ws-token-input"
                 type="password"
                 value={tokens[ref] ?? ''}
-                placeholder="Paste this client's token"
+                placeholder="Paste this client's token — optional"
                 onChange={(e) => setTokens({ ...tokens, [ref]: e.target.value })}
               />
             ))}
         </div>
       ))}
+      {/* `wire()` drops empty tokens, so this genuinely works blank — but the
+          bare password field read as a required step, which left a client that
+          has never connected looking like it had no way in. Sign-in cannot
+          appear until the connection exists: it is stored per client against a
+          host this card is what declares. */}
+      <div className="cp-conn-detail">
+        Wire without a token to sign in to Genudo from this page instead.
+      </div>
       <div className="cp-ws-row" style={{ marginTop: 8 }}>
         <button
           type="button"

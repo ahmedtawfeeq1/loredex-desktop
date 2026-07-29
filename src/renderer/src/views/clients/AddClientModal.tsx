@@ -207,12 +207,21 @@ export function AddClientModal({ onClose }: { onClose: () => void }): React.JSX.
                       type="password"
                       value={tokens[ref] ?? ''}
                       onChange={(e) => setTokens({ ...tokens, [ref]: e.target.value })}
-                      placeholder="Paste this client's token (stored in your OS keychain, never in git)"
+                      placeholder="Paste this client's token — optional"
                     />
                   </label>
                 ))}
             </div>
           ))}
+          {/* Tokens are optional here: only name and manager block Create, and
+              `tokensFor` drops empty ones. Sign-in cannot live in this modal —
+              the session is stored per client and the slug does not exist until
+              Create runs — so say where it does live rather than leaving the
+              field looking mandatory. */}
+          <p className="acm-hint">
+            Held in your OS keychain, never in git. Leave blank to sign in to Genudo from the
+            client's page after creating.
+          </p>
         </div>
       )}
     </Modal>

@@ -1729,8 +1729,31 @@ What this plan *does* cover from that area: Task 6 swaps the plugin id in every 
 
 ## Manual verification before calling this done
 
-1. `rm -rf ~/.npm/_npx` — this machine's cache holds 1.1.0 / 2.3.1 / 2.3.2, all SSE-era.
+Sharpened by the final whole-branch review (2026-07-29), which inspected this machine's actual
+plugin state. **Steps 2 and 3 gate the migration — they are not a follow-up.**
+
+1. ~~`rm -rf ~/.npm/_npx`~~ — **done 2026-07-29.** The cache held 1.1.0 / 2.3.1 / 2.3.2, all SSE-era.
 2. `claude plugin uninstall genudo@genudo-ai` at **both** user and project scope (`clients_work/projects/arabicss`), and `claude plugin uninstall genudo-desktop@genudo-ai`.
-3. Install `genudo-no-connector` from the local zip, then confirm `claude mcp list` in a migrated client dir shows exactly one `genudo` server pointing at `https://api.genudo.ai/mcp`. `claude plugin details` reports "MCP servers (0)" regardless and cannot be used for this.
-4. Diff one client's pull output bridge-vs-direct before trusting the new pull — the backend may or may not truncate long `instructions` / `persona` fields, and the pull writes into the vault as if the content were complete.
-5. Start a Codex session in a migrated client dir and confirm Genudo tools are present. The adapter advertises http, so this confirms it *honours* what it advertises — the one thing reading the package could not prove.
+3. Install `genudo-no-connector` from the local zip, then confirm `claude mcp list` in a migrated client dir shows exactly one `genudo` server pointing at that client's endpoint. `claude plugin details` reports "MCP servers (0)" regardless and cannot be used for this.
+
+   **Why these gate the migration.** Verified state on this machine: `~/.claude/settings.json` enables `genudo@genudo-ai` *and* `genudo-desktop@genudo-ai` at **user** scope, and `genudo-no-connector` is not installed at all. The migration prunes only the *per-project* key — so applying it first leaves every client session still loading the user-scope bundled connector, which is the exact cross-client-login hazard D5 exists to prevent, while the 12 clients' regenerated settings enable a plugin that isn't there.
+4. Run the migration dry, read the list, then `--apply`, then **`git diff` in the vault before anything else writes**. The runner prints filenames, not diffs. Note it needs `npx tsx`, not plain `node`.
+5. **Re-wire each migrated client** (or open its page) — the script does not re-materialize, so until then `.mcp.json` still points at the dead stdio bridge.
+6. Diff one client's `list_pipelines` bridge-vs-direct before trusting the new pull — the backend may or may not truncate long `instructions` / `persona` fields, and the pull writes into the vault as if the content were complete.
+7. Start a Chat Here session against a migrated client and confirm Genudo tools appear **once**. Both `acp.ts` and that client's `.mcp.json` now declare a `genudo` server; the adapter is expected to dedupe, but no one has watched it happen.
+8. Start a Codex session in a migrated client dir and confirm Genudo tools are present. The adapter advertises http, so this confirms it *honours* what it advertises — the one thing reading the package could not prove.
+9. Sign in on one client, then let the access token expire and confirm the refresh succeeds. That exercises the RFC 8707 `resource` round trip, which no test can prove, and `expires_in`, whose absence would make a session look permanently fresh.
+
+## Known-deferred at merge
+
+Each reviewed and judged fine to defer; none is a correctness risk today.
+
+- `setStdioGenudoBaseUrl`'s in-place rewrite drops an inline trailing comment on the `GENUDO_BASE_URL` line. The value written is still correct and the loss is git-recoverable.
+- A refresh rejected with an OAuth error outside `invalid_client` / `unauthorized_client` / `invalid_grant` leaves a dead session stored until the user clicks Sign out — matches the SDK's own convention.
+- `stamp()` treats a missing or zero `expires_in` as never-expiring. Needs the live-backend evidence from step 9 before deciding whether to change it.
+- `genudo-migrate.ts`: non-global block match, flow-style unquoted `${VAR}` skip, `OLD_PLUGIN` rewriting a comment, `type: https` matching. All verified to fail safe.
+- No end-to-end test for `clients.pull`; the confirm dialog is hand-rolled rather than `components/Modal.tsx`; the environment field has no format validation beyond the write-then-rollback guard.
+
+## Still unbuilt
+
+The plugin installer and update check (spec §4a/4b) get their own plan, as scoped. Nothing in this branch installs or updates a Genudo plugin — step 3 above is manual for now.

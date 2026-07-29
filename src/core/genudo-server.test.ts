@@ -83,6 +83,31 @@ describe('genudoServerFor', () => {
     })
   })
 
+  it('does not double up /mcp when the self-hosted GENUDO_BASE_URL already carries the full endpoint', async () => {
+    // The field mirrors what a user can see verbatim in workspace.yml — the
+    // FULL endpoint, `/mcp` and all — so pasting it whole must not produce
+    // `.../mcp/mcp`.
+    vi.mocked(clientConnections).mockReturnValue([
+      {
+        server: 'genudo',
+        envRefs: ['GENUDO_TOKEN_ACME', 'GENUDO_BASE_URL'],
+        command: 'npx',
+        args: ['-y', 'genudo-mcp-client'],
+        env: { GENUDO_TOKEN: '${GENUDO_TOKEN_ACME}', GENUDO_BASE_URL: '${GENUDO_BASE_URL}' },
+      },
+    ])
+    vi.mocked(resolveConnEnv).mockResolvedValue({
+      GENUDO_TOKEN: 'tok-self-hosted',
+      GENUDO_BASE_URL: 'https://genudo.acme.internal/mcp',
+    })
+    expect(await genudoServerFor('acme', true)).toEqual({
+      type: 'http',
+      name: 'genudo',
+      url: 'https://genudo.acme.internal/mcp',
+      headers: [{ name: 'Authorization', value: 'Bearer tok-self-hosted' }],
+    })
+  })
+
   it('falls back to the production default when unmigrated with no GENUDO_BASE_URL override', async () => {
     vi.mocked(clientConnections).mockReturnValue([
       {

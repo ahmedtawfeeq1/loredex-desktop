@@ -69,8 +69,13 @@ export async function genudoServerFor(
     // which has no `url` at all: `resolved.GENUDO_BASE_URL` is that
     // connection's OWN expanded env var (e.g. a self-hosted override), so it
     // wins over the production default — an unmigrated self-hosted client
-    // must not get silently pointed at prod.
-    url: conn.url ?? `${(resolved.GENUDO_BASE_URL ?? GENUDO_BASE_URL).replace(/\/+$/, '')}/mcp`,
+    // must not get silently pointed at prod. Strip a trailing `/mcp` (and any
+    // trailing slash) before re-appending it — the field is a copy-paste
+    // target for a value a user can see verbatim in workspace.yml, which is
+    // the FULL endpoint, so pasting it whole must not double up the suffix.
+    // Mirrors `handlers.ts`'s `genudoBaseUrl()`, which strips the same suffix
+    // going the other direction.
+    url: conn.url ?? `${(resolved.GENUDO_BASE_URL ?? GENUDO_BASE_URL).replace(/\/mcp\/?$/, '').replace(/\/+$/, '')}/mcp`,
     headers: [{ name: 'Authorization', value: `Bearer ${token}` }],
   } as McpServer
 }

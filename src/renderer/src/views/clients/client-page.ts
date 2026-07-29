@@ -208,3 +208,32 @@ export function genudoUrlDecision(
   const changed = nextEndpoint !== currentEndpoint
   return { payload, changed, warn: changed && signedIn }
 }
+
+/**
+ * Review finding (2026-07-29): "Sign out and change" was wired as
+ * `invoke(signOut).catch(toast).then(() => commit())` — a `.catch` handler
+ * that doesn't rethrow resolves the chain, so the `.then` ran UNCONDITIONALLY.
+ * A locked keychain (or any sign-out failure) produced a "Sign-out failed"
+ * toast AND still committed the new environment — leaving the client holding
+ * a token minted at the OLD host, exactly the silent-401 failure this whole
+ * warn-and-offer-sign-out flow exists to prevent. That bug was untestable as
+ * written (the sequencing lived inline in a JSX onClick), which is why it
+ * survived review the first time.
+ *
+ * The effects are injected (`signOut`/`commit`/`onSignOutFailed`) so the
+ * SEQUENCING — commit only ever runs after signOut genuinely resolved — is
+ * unit-tested independent of IPC/React.
+ */
+export async function signOutThenChangeEnvironment(
+  signOut: () => Promise<void>,
+  commit: () => Promise<void>,
+  onSignOutFailed: (error: unknown) => void,
+): Promise<void> {
+  try {
+    await signOut()
+  } catch (e) {
+    onSignOutFailed(e)
+    return
+  }
+  await commit()
+}

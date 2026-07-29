@@ -36,6 +36,7 @@ import {
   genudoLabel,
   genudoUrlDecision,
   genudoUrlFieldValue,
+  signOutThenChangeEnvironment,
   type GenudoStatus,
   type UnitSection,
 } from './client-page'
@@ -791,9 +792,11 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
             }
           >
             {/* Task 7: sign-in control. The host comes from THIS connection's
-                own `url` (server-side, via genudoBaseUrl) — a client pointed
-                at staging runs discovery/DCR/the token exchange against
-                staging, not silently against production. */}
+                own declared host (server-side, via genudoBaseUrl — both the
+                http shape's url and a still-stdio shape's own
+                GENUDO_BASE_URL) — a client pointed at staging runs
+                discovery/DCR/the token exchange against staging, not
+                silently against production. */}
             {conn.server === 'genudo' && genudo && genudoStatusLabel && (
               <div className="cp-ws-ref">
                 <span className={genudoActive ? 'cp-ws-ref-state ok' : 'cp-ws-ref-state warn'}>
@@ -804,85 +807,107 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                   variant={genudoActive ? 'secondary' : 'primary'}
                   disabled={signingIn}
                   onClick={() => {
+                    // captured once, up front — genudoActive itself must not
+                    // change mid-flight (nothing refreshes `genudo` until this
+                    // resolves), but capturing makes that explicit rather than
+                    // relying on it
+                    const signingOut = genudoActive
                     setSigningIn(true)
-                    const channel = genudoActive ? 'clients.genudo.signOut' : 'clients.genudo.signIn'
-                    void invoke(channel, { client: info.slug })
+                    void invoke(signingOut ? 'clients.genudo.signOut' : 'clients.genudo.signIn', {
+                      client: info.slug,
+                    })
                       .then(() => {
                         setSigningIn(false)
                         refreshAll(true)
                       })
                       .catch((e) => {
                         setSigningIn(false)
-                        useToasts.getState().push('Genudo sign-in failed', reason(e))
+                        useToasts
+                          .getState()
+                          .push(signingOut ? 'Genudo sign-out failed' : 'Genudo sign-in failed', reason(e))
                       })
                   }}
                 >
-                  {signingIn ? 'Waiting for the browser…' : genudoStatusLabel.action}
+                  {signingIn
+                    ? genudoActive
+                      ? 'Signing out…'
+                      : 'Waiting for the browser…'
+                    : genudoStatusLabel.action}
                 </Button>
               </div>
             )}
-            {/* Task 7: the environment override. Only for an already-migrated
-                (http-shaped) connection — a still-stdio genudo block has no
-                `url:` line to rewrite, same omit-rather-than-half-build rule
-                genudo-server.ts follows. Editable value seeds on entering
-                edit mode (not kept in sync live) so a background refresh
-                mid-edit can never stomp on what the user is typing. */}
-            {conn.server === 'genudo' && 'url' in conn && (
-              <div className="cp-ws-ref">
-                <span className="cp-ws-ref-state">Environment</span>
-                <span className="cp-ws-conn">
-                  {genudoUrlFieldValue(conn.url) || 'production (default)'}
-                </span>
-                {urlEditing ? (
-                  <>
-                    <input
-                      className="cp-ws-token-input"
-                      type="text"
-                      value={urlInput}
-                      placeholder={GENUDO_DEFAULT_BASE_URL}
-                      onChange={(e) => setUrlInput(e.target.value)}
-                    />
-                    <Button
-                      variant="secondary"
-                      disabled={urlBusy}
-                      onClick={() => {
-                        const decision = genudoUrlDecision(urlInput, conn.url, genudo?.signedIn ?? false)
-                        if (!decision.changed) {
-                          setUrlEditing(false)
-                          return
+            {/* Task 7: the environment override. Both shapes: an already-http
+                connection's `url:` line, or a still-stdio (unmigrated)
+                connection's own `GENUDO_BASE_URL:` — the fleet migration is
+                dry-by-default and has not touched the fleet yet, so gating
+                this on the http shape would leave the field permanently
+                unsettable for most real clients. Editable value seeds on
+                entering edit mode (not kept in sync live) so a background
+                refresh mid-edit can never stomp on what the user is typing. */}
+            {conn.server === 'genudo' &&
+              (() => {
+                const currentUrl = 'url' in conn ? conn.url : conn.env.GENUDO_BASE_URL
+                return (
+                  <div className="cp-ws-ref">
+                    <span className="cp-ws-ref-state">Environment</span>
+                    <span className="cp-ws-conn">
+                      {genudoUrlFieldValue(currentUrl) || 'production (default)'}
+                    </span>
+                    {urlEditing ? (
+                      <>
+                        <input
+                          className="cp-ws-token-input"
+                          type="text"
+                          value={urlInput}
+                          placeholder={GENUDO_DEFAULT_BASE_URL}
+                          onChange={(e) => setUrlInput(e.target.value)}
+                        />
+                        <Button
+                          variant="secondary"
+                          disabled={urlBusy}
+                          onClick={() => {
+                            const decision = genudoUrlDecision(
+                              urlInput,
+                              currentUrl,
+                              genudo?.signedIn ?? false,
+                            )
+                            if (!decision.changed) {
+                              setUrlEditing(false)
+                              return
+                            }
+                            if (decision.warn) {
+                              setUrlConfirm({ payload: decision.payload })
+                              return
+                            }
+                            void commitUrl(decision.payload)
+                          }}
+                        >
+                          Save
+                        </Button>
+                        <Button variant="quiet" disabled={urlBusy} onClick={() => setUrlEditing(false)}>
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        disabled={!identity}
+                        title={
+                          identity
+                            ? 'Point this client at a different Genudo host — must be set before Sign in, since that host is where sign-in registers'
+                            : 'Changing the environment needs an identity — set name and email in Settings'
                         }
-                        if (decision.warn) {
-                          setUrlConfirm({ payload: decision.payload })
-                          return
-                        }
-                        void commitUrl(decision.payload)
-                      }}
-                    >
-                      Save
-                    </Button>
-                    <Button variant="quiet" disabled={urlBusy} onClick={() => setUrlEditing(false)}>
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    variant="secondary"
-                    disabled={!identity}
-                    title={
-                      identity
-                        ? "Point this client at a different Genudo host — must be set before Sign in, since that host is where sign-in registers"
-                        : 'Changing the environment needs an identity — set name and email in Settings'
-                    }
-                    onClick={() => {
-                      setUrlInput(genudoUrlFieldValue(conn.url))
-                      setUrlEditing(true)
-                    }}
-                  >
-                    Change Environment
-                  </Button>
-                )}
-              </div>
-            )}
+                        onClick={() => {
+                          setUrlInput(genudoUrlFieldValue(currentUrl))
+                          setUrlEditing(true)
+                        }}
+                      >
+                        Change environment
+                      </Button>
+                    )}
+                  </div>
+                )
+              })()}
             {conn.envRefs.map((ref) => {
               const missing = status?.missingRefs.includes(ref) ?? false
               const editing = missing || replacing.has(ref)
@@ -960,11 +985,17 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="cp-modal-title">Change Genudo environment?</div>
+            {/* "has a Genudo session for" rather than "is signed in to" — this
+                modal also opens for an EXPIRED session (warn deliberately
+                derives from the raw signedIn flag, not the "is it actually
+                usable" label, since an expired session still holds a token
+                tied to the old host), and "is signed in" would be a false
+                claim in that case. */}
             <div className="cp-modal-field">
-              {info.slug} is signed in to Genudo{genudo.account ? ` as ${genudo.account}` : ''}. That
-              session was issued by the current environment — changing it leaves the client holding
-              a token the new host will reject, which shows up later as an unexplained sign-in
-              failure. Sign out now, then sign back in once you're ready.
+              {info.slug} has a Genudo session for the current environment
+              {genudo.account ? ` (${genudo.account})` : ''}. Changing the host leaves that session
+              holding a token the new host will reject, which shows up later as an unexplained
+              sign-in failure. Sign out now, then sign back in once you're ready.
             </div>
             <div className="cp-modal-actions">
               <Button variant="secondary" disabled={urlBusy} onClick={() => setUrlConfirm(null)}>
@@ -976,12 +1007,23 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                 onClick={() => {
                   const payload = urlConfirm.payload
                   setUrlBusy(true)
-                  void invoke('clients.genudo.signOut', { client: info.slug })
-                    .catch((e) => useToasts.getState().push('Sign-out failed', reason(e)))
-                    .then(() => commitUrl(payload))
+                  // Review finding (2026-07-29): was `.catch(toast).then(commit)`,
+                  // which commits UNCONDITIONALLY (a non-rethrowing .catch
+                  // resolves the chain) — a failed sign-out still changed the
+                  // environment, leaving the client holding a token minted at
+                  // the OLD host. signOutThenChangeEnvironment only commits
+                  // once sign-out genuinely succeeded.
+                  void signOutThenChangeEnvironment(
+                    () => invoke('clients.genudo.signOut', { client: info.slug }),
+                    () => commitUrl(payload),
+                    (e) => {
+                      setUrlBusy(false)
+                      useToasts.getState().push('Sign-out failed', reason(e))
+                    },
+                  )
                 }}
               >
-                Sign Out And Change
+                Sign out and change
               </Button>
             </div>
           </div>

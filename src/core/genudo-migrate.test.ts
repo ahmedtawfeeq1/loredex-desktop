@@ -262,8 +262,10 @@ skills: []
     expect(text).toContain('skills: []')
   })
 
-  it('leaves a still-stdio (unmigrated) genudo block alone — nothing to rewrite', () => {
-    const stdio = `mcp:
+  // Review finding (2026-07-29): the fleet migration is dry-by-default and has
+  // not touched the fleet yet, so most real clients are STILL on this shape.
+  // The field must work on it too, or it is invisible fleet-wide.
+  const STDIO_WS = `mcp:
   genudo:
     command: npx
     args: [-y, genudo-mcp-client]
@@ -274,9 +276,32 @@ plugins:
   claude: [genudo@genudo-ai]
 skills: []
 `
-    const { text, changed } = setGenudoUrl(stdio, 'https://genudo.acme.internal')
-    expect(changed).toBe(false)
-    expect(text).toBe(stdio)
+
+  it('rewrites GENUDO_BASE_URL (bare host, no /mcp) inside a still-stdio block', () => {
+    const { text, changed } = setGenudoUrl(STDIO_WS, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('GENUDO_BASE_URL: https://genudo.acme.internal')
+    // bare host, not the /mcp endpoint form — the stdio fallback appends
+    // /mcp itself at read time (genudo-server.ts); writing it here too would
+    // eventually double it
+    expect(text).not.toContain('/mcp')
+    // untouched: the command/args shape, the token ref, the rest of the file
+    expect(text).toContain('command: npx')
+    expect(text).toContain('GENUDO_TOKEN: "${GENUDO_TOKEN_X}"')
+    expect(text).toContain('genudo@genudo-ai')
+  })
+
+  it('strips a pasted /mcp endpoint back to a bare host for the stdio shape too', () => {
+    const { text } = setGenudoUrl(STDIO_WS, 'https://genudo.acme.internal/mcp/')
+    expect(text).toContain('GENUDO_BASE_URL: https://genudo.acme.internal')
+    expect(text).not.toContain('/mcp')
+  })
+
+  it('null restores the production default on the stdio shape (bare host)', () => {
+    const overridden = setGenudoUrl(STDIO_WS, 'https://genudo.acme.internal').text
+    const { text, changed } = setGenudoUrl(overridden, null)
+    expect(changed).toBe(true)
+    expect(text).toContain('GENUDO_BASE_URL: https://api.genudo.ai')
   })
 
   it('leaves a workspace.yml with no genudo block at all alone', () => {
@@ -291,5 +316,98 @@ skills: []
     const { text, changed } = setGenudoUrl(noGenudo, 'https://genudo.acme.internal')
     expect(changed).toBe(false)
     expect(text).toBe(noGenudo)
+  })
+
+  // Review finding (2026-07-29): `type: "http"` is valid YAML and passes the
+  // lib's schema check + the handler's `'url' in conn` guard, but the old
+  // unquoted-only `/type:\s*http/` check silently treated this block as
+  // still-stdio and no-op'd — the panel would print "up to date" while never
+  // actually writing anything.
+  it('recognises a QUOTED type: "http" as the already-migrated shape', () => {
+    const quoted = `mcp:
+  genudo:
+    type: "http"
+    url: https://api.genudo.ai/mcp
+    headers:
+      Authorization: "Bearer \${GENUDO_TOKEN_X}"
+plugins:
+  claude: [genudo-no-connector@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(quoted, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('url: https://genudo.acme.internal/mcp')
+  })
+
+  // Review finding (2026-07-29): a genudo block that is the LAST thing in the
+  // file, with no trailing newline after its final line, previously failed to
+  // match GENUDO_BLOCK at all (every repeated line required a trailing `\n`,
+  // including the last) — so the rewrite silently did nothing.
+  it('rewrites a genudo block that is the last content in the file, no trailing newline', () => {
+    const noTrailer =
+      'mcp:\n' +
+      '  genudo:\n' +
+      '    type: http\n' +
+      '    url: https://api.genudo.ai/mcp\n' +
+      '    headers:\n' +
+      '      Authorization: "Bearer ${GENUDO_TOKEN_LAST}"'
+    // sanity: this fixture really has no trailing newline
+    expect(noTrailer.endsWith('\n')).toBe(false)
+    const { text, changed } = setGenudoUrl(noTrailer, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('url: https://genudo.acme.internal/mcp')
+  })
+
+  // Review finding (2026-07-29): pin that a sibling `genudo-old-platform:`
+  // block (same indent, name-prefixed with "genudo") cannot leak into the
+  // match — GENUDO_BLOCK requires the literal "genudo:" immediately (not
+  // "genudo-old-platform:"), and the block-end lookahead correctly recognises
+  // a same-indent sibling key as the boundary. Behaviour was already correct;
+  // nothing pinned it.
+  it('does not let a sibling genudo-old-platform: block leak into the match', () => {
+    const withOldPlatform = `mcp:
+  genudo:
+    type: http
+    url: https://api.genudo.ai/mcp
+    headers:
+      Authorization: "Bearer \${GENUDO_TOKEN_X}"
+  genudo-old-platform:
+    type: http
+    url: https://old.genudo.ai/mcp
+plugins:
+  claude: [genudo-no-connector@genudo-ai]
+skills: []
+`
+    const { text, changed } = setGenudoUrl(withOldPlatform, 'https://genudo.acme.internal')
+    expect(changed).toBe(true)
+    expect(text).toContain('url: https://genudo.acme.internal/mcp')
+    // the sibling block's own url must survive completely untouched
+    expect(text).toContain('url: https://old.genudo.ai/mcp')
+  })
+})
+
+describe('migrateWorkspaceYml — normalisation agreement', () => {
+  // Review finding (2026-07-29): migrateWorkspaceYml built its own
+  // `${base.replace(/\/+$/, '')}/mcp`, which does not strip an EXISTING /mcp
+  // suffix — a third copy of the normalisation rule silently disagreeing with
+  // normalizeGenudoUrl/genudo-server.ts. The migration is dry-by-default and
+  // has not touched the fleet yet, so this was worth fixing now rather than
+  // after real data was migrated with the doubled suffix baked in.
+  it('does not double /mcp when GENUDO_BASE_URL already ends in /mcp', () => {
+    const alreadySuffixed = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}"
+      GENUDO_BASE_URL: "https://genudo.acme.internal/mcp"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = migrateWorkspaceYml(alreadySuffixed)
+    expect(changed).toBe(true)
+    expect(text).toContain('url: https://genudo.acme.internal/mcp')
+    expect(text).not.toContain('/mcp/mcp')
   })
 })

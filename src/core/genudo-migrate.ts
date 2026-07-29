@@ -17,7 +17,23 @@ const GENUDO_BLOCK =
   // `(?![\s\S])` is the correct JS idiom — it only succeeds with zero characters left,
   // so it can't fire early at a blank line inside the block (unlike `$` with the `m`
   // flag, which would end the match right before that blank line's own `\n`).
-  /^([ \t]+)genudo:\n(?:\1[ \t]+.*\n|\s*\n)*?(?=^\1\S|^\S|(?![\s\S]))/m
+  //
+  // Review finding (2026-07-29): each repeated line ALSO needs a "true end of
+  // string" branch, not just the block-end lookahead — a genudo block whose
+  // last line has no trailing `\n` (a file that just doesn't end in a
+  // newline) previously failed to match AT ALL, because the repetition
+  // required every line, including the last, to be `\n`-terminated. `(?:\n|
+  // (?![\s\S]))` accepts either a real newline or true end-of-string, so the
+  // very last line of the file is no longer a silent no-match.
+  /^([ \t]+)genudo:\n(?:\1[ \t]+.*(?:\n|(?![\s\S]))|\s*\n)*?(?=^\1\S|^\S|(?![\s\S]))/m
+
+// Review finding (2026-07-29): `type: "http"` (quoted) is valid YAML and the
+// lib's schema-level `isRemoteServer` check (and thus `'url' in conn`) already
+// treats it as remote — but a bare `/type:\s*http/` does not match through the
+// quote characters, so setGenudoUrl silently no-op'd on any block a human (or
+// a future codegen path) happened to quote. Tolerate an optional `'`/`"` on
+// either side; unquoted `type: http` still matches exactly as before.
+const HTTP_TYPE_RE = /type:\s*['"]?http['"]?/
 
 // NOTE: deliberately NOT reused with `.test()`. A global regex's `.test()`/`.exec()`
 // carries `lastIndex` across calls, so calling `migrateWorkspaceYml` on a second file
@@ -32,7 +48,7 @@ export const STALE_PLUGIN_KEY = 'genudo@genudo-ai'
 export function migrateWorkspaceYml(text: string): { text: string; changed: boolean } {
   let changed = false
   let out = text.replace(GENUDO_BLOCK, (block, indent: string) => {
-    if (/type:\s*http/.test(block)) return block // already migrated
+    if (HTTP_TYPE_RE.test(block)) return block // already migrated
     const ref = /\$\{([A-Z0-9_]+)\}/.exec(block)?.[1]
     const base = /GENUDO_BASE_URL:\s*"?([^"\s]+)"?/.exec(block)?.[1] ?? 'https://api.genudo.ai'
     if (!ref) return block // nothing to carry over — leave it for a human
@@ -41,7 +57,13 @@ export function migrateWorkspaceYml(text: string): { text: string; changed: bool
     return (
       `${indent}genudo:\n` +
       `${inner}type: http\n` +
-      `${inner}url: ${base.replace(/\/+$/, '')}/mcp\n` +
+      // Review finding (2026-07-29): was `${base.replace(/\/+$/, '')}/mcp`,
+      // which does not strip an EXISTING /mcp suffix — a self-hosted
+      // GENUDO_BASE_URL already ending in /mcp migrated to a doubled
+      // `/mcp/mcp`. normalizeGenudoUrl is the one canonical strip-then-append
+      // rule (also used by setGenudoUrl and mirrored by genudo-server.ts) —
+      // this was the third copy silently disagreeing with the other two.
+      `${inner}url: ${normalizeGenudoUrl(base)}\n` +
       `${inner}headers:\n` +
       `${inner}  Authorization: "Bearer \${${ref}}"\n`
     )
@@ -75,38 +97,67 @@ export function pruneEnabledPlugins(json: string): { json: string; changed: bool
 }
 
 /**
+ * Strip an existing trailing `/mcp` and any trailing slashes — the shared half
+ * of both normalisers below. A bare host (`https://x`) passes through
+ * unchanged; the full endpoint pasted verbatim out of workspace.yml
+ * (`https://x/mcp`, `https://x/mcp/`) collapses to the same host either way.
+ */
+function stripGenudoSuffix(input: string): string {
+  return input.trim().replace(/\/mcp\/?$/, '').replace(/\/+$/, '')
+}
+
+/**
  * Task 7: normalise what a user TYPES (a bare host, or the full endpoint pasted
  * verbatim out of workspace.yml — the obvious copy-paste mistake) into the
- * canonical `url:` shape. Strip an existing trailing `/mcp` and any trailing
- * slashes, then append `/mcp` exactly once, so pasting the endpoint whole never
- * doubles the suffix. Mirrors `genudo-server.ts`'s own fallback normalisation
+ * canonical `url:` shape (the already-migrated/http block). Strip-then-append
+ * `/mcp` exactly once, so pasting the endpoint whole never doubles the suffix.
+ * Mirrors `genudo-server.ts`'s own fallback normalisation
  * (`.replace(/\/mcp\/?$/, '').replace(/\/+$/, '')` + `/mcp`) so the two paths —
  * "what a session actually connects to" and "what gets written to disk" — can
  * never disagree about what a given input resolves to.
  */
 export function normalizeGenudoUrl(input: string): string {
-  return `${input.trim().replace(/\/mcp\/?$/, '').replace(/\/+$/, '')}/mcp`
+  return `${stripGenudoSuffix(input)}/mcp`
 }
 
 /**
- * Rewrite the `genudo` connection's `url:` line in a client's workspace.yml —
- * TEXT-level, exactly like `migrateWorkspaceYml` above, so comments and
- * unrelated formatting in this committed, human-authored file survive.
- * `url === null` restores the production default.
+ * Rewrite the `genudo` connection's declared base host in a client's
+ * workspace.yml — TEXT-level, exactly like `migrateWorkspaceYml` above, so
+ * comments and unrelated formatting in this committed, human-authored file
+ * survive. `url === null` restores the production default.
  *
- * A no-op (`changed: false`) when there is no ALREADY-http genudo block to
- * rewrite — a client still on the legacy stdio shape has no `url:` line, and
- * this only ever edits one, never introduces one (same omit-rather-than-
- * half-build rule `genudo-server.ts`'s module doc names). The caller (engine/
- * handlers) is responsible for telling the user why nothing happened.
+ * Handles BOTH shapes (review finding, 2026-07-29 — the field must not be
+ * unsettable just because a client hasn't been through the fleet migration,
+ * which is dry-by-default and has not touched the fleet yet):
+ *   - already-http: rewrites the `url:` line to the canonical `.../mcp` endpoint.
+ *   - still-stdio (unmigrated): rewrites the `GENUDO_BASE_URL:` line inside the
+ *     block's `env:` — as a BARE HOST, matching the existing fixture
+ *     convention (`genudo-server.ts`'s stdio fallback appends `/mcp` itself at
+ *     read time; writing the endpoint form here would eventually double it).
+ *     Only rewrites an EXISTING line — every real fixture already declares
+ *     one — never inserts a new one.
+ *
+ * A no-op (`changed: false`) when the block has neither a `url:` line (http
+ * shape) nor a `GENUDO_BASE_URL:` line (stdio shape) to rewrite, or no genudo
+ * block at all. The caller (engine/handlers) treats that as a hard failure —
+ * see `setGenudoBaseUrl` in engine.ts — rather than silently reporting success.
  */
 export function setGenudoUrl(text: string, url: string | null): { text: string; changed: boolean } {
-  const target = url === null ? `${GENUDO_BASE_URL}/mcp` : normalizeGenudoUrl(url)
   let changed = false
   const out = text.replace(GENUDO_BLOCK, (block: string) => {
-    if (!/type:\s*http/.test(block)) return block // stdio (unmigrated) — nothing to set
-    return block.replace(/^([ \t]+)url:[ \t]*.*$/m, (line: string, indent: string) => {
-      const next = `${indent}url: ${target}`
+    if (HTTP_TYPE_RE.test(block)) {
+      const target = url === null ? `${GENUDO_BASE_URL}/mcp` : normalizeGenudoUrl(url)
+      return block.replace(/^([ \t]+)url:[ \t]*.*$/m, (line: string, indent: string) => {
+        const next = `${indent}url: ${target}`
+        if (next !== line) changed = true
+        return next
+      })
+    }
+    // stdio (unmigrated) shape: the override lives in env.GENUDO_BASE_URL, as
+    // a bare host (see doc comment above — no /mcp suffix here).
+    const target = url === null ? GENUDO_BASE_URL : stripGenudoSuffix(url)
+    return block.replace(/^([ \t]+)GENUDO_BASE_URL:[ \t]*.*$/m, (line: string, indent: string) => {
+      const next = `${indent}GENUDO_BASE_URL: ${target}`
       if (next !== line) changed = true
       return next
     })

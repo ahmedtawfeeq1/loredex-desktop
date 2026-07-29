@@ -2,9 +2,15 @@
  * Pure client-page builder (agent-ops epic) — DOM-free, deterministic
  * (pattern: project-page tests).
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ClientInfo, LintFinding } from '../../../../shared/ipc-contract'
-import { buildClientPage, genudoLabel, genudoUrlDecision, genudoUrlFieldValue } from './client-page'
+import {
+  buildClientPage,
+  genudoLabel,
+  genudoUrlDecision,
+  genudoUrlFieldValue,
+  signOutThenChangeEnvironment,
+} from './client-page'
 
 const stage = (nn: string, slug: string, opts?: { noConfig?: boolean; noInstructions?: boolean }) => ({
   nn,
@@ -202,5 +208,47 @@ describe('genudoUrlDecision', () => {
   it('restoring the default off a non-default current value is a change', () => {
     const d = genudoUrlDecision('', 'https://staging.genudo.ai/mcp', true)
     expect(d).toEqual({ payload: null, changed: true, warn: true })
+  })
+})
+
+describe('signOutThenChangeEnvironment', () => {
+  it('commits only after sign-out actually succeeds', async () => {
+    const commit = vi.fn(async () => {})
+    const onFailed = vi.fn()
+    await signOutThenChangeEnvironment(async () => {}, commit, onFailed)
+    expect(commit).toHaveBeenCalledOnce()
+    expect(onFailed).not.toHaveBeenCalled()
+  })
+
+  // The bug this pins: a `.catch(toast).then(commit)` chain runs `.then`
+  // unconditionally because `.catch` without a rethrow resolves the chain —
+  // so a FAILED sign-out (e.g. a locked keychain) still committed the new
+  // environment, leaving the client holding a token minted at the old host.
+  it('does NOT commit when sign-out fails', async () => {
+    const commit = vi.fn(async () => {})
+    const onFailed = vi.fn()
+    const boom = new Error('keychain locked')
+    await signOutThenChangeEnvironment(
+      async () => {
+        throw boom
+      },
+      commit,
+      onFailed,
+    )
+    expect(commit).not.toHaveBeenCalled()
+    expect(onFailed).toHaveBeenCalledWith(boom)
+  })
+
+  it('a failing commit itself does not get swallowed — it propagates to the caller', async () => {
+    const commitError = new Error('write lock busy')
+    await expect(
+      signOutThenChangeEnvironment(
+        async () => {},
+        async () => {
+          throw commitError
+        },
+        vi.fn(),
+      ),
+    ).rejects.toBe(commitError)
   })
 })

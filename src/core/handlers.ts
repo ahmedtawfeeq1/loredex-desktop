@@ -642,15 +642,42 @@ export function registerCoreHandlers(
   ipc.register('clients.genudo.status', ({ client }) => genudoStatus(client))
   ipc.register('clients.genudo.signIn', ({ client }) => {
     const conn = engine.clientConnections(client).find((c) => c.server === 'genudo')
-    return genudoSignIn(client, genudoBaseUrl(conn))
+    // Review finding (2026-07-29) — CRITICAL: this used to call
+    // genudoBaseUrl(conn) with NO env, so for a still-stdio connection (the
+    // shape genudo-server.test.ts models, and the shape most of the fleet is
+    // STILL on — the migration is dry-by-default) genudoBaseUrl's stdio
+    // branch (`env.GENUDO_BASE_URL ?? GENUDO_BASE_URL`) always fell through
+    // to production, ignoring that connection's own declared
+    // GENUDO_BASE_URL. A self-hosted client would sign in — discovery, DCR,
+    // token exchange, all of it — against the wrong tenant.
+    //
+    // Fixed by passing the connection's OWN declared env: `conn.env` on the
+    // stdio shape carries GENUDO_BASE_URL as a plain literal (never a
+    // `${VAR}` secret ref — see the genudo-migrate.ts fixtures), so this is
+    // NOT routed through resolveConnEnv, which resolves CREDENTIALS and can
+    // sign the client out as a side effect (genudo-credential.ts's module
+    // doc) — wrong on a sign-in path that hasn't signed in yet. The http
+    // branch of genudoBaseUrl ignores `env` entirely (it reads conn.url
+    // instead), so this is a no-op for an already-migrated connection.
+    const env = conn && 'env' in conn ? conn.env : {}
+    return genudoSignIn(client, genudoBaseUrl(conn, env))
   })
   ipc.register('clients.genudo.signOut', ({ client }) => genudoSignOut(client))
   /**
    * Task 7: the per-client Genudo environment override. Must run BEFORE
    * sign-in — OAuth discovery/DCR/the token exchange all run against
-   * workspace.yml's `url`, so the renderer blocks editing this once a session
-   * is live without an explicit sign-out first; this handler still checks
-   * identity + connection shape itself rather than trust that gate.
+   * workspace.yml's declared host, so the renderer blocks editing this once a
+   * session is live without an explicit sign-out first; this handler still
+   * checks identity + connection presence itself rather than trust that gate.
+   *
+   * engine.setGenudoBaseUrl (via genudo-migrate.ts's setGenudoUrl) handles
+   * BOTH the already-http and the still-stdio (unmigrated) shape — review
+   * finding (2026-07-29): the fleet migration is dry-by-default and has not
+   * touched the fleet yet, so gating this on `'url' in conn` would have left
+   * the field permanently unsettable for most real clients. Only "no genudo
+   * connection at all" is checked here; a block in some OTHER unexpected
+   * shape surfaces as an actionable error from setGenudoBaseUrl itself
+   * (throws rather than silently reporting success).
    *
    * Same write shape as `clients.tooling.copy`: write lock, identity, the
    * SAME token overlay `clients.tokens.set` uses (so a live session's bearer
@@ -670,12 +697,6 @@ export function registerCoreHandlers(
       const conn = engine.clientConnections(client).find((c) => c.server === 'genudo')
       if (!conn) {
         throw ipcError('INTERNAL', `${client} has no genudo connection in workspace.yml`)
-      }
-      if (!('url' in conn)) {
-        throw ipcError(
-          'INTERNAL',
-          `${client}'s genudo connection still uses the legacy connector — migrate it to remote HTTP first`,
-        )
       }
       const held = await clientTokenOverlay(client, engine.clientConnections(client))
       const result = engine.setGenudoBaseUrl(client, baseUrl, identity, held)

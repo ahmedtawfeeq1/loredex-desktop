@@ -142,8 +142,25 @@ export interface GenudoStatus {
 }
 
 /** Copy for the genudo row: signed-out, live, or expired. Pure, so it is testable. */
-export function genudoLabel(status: GenudoStatus): { text: string; action: string } {
-  if (!status.signedIn) return { text: 'Not connected to Genudo', action: 'Sign in to Genudo' }
+export function genudoLabel(
+  status: GenudoStatus,
+  /**
+   * Whether this machine holds a pasted token for the connection's `${VAR}` ref.
+   *
+   * Without it the row claimed "● Not connected to Genudo" directly beneath a
+   * green "✓ Connected · 29 tools" from the live probe — both were true and the
+   * pair read as a contradiction. A pasted token IS a working connection; it
+   * just isn't a sign-in session. Defaults to `false` so an omitted argument
+   * keeps the old, more cautious wording rather than silently claiming a
+   * credential that may not exist.
+   */
+  hasToken = false,
+): { text: string; action: string } {
+  if (!status.signedIn) {
+    return hasToken
+      ? { text: 'Connected with a token', action: 'Sign in instead' }
+      : { text: 'Not connected to Genudo', action: 'Sign in to Genudo' }
+  }
   if (status.expiresAt !== null && status.expiresAt <= Date.now()) {
     return { text: 'Genudo session expired', action: 'Sign in again' }
   }

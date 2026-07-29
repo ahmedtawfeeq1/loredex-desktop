@@ -165,6 +165,36 @@ describe('genudoLabel', () => {
       action: 'Sign in again',
     })
   })
+
+  // Reported from a live run: the row showed a red "Not connected to Genudo"
+  // immediately under the probe's green "✓ Connected · 29 tools". Both were
+  // true — a pasted token was working and no OAuth session existed — but the
+  // pair reads as a contradiction. A held token is a working connection.
+  it('says the connection works when a pasted token is held and no session exists', () => {
+    expect(genudoLabel({ signedIn: false, account: null, expiresAt: null }, true)).toEqual({
+      text: 'Connected with a token',
+      action: 'Sign in instead',
+    })
+  })
+
+  it('defaults to the cautious wording when the caller omits the token flag', () => {
+    expect(genudoLabel({ signedIn: false, account: null, expiresAt: null })).toEqual(
+      genudoLabel({ signedIn: false, account: null, expiresAt: null }, false),
+    )
+  })
+
+  it('a live session outranks a held token', () => {
+    expect(
+      genudoLabel({ signedIn: true, account: 'ops@acme.test', expiresAt: Date.now() + 3_600_000 }, true),
+    ).toEqual({ text: 'Signed in as ops@acme.test · renews automatically', action: 'Sign out' })
+  })
+
+  it('an expired session still asks for a fresh sign-in even with a token held', () => {
+    expect(genudoLabel({ signedIn: true, account: null, expiresAt: Date.now() - 1 }, true)).toEqual({
+      text: 'Genudo session expired',
+      action: 'Sign in again',
+    })
+  })
 })
 
 describe('genudoUrlFieldValue', () => {

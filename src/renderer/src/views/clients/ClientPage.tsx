@@ -638,8 +638,22 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
   // action string that means an ACTIVE session (genudo.signedIn alone is not
   // enough: an EXPIRED session still has signedIn: true, but the label reads
   // "Sign in again", the same primary-CTA case as never having signed in).
-  const genudoStatusLabel = genudo ? genudoLabel(genudo) : null
+  // A pasted token IS a working connection, just not a sign-in session — without
+  // this the row showed a red "Not connected to Genudo" directly under the live
+  // probe's green "✓ Connected · 29 tools". `missingRefs` is the same source the
+  // per-ref rows use, so the two cannot disagree. An unloaded `status` counts as
+  // "no token": claim less, never more.
+  const genudoConn = conns.find((c) => c.server === 'genudo')
+  const genudoHasToken =
+    genudoConn !== undefined &&
+    genudoConn.envRefs.length > 0 &&
+    genudoConn.envRefs.every((ref) => !(status?.missingRefs.includes(ref) ?? true))
+  const genudoStatusLabel = genudo ? genudoLabel(genudo, genudoHasToken) : null
   const genudoActive = genudoStatusLabel?.action === 'Sign out'
+  // Two states are already-working ("Sign out" = live session, "Sign in instead"
+  // = a held token): green, and a secondary button. The other two are real calls
+  // to action — never signed in, or expired — and stay red and primary.
+  const genudoSettled = genudoActive || genudoStatusLabel?.action === 'Sign in instead'
   const PROBE_LABEL: Record<ProbeState['state'], string> = {
     testing: '◌ Testing…',
     ok: '✓ Connected',
@@ -799,12 +813,12 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
                 silently against production. */}
             {conn.server === 'genudo' && genudo && genudoStatusLabel && (
               <div className="cp-ws-ref">
-                <span className={genudoActive ? 'cp-ws-ref-state ok' : 'cp-ws-ref-state warn'}>
-                  {genudoActive ? '✓ ' : '● '}
+                <span className={genudoSettled ? 'cp-ws-ref-state ok' : 'cp-ws-ref-state warn'}>
+                  {genudoSettled ? '✓ ' : '● '}
                   {genudoStatusLabel.text}
                 </span>
                 <Button
-                  variant={genudoActive ? 'secondary' : 'primary'}
+                  variant={genudoSettled ? 'secondary' : 'primary'}
                   disabled={signingIn}
                   onClick={() => {
                     // captured once, up front — genudoActive itself must not

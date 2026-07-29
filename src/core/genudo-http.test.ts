@@ -92,4 +92,26 @@ describe('genudoRpc', () => {
     const base = await serve(() => ({ status: 401, body: '{"error":"unauthorized"}' }))
     await expect(genudoRpc(base, 'tok').callTool('x')).rejects.toThrow(/401/)
   })
+
+  // Review finding (2026-07-29, final branch review): a TOOL-level failure —
+  // MCP's `isError: true` on an otherwise-200/success JSON-RPC response,
+  // distinct from the `error` field surfaced above — used to be returned as
+  // if it were a successful result. genudo-pull.ts's fetchBundles feeds this
+  // straight into `stages?.stages ?? []`, so a failed `list_pipeline_stages`
+  // silently became "zero stages" and writePlan then deleted that pipeline's
+  // whole stages/ directory and wrote nothing back — silent data loss that
+  // contradicts the module's own "never deletes anything it does not write"
+  // promise.
+  it('treats an isError tool result as a thrown Error carrying the text content', async () => {
+    const base = await serve((body) => ({
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: { isError: true, content: [{ type: 'text', text: 'pipeline 42 not found' }] },
+      }),
+    }))
+    await expect(genudoRpc(base, 'tok').callTool('list_pipeline_stages')).rejects.toThrow(
+      /pipeline 42 not found/,
+    )
+  })
 })

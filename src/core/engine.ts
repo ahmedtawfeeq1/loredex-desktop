@@ -429,6 +429,21 @@ export function clientConnections(client: string): Array<
  * matcher — NOT "already up to date". Throwing here, rather than silently
  * returning the unchanged workspace, is what stops the panel from printing
  * "Workspace up to date." while the value quietly reverts on the next refresh.
+ *
+ * Final branch review finding (2026-07-29): `setGenudoUrl`'s text-level
+ * rewrite and `normalizeGenudoUrl` both accept a scheme-less host (e.g. the
+ * natural-to-type "staging.genudo.ai"), but loredex's own schema
+ * (`remoteServerSchema`'s `z.string().url()`) rejects it once
+ * `materializeWorkspace` re-parses the file this function just wrote — and it
+ * used to write BEFORE that validation ran, with no rollback. A rejected
+ * value left an invalid workspace.yml on disk with no commit to explain it:
+ * `clientConnections` then throws for that client, and the renderer's
+ * `.catch(() => setConns([]))` silently empties the whole connection panel —
+ * including the control that could fix it — with no hand-edit escape hatch
+ * (this project's automation-first rule). The write now happens first (so a
+ * WorkspaceResult from a successful materialize still reflects real disk
+ * state), but a failure restores the ORIGINAL bytes before the error
+ * surfaces, so a rejected value leaves workspace.yml exactly as it was.
  */
 export function setGenudoBaseUrl(
   client: string,
@@ -447,9 +462,19 @@ export function setGenudoBaseUrl(
     )
   }
   writeFileSync(wsPath, text)
-  const workspace = materializeWorkspace(config.vaultPath, client, {
-    env: { ...process.env, ...env },
-  })
+  let workspace: WorkspaceResult
+  try {
+    workspace = materializeWorkspace(config.vaultPath, client, {
+      env: { ...process.env, ...env },
+    })
+  } catch (e) {
+    // Roll back — a value that fails materialize's schema validation must
+    // never leave a broken workspace.yml on disk with no commit to explain
+    // it (see finding above).
+    writeFileSync(wsPath, before)
+    const detail = e instanceof Error ? e.message : String(e)
+    throw ipcError('INTERNAL', `could not set ${client}'s genudo environment — ${detail}`)
+  }
   rebuildIndexes(config.vaultPath)
   withGitIdentity(identity, () =>
     gitAutoCommit(

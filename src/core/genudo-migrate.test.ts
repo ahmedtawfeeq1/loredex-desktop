@@ -673,3 +673,53 @@ skills: []
     expect(text).not.toContain('/mcp/mcp')
   })
 })
+
+describe('migrateWorkspaceYml — extractEnvValue stops at an inline trailing comment', () => {
+  // Review finding (2026-07-29, final branch review): round 4 of the same
+  // unanchored-match class as the three fixes above (decoy ref, decoy base,
+  // decoy "type: http" comment) — the bare-value alternative was greedy and
+  // unbounded, so it swallowed a trailing YAML comment on the SAME line as
+  // the real value. Verified by execution before the fix:
+  //   GENUDO_BASE_URL: "https://staging.genudo.ai"  # staging tenant
+  //     → url: https://staging.genudo.ai"  # staging tenant/mcp
+  // Because migrateWorkspaceYml REBUILDS the block, that garbage would be
+  // permanent: the next run sees `type: http` and skips it, no second chance.
+  it('extracts GENUDO_BASE_URL correctly despite a trailing inline comment', () => {
+    const trailingComment = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}"
+      GENUDO_BASE_URL: "https://staging.genudo.ai"  # staging tenant
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = migrateWorkspaceYml(trailingComment)
+    expect(changed).toBe(true)
+    expect(text).toContain('url: https://staging.genudo.ai/mcp')
+    expect(text).not.toContain('staging tenant')
+    // the OLD bug specifically left a stray trailing quote glued onto the
+    // url — pin that the rebuilt url line is exactly this, nothing appended
+    expect(text).toMatch(/url: https:\/\/staging\.genudo\.ai\/mcp\n/)
+  })
+
+  it('extracts GENUDO_TOKEN correctly despite a trailing inline comment', () => {
+    const trailingComment = `mcp:
+  genudo:
+    command: npx
+    args: [-y, genudo-mcp-client]
+    env:
+      GENUDO_TOKEN: "\${GENUDO_TOKEN_ACME}"  # rotate quarterly
+      GENUDO_BASE_URL: "https://api.genudo.ai"
+plugins:
+  claude: [genudo@genudo-ai]
+skills: []
+`
+    const { text, changed } = migrateWorkspaceYml(trailingComment)
+    expect(changed).toBe(true)
+    expect(text).toContain('Authorization: "Bearer ${GENUDO_TOKEN_ACME}"')
+    expect(text).not.toContain('rotate quarterly')
+  })
+})

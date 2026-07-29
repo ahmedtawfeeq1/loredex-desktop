@@ -21,6 +21,7 @@ import { storeClientToken } from './client-tokens'
 import { genudoSignIn, genudoSignOut, genudoStatus } from './genudo-auth'
 import { clientTokenOverlay, resolveConnEnv, stdioGenudoBaseUrl } from './genudo-credential'
 import { GENUDO_BASE_URL } from './genudo-http'
+import { stripGenudoSuffix } from './genudo-migrate'
 import { fetchBundles, planFiles } from './genudo-pull'
 import { buildKbWorkbook } from './kb-export'
 import { scanStagedEdits } from './staged-edits'
@@ -205,13 +206,21 @@ type Connection = ReturnType<typeof engine.clientConnections>[number]
  * function so `clients.pull` and `clients.genudo.signIn` cannot drift on
  * which host they mean (Task 7 adds an explicit per-client override that
  * writes into `conn.url` itself, so this keeps working unchanged then too).
+ *
+ * Review finding (2026-07-29, final branch review): the stdio branch used to
+ * return `env.GENUDO_BASE_URL` verbatim — the only one of six normalisation
+ * sites on this branch that did not strip a trailing `/mcp` — so a stdio
+ * client whose declared GENUDO_BASE_URL was the FULL endpoint (not a bare
+ * host) got `/mcp/mcp` once `genudoRpc`/`genudoSignIn` appended their own
+ * `/mcp`. Both branches now go through the same `stripGenudoSuffix` the rest
+ * of this suffix's normalisers already share (genudo-migrate.ts,
+ * genudo-server.ts), so this helper can no longer disagree with itself.
  */
 function genudoBaseUrl(conn: Connection | undefined, env: Record<string, string> = {}): string {
   if (conn && 'url' in conn) {
-    const stripped = conn.url.replace(/\/mcp\/?$/, '')
-    return stripped || GENUDO_BASE_URL
+    return stripGenudoSuffix(conn.url) || GENUDO_BASE_URL
   }
-  return env.GENUDO_BASE_URL ?? GENUDO_BASE_URL
+  return stripGenudoSuffix(env.GENUDO_BASE_URL ?? GENUDO_BASE_URL) || GENUDO_BASE_URL
 }
 
 /** WP-C: `YYYY-MM-DD_HHMMSS` local-time stamp = the snapshot dir name. The clock

@@ -116,6 +116,44 @@ describe('genudo sign-in session', () => {
     expect(await genudoStatus('acme')).toMatchObject({ signedIn: false })
   })
 
+  // Review finding (2026-07-29, final branch review): the OLD behaviour
+  // signed the client out on ANY refresh error — a transport/DNS failure is
+  // NOT proof the grant is dead, and this path runs on every client-page
+  // mount (clientTokenOverlay → clients.workspace.status). An offline laptop
+  // with a token past the refresh margin would otherwise permanently delete
+  // a perfectly good session.
+  it('does NOT clear the session on a transport/network failure', async () => {
+    seed({
+      tokens: { access_token: 'stale', token_type: 'Bearer', refresh_token: 'r1' },
+      expiresAt: Date.now() + 1_000,
+      // nothing listens on 127.0.0.1:1 — fetch() rejects with a plain
+      // connection error, never an OAuthError subclass
+      tokenEndpoint: 'http://127.0.0.1:1/oauth/token',
+      client: { client_id: 'cid', redirect_uri: 'http://127.0.0.1:47821/callback' },
+    })
+    await expect(genudoAccessToken('acme')).rejects.toThrow()
+    expect(refreshCalls).toBe(0)
+    // the session survives — a connection failure is not proof the grant is dead
+    expect(await genudoStatus('acme')).toMatchObject({ signedIn: true })
+  })
+
+  // A 502/maintenance page is not valid OAuth-error JSON, so the SDK's
+  // parseErrorResponse falls back to a generic ServerError — an OAuthError
+  // subclass, but NOT one of the three the SDK itself treats as "the grant
+  // is dead" (InvalidClientError/UnauthorizedClientError/InvalidGrantError).
+  // Must not clear the session either.
+  it('does NOT clear the session on a 502 that is not a valid OAuth error body', async () => {
+    const base = await tokenServer(() => ({ status: 502, body: '<html>Bad Gateway</html>' }))
+    seed({
+      tokens: { access_token: 'stale', token_type: 'Bearer', refresh_token: 'r1' },
+      expiresAt: Date.now() + 1_000,
+      tokenEndpoint: `${base}/oauth/token`,
+      client: { client_id: 'cid', redirect_uri: 'http://127.0.0.1:47821/callback' },
+    })
+    await expect(genudoAccessToken('acme')).rejects.toThrow()
+    expect(await genudoStatus('acme')).toMatchObject({ signedIn: true })
+  })
+
   it('sign-out deletes the session', async () => {
     seed({ tokens: { access_token: 'live', token_type: 'Bearer' }, expiresAt: null })
     await genudoSignOut('acme')

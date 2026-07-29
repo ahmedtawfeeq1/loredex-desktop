@@ -88,8 +88,27 @@ export const STALE_PLUGIN_KEY = 'genudo@genudo-ai'
  * short of the closing brace, which then failed the trailing `[ \t]*$` anchor
  * and matched nothing at all.
  */
+// Review finding (2026-07-29, final branch review — round 4 of this same
+// class): the block-style bare-value alternative (`[^\s][^\n]*`) is greedy
+// and unbounded, so it also swallowed an inline trailing YAML comment —
+// `GENUDO_BASE_URL: "https://staging.genudo.ai"  # staging tenant` extracted
+// as `https://staging.genudo.ai"  # staging tenant` (verified by execution:
+// the quoted alternative can't satisfy the old `[ \t]*$` tail with a comment
+// after it, so the regex backtracks into the bare-value alternative, which
+// happily eats the leftover quote and the whole comment). Because
+// `migrateWorkspaceYml` REBUILDS the block, that garbage would be baked in
+// permanently — same no-second-chance property as the other three fixes
+// documented above. Fixed two ways together: the bare-value alternative is
+// now LAZY and excludes a leading `#` (so it can't start matching AT a
+// comment, e.g. `KEY: # comment` with no real value), and the trailing
+// anchor now accepts an optional `[ \t]+#...` tail — which also lets the
+// QUOTED alternative match cleanly up to the comment instead of ever falling
+// through to the bare-value alternative at all.
 function extractEnvValue(block: string, key: string): string | undefined {
-  const blockKey = new RegExp(`^[ \\t]+${key}:[ \\t]*("[^"]*"|'[^']*'|[^\\s][^\\n]*)?[ \\t]*$`, 'm')
+  const blockKey = new RegExp(
+    `^[ \\t]+${key}:[ \\t]*("[^"]*"|'[^']*'|[^\\s#][^\\n]*?)?(?:[ \\t]+#[^\\n]*|[ \\t]*)$`,
+    'm',
+  )
   const flowKey = new RegExp(`[{,][ \\t]*${key}:[ \\t]*("[^"]*"|'[^']*'|[^,}\\s][^,}\\n]*)?`)
   const raw = (blockKey.exec(block) ?? flowKey.exec(block))?.[1]
   return raw === undefined ? undefined : raw.trim().replace(/^["']|["']$/g, '')
@@ -152,8 +171,17 @@ export function pruneEnabledPlugins(json: string): { json: string; changed: bool
  * of both normalisers below. A bare host (`https://x`) passes through
  * unchanged; the full endpoint pasted verbatim out of workspace.yml
  * (`https://x/mcp`, `https://x/mcp/`) collapses to the same host either way.
+ *
+ * Exported (review finding, 2026-07-29, final branch review): `handlers.ts`'s
+ * `genudoBaseUrl` used to return a still-stdio connection's resolved
+ * `GENUDO_BASE_URL` verbatim, with no strip — the only one of six
+ * normalisation sites on this branch that disagreed (`genudo-server.ts`
+ * strips it, `genudoRpc`/`genudoSignIn` both append `/mcp` unconditionally),
+ * so a stdio client whose `GENUDO_BASE_URL` was the full endpoint got
+ * `/mcp/mcp` on pull and sign-in. Routed through this shared helper instead
+ * of a fourth ad hoc copy of the same regex.
  */
-function stripGenudoSuffix(input: string): string {
+export function stripGenudoSuffix(input: string): string {
   return input.trim().replace(/\/mcp\/?$/, '').replace(/\/+$/, '')
 }
 

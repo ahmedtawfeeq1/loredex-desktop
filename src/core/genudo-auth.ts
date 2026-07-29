@@ -22,6 +22,11 @@ import {
   refreshAuthorization,
   selectResourceURL,
 } from '@modelcontextprotocol/sdk/client/auth.js'
+import {
+  InvalidClientError,
+  InvalidGrantError,
+  UnauthorizedClientError,
+} from '@modelcontextprotocol/sdk/server/auth/errors.js'
 import type {
   AuthorizationServerMetadata,
   OAuthClientInformation,
@@ -192,8 +197,38 @@ export async function genudoAccessToken(client: string): Promise<string | null> 
     })
     return tokens.access_token
   } catch (e) {
-    await genudoSignOut(client)
     const detail = e instanceof Error ? e.message : String(e)
+    // Final branch review finding (2026-07-29): this used to sign the client
+    // OUT on ANY error out of refreshAuthorization — a transport error, DNS
+    // failure or 502 destroyed the stored session exactly like a genuine
+    // grant rejection would. This path runs on every client-page mount (via
+    // clientTokenOverlay → clients.workspace.status), so an offline laptop
+    // with an access token past the refresh margin would permanently delete
+    // a perfectly good session. Same hazard genudoServerFor already treats as
+    // worth guarding against (checks httpOk before touching any credential so
+    // a doomed lookup can't destroy a session on its way to being thrown
+    // away) — it survived here on the hotter path.
+    //
+    // Only an OAuth-level grant rejection means the session is actually
+    // dead — the same three error classes the SDK's own `auth()` treats as
+    // "recoverable by invalidating credentials and retrying" (see
+    // client/auth.js): InvalidClientError/UnauthorizedClientError (the
+    // client registration itself was rejected) and InvalidGrantError (the
+    // refresh token is invalid/expired/revoked). Everything else —
+    // fetch() throwing outright (no network, DNS failure), or a 502/maintenance
+    // page that parseErrorResponse can't parse as a standard OAuth error body
+    // (falls back to a generic ServerError, ALSO an OAuthError subclass but
+    // NOT proof of a dead grant) — must not delete the session.
+    const isDeadGrant =
+      e instanceof InvalidClientError ||
+      e instanceof UnauthorizedClientError ||
+      e instanceof InvalidGrantError
+    if (!isDeadGrant) {
+      throw new Error(
+        `Genudo session for ${client} could not be refreshed right now (${clampServerMessage(detail, refreshToken)}) — try again`,
+      )
+    }
+    await genudoSignOut(client)
     throw new Error(
       `Genudo session for ${client} could not be renewed (${clampServerMessage(detail, refreshToken)}) — sign in again on the client page`,
     )

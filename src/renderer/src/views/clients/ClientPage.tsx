@@ -1724,7 +1724,7 @@ function InboxPanel({
   )
 }
 
-const NEW_MANAGER = ' new' // sentinel option — never a real manager name
+const NEW_MANAGER = '__new_manager__' // sentinel option — never a real manager name
 
 /**
  * Manager assignment + tag editing, on the client page (reported: the fleet

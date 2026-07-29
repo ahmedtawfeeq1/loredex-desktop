@@ -68,12 +68,26 @@ export function genudoRpc(
     async callTool(name, args = {}) {
       const result = (await rpc('tools/call', { name, arguments: args })) as {
         content?: { type: string; text?: string }[]
+        isError?: boolean
       } | null
       if (result === null) return null
       const text = (result.content ?? [])
         .filter((c) => c.type === 'text')
         .map((c) => c.text ?? '')
         .join('\n')
+      // Review finding (2026-07-29, final branch review): a tool-level failure
+      // (MCP's `isError: true` — distinct from the JSON-RPC `error` field
+      // already handled above) was returned as if it were a successful
+      // result. genudo-pull.ts's fetchBundles feeds this straight into
+      // `stages?.stages ?? []`, so a failed `list_pipeline_stages` silently
+      // became "this pipeline has zero stages" — and writePlan then rmSync's
+      // that pipeline's whole stages/ directory and writes nothing back,
+      // auto-committing the deletion. Recoverable from git, but silent, and
+      // it contradicts this module's own promise that a pull "never deletes
+      // anything it does not write". Treat isError as a thrown error instead.
+      if (result.isError) {
+        throw new Error(`genudo ${name} failed — ${text || '(no error detail)'}`)
+      }
       try {
         return JSON.parse(text)
       } catch {

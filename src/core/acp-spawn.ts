@@ -27,7 +27,7 @@ const ADAPTER: Record<AcpAgent, AdapterSpawn> = {
   // gemini rides the user's own `@google/gemini-cli` on PATH (ARCHITECT-ONLY
   // this round: not installed, not live-tested; a missing binary surfaces a
   // clean ENOENT hint via spawnErrorDetail, never a crash).
-  gemini: { kind: 'user-binary', bin: 'gemini', args: ['--experimental-acp'] },
+  gemini: { kind: 'user-binary', bin: 'gemini', args: ['--acp'] },
 }
 
 /** Resolve a node-module adapter's bin entry (dist/index.js for both, verified
@@ -101,7 +101,15 @@ export function sharedEnvKeys(platform: NodeJS.Platform = process.platform): rea
 const PROVIDER_KEYS: Record<AcpAgent, readonly string[]> = {
   claude: ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_EXECUTABLE'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_PATH'],
-  gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+  gemini: [
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_GENAI_USE_VERTEXAI',
+    'GOOGLE_GENAI_USE_GCA',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_CLOUD_PROJECT_ID',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+  ],
 }
 
 /** The BILLING credentials only (not executable-path hints). Presence of one

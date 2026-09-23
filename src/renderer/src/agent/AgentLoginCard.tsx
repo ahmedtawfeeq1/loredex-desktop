@@ -16,9 +16,10 @@ import { useTerminal } from '../stores/terminal'
 
 /** The user-facing CLI login command per terminal-auth provider. Self-contained
  *  (no import from AgentPanel) to avoid a render-order module cycle. */
-const LOGIN: Partial<Record<AcpAgent, { label: string; command: string }>> = {
+const LOGIN: Record<AcpAgent, { label: string; command: string }> = {
   claude: { label: 'Claude', command: 'claude /login' },
   codex: { label: 'Codex', command: 'codex login' },
+  gemini: { label: 'Gemini', command: 'gemini' },
 }
 
 export function AgentLoginCard({ agent }: { agent: AcpAgent }): React.JSX.Element {

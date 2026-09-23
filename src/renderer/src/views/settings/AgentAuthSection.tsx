@@ -17,7 +17,7 @@ import { Button } from '../../components/Button'
 const PROVIDERS: { agent: AcpAgent; label: string; keyName: string; terminal: boolean }[] = [
   { agent: 'claude', label: 'Claude', keyName: 'ANTHROPIC_API_KEY', terminal: true },
   { agent: 'codex', label: 'Codex', keyName: 'OPENAI_API_KEY', terminal: true },
-  { agent: 'gemini', label: 'Gemini', keyName: 'GEMINI_API_KEY', terminal: false },
+  { agent: 'gemini', label: 'Gemini', keyName: 'GEMINI_API_KEY', terminal: true },
 ]
 
 function ProviderRow({
@@ -60,6 +60,8 @@ function ProviderRow({
     }
   }
 
+  const terminalCmd = agent === 'claude' ? 'claude /login' : agent === 'codex' ? 'codex login' : 'gemini'
+
   return (
     <div className="agent-auth-row">
       <div className="agent-auth-head">
@@ -71,7 +73,7 @@ function ProviderRow({
         {terminal ? (
           <>
             Default: reuse the CLI subscription — click <b>Log in with {label}</b> in the agent
-            panel (runs <span className="mono">{agent === 'claude' ? 'claude /login' : 'codex login'}</span>).
+            panel (runs <span className="mono">{terminalCmd}</span>).
             Or paste an <span className="mono">{keyName}</span> below to bill per token.
           </>
         ) : (

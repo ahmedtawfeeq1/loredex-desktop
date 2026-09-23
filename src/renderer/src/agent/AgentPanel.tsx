@@ -21,6 +21,7 @@ import {
   type ProviderAuth,
 } from '../stores/agentPanel'
 import { useReader } from '../stores/reader'
+import { useTerminal } from '../stores/terminal'
 import { absVaultPath } from '../vaultPaths'
 import { AgentLoginCard } from './AgentLoginCard'
 import { renderAgentMarkdown } from './agentMarkdown'
@@ -735,11 +736,27 @@ function ContinueControl({ active }: { active: AcpSessionView }): React.JSX.Elem
 /** Inline auth/error card — graceful, never a crash or modal. */
 function StateNote({ s }: { s: AcpSessionView }): React.JSX.Element {
   const err = s.state === 'error'
+  const isMissingGemini = s.agent === 'gemini' && s.detail?.includes('install @google/gemini-cli')
   return (
     <div className={err ? 'agent-state-note is-err' : 'agent-state-note'}>
       <div className="agent-state-note-head">{err ? '✕ error' : '⚠ signed out'}</div>
       {s.detail && <div className="agent-state-note-detail">{s.detail}</div>}
       {!err && <AgentLoginCard agent={s.agent} />}
+      {isMissingGemini && (
+        <div className="agent-login" style={{ marginTop: '8px' }}>
+          <button
+            type="button"
+            className="agent-login-btn"
+            title="Open the terminal and install Gemini CLI"
+            onClick={() => void useTerminal.getState().runCommand('npm install -g @google/gemini-cli && gemini')}
+          >
+            Install Gemini CLI &amp; Log In
+          </button>
+          <span className="agent-login-hint">
+            Runs <span className="mono">npm install -g @google/gemini-cli &amp;&amp; gemini</span> in the terminal drawer.
+          </span>
+        </div>
+      )}
     </div>
   )
 }

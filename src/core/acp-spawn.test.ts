@@ -40,7 +40,15 @@ const SHARED = new Set(['ELECTRON_RUN_AS_NODE', ...sharedEnvKeys()])
 const PROVIDER_ALLOWED = {
   claude: new Set(['ANTHROPIC_API_KEY', 'CLAUDE_CODE_EXECUTABLE']),
   codex: new Set(['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_PATH']),
-  gemini: new Set(['GEMINI_API_KEY', 'GOOGLE_API_KEY']),
+  gemini: new Set([
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_GENAI_USE_VERTEXAI',
+    'GOOGLE_GENAI_USE_GCA',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_CLOUD_PROJECT_ID',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+  ]),
 } as const
 
 describe('adapterEnv (explicit, per-agent allowlist)', () => {
@@ -199,14 +207,14 @@ describe('adapterEntry (pinned dependency on disk — never npx/PATH)', () => {
 })
 
 describe('spawnAdapter (descriptor-driven — node-module vs user-binary)', () => {
-  it('spawns gemini as the user binary on PATH with --experimental-acp + its env allowlist', () => {
+  it('spawns gemini as the user binary on PATH with --acp + its env allowlist', () => {
     vi.stubEnv('GEMINI_API_KEY', 'sk-gemini')
     const spawnMock = vi.mocked(childProcess.spawn).mockReturnValue({} as never)
     spawnAdapter('gemini', '/vault/root')
     expect(spawnMock).toHaveBeenCalledTimes(1)
     const [cmd, args, opts] = spawnMock.mock.calls[0]
     expect(cmd).toBe('gemini') // the CLI name off PATH, NOT process.execPath
-    expect(args).toEqual(['--experimental-acp'])
+    expect(args).toEqual(['--acp'])
     expect(opts).toMatchObject({ cwd: '/vault/root', stdio: ['pipe', 'pipe', 'pipe'] })
     // the child inherits gemini's own allowlist (never a Claude/Codex key)
     const env = (opts as { env: NodeJS.ProcessEnv }).env

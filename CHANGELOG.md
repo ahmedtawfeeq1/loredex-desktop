@@ -7,6 +7,30 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-09-23
+
+### Added
+- **First-class Gemini CLI integration across the desktop app and terminal.**
+  Gemini is promoted to a first-class ACP agent provider alongside Claude and
+  Codex:
+  - **One-click terminal install & auth**: If `@google/gemini-cli` is not installed,
+    the agent error card provides an instant **Install Gemini CLI & Log In** button
+    that runs `npm install -g @google/gemini-cli && gemini` in the embedded terminal.
+  - **Terminal login card**: When signed out, the agent panel renders a **Log in with Gemini**
+    button to launch the interactive Google OAuth login in your browser.
+  - **Expanded cloud credentials**: The Gemini adapter process now forwards Vertex AI
+    (`GOOGLE_GENAI_USE_VERTEXAI`, `GOOGLE_GENAI_USE_GCA`), Google Cloud projects
+    (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_PROJECT_ID`), and service account credentials
+    (`GOOGLE_APPLICATION_CREDENTIALS`) in addition to API keys.
+  - **Automatic client workspace wiring**: Clicking **Wire** or **Re-wire** on any client
+    now auto-generates `.gemini/settings.json` alongside `.mcp.json`. Running `gemini` in
+    any client folder in the terminal now connects to all of that client's MCP tools
+    out of the box.
+
+### Fixed
+- **Failed connection tests now state which host was called**, resolving ambiguity
+  during client MCP diagnostics.
+
 ## [0.12.1] - 2026-07-29
 
 ### Fixed

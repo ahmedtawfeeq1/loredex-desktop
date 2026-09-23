@@ -20,7 +20,7 @@
  * Only PRESENCE crosses the IPC seam. The token itself reaches the request
  * header at spawn, the Test round trip, and the gitignored `.mcp.json`.
  */
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { deleteClientToken, readClientToken, storeClientToken } from './client-tokens'
 import { probeHttpTools } from './mcp-tools'
@@ -124,11 +124,52 @@ export async function syncOldPlatformMcp(clientDir: string, client: string): Pro
       headers: { Authorization: `Bearer ${token}` },
     }
   } else if (!(OLD_PLATFORM_SERVER in json.mcpServers)) {
+    syncGeminiSettings(clientDir, json.mcpServers)
     return // nothing stored, nothing written — leave the file's mtime alone
   } else {
     delete json.mcpServers[OLD_PLATFORM_SERVER]
   }
   writeFileSync(path, stableJson(json))
+  syncGeminiSettings(clientDir, json.mcpServers)
+}
+
+/**
+ * Mirror the client's MCP servers into `.gemini/settings.json` so Gemini CLI in
+ * terminal has identical access to client tools.
+ */
+export function syncGeminiSettings(clientDir: string, mcpServers?: Record<string, unknown>): void {
+  try {
+    const geminiDir = join(clientDir, '.gemini')
+    const geminiSettingsPath = join(geminiDir, 'settings.json')
+    if (!mcpServers || Object.keys(mcpServers).length === 0) {
+      if (existsSync(geminiSettingsPath)) {
+        let current: { mcpServers?: Record<string, unknown> } = {}
+        try {
+          current = JSON.parse(readFileSync(geminiSettingsPath, 'utf8')) as { mcpServers?: Record<string, unknown> }
+        } catch {
+          return
+        }
+        delete current.mcpServers
+        writeFileSync(geminiSettingsPath, stableJson(current))
+      }
+      return
+    }
+    if (!existsSync(geminiDir)) {
+      mkdirSync(geminiDir, { recursive: true })
+    }
+    let current: { mcpServers?: Record<string, unknown> } = {}
+    if (existsSync(geminiSettingsPath)) {
+      try {
+        current = JSON.parse(readFileSync(geminiSettingsPath, 'utf8')) as { mcpServers?: Record<string, unknown> }
+      } catch {
+        current = {}
+      }
+    }
+    current.mcpServers = mcpServers
+    writeFileSync(geminiSettingsPath, stableJson(current))
+  } catch {
+    // best-effort write, do not block client wiring
+  }
 }
 
 /**

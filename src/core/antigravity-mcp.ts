@@ -93,7 +93,19 @@ export function syncGlobalAntigravityMcp(
 
     for (const [name, cfg] of Object.entries(agyServers)) {
       if (!DROPPED_MCP_SERVERS.has(name)) {
-        current.mcpServers[name] = cfg
+        if (name === 'genudo') {
+          // Enforce per-client token isolation: the global config must never hardcode
+          // a specific client's secret token. Use ${GENUDO_TOKEN} so each terminal/project resolves its own.
+          current.mcpServers[name] = {
+            ...cfg,
+            headers: {
+              ...((cfg.headers as Record<string, string>) ?? {}),
+              Authorization: 'Bearer ${GENUDO_TOKEN}',
+            },
+          }
+        } else {
+          current.mcpServers[name] = cfg
+        }
       }
     }
 
@@ -231,6 +243,18 @@ function syncDirSettings(dir: string, file: string, mcpServers?: Record<string, 
 export function syncAllFleetToAntigravity(vaultPath: string, globalConfigPath?: string): void {
   try {
     ensureGenudoPluginInstalled()
+    // Register global GenuDo MCP template once using ${GENUDO_TOKEN}
+    syncGlobalAntigravityMcp(
+      {
+        genudo: {
+          type: 'http',
+          url: 'https://api.genudo.ai/mcp',
+          serverUrl: 'https://api.genudo.ai/mcp',
+        },
+      },
+      globalConfigPath,
+    )
+
     const projectsDir = join(vaultPath, 'projects')
     if (!existsSync(projectsDir)) return
     const entries = readdirSync(projectsDir)
@@ -238,7 +262,7 @@ export function syncAllFleetToAntigravity(vaultPath: string, globalConfigPath?: 
       const clientDir = join(projectsDir, name)
       try {
         if (!statSync(clientDir).isDirectory()) continue
-        syncClientWorkspaceMcp(clientDir, undefined, globalConfigPath)
+        syncClientWorkspaceMcp(clientDir, undefined, globalConfigPath, false)
       } catch {
         // continue scanning other clients
       }

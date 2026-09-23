@@ -168,27 +168,30 @@ describe('antigravity-mcp', () => {
 
       syncClientWorkspaceMcp(clientDir, undefined, globalConfigPath)
 
-      // 1. check .agents/mcp_config.json
+      // 1. check .agents/mcp_config.json carries client-specific token
       const agentsFile = join(clientDir, '.agents', 'mcp_config.json')
       expect(existsSync(agentsFile)).toBe(true)
       const agentsData = JSON.parse(readFileSync(agentsFile, 'utf8'))
       expect(agentsData.mcpServers.genudo.serverUrl).toBe('https://api.genudo.ai/mcp')
+      expect(agentsData.mcpServers.genudo.headers.Authorization).toBe('Bearer abc')
 
-      // 2. check .gemini/settings.json
+      // 2. check .gemini/settings.json carries client-specific token
       const geminiFile = join(clientDir, '.gemini', 'settings.json')
       expect(existsSync(geminiFile)).toBe(true)
       const geminiData = JSON.parse(readFileSync(geminiFile, 'utf8'))
       expect(geminiData.mcpServers.genudo.serverUrl).toBe('https://api.genudo.ai/mcp')
+      expect(geminiData.mcpServers.genudo.headers.Authorization).toBe('Bearer abc')
 
-      // 3. check global config
+      // 3. check global config uses sanitized ${GENUDO_TOKEN} template, preventing token leak
       expect(existsSync(globalConfigPath)).toBe(true)
       const globalData = JSON.parse(readFileSync(globalConfigPath, 'utf8'))
       expect(globalData.mcpServers.genudo.serverUrl).toBe('https://api.genudo.ai/mcp')
+      expect(globalData.mcpServers.genudo.headers.Authorization).toBe('Bearer ${GENUDO_TOKEN}')
     })
   })
 
   describe('syncAllFleetToAntigravity', () => {
-    it('scans all projects in vault and syncs their .mcp.json servers', () => {
+    it('scans all projects in vault and syncs per-project .mcp.json servers without global pollution', () => {
       const vaultPath = join(tmp, 'vault')
       const client1 = join(vaultPath, 'projects', 'client1')
       const client2 = join(vaultPath, 'projects', 'client2')
@@ -200,7 +203,10 @@ describe('antigravity-mcp', () => {
         join(client1, '.mcp.json'),
         JSON.stringify({
           mcpServers: {
-            genudo: { url: 'https://api.genudo.ai/mcp' },
+            genudo: {
+              url: 'https://api.genudo.ai/mcp',
+              headers: { Authorization: 'Bearer token-client1' },
+            },
           },
         }),
       )
@@ -215,9 +221,23 @@ describe('antigravity-mcp', () => {
 
       syncAllFleetToAntigravity(vaultPath, globalConfigPath)
 
+      // Global config has the single genudo template with ${GENUDO_TOKEN}
       const globalData = JSON.parse(readFileSync(globalConfigPath, 'utf8'))
       expect(globalData.mcpServers.genudo.serverUrl).toBe('https://api.genudo.ai/mcp')
-      expect(globalData.mcpServers.customTool.command).toBe('echo')
+      expect(globalData.mcpServers.genudo.headers.Authorization).toBe('Bearer ${GENUDO_TOKEN}')
+      // Client-specific customTool does not pollute global config
+      expect(globalData.mcpServers.customTool).toBeUndefined()
+
+      // But client-specific directories have their own isolated .agents configs
+      const client1Agents = JSON.parse(
+        readFileSync(join(client1, '.agents', 'mcp_config.json'), 'utf8'),
+      )
+      expect(client1Agents.mcpServers.genudo.headers.Authorization).toBe('Bearer token-client1')
+
+      const client2Agents = JSON.parse(
+        readFileSync(join(client2, '.agents', 'mcp_config.json'), 'utf8'),
+      )
+      expect(client2Agents.mcpServers.customTool.command).toBe('echo')
     })
   })
 

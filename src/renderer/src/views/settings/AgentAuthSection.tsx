@@ -15,6 +15,7 @@ import { invoke } from '../../api'
 import { Button } from '../../components/Button'
 
 const PROVIDERS: { agent: AcpAgent; label: string; keyName: string; terminal: boolean }[] = [
+  { agent: 'agy', label: 'Antigravity (agy)', keyName: 'GEMINI_API_KEY', terminal: true },
   { agent: 'claude', label: 'Claude', keyName: 'ANTHROPIC_API_KEY', terminal: true },
   { agent: 'codex', label: 'Codex', keyName: 'OPENAI_API_KEY', terminal: true },
   { agent: 'gemini', label: 'Gemini', keyName: 'GEMINI_API_KEY', terminal: true },
@@ -60,7 +61,14 @@ function ProviderRow({
     }
   }
 
-  const terminalCmd = agent === 'claude' ? 'claude /login' : agent === 'codex' ? 'codex login' : 'gemini'
+  const terminalCmd =
+    agent === 'agy'
+      ? 'agy'
+      : agent === 'claude'
+        ? 'claude /login'
+        : agent === 'codex'
+          ? 'codex login'
+          : 'gemini'
 
   return (
     <div className="agent-auth-row">

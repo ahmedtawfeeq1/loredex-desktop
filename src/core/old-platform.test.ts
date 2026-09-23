@@ -148,10 +148,13 @@ describe('syncOldPlatformMcp — what an EXTERNAL agent gets', () => {
     await expect(mod.syncOldPlatformMcp(clientDir(), 'c')).resolves.toBeUndefined()
   })
 
-  it('syncs client mcpServers into .gemini/settings.json alongside .mcp.json', async () => {
+  it('syncs client mcpServers into .agents/mcp_config.json and .gemini/settings.json alongside .mcp.json', async () => {
     await mod.setOldPlatformToken('c', 'gnd_x')
     const dir = clientDir({ mcpServers: { genudo: { command: 'npx' } } })
     await mod.syncOldPlatformMcp(dir, 'c')
+    const agyConfig = JSON.parse(readFileSync(join(dir, '.agents', 'mcp_config.json'), 'utf8'))
+    expect(agyConfig.mcpServers.genudo).toEqual({ command: 'npx' })
+    expect(agyConfig.mcpServers['genudo-old-platform']).toBeDefined()
     const geminiSettings = JSON.parse(readFileSync(join(dir, '.gemini', 'settings.json'), 'utf8'))
     expect(geminiSettings.mcpServers.genudo).toEqual({ command: 'npx' })
     expect(geminiSettings.mcpServers['genudo-old-platform']).toBeDefined()

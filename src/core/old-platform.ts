@@ -134,39 +134,44 @@ export async function syncOldPlatformMcp(clientDir: string, client: string): Pro
 }
 
 /**
- * Mirror the client's MCP servers into `.gemini/settings.json` so Gemini CLI in
- * terminal has identical access to client tools.
+ * Mirror the client's MCP servers into `.agents/mcp_config.json` (for Antigravity agy)
+ * and `.gemini/settings.json` (for Gemini CLI) so terminal agents have identical
+ * access to client tools.
  */
 export function syncGeminiSettings(clientDir: string, mcpServers?: Record<string, unknown>): void {
+  syncAgentDirSettings(join(clientDir, '.agents'), 'mcp_config.json', mcpServers)
+  syncAgentDirSettings(join(clientDir, '.gemini'), 'settings.json', mcpServers)
+}
+
+function syncAgentDirSettings(dir: string, file: string, mcpServers?: Record<string, unknown>): void {
   try {
-    const geminiDir = join(clientDir, '.gemini')
-    const geminiSettingsPath = join(geminiDir, 'settings.json')
+    const filePath = join(dir, file)
     if (!mcpServers || Object.keys(mcpServers).length === 0) {
-      if (existsSync(geminiSettingsPath)) {
+      if (existsSync(filePath)) {
         let current: { mcpServers?: Record<string, unknown> } = {}
         try {
-          current = JSON.parse(readFileSync(geminiSettingsPath, 'utf8')) as { mcpServers?: Record<string, unknown> }
+          current = JSON.parse(readFileSync(filePath, 'utf8')) as { mcpServers?: Record<string, unknown> }
         } catch {
           return
         }
         delete current.mcpServers
-        writeFileSync(geminiSettingsPath, stableJson(current))
+        writeFileSync(filePath, stableJson(current))
       }
       return
     }
-    if (!existsSync(geminiDir)) {
-      mkdirSync(geminiDir, { recursive: true })
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true })
     }
     let current: { mcpServers?: Record<string, unknown> } = {}
-    if (existsSync(geminiSettingsPath)) {
+    if (existsSync(filePath)) {
       try {
-        current = JSON.parse(readFileSync(geminiSettingsPath, 'utf8')) as { mcpServers?: Record<string, unknown> }
+        current = JSON.parse(readFileSync(filePath, 'utf8')) as { mcpServers?: Record<string, unknown> }
       } catch {
         current = {}
       }
     }
     current.mcpServers = mcpServers
-    writeFileSync(geminiSettingsPath, stableJson(current))
+    writeFileSync(filePath, stableJson(current))
   } catch {
     // best-effort write, do not block client wiring
   }

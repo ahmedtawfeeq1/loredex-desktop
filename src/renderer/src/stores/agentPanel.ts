@@ -171,6 +171,7 @@ export type ProviderAuth = 'unknown' | 'ok' | 'auth_required'
 /** Fresh default map — a Record over the AcpAgent union, so a Phase-2 provider
  *  (gemini) is a compile error here until it's listed (no silent gap). */
 const defaultProviderAuth = (): Record<AcpAgent, ProviderAuth> => ({
+  agy: 'unknown',
   claude: 'unknown',
   codex: 'unknown',
   gemini: 'unknown',
@@ -574,12 +575,16 @@ async function startContinuation(
   /** BL-5: force the vault root instead of the thread's own folder. */
   atVaultRoot?: boolean,
 ): Promise<void> {
-  // Same subscription-Claude fence as openHere: continuing a thread INTO Claude
-  // on a subscription would drive it over ACP, which is prohibited. Host the
-  // compliant `claude` CLI instead and say the thread isn't carried into it. The
-  // `provider === 'claude'` short-circuit keeps codex/gemini fully SYNCHRONOUS up
-  // to `const gen = resetGen` below — the reset-race guard depends on gen being
-  // captured before the first await.
+  if (provider === 'agy') {
+    await useTerminal.getState().openAgent(undefined, 'agy')
+    useToasts
+      .getState()
+      .push(
+        'Opened Antigravity in the terminal',
+        'Antigravity CLI runs as an interactive terminal session.',
+      )
+    return
+  }
   if (provider === 'claude' && (await routeSubscriptionClaudeToTerminal(provider, undefined))) {
     useToasts
       .getState()
@@ -648,7 +653,7 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
   open: false,
   width: DEFAULT_PANEL_WIDTH,
   resizing: false,
-  agent: 'claude',
+  agent: 'agy',
   filter: 'all',
   providerAuth: defaultProviderAuth(),
   popout: false,
@@ -705,14 +710,10 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
     // BL-6: an explicit provider wins (Chat Here picker); otherwise the panel's
     // current selection, as before.
     const agent = provider ?? get().agent
-    // Claude on a subscription must NOT be driven over ACP (Anthropic Consumer
-    // Terms, Feb 2026 — prohibited for third-party apps). Route it to the
-    // compliant path instead: host the official `claude` CLI in a first-class
-    // terminal panel. An API key → the ACP chat panel below. Checked BEFORE the
-    // optimistic open so a subscription start raises the terminal, not an empty
-    // chat panel. Codex/Gemini and API-key Claude fall straight through. The
-    // `agent === 'claude'` short-circuit keeps codex/gemini synchronous up to the
-    // gen capture below (the reset-race guard needs gen before the first await).
+    if (agent === 'agy') {
+      await useTerminal.getState().openAgent(cwd, 'agy')
+      return
+    }
     if (agent === 'claude' && (await routeSubscriptionClaudeToTerminal(agent, cwd))) return
     set({ open: true }) // optimistic — the panel appears while the start rides
     persist()

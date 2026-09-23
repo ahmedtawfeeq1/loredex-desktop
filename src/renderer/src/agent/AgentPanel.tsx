@@ -86,16 +86,26 @@ const STATE_CHIP: Record<AcpSessionState, { glyph: string; label: string; cls: s
 /** exported so other surfaces (e.g. the client page's Chat Here picker) name the
  *  providers exactly the way the panel does — one source of truth. */
 export const AGENT_META: Record<AcpAgent, { label: string; tag: string }> = {
+  agy: { label: 'Antigravity', tag: 'AG' },
   claude: { label: 'Claude', tag: 'CC' },
   codex: { label: 'Codex', tag: 'CX' },
   gemini: { label: 'Gemini', tag: 'GM' },
 }
-export const AGENTS = Object.keys(AGENT_META) as AcpAgent[]
+export const AGENTS: AcpAgent[] = ['agy', 'claude', 'codex']
 
-/** Small monochrome provider mark (currentColor, theme-safe): Claude = the
- *  Anthropic burst, Codex = the OpenAI knot ring, Gemini = the 4-point spark. */
+/** Small monochrome provider mark (currentColor, theme-safe): Antigravity = the
+ *  gravity chevron, Claude = the Anthropic burst, Codex = the OpenAI knot ring,
+ *  Gemini = the 4-point spark. */
 function ProviderMark({ agent, size = 13 }: { agent: AcpAgent; size?: number }): React.JSX.Element {
   const common = { width: size, height: size, viewBox: '0 0 24 24', 'aria-hidden': true } as const
+  if (agent === 'agy') {
+    return (
+      <svg {...common} fill="currentColor">
+        <path d="M12 2L2 22h20L12 2zm0 5.5l5.5 11.5H6.5L12 7.5z" />
+        <circle cx="12" cy="14" r="2" />
+      </svg>
+    )
+  }
   if (agent === 'claude') {
     return (
       <svg {...common} fill="currentColor">
@@ -736,12 +746,28 @@ function ContinueControl({ active }: { active: AcpSessionView }): React.JSX.Elem
 /** Inline auth/error card — graceful, never a crash or modal. */
 function StateNote({ s }: { s: AcpSessionView }): React.JSX.Element {
   const err = s.state === 'error'
+  const isMissingAgy = s.agent === 'agy' && s.detail?.includes('install via curl')
   const isMissingGemini = s.agent === 'gemini' && s.detail?.includes('install @google/gemini-cli')
   return (
     <div className={err ? 'agent-state-note is-err' : 'agent-state-note'}>
       <div className="agent-state-note-head">{err ? '✕ error' : '⚠ signed out'}</div>
       {s.detail && <div className="agent-state-note-detail">{s.detail}</div>}
       {!err && <AgentLoginCard agent={s.agent} />}
+      {isMissingAgy && (
+        <div className="agent-login" style={{ marginTop: '8px' }}>
+          <button
+            type="button"
+            className="agent-login-btn"
+            title="Open the terminal and install Antigravity CLI"
+            onClick={() => void useTerminal.getState().runCommand('curl -fsSL https://antigravity.google/cli/install.sh | bash && agy')}
+          >
+            Install Antigravity CLI &amp; Start
+          </button>
+          <span className="agent-login-hint">
+            Runs <span className="mono">curl -fsSL https://antigravity.google/cli/install.sh | bash</span> in the terminal.
+          </span>
+        </div>
+      )}
       {isMissingGemini && (
         <div className="agent-login" style={{ marginTop: '8px' }}>
           <button

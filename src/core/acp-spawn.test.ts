@@ -38,6 +38,15 @@ const SHARED = new Set(['ELECTRON_RUN_AS_NODE', ...sharedEnvKeys()])
 /** the ONLY provider credentials each agent may emit — a cross-provider key
  *  must NEVER appear (least privilege). */
 const PROVIDER_ALLOWED = {
+  agy: new Set([
+    'ANTIGRAVITY_API_KEY',
+    'ANTIGRAVITY_SAFECLIS_SOURCE',
+    'ANTIGRAVITY_SOURCE_METADATA',
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+  ]),
   claude: new Set(['ANTHROPIC_API_KEY', 'CLAUDE_CODE_EXECUTABLE']),
   codex: new Set(['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_PATH']),
   gemini: new Set([
@@ -56,7 +65,7 @@ describe('adapterEnv (explicit, per-agent allowlist)', () => {
     vi.stubEnv('SECRET_X', 'y')
     vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'z')
     vi.stubEnv('NPM_TOKEN', 't')
-    for (const agent of ['claude', 'codex', 'gemini'] as const) {
+    for (const agent of ['agy', 'claude', 'codex', 'gemini'] as const) {
       const env = adapterEnv(agent)
       expect(env.SECRET_X).toBeUndefined()
       expect(env.AWS_SECRET_ACCESS_KEY).toBeUndefined()
@@ -232,6 +241,13 @@ describe('spawnAdapter (descriptor-driven — node-module vs user-binary)', () =
 })
 
 describe('spawnErrorDetail (missing user binary → clean install hint, never a crash)', () => {
+  it('maps an agy ENOENT to an actionable install message', () => {
+    const err = Object.assign(new Error('spawn agy ENOENT'), { code: 'ENOENT' })
+    expect(spawnErrorDetail('agy', err)).toBe(
+      'agy CLI not found — install via curl -fsSL https://antigravity.google/cli/install.sh | bash',
+    )
+  })
+
   it('maps a gemini ENOENT to an actionable install message', () => {
     const err = Object.assign(new Error('spawn gemini ENOENT'), { code: 'ENOENT' })
     expect(spawnErrorDetail('gemini', err)).toBe(

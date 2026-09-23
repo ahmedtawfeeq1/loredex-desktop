@@ -22,11 +22,10 @@ type AdapterSpawn =
   | { kind: 'user-binary'; bin: string; args: string[] }
 
 const ADAPTER: Record<AcpAgent, AdapterSpawn> = {
+  agy: { kind: 'user-binary', bin: 'agy', args: [] },
   claude: { kind: 'node-module', pkg: '@agentclientprotocol/claude-agent-acp' },
   codex: { kind: 'node-module', pkg: '@agentclientprotocol/codex-acp' },
-  // gemini rides the user's own `@google/gemini-cli` on PATH (ARCHITECT-ONLY
-  // this round: not installed, not live-tested; a missing binary surfaces a
-  // clean ENOENT hint via spawnErrorDetail, never a crash).
+  // gemini rides the user's own `@google/gemini-cli` on PATH
   gemini: { kind: 'user-binary', bin: 'gemini', args: ['--acp'] },
 }
 
@@ -99,6 +98,15 @@ export function sharedEnvKeys(platform: NodeJS.Platform = process.platform): rea
  *  must never receive ANTHROPIC_API_KEY, nor a Claude adapter the user's
  *  OPENAI_API_KEY/CODEX_API_KEY. Each is forwarded only when already set. */
 const PROVIDER_KEYS: Record<AcpAgent, readonly string[]> = {
+  agy: [
+    'ANTIGRAVITY_API_KEY',
+    'ANTIGRAVITY_SAFECLIS_SOURCE',
+    'ANTIGRAVITY_SOURCE_METADATA',
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+  ],
   claude: ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_EXECUTABLE'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY', 'CODEX_PATH'],
   gemini: [
@@ -118,6 +126,7 @@ const PROVIDER_KEYS: Record<AcpAgent, readonly string[]> = {
  *  Drives the usage meter's "plan quota" vs "API" tag so the cost figure reads
  *  as an estimate, not a bill, on a subscription. */
 const BILLING_KEYS: Record<AcpAgent, readonly string[]> = {
+  agy: ['ANTIGRAVITY_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
   claude: ['ANTHROPIC_API_KEY'],
   codex: ['OPENAI_API_KEY', 'CODEX_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
@@ -217,6 +226,9 @@ export function spawnErrorDetail(agent: AcpAgent, err: unknown): string {
   const spec = ADAPTER[agent]
   const code = (err as NodeJS.ErrnoException | null)?.code
   if (spec.kind === 'user-binary' && code === 'ENOENT') {
+    if (agent === 'agy') {
+      return `agy CLI not found — install via curl -fsSL https://antigravity.google/cli/install.sh | bash`
+    }
     return `${spec.bin} CLI not found — install @google/gemini-cli`
   }
   return (err instanceof Error ? err.message : String(err)).split('\n')[0]

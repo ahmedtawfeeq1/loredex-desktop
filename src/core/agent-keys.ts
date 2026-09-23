@@ -14,6 +14,7 @@ import { deleteClientToken, readClientToken, storeClientToken } from './client-t
 /** The canonical billing env VAR per adapter (the first PROVIDER/BILLING key in
  *  acp-spawn). Setting it here is the "API key" auth path. */
 const KEY_VAR: Record<AcpAgent, string> = {
+  agy: 'GEMINI_API_KEY',
   claude: 'ANTHROPIC_API_KEY',
   codex: 'OPENAI_API_KEY',
   gemini: 'GEMINI_API_KEY',

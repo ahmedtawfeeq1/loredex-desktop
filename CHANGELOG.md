@@ -7,6 +7,23 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.12.3] - 2026-09-23
+
+### Added
+- **Switch and default to Google Antigravity CLI (`agy`)**:
+  Following Google's deprecation of individual OAuth logins for Gemini CLI, Loredex
+  now defaults to Google's official **Antigravity CLI (`agy`)** as its primary agent:
+  - **Default agent**: Loredex now selects Antigravity (`agy`) by default on startup.
+  - **1-Click native installer**: If `agy` is not installed on PATH, the agent panel
+    provides an **Install Antigravity CLI & Start** button running
+    `curl -fsSL https://antigravity.google/cli/install.sh | bash && agy` in the embedded terminal.
+  - **Interactive terminal routing**: Antigravity sessions launch directly in Loredex's
+    embedded terminal panel, providing the full interactive TUI, tool approvals, and
+    Google account authentication.
+  - **Workspace `.agents/mcp_config.json` sync**: Clicking **Wire** or **Re-wire** on any client
+    now auto-generates `.agents/mcp_config.json` alongside `.mcp.json` and `.gemini/settings.json`,
+    giving `agy` instant access to client tools when run in client directories.
+
 ## [0.12.2] - 2026-09-23
 
 ### Added

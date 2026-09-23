@@ -587,6 +587,7 @@ describe('provider filter + login-state chips (A6)', () => {
     useAgentPanel.setState({ sessions: [session('s1', { agent: 'codex' })], activeId: 's1' })
     // fresh default: every provider unknown until one reports in
     expect(useAgentPanel.getState().providerAuth).toEqual({
+      agy: 'unknown',
       claude: 'unknown',
       codex: 'unknown',
       gemini: 'unknown',
@@ -603,7 +604,7 @@ describe('provider filter + login-state chips (A6)', () => {
     useAgentPanel.setState({
       sessions: [session('s1', { agent: 'claude' })],
       activeId: 's1',
-      providerAuth: { claude: 'ok', codex: 'unknown', gemini: 'unknown' },
+      providerAuth: { agy: 'unknown', claude: 'ok', codex: 'unknown', gemini: 'unknown' },
     })
     emit({ kind: 'acp.session', sessionId: 's1', agent: 'claude', state: 'error', detail: 'boom' })
     // an error says nothing about auth — the 'ok' verdict survives
@@ -613,11 +614,12 @@ describe('provider filter + login-state chips (A6)', () => {
   it('reset restores filter "all" and unknown login state', async () => {
     useAgentPanel.setState({
       filter: 'codex',
-      providerAuth: { claude: 'ok', codex: 'auth_required', gemini: 'unknown' },
+      providerAuth: { agy: 'unknown', claude: 'ok', codex: 'auth_required', gemini: 'unknown' },
     })
     await useAgentPanel.getState().reset()
     expect(useAgentPanel.getState().filter).toBe('all')
     expect(useAgentPanel.getState().providerAuth).toEqual({
+      agy: 'unknown',
       claude: 'unknown',
       codex: 'unknown',
       gemini: 'unknown',
@@ -1038,11 +1040,21 @@ describe('queued messages while a turn runs', () => {
  * Codex/Gemini are never even auth-checked.
  */
 describe('openHere — Claude on subscription routes to the hosted terminal', () => {
+  beforeEach(() => {
+    useAgentPanel.setState({ agent: 'claude' })
+  })
+
   const mockAuth = (mode: 'api' | 'subscription') => (ch: string) => {
     if (ch === 'agent.claudeAuth') return Promise.resolve({ mode })
     if (ch === 'acp.start') return Promise.resolve({ sessionId: 's1' })
     return Promise.resolve(undefined)
   }
+
+  it('Antigravity (agy) always routes to the hosted terminal', async () => {
+    await useAgentPanel.getState().openHere(undefined, 'agy')
+    expect(openAgentMock).toHaveBeenCalledWith(undefined, 'agy')
+    expect(invoke).not.toHaveBeenCalledWith('acp.start', expect.anything())
+  })
 
   it('subscription Claude hosts the claude CLI in the terminal, never starts ACP', async () => {
     invoke.mockImplementation(mockAuth('subscription'))

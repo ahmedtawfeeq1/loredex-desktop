@@ -84,7 +84,7 @@ export type { WorkspaceServerId } from './types'
 
 // ── ACP agent panels (acp blueprint 2026-07-18): shared types ───────────────
 
-export type AcpAgent = 'claude' | 'codex' | 'gemini'
+export type AcpAgent = 'agy' | 'claude' | 'codex' | 'gemini'
 export type AcpSessionState = 'starting' | 'ready' | 'auth_required' | 'error' | 'exited'
 export interface AcpPermissionOption {
   optionId: string

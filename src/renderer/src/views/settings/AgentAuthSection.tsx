@@ -97,8 +97,12 @@ function ProviderRow({
         setPluginMsg(res.detail)
       }
       refreshPlugin()
-    } catch (e) {
-      setPluginMsg(String(e))
+    } catch (e: unknown) {
+      const detail =
+        e && typeof e === 'object' && 'message' in e && typeof e.message === 'string'
+          ? e.message
+          : String(e)
+      setPluginMsg(detail)
     } finally {
       setPluginBusy(false)
     }

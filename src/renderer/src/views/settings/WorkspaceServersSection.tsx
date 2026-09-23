@@ -612,8 +612,12 @@ function GenudoIntegration(): React.JSX.Element {
         setMsg(res.detail)
       }
       refresh()
-    } catch (e) {
-      setMsg(String(e))
+    } catch (e: unknown) {
+      const detail =
+        e && typeof e === 'object' && 'message' in e && typeof e.message === 'string'
+          ? e.message
+          : String(e)
+      setMsg(detail)
     } finally {
       setBusy(false)
     }

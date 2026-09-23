@@ -12,6 +12,7 @@
  * hairline accent call-to-action, matching the continue chips.
  */
 import type { AcpAgent } from '../../../shared/ipc-contract'
+import { invoke } from '../api'
 import { useTerminal } from '../stores/terminal'
 
 /** The user-facing CLI login command per terminal-auth provider. Self-contained
@@ -42,7 +43,12 @@ export function AgentLoginCard({ agent }: { agent: AcpAgent }): React.JSX.Elemen
         type="button"
         className="agent-login-btn"
         title={`Open the terminal and run ${login.command}`}
-        onClick={() => void useTerminal.getState().runCommand(login.command)}
+        onClick={() => {
+          if (agent === 'agy') {
+            void invoke('antigravity.plugin.install', undefined).catch(() => {})
+          }
+          void useTerminal.getState().runCommand(login.command)
+        }}
       >
         Log in with {login.label}
       </button>

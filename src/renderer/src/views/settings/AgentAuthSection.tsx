@@ -70,6 +70,40 @@ function ProviderRow({
           ? 'codex login'
           : 'gemini'
 
+  const [pluginStatus, setPluginStatus] = useState<{ installed: boolean; version: string | null } | null>(null)
+  const [pluginBusy, setPluginBusy] = useState(false)
+  const [pluginMsg, setPluginMsg] = useState<string | null>(null)
+
+  const refreshPlugin = (): void => {
+    if (agent !== 'agy') return
+    void invoke('antigravity.plugin.status', undefined)
+      .then(setPluginStatus)
+      .catch(() => setPluginStatus(null))
+  }
+
+  useEffect(() => {
+    refreshPlugin()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent])
+
+  const installPlugin = async (): Promise<void> => {
+    setPluginBusy(true)
+    setPluginMsg(null)
+    try {
+      const res = await invoke('antigravity.plugin.install', undefined)
+      if (res.ok) {
+        setPluginMsg('Installed to ~/.gemini/config/plugins/genudo')
+      } else {
+        setPluginMsg(res.detail)
+      }
+      refreshPlugin()
+    } catch (e) {
+      setPluginMsg(String(e))
+    } finally {
+      setPluginBusy(false)
+    }
+  }
+
   return (
     <div className="agent-auth-row">
       <div className="agent-auth-head">
@@ -107,6 +141,61 @@ function ProviderRow({
           </Button>
         )}
       </div>
+
+      {agent === 'agy' && (
+        <div
+          className="agent-auth-plugin-box"
+          style={{
+            marginTop: '12px',
+            padding: '12px',
+            background: 'var(--bg-subtle, rgba(255,255,255,0.03))',
+            borderRadius: '6px',
+            border: '1px solid var(--border-subtle, rgba(255,255,255,0.08))',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '6px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span
+                className={`settings-dot ${pluginStatus?.installed ? 'dot-ok' : 'dot-rust'}`}
+                aria-hidden="true"
+              />
+              <strong style={{ fontSize: '13px' }}>Official GenuDo Antigravity Plugin</strong>
+              <span className="mono" style={{ fontSize: '11px', opacity: 0.75 }}>
+                {pluginStatus?.installed ? `v${pluginStatus.version ?? '1.0.0'}` : 'not installed'}
+              </span>
+            </div>
+            <Button variant="secondary" disabled={pluginBusy} onClick={() => void installPlugin()}>
+              {pluginBusy
+                ? 'Installing…'
+                : pluginStatus?.installed
+                  ? 'Reinstall / Update'
+                  : 'Install Plugin'}
+            </Button>
+          </div>
+          <p className="settings-hint" style={{ margin: 0 }}>
+            Bundles GenuDo MCP tools and 4 on-demand workflow skills (Pipelines, Knowledge Tables,
+            Messaging &amp; Follow-ups) into <span className="mono">~/.gemini/config/plugins/genudo</span>.
+          </p>
+          {pluginMsg && (
+            <div
+              style={{
+                marginTop: '6px',
+                fontSize: '12px',
+                color: 'var(--text-accent, #68d391)',
+              }}
+            >
+              {pluginMsg}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

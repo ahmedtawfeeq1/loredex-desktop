@@ -17,6 +17,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { ensureGenudoPluginInstalled } from './genudo-plugin-bundle'
 
 /** Servers that are permanently dropped and must never be synced. */
 export const DROPPED_MCP_SERVERS = new Set(['genudo-old-platform'])
@@ -226,6 +227,7 @@ function syncDirSettings(dir: string, file: string, mcpServers?: Record<string, 
  */
 export function syncAllFleetToAntigravity(vaultPath: string, globalConfigPath?: string): void {
   try {
+    ensureGenudoPluginInstalled()
     const projectsDir = join(vaultPath, 'projects')
     if (!existsSync(projectsDir)) return
     const entries = readdirSync(projectsDir)

@@ -27,6 +27,7 @@
  */
 import { useEffect, useState } from 'react'
 import type { CoreApi } from '../../../../shared/ipc-contract'
+import { invoke } from '../../api'
 import { Button } from '../../components/Button'
 import { useApp } from '../../stores/app'
 import { useTerminal } from '../../stores/terminal'
@@ -303,6 +304,8 @@ export function WorkspaceServersSection(): React.JSX.Element {
           blurb="Ours — the dex itself. Search notes, file findings, read and update work items. Always available, nothing to configure."
         />
       )}
+
+      <GenudoIntegration />
 
       {n8n && (
         <Integration
@@ -581,3 +584,100 @@ function LangsmithIntegration({
     />
   )
 }
+
+function GenudoIntegration(): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const [status, setStatus] = useState<CoreApi['antigravity.plugin.status']['out'] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  const refresh = (): void => {
+    void invoke('antigravity.plugin.status', undefined)
+      .then(setStatus)
+      .catch(() => setStatus(null))
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  const install = async (): Promise<void> => {
+    setBusy(true)
+    setMsg(null)
+    try {
+      const res = await invoke('antigravity.plugin.install', undefined)
+      if (res.ok) {
+        setMsg(`Installed successfully to ${res.path}`)
+      } else {
+        setMsg(res.detail)
+      }
+      refresh()
+    } catch (e) {
+      setMsg(String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const installed = status?.installed ?? false
+
+  return (
+    <div className={`ws-int${open ? ' is-open' : ''}`}>
+      <div className="ws-int-head">
+        <button
+          type="button"
+          className="ws-int-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="ws-int-chev" aria-hidden="true">
+            {open ? '▾' : '▸'}
+          </span>
+          <span className={`settings-dot ${installed ? 'dot-ok' : 'dot-rust'}`} aria-hidden="true" />
+          <span className="ws-row-name">GenuDo Antigravity Plugin</span>
+          <span className="ws-mode">Antigravity &amp; Gemini CLI</span>
+          <span className="ws-int-count">
+            {installed ? `v${status?.version ?? '1.0.0'} installed` : 'not installed'}
+          </span>
+        </button>
+      </div>
+
+      {open && (
+        <div className="ws-int-body">
+          <p className="settings-hint">
+            Official plugin providing GenuDo platform MCP tools and 4 on-demand workflow skills for Google
+            Antigravity &amp; Gemini CLI (<span className="mono">agy</span>).
+          </p>
+
+          <div className="ws-setup-actions" style={{ marginBottom: '12px' }}>
+            <Button variant="primary" disabled={busy} onClick={() => void install()}>
+              {busy ? 'Installing…' : installed ? 'Reinstall / Update' : 'Install Plugin'}
+            </Button>
+            {msg && <span className={installed ? 'ws-saved' : 'ws-error'}>{msg}</span>}
+          </div>
+
+          <h4 className="ws-adv-title">Bundled Workflow Skills</h4>
+          <ul className="ws-tools" style={{ marginBottom: '16px' }}>
+            <li>pipeline-management (Pipelines, Stages, Actions, Journeys)</li>
+            <li>knowledge-tables (Grounding, Vector points, Hybrid search)</li>
+            <li>messaging-operations (Omni-channel stats, AI performance, Transcripts)</li>
+            <li>stage-followups (Re-engagement intervals &amp; Scheduled prompts)</li>
+          </ul>
+
+          <h4 className="ws-adv-title">Validation</h4>
+          <p className="settings-hint">
+            Verify plugin discovery and MCP tool definitions with the Antigravity CLI:
+          </p>
+          <SetupCard
+            title="Validate GenuDo plugin"
+            note="Checks plugin manifest, rules, skills, and MCP connectivity"
+            command={`agy plugin validate ${status?.path ?? '~/.gemini/config/plugins/genudo'}`}
+            done={installed}
+            onVerify={refresh}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+

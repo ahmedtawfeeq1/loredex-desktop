@@ -759,7 +759,10 @@ function StateNote({ s }: { s: AcpSessionView }): React.JSX.Element {
             type="button"
             className="agent-login-btn"
             title="Open the terminal and install Antigravity CLI"
-            onClick={() => void useTerminal.getState().runCommand('curl -fsSL https://antigravity.google/cli/install.sh | bash && agy')}
+            onClick={() => {
+              void invoke('antigravity.plugin.install', undefined).catch(() => {})
+              void useTerminal.getState().runCommand('curl -fsSL https://antigravity.google/cli/install.sh | bash && agy')
+            }}
           >
             Install Antigravity CLI &amp; Start
           </button>

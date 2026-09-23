@@ -395,6 +395,15 @@ export interface CoreApi {
   }
   'clients.genudo.signIn': { in: { client: string }; out: { account: string | null } }
   'clients.genudo.signOut': { in: { client: string }; out: void }
+  /** Official GenuDo Antigravity & Gemini CLI plugin inspection & installation */
+  'antigravity.plugin.status': {
+    in: void
+    out: { installed: boolean; version: string | null; bundledVersion: string; path: string }
+  }
+  'antigravity.plugin.install': {
+    in: void
+    out: { ok: boolean; detail: string; path: string }
+  }
   /** Task 7: the per-client Genudo host override — editable BEFORE sign-in,
    *  because OAuth discovery, dynamic client registration and the token
    *  exchange all run against this host. `baseUrl: null` restores the

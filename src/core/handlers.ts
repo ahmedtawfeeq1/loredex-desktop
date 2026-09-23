@@ -93,6 +93,7 @@ import {
 import { parseTraceRef } from './langsmith-links'
 import { deleteConversationMedia, readSessionMedia } from './session-media'
 import { syncClientWorkspaceMcp } from './antigravity-mcp'
+import { getGenudoPluginStatus, installGenudoPlugin } from './genudo-plugin-bundle'
 import { fetchTraceForRef } from './langsmith-trace'
 import { probeHttpTools, probeStdioTools } from './mcp-tools'
 import { clearN8nKey, n8nEnv, n8nStatus, setN8nKey, setN8nUrl, testN8nConnection } from './n8n-config'
@@ -642,6 +643,18 @@ export function registerCoreHandlers(
     }
   })
   ipc.register('workspace.langsmith.test', () => testLangsmithConnection())
+  // ── Official GenuDo Antigravity & Gemini CLI plugin ───────────────────────
+  ipc.register('antigravity.plugin.status', () => getGenudoPluginStatus())
+  ipc.register('antigravity.plugin.install', () => {
+    const res = installGenudoPlugin()
+    return {
+      ok: res.ok,
+      detail: res.ok
+        ? `GenuDo plugin v1.0.0 installed (${res.files.length} files)`
+        : 'Failed to write plugin files',
+      path: res.path,
+    }
+  })
   // Per-client Genudo sign-in (OAuth session, keychain-backed). Secrets never
   // cross this seam — only signedIn/account/expiresAt do. The host comes from
   // the SAME genudoBaseUrl helper clients.pull uses — a client wired at a

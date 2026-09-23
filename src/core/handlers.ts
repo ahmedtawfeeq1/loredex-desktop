@@ -100,6 +100,7 @@ import {
   syncOldPlatformMcp,
   testOldPlatform,
 } from './old-platform'
+import { syncClientWorkspaceMcp } from './antigravity-mcp'
 import { fetchTraceForRef } from './langsmith-trace'
 import { probeHttpTools, probeStdioTools } from './mcp-tools'
 import { clearN8nKey, n8nEnv, n8nStatus, setN8nKey, setN8nUrl, testN8nConnection } from './n8n-config'
@@ -351,6 +352,7 @@ export function registerCoreHandlers(
       for (const [ref, token] of Object.entries(tokens)) {
         if (token) await storeClientToken(tokenRefs[ref] ?? ref, token)
       }
+      syncClientWorkspaceMcp(engine.clientDirAbs(slug))
       invalidateAtlas()
       ipc.emit({ kind: 'vault.changed', paths: [`projects/${slug}`] })
       notifier.refresh()
@@ -388,6 +390,7 @@ export function registerCoreHandlers(
       const held = await clientTokenOverlay(client, engine.clientConnections(client))
       const result = engine.generateWorkspace(client, false, held)
       await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+      syncClientWorkspaceMcp(engine.clientDirAbs(client))
       return result
     }),
   )
@@ -447,6 +450,7 @@ export function registerCoreHandlers(
       for (const [ref, token] of Object.entries(tokens)) {
         if (token) await storeClientToken(tokenRefs[ref] ?? ref, token)
       }
+      syncClientWorkspaceMcp(engine.clientDirAbs(client))
       invalidateAtlas()
       ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
       notifier.refresh()
@@ -553,7 +557,11 @@ export function registerCoreHandlers(
   // The terminal-free bridge: drop the teammate exactly where `claude` runs.
   // "Open in Terminal" opens the IN-APP terminal drawer at this dir (renderer
   // side); the core just resolves the absolute path cross-platform.
-  ipc.register('clients.dirAbs', ({ client }) => ({ dir: engine.clientDirAbs(client) }))
+  ipc.register('clients.dirAbs', ({ client }) => {
+    const dir = engine.clientDirAbs(client)
+    syncClientWorkspaceMcp(dir)
+    return { dir }
+  })
   // BL-19: read-only note history — the reader's before/after Changes panel
   ipc.register('note.diff', ({ path }) => engine.noteDiff(path))
   // ── Workspace MCP servers (2026-07-20 spec) ───────────────────────────────
@@ -690,9 +698,29 @@ export function registerCoreHandlers(
     // instead), so this is a no-op for an already-migrated connection.
     const baseUrl = conn && 'env' in conn ? await stdioGenudoBaseUrl(client, conn) : undefined
     const env: Record<string, string> = baseUrl !== undefined ? { GENUDO_BASE_URL: baseUrl } : {}
-    return genudoSignIn(client, genudoBaseUrl(conn, env))
+    const res = await genudoSignIn(client, genudoBaseUrl(conn, env))
+    try {
+      const held = await clientTokenOverlay(client, engine.clientConnections(client))
+      engine.generateWorkspace(client, false, held)
+      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+      syncClientWorkspaceMcp(engine.clientDirAbs(client))
+    } catch {
+      // non-blocking
+    }
+    return res
   })
-  ipc.register('clients.genudo.signOut', ({ client }) => genudoSignOut(client))
+  ipc.register('clients.genudo.signOut', async ({ client }) => {
+    const res = await genudoSignOut(client)
+    try {
+      const held = await clientTokenOverlay(client, engine.clientConnections(client))
+      engine.generateWorkspace(client, false, held)
+      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+      syncClientWorkspaceMcp(engine.clientDirAbs(client))
+    } catch {
+      // non-blocking
+    }
+    return res
+  })
   /**
    * Task 7: the per-client Genudo environment override. Must run BEFORE
    * sign-in — OAuth discovery/DCR/the token exchange all run against

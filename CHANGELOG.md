@@ -7,6 +7,16 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.12.4] - 2026-09-23
+
+### Fixed
+- **Automatic Antigravity CLI (`agy`) MCP synchronization across all clients**:
+  - Antigravity CLI does not discover MCP servers from local `.mcp.json` files and requires remote HTTP endpoints to declare `serverUrl`.
+  - Added `antigravity-mcp` core module that automatically converts client MCP configurations (such as Genudo's remote MCP server) into Antigravity schema.
+  - Automatically merges client MCP servers into `~/.gemini/config/mcp_config.json` while preserving all pre-existing global MCP servers.
+  - Generates `.agents/mcp_config.json` and `.gemini/settings.json` in project workspaces.
+  - Triggers seamless synchronization on client selection, "Open in Terminal", "Chat Here", Genudo OAuth sign-in/sign-out, and initial application boot.
+
 ## [0.12.3] - 2026-09-23
 
 ### Added

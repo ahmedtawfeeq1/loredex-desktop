@@ -133,48 +133,15 @@ export async function syncOldPlatformMcp(clientDir: string, client: string): Pro
   syncGeminiSettings(clientDir, json.mcpServers)
 }
 
+import { syncClientWorkspaceMcp } from './antigravity-mcp'
+
 /**
- * Mirror the client's MCP servers into `.agents/mcp_config.json` (for Antigravity agy)
- * and `.gemini/settings.json` (for Gemini CLI) so terminal agents have identical
- * access to client tools.
+ * Mirror the client's MCP servers into `.agents/mcp_config.json` (for Antigravity agy),
+ * `.gemini/settings.json` (for Gemini CLI), and `~/.gemini/config/mcp_config.json` (global agy)
+ * so terminal agents have identical access to client tools.
  */
 export function syncGeminiSettings(clientDir: string, mcpServers?: Record<string, unknown>): void {
-  syncAgentDirSettings(join(clientDir, '.agents'), 'mcp_config.json', mcpServers)
-  syncAgentDirSettings(join(clientDir, '.gemini'), 'settings.json', mcpServers)
-}
-
-function syncAgentDirSettings(dir: string, file: string, mcpServers?: Record<string, unknown>): void {
-  try {
-    const filePath = join(dir, file)
-    if (!mcpServers || Object.keys(mcpServers).length === 0) {
-      if (existsSync(filePath)) {
-        let current: { mcpServers?: Record<string, unknown> } = {}
-        try {
-          current = JSON.parse(readFileSync(filePath, 'utf8')) as { mcpServers?: Record<string, unknown> }
-        } catch {
-          return
-        }
-        delete current.mcpServers
-        writeFileSync(filePath, stableJson(current))
-      }
-      return
-    }
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
-    }
-    let current: { mcpServers?: Record<string, unknown> } = {}
-    if (existsSync(filePath)) {
-      try {
-        current = JSON.parse(readFileSync(filePath, 'utf8')) as { mcpServers?: Record<string, unknown> }
-      } catch {
-        current = {}
-      }
-    }
-    current.mcpServers = mcpServers
-    writeFileSync(filePath, stableJson(current))
-  } catch {
-    // best-effort write, do not block client wiring
-  }
+  syncClientWorkspaceMcp(clientDir, mcpServers)
 }
 
 /**

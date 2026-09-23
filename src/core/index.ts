@@ -33,6 +33,7 @@ import { killAllAcpSessions } from './acp'
 import { loadAgentKeys } from './agent-keys'
 import { loadLangsmithConfig } from './langsmith-config'
 import { loadN8nConfig } from './n8n-config'
+import { syncAllFleetToAntigravity } from './antigravity-mcp'
 import { killAllTerminals } from './terminals'
 import { startVaultWatcher } from './watcher'
 import { writeLock } from './write-lock'
@@ -74,6 +75,8 @@ void loadAgentKeys()
 void loadN8nConfig()
 // …and for LangSmith (remote MCP): keychain key + meta-table endpoint/project.
 void loadLangsmithConfig()
+// Sync all tooled client MCP servers into Antigravity global & local configs
+if (config?.vaultPath) void syncAllFleetToAntigravity(config.vaultPath)
 
 // vault_id scopes every app-db row (story 9.2); null without a config or db.
 const vid = config && appDb ? vaultId(config.vaultPath, engine.identity().remote) : null
@@ -87,6 +90,7 @@ function reconcileState(): void {
   invalidateLinkIndex()
   clearFacetCache()
   invalidateAtlas()
+  if (config?.vaultPath) void syncAllFleetToAntigravity(config.vaultPath)
   const cards = notifier.refresh()
   if (appDb && vid) reconcileSnoozeTimers(appDb, vid, cards)
 }

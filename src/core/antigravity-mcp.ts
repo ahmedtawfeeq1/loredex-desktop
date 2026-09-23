@@ -86,6 +86,31 @@ export function syncGlobalAntigravityMcp(
 }
 
 /**
+ * Ensure `.agents/` and `.gemini/` are added to a client's `.gitignore` so
+ * local generated MCP configurations and tokens are never committed to Git.
+ */
+export function ensureClientGitignore(clientDir: string): void {
+  try {
+    const gitignorePath = join(clientDir, '.gitignore')
+    const needed = ['.agents/', '.gemini/']
+    let content = ''
+    if (existsSync(gitignorePath)) {
+      content = readFileSync(gitignorePath, 'utf8')
+    }
+    const lines = content.split('\n').map((l) => l.trim())
+    const missing = needed.filter(
+      (entry) => !lines.includes(entry) && !lines.includes(entry.replace(/\/$/, '')),
+    )
+    if (missing.length > 0) {
+      const prefix = content.length === 0 || content.endsWith('\n') ? '' : '\n'
+      writeFileSync(gitignorePath, content + prefix + missing.join('\n') + '\n')
+    }
+  } catch {
+    // Non-blocking best-effort
+  }
+}
+
+/**
  * Synchronize a client's MCP servers to:
  * 1. `clientDir/.agents/mcp_config.json` (for project-level Antigravity IDE / agents)
  * 2. `clientDir/.gemini/settings.json` (for Gemini CLI)
@@ -97,6 +122,7 @@ export function syncClientWorkspaceMcp(
   globalConfigPath?: string,
 ): void {
   try {
+    ensureClientGitignore(clientDir)
     let servers = mcpServers
     if (!servers) {
       const mcpJsonPath = join(clientDir, '.mcp.json')

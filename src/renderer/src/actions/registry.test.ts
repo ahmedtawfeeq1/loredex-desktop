@@ -242,15 +242,12 @@ describe('agent panel actions (acp blueprint 2026-07-18)', () => {
   })
 
   it('Open agent here is a combo-less palette row that opens the panel', async () => {
-    useAgentPanel.setState({ open: false })
+    useAgentPanel.setState({ open: false, agent: 'claude' })
     const action = appActions().find((a) => a.id === 'action:open-agent-here')
     expect(action?.title).toBe('Open agent here')
     expect(action?.combo).toBeUndefined() // palette/nav reachable, no shortcut spent
     action?.run()
-    // openHere gates Claude (the default provider) on an async auth-mode check
-    // before opening: on subscription it hosts the terminal, on an API key it
-    // opens the chat panel. Node env has no bridge, so the check fails open and
-    // the panel opens on the next microtasks (acp.start then silently no-ops).
+    // openHere with Claude on API-key/fallback opens the chat panel.
     for (let i = 0; i < 5; i++) await Promise.resolve()
     expect(useAgentPanel.getState().open).toBe(true)
     expect(actionItems('agent').some((i) => i.key === 'action:open-agent-here')).toBe(true)

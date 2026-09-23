@@ -231,6 +231,20 @@ describe('spawnAdapter (descriptor-driven — node-module vs user-binary)', () =
     expect('ANTHROPIC_API_KEY' in env).toBe(false)
   })
 
+  it('spawns agy as the user binary on PATH with its env allowlist', () => {
+    vi.stubEnv('GEMINI_API_KEY', 'sk-gemini')
+    const spawnMock = vi.mocked(childProcess.spawn).mockReturnValue({} as never)
+    spawnAdapter('agy', '/vault/root')
+    expect(spawnMock).toHaveBeenCalledTimes(1)
+    const [cmd, args, opts] = spawnMock.mock.calls[0]
+    expect(cmd).toBe('agy')
+    expect(args).toEqual([])
+    expect(opts).toMatchObject({ cwd: '/vault/root', stdio: ['pipe', 'pipe', 'pipe'] })
+    const env = (opts as { env: NodeJS.ProcessEnv }).env
+    expect(env.GEMINI_API_KEY).toBe('sk-gemini')
+    expect('ANTHROPIC_API_KEY' in env).toBe(false)
+  })
+
   it('spawns a node-module adapter (claude) under process.execPath, not a PATH binary', () => {
     const spawnMock = vi.mocked(childProcess.spawn).mockReturnValue({} as never)
     spawnAdapter('claude', '/vault/root')

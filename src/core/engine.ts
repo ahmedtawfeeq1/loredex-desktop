@@ -118,6 +118,7 @@ import { toVaultRelative } from '../shared/handoff-lanes'
 import { abbreviatePath } from '../shared/identity'
 import { type DuplicateGroup, findDuplicates, type NoteRecord } from './duplicates'
 import { gitLog, withGitIdentity } from './git'
+import { ensureClientGitignore } from './antigravity-mcp'
 import { ipcError } from '../shared/ipc-contract'
 import { applyFrontmatterEdit, spliceBody } from './notes'
 import { listMarkdownFiles } from './tree'
@@ -292,6 +293,7 @@ export function createClient(
     manager: spec.manager,
     tags: spec.tags,
   })
+  ensureClientGitignore(join(config.vaultPath, 'projects', slug))
   const renamed = spec.fromClient
     ? copyWorkspaceSpec(config.vaultPath, spec.fromClient, slug, { servers: spec.servers }).renamed
     : []

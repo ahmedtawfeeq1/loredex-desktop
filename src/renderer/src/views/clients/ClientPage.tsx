@@ -741,7 +741,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           type="button"
           className="button-secondary"
           disabled={!info.hasWorkspaceYml}
-          title="Open the in-app terminal in this client's folder — then just type claude"
+          title="Open the in-app terminal in this client's folder — then just type agy (or claude)"
           onClick={() =>
             void invoke('clients.dirAbs', { client: info.slug })
               .then(({ dir }) => useTerminal.getState().openAt(dir))

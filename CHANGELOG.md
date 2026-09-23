@@ -7,6 +7,16 @@ Linux) are on the [releases page](https://github.com/ahmedtawfeeq1/loredex-deskt
 
 ## [Unreleased]
 
+## [0.12.5] - 2026-09-23
+
+### Fixed
+- **Gitignore protection for generated Antigravity and Gemini workspace configurations**:
+  - Automatically add `.agents/` and `.gemini/` to client `.gitignore` during client creation and workspace sync, preventing accidental commits of local tokens or dirty working trees.
+- **Agent panel defaults & test coverage**:
+  - Set default agent provider on reset to `agy`.
+  - Updated "Open in Terminal" tooltip to mention `agy`.
+  - Added test coverage for `agy` process spawning allowlist and client `.gitignore` generation.
+
 ## [0.12.4] - 2026-09-23
 
 ### Fixed

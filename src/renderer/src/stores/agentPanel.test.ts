@@ -99,6 +99,10 @@ describe('load (rails pattern)', () => {
 })
 
 describe('openHere', () => {
+  beforeEach(() => {
+    useAgentPanel.setState({ agent: 'claude' })
+  })
+
   it('opens the panel, starts with the picked agent (no cwd key = vault root), selects', async () => {
     invoke.mockImplementation((ch: string) =>
       ch === 'acp.start' ? Promise.resolve({ sessionId: 's1' }) : Promise.resolve(undefined),
@@ -969,7 +973,7 @@ describe('reset (vault switch)', () => {
     expect(useAgentPanel.getState()).toMatchObject({
       open: false,
       width: DEFAULT_PANEL_WIDTH,
-      agent: 'claude',
+      agent: 'agy',
       sessions: [],
       activeId: null,
       permission: null,

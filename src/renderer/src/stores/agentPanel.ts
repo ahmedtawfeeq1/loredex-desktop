@@ -1059,7 +1059,7 @@ export const useAgentPanel = create<AgentPanelState>((set, get) => ({
       open: false,
       width: DEFAULT_PANEL_WIDTH,
       resizing: false,
-      agent: 'claude',
+      agent: 'agy',
       filter: 'all',
       providerAuth: defaultProviderAuth(),
       popout: false,

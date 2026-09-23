@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
+  ensureClientGitignore,
   syncAllFleetToAntigravity,
   syncClientWorkspaceMcp,
   syncGlobalAntigravityMcp,
@@ -191,6 +192,33 @@ describe('antigravity-mcp', () => {
       const globalData = JSON.parse(readFileSync(globalConfigPath, 'utf8'))
       expect(globalData.mcpServers.genudo.serverUrl).toBe('https://api.genudo.ai/mcp')
       expect(globalData.mcpServers.customTool.command).toBe('echo')
+    })
+  })
+
+  describe('ensureClientGitignore', () => {
+    it('creates .gitignore with .agents/ and .gemini/ if file does not exist', () => {
+      const clientDir = join(tmp, 'client-new')
+      mkdirSync(clientDir, { recursive: true })
+      ensureClientGitignore(clientDir)
+      const gitignore = readFileSync(join(clientDir, '.gitignore'), 'utf8')
+      expect(gitignore).toContain('.agents/')
+      expect(gitignore).toContain('.gemini/')
+    })
+
+    it('appends .agents/ and .gemini/ to existing .gitignore without duplicating', () => {
+      const clientDir = join(tmp, 'client-existing')
+      mkdirSync(clientDir, { recursive: true })
+      writeFileSync(join(clientDir, '.gitignore'), '.mcp.json\n.claude/\n')
+      ensureClientGitignore(clientDir)
+      let gitignore = readFileSync(join(clientDir, '.gitignore'), 'utf8')
+      expect(gitignore).toContain('.mcp.json')
+      expect(gitignore).toContain('.agents/')
+      expect(gitignore).toContain('.gemini/')
+
+      // running again should not duplicate
+      ensureClientGitignore(clientDir)
+      gitignore = readFileSync(join(clientDir, '.gitignore'), 'utf8')
+      expect(gitignore.split('.agents/').length - 1).toBe(1)
     })
   })
 })

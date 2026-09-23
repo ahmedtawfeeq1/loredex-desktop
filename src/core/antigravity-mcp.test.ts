@@ -119,6 +119,32 @@ describe('antigravity-mcp', () => {
       expect(data.mcpServers.genudo).toBeDefined()
       expect(data.mcpServers.genudo.serverUrl).toBe('https://api.genudo.ai/mcp')
     })
+
+    it('purges dropped servers like genudo-old-platform', () => {
+      const configPath = join(tmp, 'config', 'mcp_config.json')
+      mkdirSync(join(tmp, 'config'), { recursive: true })
+      writeFileSync(
+        configPath,
+        JSON.stringify({
+          mcpServers: {
+            'genudo-old-platform': { type: 'http', url: 'https://old.genudo.ai' },
+            supabase: { command: 'npx' },
+          },
+        }),
+      )
+
+      syncGlobalAntigravityMcp(
+        {
+          genudo: { url: 'https://api.genudo.ai/mcp' },
+        },
+        configPath,
+      )
+
+      const data = JSON.parse(readFileSync(configPath, 'utf8'))
+      expect(data.mcpServers['genudo-old-platform']).toBeUndefined()
+      expect(data.mcpServers.supabase).toBeDefined()
+      expect(data.mcpServers.genudo).toBeDefined()
+    })
   })
 
   describe('syncClientWorkspaceMcp', () => {

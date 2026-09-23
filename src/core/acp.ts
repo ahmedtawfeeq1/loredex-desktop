@@ -61,7 +61,6 @@ import {
   revokeAgentToken,
 } from './settings'
 import { genudoServerFor } from './genudo-server'
-import { oldPlatformServer } from './old-platform'
 import { storeSessionMedia } from './session-media'
 import { buildWorkspaceServers } from './workspace-mcp'
 import type { PermissionRule } from '../shared/types'
@@ -567,16 +566,6 @@ async function boot(sessionId: string, agent: AcpAgent, cwd: string): Promise<vo
     httpOk,
     enabled: loadWorkspaceEnabled(),
   })
-  // The OLD genudo platform, scoped to THIS client only (2026-07-23): a client
-  // mid-migration sits on both platforms, and a session for another client must
-  // never see it. Injected rather than declared in workspace.yml — that schema
-  // is stdio-only, and injecting keeps the token in the keychain instead of
-  // expanding it into a .mcp.json inside the vault. Remote http, so it rides the
-  // same capability the loredex host needs.
-  if (httpOk) {
-    const oldPlatform = await oldPlatformServer(s.clientSlug)
-    if (oldPlatform) mcpServers.push(oldPlatform as McpServer)
-  }
   // The NEW platform, scoped to THIS client — remote, like the old one. Both
   // shipped adapters advertise http (codex-acp 1.1.4: {acp:false, http:true,
   // sse:false}), so this is the only path; an adapter without it gets no Genudo.

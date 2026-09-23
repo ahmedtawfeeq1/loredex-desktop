@@ -692,7 +692,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           disabled={busy || !info.hasWorkspaceYml}
           title={
             info.hasWorkspaceYml
-              ? "Regenerate .mcp.json / .claude settings / AGENTS.md from workspace.yml with this machine's stored tokens (gitignored files only). genudo-old-platform is added from the keychain in the same pass."
+              ? "Regenerate .mcp.json / .claude settings / AGENTS.md from workspace.yml with this machine's stored tokens (gitignored files only)."
               : 'No workspace.yml in this client'
           }
           onClick={() => void rewire({})}
@@ -1087,122 +1087,7 @@ function WorkspacePanel({ info }: { info: ClientInfo }): React.JSX.Element {
           </div>
         </div>
       )}
-      <OldPlatformConnection client={info.slug} />
     </div>
-  )
-}
-
-/**
- * The OLD genudo platform, for a client mid-migration — a second connection
- * beside the new-platform one, with its own token and its own Test.
- *
- * It is NOT part of workspace.yml and deliberately so: that schema models stdio
- * servers only (`command`/`args`/`env`), and the old platform is remote HTTP
- * with a Bearer header. loredex injects it at spawn for THIS client's sessions,
- * so the token stays in the OS keychain instead of being expanded into a
- * `.mcp.json` inside the vault. Other clients' sessions never see it.
- */
-function OldPlatformConnection({ client }: { client: string }): React.JSX.Element {
-  const [state, setState] = useState<{ hasToken: boolean; url: string } | null>(null)
-  const [token, setToken] = useState('')
-  const [editing, setEditing] = useState(false)
-  const [busy, setBusy] = useState(false)
-  const [probe, setProbe] = useState<{ ok: boolean; detail: string; tools: string[] } | null>(null)
-
-  const refresh = (): void => {
-    void invoke('clients.oldPlatform.get', { client })
-      .then(setState)
-      .catch(() => setState(null))
-  }
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reload per client
-  useEffect(refresh, [client])
-
-  async function save(): Promise<void> {
-    setBusy(true)
-    try {
-      await invoke('clients.oldPlatform.set', { client, token: token.trim() })
-      setToken('')
-      setEditing(false)
-      refresh()
-      // saving is not working — verify at once, as every other credential here
-      setProbe(await invoke('clients.oldPlatform.test', { client }))
-    } catch (e) {
-      setProbe({ ok: false, detail: reason(e), tools: [] })
-    }
-    setBusy(false)
-  }
-
-  const showField = editing || state?.hasToken === false
-
-  return (
-    <ConnCard
-      name="genudo-old-platform"
-      source="keychain"
-      state={probe ? (probe.ok ? 'ok' : 'fail') : 'untested'}
-      testing={busy}
-      tools={probe?.tools ?? []}
-      // failures only, exactly like the new-platform card: the chip and the
-      // tools toggle already say "connected", and repeating it as a detail line
-      // was the visible difference between the two cards
-      detail={probe && !probe.ok ? probe.detail : undefined}
-      onTest={() => {
-        setBusy(true)
-        void invoke('clients.oldPlatform.test', { client })
-          .then(setProbe)
-          .catch((e) => setProbe({ ok: false, detail: reason(e), tools: [] }))
-          .finally(() => setBusy(false))
-      }}
-    >
-      {/* same label/value/action grid as the new-platform card — the two used to
-          read as different kinds of thing purely because their rows were built
-          differently */}
-      <div className="cp-facts">
-        <span className="cp-fact-label">Endpoint</span>
-        <span className="cp-fact-value" title={state?.url ?? ''}>
-          <span className="mono">{state?.url ?? ''}</span>
-        </span>
-        <div className="cp-fact-actions" />
-        <span className="cp-fact-label">Token</span>
-        <span className={state?.hasToken ? 'cp-fact-value' : 'cp-fact-value warn'}>
-          {state?.hasToken ? 'Stored in your keychain' : 'Needed — paste it to connect'}
-        </span>
-        <div className="cp-fact-actions">
-        {showField ? (
-          <>
-            <input
-              className="cp-ws-token-input"
-              type="password"
-              placeholder="Paste the old-platform token"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-            />
-            <button
-              type="button"
-              className="button-secondary"
-              disabled={busy || !token.trim()}
-              onClick={() => void save()}
-            >
-              Save
-            </button>
-            {state?.hasToken && (
-              <button type="button" className="button-secondary" onClick={() => setEditing(false)}>
-                Cancel
-              </button>
-            )}
-          </>
-        ) : (
-          <button
-            type="button"
-            className="button-secondary"
-            title="Paste a new token (replaces the stored one)"
-            onClick={() => setEditing(true)}
-          >
-            Replace
-          </button>
-        )}
-        </div>
-      </div>
-    </ConnCard>
   )
 }
 

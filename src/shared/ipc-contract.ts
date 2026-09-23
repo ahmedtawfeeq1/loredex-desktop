@@ -387,14 +387,6 @@ export interface CoreApi {
     in: { sha256: string }
     out: { dataB64: string; mime: string; name: string } | null
   }
-  'clients.oldPlatform.get': { in: { client: string }; out: { hasToken: boolean; url: string } }
-  'clients.oldPlatform.set': { in: { client: string; token: string | null }; out: void }
-  /** A real MCP handshake with the stored token — green means an agent would
-   *  actually get these tools. */
-  'clients.oldPlatform.test': {
-    in: { client: string }
-    out: { ok: boolean; detail: string; tools: string[] }
-  }
   /** Per-client Genudo sign-in (OAuth session, keychain-backed). Secrets never
    *  cross this seam — only signedIn/account/expiresAt do. */
   'clients.genudo.status': {

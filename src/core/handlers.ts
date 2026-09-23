@@ -92,14 +92,6 @@ import {
 } from './langsmith-config'
 import { parseTraceRef } from './langsmith-links'
 import { deleteConversationMedia, readSessionMedia } from './session-media'
-import {
-  OLD_PLATFORM_URL,
-  clearOldPlatformToken,
-  oldPlatformStatus,
-  setOldPlatformToken,
-  syncOldPlatformMcp,
-  testOldPlatform,
-} from './old-platform'
 import { syncClientWorkspaceMcp } from './antigravity-mcp'
 import { fetchTraceForRef } from './langsmith-trace'
 import { probeHttpTools, probeStdioTools } from './mcp-tools'
@@ -333,9 +325,7 @@ export function registerCoreHandlers(
   ipc.register('clients.lints', () => engine.agentOpsLints())
   ipc.register('clients.workspace', async ({ client, check }) => {
     const result = engine.generateWorkspace(client, check)
-    // the lib writes the workspace.yml servers; the old platform is keychain-only
-    // and rides in after, so a generate leaves the terminal's view complete
-    if (!check) await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+    if (!check) syncClientWorkspaceMcp(engine.clientDirAbs(client))
     return result
   })
   // Add-Client (docs/plan/agent-ops-desktop-flow.md): tokens land in the OS
@@ -389,7 +379,6 @@ export function registerCoreHandlers(
       }
       const held = await clientTokenOverlay(client, engine.clientConnections(client))
       const result = engine.generateWorkspace(client, false, held)
-      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
       syncClientWorkspaceMcp(engine.clientDirAbs(client))
       return result
     }),
@@ -653,18 +642,6 @@ export function registerCoreHandlers(
     }
   })
   ipc.register('workspace.langsmith.test', () => testLangsmithConnection())
-  // ── The old genudo platform, per client (2026-07-23) ──────────────────────
-  ipc.register('clients.oldPlatform.get', async ({ client }) => ({
-    ...(await oldPlatformStatus(client)),
-    url: OLD_PLATFORM_URL,
-  }))
-  ipc.register('clients.oldPlatform.set', async ({ client, token }) => {
-    if (token === null || token.trim() === '') await clearOldPlatformToken(client)
-    else await setOldPlatformToken(client, token)
-    // keep the terminal's .mcp.json in step with the keychain, both directions
-    await syncOldPlatformMcp(engine.clientDirAbs(client), client)
-  })
-  ipc.register('clients.oldPlatform.test', ({ client }) => testOldPlatform(client))
   // Per-client Genudo sign-in (OAuth session, keychain-backed). Secrets never
   // cross this seam — only signedIn/account/expiresAt do. The host comes from
   // the SAME genudoBaseUrl helper clients.pull uses — a client wired at a
@@ -702,7 +679,6 @@ export function registerCoreHandlers(
     try {
       const held = await clientTokenOverlay(client, engine.clientConnections(client))
       engine.generateWorkspace(client, false, held)
-      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
       syncClientWorkspaceMcp(engine.clientDirAbs(client))
     } catch {
       // non-blocking
@@ -714,7 +690,6 @@ export function registerCoreHandlers(
     try {
       const held = await clientTokenOverlay(client, engine.clientConnections(client))
       engine.generateWorkspace(client, false, held)
-      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
       syncClientWorkspaceMcp(engine.clientDirAbs(client))
     } catch {
       // non-blocking
@@ -758,7 +733,7 @@ export function registerCoreHandlers(
       }
       const held = await clientTokenOverlay(client, engine.clientConnections(client))
       const result = engine.setGenudoBaseUrl(client, baseUrl, identity, held)
-      await syncOldPlatformMcp(engine.clientDirAbs(client), client)
+      syncClientWorkspaceMcp(engine.clientDirAbs(client))
       invalidateAtlas()
       ipc.emit({ kind: 'vault.changed', paths: [`projects/${client}`] })
       notifier.refresh()

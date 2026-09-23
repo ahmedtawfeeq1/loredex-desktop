@@ -11,10 +11,15 @@
  * 2. Client workspace files (`.agents/mcp_config.json` and `.gemini/settings.json`) are written.
  * 3. The global `~/.gemini/config/mcp_config.json` is safely merged so that running `agy`
  *    in the terminal immediately has access to all client tools without manual configuration.
+ * 4. Dropped servers (specifically `genudo-old-platform`) are proactively purged.
+ * 5. Test runs never mutate user's global ~/.gemini/config/mcp_config.json.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+
+/** Servers that are permanently dropped and must never be synced. */
+export const DROPPED_MCP_SERVERS = new Set(['genudo-old-platform'])
 
 /** Default path to global Antigravity MCP configuration. */
 export function defaultGlobalConfigPath(): string {
@@ -34,12 +39,13 @@ export function toAntigravityServer(server: unknown): Record<string, unknown> {
   return out
 }
 
-/** Convert a dictionary of MCP servers to Antigravity schema. */
+/** Convert a dictionary of MCP servers to Antigravity schema, filtering dropped servers. */
 export function toAntigravityServers(
   servers: Record<string, unknown>,
 ): Record<string, Record<string, unknown>> {
   const out: Record<string, Record<string, unknown>> = {}
   for (const [name, cfg] of Object.entries(servers)) {
+    if (DROPPED_MCP_SERVERS.has(name)) continue
     if (cfg && typeof cfg === 'object') {
       out[name] = toAntigravityServer(cfg)
     }
@@ -49,15 +55,21 @@ export function toAntigravityServers(
 
 /**
  * Merge servers into the global Antigravity configuration file (`~/.gemini/config/mcp_config.json`).
- * Existing servers (e.g. user-configured Supabase, TickTick, Cal.com) are preserved.
+ * Existing servers (e.g. user-configured Supabase, LangSmith) are preserved.
+ * Dropped servers are purged.
  */
 export function syncGlobalAntigravityMcp(
   servers: Record<string, unknown>,
   configPath: string = defaultGlobalConfigPath(),
 ): void {
   try {
+    // In test environment, never mutate user's default global config
+    const isDefault = configPath === defaultGlobalConfigPath()
+    if ((process.env.NODE_ENV === 'test' || process.env.VITEST) && isDefault) {
+      return
+    }
+
     const agyServers = toAntigravityServers(servers)
-    if (Object.keys(agyServers).length === 0) return
 
     let current: { mcpServers?: Record<string, unknown> } = {}
     if (existsSync(configPath)) {
@@ -71,8 +83,17 @@ export function syncGlobalAntigravityMcp(
     }
     current.mcpServers ??= {}
 
+    // Scrub dropped servers
+    for (const dropped of DROPPED_MCP_SERVERS) {
+      if (dropped in current.mcpServers) {
+        delete current.mcpServers[dropped]
+      }
+    }
+
     for (const [name, cfg] of Object.entries(agyServers)) {
-      current.mcpServers[name] = cfg
+      if (!DROPPED_MCP_SERVERS.has(name)) {
+        current.mcpServers[name] = cfg
+      }
     }
 
     const dir = dirname(configPath)
@@ -124,21 +145,33 @@ export function syncClientWorkspaceMcp(
   try {
     ensureClientGitignore(clientDir)
     let servers = mcpServers
-    if (!servers) {
-      const mcpJsonPath = join(clientDir, '.mcp.json')
-      if (existsSync(mcpJsonPath)) {
-        try {
-          const parsed = JSON.parse(readFileSync(mcpJsonPath, 'utf8')) as {
-            mcpServers?: Record<string, unknown>
-          }
-          servers = parsed.mcpServers
-        } catch {
-          // ignore malformed .mcp.json
+    const mcpJsonPath = join(clientDir, '.mcp.json')
+    if (existsSync(mcpJsonPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(mcpJsonPath, 'utf8')) as {
+          mcpServers?: Record<string, unknown>
         }
+        if (parsed.mcpServers) {
+          let dirty = false
+          for (const dropped of DROPPED_MCP_SERVERS) {
+            if (dropped in parsed.mcpServers) {
+              delete parsed.mcpServers[dropped]
+              dirty = true
+            }
+          }
+          if (dirty) {
+            writeFileSync(mcpJsonPath, JSON.stringify(parsed, null, 2) + '\n')
+          }
+        }
+        if (!servers) {
+          servers = parsed.mcpServers
+        }
+      } catch {
+        // ignore malformed .mcp.json
       }
     }
 
-    if (servers && Object.keys(servers).length > 0) {
+    if (servers) {
       const agyServers = toAntigravityServers(servers)
       syncDirSettings(join(clientDir, '.agents'), 'mcp_config.json', agyServers)
       syncDirSettings(join(clientDir, '.gemini'), 'settings.json', agyServers)

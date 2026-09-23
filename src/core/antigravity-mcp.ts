@@ -142,6 +142,7 @@ export function syncClientWorkspaceMcp(
   clientDir: string,
   mcpServers?: Record<string, unknown>,
   globalConfigPath?: string,
+  syncGlobal = true,
 ): void {
   try {
     ensureClientGitignore(clientDir)
@@ -176,7 +177,9 @@ export function syncClientWorkspaceMcp(
       const agyServers = toAntigravityServers(servers)
       syncDirSettings(join(clientDir, '.agents'), 'mcp_config.json', agyServers)
       syncDirSettings(join(clientDir, '.gemini'), 'settings.json', agyServers)
-      syncGlobalAntigravityMcp(servers, globalConfigPath)
+      if (syncGlobal) {
+        syncGlobalAntigravityMcp(servers, globalConfigPath)
+      }
     }
   } catch {
     // Non-blocking best-effort write

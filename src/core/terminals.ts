@@ -7,9 +7,35 @@
  * shell (keystrokes echo through it). Error paths log ids/codes only.
  */
 import { randomUUID } from 'node:crypto'
-import { statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import type { IPty } from 'node-pty' // type-only import — no runtime load
 import { type CoreEvent, ipcError } from '../shared/ipc-contract'
+
+/** Extract per-client GenuDo token from project root (.mcp.json) if present. */
+function extractClientGenudoToken(cwd: string): string | null {
+  try {
+    const mcpPath = join(cwd, '.mcp.json')
+    if (existsSync(mcpPath)) {
+      const parsed = JSON.parse(readFileSync(mcpPath, 'utf8')) as {
+        mcpServers?: Record<string, { headers?: Record<string, string>; env?: Record<string, string> }>
+      }
+      const genudo = parsed.mcpServers?.genudo
+      if (genudo) {
+        const auth = genudo.headers?.Authorization ?? genudo.headers?.authorization
+        if (auth && auth.startsWith('Bearer ')) {
+          return auth.slice(7).trim()
+        }
+        if (genudo.env?.GENUDO_TOKEN) {
+          return genudo.env.GENUDO_TOKEN
+        }
+      }
+    }
+  } catch {
+    // Non-blocking best-effort
+  }
+  return null
+}
 
 /** Batch window for term.data — the research doc's ~8ms bridge-protection. */
 const FLUSH_MS = 8
@@ -70,12 +96,18 @@ export async function termCreate(
     process.platform === 'win32'
       ? (process.env.COMSPEC ?? 'powershell.exe')
       : (process.env.SHELL ?? '/bin/zsh')
+  const ptyEnv: Record<string, string | undefined> = { ...process.env }
+  const clientToken = extractClientGenudoToken(arg.cwd)
+  if (clientToken) {
+    ptyEnv.GENUDO_TOKEN = clientToken
+  }
+
   const pty = spawn(shell, process.platform === 'win32' ? [] : ['-l'], {
     name: 'xterm-256color',
     cols: arg.cols,
     rows: arg.rows,
     cwd: arg.cwd,
-    env: process.env,
+    env: ptyEnv,
   })
   const id = randomUUID()
   const s: Session = { pty, buf: '', timer: null, emit }

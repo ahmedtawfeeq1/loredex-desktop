@@ -12,7 +12,7 @@
  *    - 4 Workflow Skills (Pipelines, Knowledge Tables, Messaging Operations, Follow-ups)
  *    - Operating conventions and safety rules
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -35,21 +35,6 @@ export const GENUDO_PLUGIN_FILES: Record<string, string> = {
     "pipelines",
     "automation"
   ]
-}
-`,
-
-  'mcp_config.json': `{
-  "mcpServers": {
-    "genudo": {
-      "type": "http",
-      "url": "https://api.genudo.ai/mcp",
-      "serverUrl": "https://api.genudo.ai/mcp",
-      "headers": {
-        "Authorization": "Bearer \${GENUDO_TOKEN}"
-      },
-      "trust": true
-    }
-  }
 }
 `,
 
@@ -392,6 +377,16 @@ export function installGenudoPlugin(targetDir: string = defaultPluginInstallDir(
 } {
   const written: string[] = []
   try {
+    // Purge legacy mcp_config.json from plugin directory to avoid duplicate genudo_genudo server
+    const legacyMcpConfig = join(targetDir, 'mcp_config.json')
+    if (existsSync(legacyMcpConfig)) {
+      try {
+        rmSync(legacyMcpConfig)
+      } catch {
+        // ignore
+      }
+    }
+
     for (const [relPath, content] of Object.entries(GENUDO_PLUGIN_FILES)) {
       const absPath = join(targetDir, relPath)
       const parentDir = dirname(absPath)
